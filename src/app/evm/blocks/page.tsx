@@ -2,7 +2,7 @@
 
 import { IconRefresh } from "@tabler/icons-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { getEvmBlocksPageDirect } from "@/domains/evm/client/queries";
@@ -35,7 +35,7 @@ function buildPageHref(pathname: string, searchParams: URLSearchParams, page: nu
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
-export default function EvmBlocksPage() {
+function EvmBlocksPageContent() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -197,5 +197,19 @@ export default function EvmBlocksPage() {
         </section>
       </main>
     </AppShell>
+  );
+}
+
+export default function EvmBlocksPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell>
+          <ListPageSkeleton titleWidth="w-20" metricCards={4} rows={8} columns={7} />
+        </AppShell>
+      }
+    >
+      <EvmBlocksPageContent />
+    </Suspense>
   );
 }

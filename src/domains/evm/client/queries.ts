@@ -5,6 +5,10 @@ import { getEvmCurrencyName } from "@/platform/workbench/rpc-profile";
 import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
 import { createEvmClient } from "@/domains/evm/server/client";
 import {
+  rememberEvmTransactionCache,
+  type EvmCachedTransactionItem,
+} from "@/domains/evm/client/transaction-cache";
+import {
   formatEvmAddressSummary,
   formatEvmBlock,
   formatEvmTransactionDetail,
@@ -302,19 +306,7 @@ function formatBlocksPageItem(block: {
   };
 }
 
-type FormattedTransactionsPageItem = {
-  hash: string;
-  hashLabel: string;
-  blockNumber: string;
-  timestampMs: number | null;
-  from: string;
-  fromLabel: string;
-  to: string | null;
-  toLabel: string;
-  methodLabel: string;
-  amountLabel: string;
-  maxTxCostLabel: string;
-};
+type FormattedTransactionsPageItem = EvmCachedTransactionItem;
 
 function finalizeTransactionsPageItems(
   currencyName: string,
@@ -350,6 +342,56 @@ function finalizeTransactionsPageItems(
           : "Unavailable",
     }),
   );
+}
+
+function formatTransactionsPageItemsForBlock(
+  block: {
+    number: bigint;
+    timestamp?: bigint | null;
+    transactions: readonly unknown[];
+  },
+  currencyName: string,
+  limit = Number.POSITIVE_INFINITY,
+) {
+  const collected: Array<{
+    hash: string;
+    blockNumber: string;
+    timestampMs: number | null;
+    from: string;
+    fromLabel: string;
+    to: string | null;
+    toLabel: string;
+    methodLabel: string;
+    amountLabel: string;
+    gas: bigint | null;
+    gasPrice: bigint | null;
+  }> = [];
+
+  for (const transaction of block.transactions) {
+    if (collected.length >= limit) {
+      break;
+    }
+
+    if (typeof transaction === "string" || !isPageTransactionLike(transaction)) {
+      continue;
+    }
+
+    collected.push({
+      hash: transaction.hash,
+      blockNumber: block.number.toString(),
+      timestampMs: block.timestamp ? Number(block.timestamp) * 1000 : null,
+      from: transaction.from,
+      fromLabel: shortenAddress(transaction.from),
+      to: transaction.to ?? null,
+      toLabel: shortenAddress(transaction.to),
+      methodLabel: formatMethodLabel(transaction.input, transaction.to),
+      amountLabel: formatTxValue(transaction.value, currencyName),
+      gas: transaction.gas ?? null,
+      gasPrice: transaction.gasPrice ?? null,
+    });
+  }
+
+  return finalizeTransactionsPageItems(currencyName, collected);
 }
 
 export async function getEvmHomeMetricsDirect() {
@@ -434,6 +476,7 @@ export async function getEvmHomeActivityDirect(blockLimit = 4, txLimit = 4) {
 
     if (includeTransactions) {
       transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
+      void rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(block, currencyName));
     }
 
     if (blocks.length >= blockLimit && transactions.length >= txLimit) {
@@ -504,6 +547,7 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
 
     if (includeTransactions) {
       transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
+      void rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(block, currencyName));
     }
 
     if (blocks.length >= blockLimit && transactions.length >= txLimit) {
@@ -539,6 +583,7 @@ export async function getEvmLatestBlockActivityDirect(txLimit = 6) {
     blockTag: "latest",
     includeTransactions: true,
   });
+  void rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(latestBlock, currencyName));
 
   return {
     latestBlock: latestBlock.number.toString(),
@@ -655,18 +700,7 @@ export async function getEvmTransactionsPageDirect(page = 1, limit = 20) {
   const blockWindow = 500;
   const maxTransactions = 1000;
   const oldestNumber = latestNumber >= BigInt(blockWindow - 1) ? latestNumber - BigInt(blockWindow - 1) : 0n;
-  const collected: Array<{
-    hash: string;
-    blockNumber: string;
-    timestampMs: number | null;
-    from: string;
-    fromLabel: string;
-    to: string | null;
-    toLabel: string;
-    methodLabel: string;
-    amountLabel: string;
-    gasPrice: bigint | null;
-  }> = [];
+  const collected: FormattedTransactionsPageItem[] = [];
   let scannedOldestNumber = latestNumber;
 
   for (let cursor = latestNumber; cursor >= oldestNumber; cursor -= 1n) {
@@ -680,29 +714,13 @@ export async function getEvmTransactionsPageDirect(page = 1, limit = 20) {
 
     scannedOldestNumber = cursor;
 
-    for (const transaction of block.transactions) {
-      if (collected.length >= maxTransactions) {
-        break;
-      }
-
-      if (typeof transaction === "string" || !isPageTransactionLike(transaction)) {
-        continue;
-      }
-
-      collected.push({
-        hash: transaction.hash,
-        blockNumber: block.number.toString(),
-        timestampMs: block.timestamp ? Number(block.timestamp) * 1000 : null,
-        from: transaction.from,
-        fromLabel: shortenAddress(transaction.from),
-        to: transaction.to ?? null,
-        toLabel: shortenAddress(transaction.to),
-        methodLabel: formatMethodLabel(transaction.input, transaction.to),
-        amountLabel: formatTxValue(transaction.value, currencyName),
-        gas: transaction.gas ?? null,
-        gasPrice: transaction.gasPrice ?? null,
-      });
-    }
+    const blockTransactions = formatTransactionsPageItemsForBlock(
+      block,
+      currencyName,
+      maxTransactions - collected.length,
+    );
+    collected.push(...blockTransactions);
+    void rememberEvmTransactionCache(blockTransactions);
 
     if (collected.length >= maxTransactions || cursor === 0n) {
       break;
@@ -713,8 +731,7 @@ export async function getEvmTransactionsPageDirect(page = 1, limit = 20) {
   const totalPages = Math.max(1, Math.ceil(totalTransactions / limit));
   const normalizedPage = Math.max(1, Math.min(page, totalPages));
   const pageStart = (normalizedPage - 1) * limit;
-  const currentPageTransactions = collected.slice(pageStart, pageStart + limit);
-  const transactions = finalizeTransactionsPageItems(currencyName, currentPageTransactions);
+  const transactions = collected.slice(pageStart, pageStart + limit);
 
   return {
     page: normalizedPage,
@@ -738,47 +755,12 @@ export async function getLatestEvmTransactionsDirect(limit = 20) {
     includeTransactions: true,
   });
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const collected: Array<{
-    hash: string;
-    blockNumber: string;
-    timestampMs: number | null;
-    from: string;
-    fromLabel: string;
-    to: string | null;
-    toLabel: string;
-    methodLabel: string;
-    amountLabel: string;
-    gas: bigint | null;
-    gasPrice: bigint | null;
-  }> = [];
-
-  for (const transaction of latestBlock.transactions) {
-    if (collected.length >= limit) {
-      break;
-    }
-
-    if (typeof transaction === "string" || !isPageTransactionLike(transaction)) {
-      continue;
-    }
-
-    collected.push({
-      hash: transaction.hash,
-      blockNumber: latestBlock.number.toString(),
-      timestampMs: latestBlock.timestamp ? Number(latestBlock.timestamp) * 1000 : null,
-      from: transaction.from,
-      fromLabel: shortenAddress(transaction.from),
-      to: transaction.to ?? null,
-      toLabel: shortenAddress(transaction.to),
-      methodLabel: formatMethodLabel(transaction.input, transaction.to),
-      amountLabel: formatTxValue(transaction.value, currencyName),
-      gas: transaction.gas ?? null,
-      gasPrice: transaction.gasPrice ?? null,
-    });
-  }
+  const transactions = formatTransactionsPageItemsForBlock(latestBlock, currencyName, limit);
+  void rememberEvmTransactionCache(transactions);
 
   return {
     latestBlockNumber: latestBlock.number.toString(),
-    transactions: finalizeTransactionsPageItems(currencyName, collected),
+    transactions,
   };
 }
 
@@ -804,43 +786,8 @@ export async function getEvmLatestFeedDirect(txLimit = 20, includePollSample = t
     }
   }
 
-  const collected: Array<{
-    hash: string;
-    blockNumber: string;
-    timestampMs: number | null;
-    from: string;
-    fromLabel: string;
-    to: string | null;
-    toLabel: string;
-    methodLabel: string;
-    amountLabel: string;
-    gas: bigint | null;
-    gasPrice: bigint | null;
-  }> = [];
-
-  for (const transaction of latestBlock.transactions) {
-    if (collected.length >= txLimit) {
-      break;
-    }
-
-    if (typeof transaction === "string" || !isPageTransactionLike(transaction)) {
-      continue;
-    }
-
-    collected.push({
-      hash: transaction.hash,
-      blockNumber: latestBlock.number.toString(),
-      timestampMs: latestBlock.timestamp ? Number(latestBlock.timestamp) * 1000 : null,
-      from: transaction.from,
-      fromLabel: shortenAddress(transaction.from),
-      to: transaction.to ?? null,
-      toLabel: shortenAddress(transaction.to),
-      methodLabel: formatMethodLabel(transaction.input, transaction.to),
-      amountLabel: formatTxValue(transaction.value, currencyName),
-      gas: transaction.gas ?? null,
-      gasPrice: transaction.gasPrice ?? null,
-    });
-  }
+  const transactionsPageItems = formatTransactionsPageItemsForBlock(latestBlock, currencyName, txLimit);
+  void rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(latestBlock, currencyName));
 
   return {
     latestBlock: latestBlock.number.toString(),
@@ -851,16 +798,31 @@ export async function getEvmLatestFeedDirect(txLimit = 20, includePollSample = t
     block: formatHomeBlockItem(latestBlock),
     blockPageItem: formatBlocksPageItem(latestBlock),
     transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.timestamp, currencyName, 6),
-    transactionsPageItems: finalizeTransactionsPageItems(currencyName, collected),
+    transactionsPageItems,
   };
 }
 
 export async function getEvmBlockByNumberDirect(number: bigint) {
   const { client, profile } = await getEvmClientWithProfile();
+  const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
+  const block = await client.getBlock({ blockNumber: number, includeTransactions: true });
+  void rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(block, currencyName));
+
   return formatEvmBlock({
-    ...(await client.getBlock({ blockNumber: number, includeTransactions: true })),
-    currencyName: getEvmCurrencyName(profile.nativeCurrencySymbol),
+    ...block,
+    currencyName,
   });
+}
+
+export async function hasEvmTransactionByHashDirect(hash: string) {
+  const { client } = await getEvmClientWithProfile();
+
+  try {
+    await client.getTransaction({ hash: hash as `0x${string}` });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getEvmTransactionReceiptSummariesDirect(hashes: string[]) {

@@ -420,10 +420,9 @@ export default function EvmTxPage() {
                 value={transaction.logs as object}
                 collapsed={2}
                 shortenTextAfterLength={0}
-              stringEllipsis=""
-              enableClipboard={false}
-              displayDataTypes={false}
-              displayObjectSize={false}
+                enableClipboard={false}
+                displayDataTypes={false}
+                displayObjectSize={false}
                 style={{
                   "--w-rjv-background-color": "transparent",
                   "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
@@ -476,7 +475,6 @@ export default function EvmTxPage() {
               value={transaction.rawJson as object}
               collapsed={2}
               shortenTextAfterLength={0}
-              stringEllipsis=""
               enableClipboard={false}
               displayDataTypes={false}
               displayObjectSize={false}

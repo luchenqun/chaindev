@@ -210,6 +210,7 @@ export default function EvmBlockDetailPage() {
   const canOpenPrevious = previousBlockNumber >= 0;
   const decodedExtraData = decodeHexToAscii(block.extraData);
   const hasTransactions = block.transactions.length > 0;
+  const currentBlock = block;
   const resolvedActiveTab = activeTab === "transactions" && !hasTransactions ? "overview" : activeTab;
   const showReceiptDetailsColumns = isReceiptDetailsLoading || hasLoadedReceiptDetails;
 
@@ -222,7 +223,7 @@ export default function EvmBlockDetailPage() {
 
     try {
       const nextDetails = await getEvmTransactionReceiptSummariesDirect(
-        block.transactions.map((transaction) => transaction.hash),
+        currentBlock.transactions.map((transaction) => transaction.hash),
       );
       setReceiptDetailsByHash(nextDetails);
       setHasLoadedReceiptDetails(true);
@@ -545,7 +546,6 @@ export default function EvmBlockDetailPage() {
               value={block.rawJson as object}
               collapsed={2}
               shortenTextAfterLength={0}
-              stringEllipsis=""
               enableClipboard={false}
               displayDataTypes={false}
               displayObjectSize={false}

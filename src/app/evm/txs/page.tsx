@@ -3,7 +3,7 @@
 import { IconFileDots, IconRefresh } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
 import { RelativeTime } from "@/components/relative-time";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -39,7 +39,7 @@ function buildPageHref(pathname: string, searchParams: URLSearchParams, page: nu
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
-export default function EvmTransactionsPage() {
+function EvmTransactionsPageContent() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -152,6 +152,7 @@ export default function EvmTransactionsPage() {
       return;
     }
 
+    const transactions = data.transactions;
     let cancelled = false;
 
     async function loadReceiptDetails() {
@@ -159,7 +160,7 @@ export default function EvmTransactionsPage() {
 
       try {
         const nextDetails = await getEvmTransactionReceiptSummariesDirect(
-          data.transactions.map((transaction) => transaction.hash),
+          transactions.map((transaction) => transaction.hash),
         );
 
         if (!cancelled) {
@@ -378,5 +379,19 @@ export default function EvmTransactionsPage() {
         </section>
       </main>
     </AppShell>
+  );
+}
+
+export default function EvmTransactionsPage() {
+  return (
+    <Suspense
+      fallback={
+        <AppShell>
+          <ListPageSkeleton titleWidth="w-28" rows={8} columns={8} />
+        </AppShell>
+      }
+    >
+      <EvmTransactionsPageContent />
+    </Suspense>
   );
 }

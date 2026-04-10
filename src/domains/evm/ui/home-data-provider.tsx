@@ -3,9 +3,14 @@
 import { usePathname } from "next/navigation";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
+  clearEvmTransactionCache,
+  getLatestCachedTransactionHash,
+} from "@/domains/evm/client/transaction-cache";
+import {
   getEvmLatestFeedDirect,
   getEvmHomeSnapshotDirect,
   getEvmLatestBlockActivityDirect,
+  hasEvmTransactionByHashDirect,
 } from "@/domains/evm/client/queries";
 
 type EvmHomeSnapshot = Awaited<ReturnType<typeof getEvmHomeSnapshotDirect>>;
@@ -38,6 +43,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   const pollIntervalRef = useRef(12_000);
   const hasResolvedPollIntervalRef = useRef(false);
   const snapshotRef = useRef<EvmHomeSnapshot | null>(null);
+  const hasValidatedCacheRef = useRef(false);
 
   function resolvePollInterval(nextPollIntervalMs: number) {
     if (!hasResolvedPollIntervalRef.current) {
@@ -212,6 +218,19 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        if (!hasValidatedCacheRef.current) {
+          const latestCachedTransactionHash = await getLatestCachedTransactionHash();
+
+          if (
+            latestCachedTransactionHash &&
+            !(await hasEvmTransactionByHashDirect(latestCachedTransactionHash))
+          ) {
+            await clearEvmTransactionCache();
+          }
+
+          hasValidatedCacheRef.current = true;
+        }
+
         if (isHomePage) {
           if (!snapshotRef.current) {
             await bootstrapHome();
@@ -241,6 +260,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
 
     const handleProfileChanged = () => {
       clearPoll();
+      hasValidatedCacheRef.current = false;
       pollIntervalRef.current = 12_000;
       hasResolvedPollIntervalRef.current = false;
       setPollIntervalMs(12_000);
