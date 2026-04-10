@@ -1,3 +1,15 @@
 cosmos-tool/
 ethereum-tool/
 docs/superpowers/
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+data/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
+!.env.example

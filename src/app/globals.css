@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f7fb;
+  --foreground: #0f172a;
+}
+
+@layer base {
+  * {
+    @apply border-slate-200;
+  }
+
+  html {
+    background: var(--background);
+  }
+
+  body {
+    @apply min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.08),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)] text-slate-900 antialiased;
+  }
+
+  a {
+    @apply transition-colors;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  pre {
+    @apply m-0 whitespace-pre-wrap break-words;
+  }
+}
+
+@layer components {
+  .page-frame {
+    @apply mx-auto max-w-7xl px-5 pb-8;
+  }
+
+  .section-block {
+    @apply mt-6;
+  }
+
+  .page-header,
+  .section-header {
+    @apply mb-4 flex items-center justify-between gap-4;
+  }
+
+  .kicker {
+    @apply mb-1 inline-block text-[11px] font-bold uppercase tracking-[0.14em] text-sky-600;
+  }
+
+  .eyebrow,
+  .panel-note,
+  .list-description {
+    @apply text-sm text-slate-500;
+  }
+
+  .content-panel,
+  .detail-card,
+  .table-card,
+  .tool-card,
+  .surface-card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)];
+  }
+
+  .content-panel,
+  .tool-card {
+    @apply p-6;
+  }
+
+  .detail-card,
+  .table-card,
+  .surface-card {
+    @apply p-5;
+  }
+
+  .card-grid {
+    @apply grid gap-4 md:grid-cols-3;
+  }
+
+  .content-grid,
+  .tools-grid,
+  .entry-grid,
+  .snapshot-grid {
+    @apply grid gap-4 md:grid-cols-2;
+  }
+
+  .feature-grid {
+    @apply grid gap-4 md:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .detail-list {
+    @apply grid gap-4;
+  }
+
+  .detail-list dt {
+    @apply text-[11px] uppercase tracking-[0.12em] text-slate-500;
+  }
+
+  .detail-list dd {
+    @apply mt-1 text-sm text-slate-900;
+  }
+
+  .feature-list {
+    @apply m-0 list-none p-0;
+  }
+
+  .feature-list li {
+    @apply border-t border-slate-200 py-3 first:border-t-0 first:pt-0;
+  }
+
+  .table-shell {
+    @apply w-full border-collapse;
+  }
+
+  .table-shell thead th {
+    @apply border-b border-slate-200 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500;
+  }
+
+  .table-shell tbody td {
+    @apply border-t border-slate-200 px-3 py-3 text-sm text-slate-700;
+  }
+
+  .tool-form {
+    @apply grid gap-4;
+  }
+
+  .tool-form-grid {
+    @apply grid gap-4 md:grid-cols-2;
+  }
+
+  .tool-form input,
+  .tool-form select,
+  .tool-form textarea {
+    @apply min-h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-0 transition focus-visible:ring-2 focus-visible:ring-sky-400;
+  }
+
+  .tool-form textarea {
+    @apply min-h-36 resize-y;
+  }
+
+  .empty-state {
+    @apply rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700;
+  }
+
+  .mono {
+    font-family:
+      "SFMono-Regular",
+      Menlo,
+      Monaco,
+      Consolas,
+      "Liberation Mono",
+      monospace;
+  }
+}
