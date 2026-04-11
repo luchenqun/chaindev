@@ -301,6 +301,8 @@ type PageTransactionLike = {
   input?: string;
   gas?: bigint;
   gasPrice?: bigint | null;
+  nonce?: bigint;
+  maxFeePerGas?: bigint | null;
 };
 
 function isPageTransactionLike(transaction: unknown): transaction is PageTransactionLike {
@@ -443,6 +445,67 @@ function formatTransactionsPageItemsForBlock(
   }
 
   return finalizeTransactionsPageItems(currencyName, collected);
+}
+
+type FormattedPendingTransactionItem = {
+  hash: string;
+  hashLabel: string;
+  from: string;
+  fromLabel: string;
+  to: string | null;
+  toLabel: string;
+  methodLabel: string;
+  amountLabel: string;
+  nonceLabel: string;
+  gasPriceLabel: string;
+  maxTxCostLabel: string;
+};
+
+function formatPendingGasPrice(value: bigint | null | undefined) {
+  if (value == null) {
+    return "Unavailable";
+  }
+
+  return `${Number(formatGwei(value)).toFixed(3).replace(/\.?0+$/, "")} Gwei`;
+}
+
+function formatPendingTransactions(
+  transactions: readonly unknown[],
+  currencyName: string,
+  limit: number,
+) {
+  const items: FormattedPendingTransactionItem[] = [];
+
+  for (const transaction of transactions) {
+    if (items.length >= limit) {
+      break;
+    }
+
+    if (typeof transaction === "string" || !isPageTransactionLike(transaction)) {
+      continue;
+    }
+
+    const effectiveGasPrice = transaction.gasPrice ?? transaction.maxFeePerGas ?? null;
+
+    items.push({
+      hash: transaction.hash,
+      hashLabel: shortenHash(transaction.hash, 12, 0),
+      from: transaction.from,
+      fromLabel: shortenAddress(transaction.from),
+      to: transaction.to ?? null,
+      toLabel: shortenAddress(transaction.to),
+      methodLabel: formatMethodLabel(transaction.input, transaction.to),
+      amountLabel: formatTxValue(transaction.value, currencyName),
+      nonceLabel: formatInteger(transaction.nonce),
+      gasPriceLabel: formatPendingGasPrice(effectiveGasPrice),
+      maxTxCostLabel:
+        transaction.gas != null && effectiveGasPrice != null
+          ? `${Number(formatEther(transaction.gas * effectiveGasPrice)).toFixed(6).replace(/\.?0+$/, "")} ${currencyName}`
+          : "Unavailable",
+    });
+  }
+
+  return items;
 }
 
 export async function getEvmHomeMetricsDirect() {
@@ -879,6 +942,42 @@ export async function getLatestEvmTransactionsDirect(limit = 20) {
 
   return {
     latestBlockNumber: latestBlock.number.toString(),
+    transactions,
+  };
+}
+
+export async function getEvmPendingTransactionsDirect(limit = 100) {
+  const { client, profile } = await getEvmClientWithProfile();
+  const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
+  const latestBlock = await client.getBlock({ blockTag: "latest" });
+  const pendingBlock = await client.getBlock({
+    blockTag: "pending",
+    includeTransactions: true,
+  });
+
+  let pollIntervalMs = 12_000;
+
+  if (latestBlock.number > 0n) {
+    const oldestBlockNumber = latestBlock.number > 10n ? latestBlock.number - 10n : 0n;
+    const oldestBlock = await client.getBlock({ blockNumber: oldestBlockNumber });
+
+    if (latestBlock.timestamp != null && oldestBlock.timestamp != null) {
+      pollIntervalMs = derivePollIntervalMsFromRange(
+        latestBlock.timestamp,
+        oldestBlock.timestamp,
+        Number(latestBlock.number - oldestBlock.number),
+      );
+    }
+  }
+
+  const transactions = formatPendingTransactions(pendingBlock.transactions, currencyName, limit);
+
+  return {
+    totalTransactions: pendingBlock.transactions.length,
+    displayedTransactions: transactions.length,
+    pollIntervalMs,
+    title: `${formatInteger(pendingBlock.transactions.length)} pending transactions`,
+    subtitle: `Live mempool snapshot from the selected provider. Refreshing every ${Math.max(1, Math.round(pollIntervalMs / 1000))}s.`,
     transactions,
   };
 }

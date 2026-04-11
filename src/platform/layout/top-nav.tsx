@@ -68,6 +68,7 @@ function matchesNavGroup(pathname: string, groupId: string) {
   if (groupId === "browser") {
     return [
       "/evm/blocks",
+      "/evm/pending-txs",
       "/evm/block/",
       "/evm/accounts",
       "/evm/txs",
@@ -101,6 +102,7 @@ export function TopNav() {
           { href: "/evm/blocks", label: "Blocks" },
           { href: "/evm/accounts", label: "Accounts" },
           { href: "/evm/txs", label: "Transactions" },
+          { href: "/evm/pending-txs", label: messages.navigation.pendingTransactions },
         ];
   const activeNavGroups: NavGroup[] = [
     {

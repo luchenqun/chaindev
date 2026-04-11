@@ -8,6 +8,7 @@ export const en = {
     nameTags: "Name Tags",
     overview: "Overview",
     blocks: "Blocks",
+    pendingTransactions: "Pending Transactions",
     transaction: "Transaction",
     address: "Address",
     account: "Account",
