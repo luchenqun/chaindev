@@ -3,6 +3,7 @@
 import { IconPencil, IconTrash } from "@tabler/icons-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -261,7 +262,7 @@ export default function EvmNameTagsPage() {
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-500">{formatUpdatedAt(item.updatedAt)}</td>
                       <td className="px-5 py-3 text-sm">
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-0">
                           {editingAddress === item.address ? (
                             <>
                               <Button size="sm" type="button" onClick={() => handleSaveEdit(item.address)}>
@@ -282,24 +283,22 @@ export default function EvmNameTagsPage() {
                             </>
                           ) : (
                             <>
-                              <button
-                                type="button"
-                                className="inline-flex size-7 items-center justify-center text-slate-400 transition hover:text-slate-700"
-                                title="Edit name tag"
+                              <ActionIconButton
+                                className="text-slate-400 hover:text-slate-700"
+                                tooltip="Edit name tag"
                                 aria-label="Edit name tag"
                                 onClick={() => handleStartEdit(item)}
                               >
                                 <IconPencil className="size-4" stroke={1.8} />
-                              </button>
-                              <button
-                                type="button"
-                                className="inline-flex size-7 items-center justify-center text-slate-400 transition hover:text-rose-600"
-                                title="Delete name tag"
+                              </ActionIconButton>
+                              <ActionIconButton
+                                className="text-slate-400 hover:text-rose-600"
+                                tooltip="Delete name tag"
                                 aria-label="Delete name tag"
                                 onClick={() => setDeleteTarget(item)}
                               >
                                 <IconTrash className="size-4" stroke={1.8} />
-                              </button>
+                              </ActionIconButton>
                             </>
                           )}
                         </div>

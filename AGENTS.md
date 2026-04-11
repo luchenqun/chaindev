@@ -43,6 +43,13 @@ Use TypeScript and ES module syntax only. Prefer named exports unless a framewor
 
 Styling is Tailwind-based. Prefer shadcn-style primitives for selects, dropdowns, and similar controls instead of custom native dropdown styling.
 
+By default, place action buttons aligned to the right in toolbars, card headers, form footers,
+and similar action areas unless a specific screen clearly requires another layout.
+
+For table action columns that use icon-only controls, keep icons tightly grouped with zero gap
+between items, use a compact `3px` visual padding per icon button, and provide an immediate
+hover label with a custom tooltip instead of relying on the browser's delayed native `title`.
+
 ## Testing Guidelines
 
 There is no automated test suite in the first version yet. Until one is introduced, use:

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { Button } from "@/components/ui/button";
@@ -19,11 +19,28 @@ import {
   MAX_CACHED_EVM_TRANSACTIONS,
   subscribeEvmTransactionCache,
 } from "@/domains/evm/client/transaction-cache";
+import {
+  getEvmContractArtifact,
+  listEvmContractBindingsByScope,
+  subscribeEvmContractRegistry,
+  type EvmContractArtifact,
+  type EvmContractBinding,
+} from "@/domains/evm/client/contract-registry";
+import { getActiveEvmContractEnvironmentDirect } from "@/domains/evm/client/contract-executor";
 import { AddressLink } from "@/domains/evm/ui/address-link";
+import { AddressContractPanel } from "@/domains/evm/ui/address-contract-panel";
 import { getActiveEvmCurrencyNameClient, getEvmAddressSummaryDirect } from "@/domains/evm/client/queries";
 import { AppShell } from "@/platform/layout/app-shell";
 
 const VISIBLE_TRANSACTIONS = 25;
+type AddressPageTab = "transactions" | "contract";
+type ContractSubview = "code" | "read" | "write";
+type ContractEnvironmentState = {
+  providerProfileId: string;
+  providerName: string;
+  chainId: string;
+  nativeCurrency: string;
+} | null;
 
 function AddressPageSkeleton() {
   return (
@@ -158,8 +175,12 @@ function AddressMetric({
 
 export default function EvmAddressPage() {
   const params = useParams<{ address: string }>();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const address = params.address;
   const isValid = useMemo(() => /^0x[a-fA-F0-9]{40}$/.test(address), [address]);
+  const requestedTab = searchParams.get("tab");
+  const requestedContractTab = searchParams.get("contractTab");
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof getEvmAddressSummaryDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nameTag, setNameTag] = useState<string | null>(null);
@@ -175,6 +196,9 @@ export default function EvmAddressPage() {
     selfCount: 0,
   });
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const [contractEnvironment, setContractEnvironment] = useState<ContractEnvironmentState>(null);
+  const [contractBinding, setContractBinding] = useState<EvmContractBinding | null>(null);
+  const [contractArtifact, setContractArtifact] = useState<EvmContractArtifact | null>(null);
   const currencyName = getActiveEvmCurrencyNameClient();
 
   useEffect(() => {
@@ -265,6 +289,50 @@ export default function EvmAddressPage() {
     };
   }, [address, isValid]);
 
+  useEffect(() => {
+    if (!isValid) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadContractBinding() {
+      const nextEnvironment = await getActiveEvmContractEnvironmentDirect();
+
+      if (cancelled) {
+        return;
+      }
+
+      const nextBinding =
+        listEvmContractBindingsByScope(
+          nextEnvironment.chainId,
+          nextEnvironment.providerProfileId,
+        ).find((binding) => binding.addressLower === address.toLowerCase()) ?? null;
+
+      setContractEnvironment(nextEnvironment);
+      setContractBinding(nextBinding);
+      setContractArtifact(nextBinding ? getEvmContractArtifact(nextBinding.artifactId) : null);
+    }
+
+    void loadContractBinding();
+
+    const unsubscribe = subscribeEvmContractRegistry(() => {
+      void loadContractBinding();
+    });
+
+    const handleProfileChanged = () => {
+      void loadContractBinding();
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, [address, isValid]);
+
   const normalizedAddress = address.toLowerCase();
   const visibleTransactions = addressCacheSnapshot.transactions;
   const latestSeenTransaction = addressCacheSnapshot.latestSeenTransaction;
@@ -272,6 +340,12 @@ export default function EvmAddressPage() {
   const inboundCount = addressCacheSnapshot.inboundCount;
   const outboundCount = addressCacheSnapshot.outboundCount;
   const selfCount = addressCacheSnapshot.selfCount;
+  const resolvedActiveTab =
+    requestedTab === "contract" && contractBinding && contractArtifact && contractEnvironment
+      ? "contract"
+      : "transactions";
+  const initialContractTab: ContractSubview =
+    requestedContractTab === "code" || requestedContractTab === "write" ? requestedContractTab : "read";
   const visibleAddresses = useMemo(
     () =>
       [...new Set(
@@ -320,6 +394,26 @@ export default function EvmAddressPage() {
     deleteEvmAddressTag(address);
     setTagInput("");
     setTagEditorOpen(false);
+  }
+
+  function navigateToTab(nextTab: AddressPageTab) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (nextTab === "transactions") {
+      nextParams.delete("tab");
+      nextParams.delete("contractTab");
+    } else {
+      nextParams.set("tab", nextTab);
+
+      if (!nextParams.get("contractTab")) {
+        nextParams.set("contractTab", "read");
+      }
+    }
+
+    const query = nextParams.toString();
+    router.replace(query ? `/evm/address/${address}?${query}` : `/evm/address/${address}`, {
+      scroll: false,
+    });
   }
 
   if (!isValid) {
@@ -472,20 +566,29 @@ export default function EvmAddressPage() {
         </section>
 
         <div className="mt-5 flex flex-wrap gap-2">
-          <button type="button" className="inline-flex rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white">
+          <button
+            type="button"
+            className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
+              resolvedActiveTab === "transactions" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-500"
+            }`}
+            onClick={() => navigateToTab("transactions")}
+          >
             Transactions
           </button>
-          <button type="button" disabled className="inline-flex cursor-not-allowed rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-300">
-            Internal Transactions
-          </button>
-          <button type="button" disabled className="inline-flex cursor-not-allowed rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-300">
-            Token Transfers
-          </button>
-          <button type="button" disabled className="inline-flex cursor-not-allowed rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-300">
-            Analytics
-          </button>
+          {contractBinding && contractArtifact && contractEnvironment ? (
+            <button
+              type="button"
+              className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
+                resolvedActiveTab === "contract" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-500"
+              }`}
+              onClick={() => navigateToTab("contract")}
+            >
+              Contract
+            </button>
+          ) : null}
         </div>
 
+        {resolvedActiveTab === "transactions" ? (
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="border-b border-slate-200 px-5 py-4">
             <p className="text-lg font-semibold text-slate-900">
@@ -605,6 +708,18 @@ export default function EvmAddressPage() {
             </table>
           </div>
         </section>
+        ) : (
+          <section className="mt-4">
+            {contractBinding && contractArtifact && contractEnvironment ? (
+              <AddressContractPanel
+                binding={contractBinding}
+                artifact={contractArtifact}
+                environment={contractEnvironment}
+                initialTab={initialContractTab}
+              />
+            ) : null}
+          </section>
+        )}
       </main>
     </AppShell>
   );

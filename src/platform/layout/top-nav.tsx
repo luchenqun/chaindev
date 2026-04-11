@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { type PlatformMode } from "@/config/chains";
 import { getMessages } from "@/i18n";
 import { ChainStatusStrip } from "@/platform/layout/chain-status-strip";
+import { ActiveEvmKeySelector } from "@/platform/layout/active-evm-key-selector";
 import { GlobalSearch } from "@/platform/search/global-search";
 import { RpcProviderManager } from "@/platform/workbench/rpc-provider-manager";
 
@@ -61,6 +62,10 @@ function matchesNavGroup(pathname: string, groupId: string) {
     return pathname.startsWith("/evm/tools") || pathname.startsWith("/cosmos/tools");
   }
 
+  if (groupId === "contracts") {
+    return pathname.startsWith("/evm/contracts");
+  }
+
   if (groupId === "settings") {
     return pathname.startsWith("/evm/settings") || pathname.startsWith("/cosmos/settings");
   }
@@ -104,6 +109,7 @@ export function TopNav() {
           { href: "/evm/txs", label: "Transactions" },
           { href: "/evm/pending-txs", label: messages.navigation.pendingTransactions },
         ];
+  const directNavItems: NavItem[] = mode === "evm" ? [{ href: "/evm/contracts", label: messages.navigation.contracts }] : [];
   const activeNavGroups: NavGroup[] = [
     {
       id: "browser",
@@ -129,6 +135,7 @@ export function TopNav() {
             label: messages.navigation.settings,
             items: [
               { href: "/evm/settings/cache", label: messages.navigation.cache },
+              { href: "/evm/settings/private-keys", label: messages.navigation.privateKeys },
               { href: "/evm/settings/name-tags", label: messages.navigation.nameTags },
             ],
           } satisfies NavGroup,
@@ -182,57 +189,75 @@ export function TopNav() {
             >
               {messages.navigation.home}
             </Link>
-            {activeNavGroups.map((group) => {
+            {activeNavGroups.map((group, index) => {
               const active = matchesNavGroup(pathname, group.id);
 
               return (
-                <div
-                  key={group.id}
-                  className="relative"
-                  onMouseEnter={() => setOpenGroup(group.id)}
-                  onMouseLeave={() => setOpenGroup((current) => (current === group.id ? null : current))}
-                >
-                  <button
-                    type="button"
-                    className={
-                      active || openGroup === group.id
-                        ? "inline-flex items-center gap-1 py-2.5 text-[#1697ea]"
-                        : "inline-flex items-center gap-1 py-2.5 text-slate-800 hover:text-[#1697ea]"
-                    }
+                <>
+                  <div
+                    key={group.id}
+                    className="relative"
+                    onMouseEnter={() => setOpenGroup(group.id)}
+                    onMouseLeave={() => setOpenGroup((current) => (current === group.id ? null : current))}
                   >
-                    {group.label}
-                    <IconChevronDown className="size-3.5" stroke={2.2} />
-                  </button>
-                  {openGroup === group.id ? (
-                    <div className="absolute left-0 top-full z-20 min-w-[220px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
-                      <div className="border-t-[3px] border-[#19a7f2]" />
-                      <div className="py-2">
-                        {group.items.map((item) => {
-                          const itemActive = matchesNavItem(pathname, item.href);
+                    <button
+                      type="button"
+                      className={
+                        active || openGroup === group.id
+                          ? "inline-flex items-center gap-1 py-2.5 text-[#1697ea]"
+                          : "inline-flex items-center gap-1 py-2.5 text-slate-800 hover:text-[#1697ea]"
+                      }
+                    >
+                      {group.label}
+                      <IconChevronDown className="size-3.5" stroke={2.2} />
+                    </button>
+                    {openGroup === group.id ? (
+                      <div className="absolute left-0 top-full z-20 min-w-[220px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                        <div className="border-t-[3px] border-[#19a7f2]" />
+                        <div className="py-2">
+                          {group.items.map((item) => {
+                            const itemActive = matchesNavItem(pathname, item.href);
 
-                          return (
-                            <Link
-                              key={item.href}
-                              href={item.href}
-                              className={
-                                itemActive
-                                  ? "block rounded-lg px-6 py-2 text-[15px] font-normal text-[#1697ea]"
-                                  : "block rounded-lg px-6 py-2 text-[15px] font-normal text-slate-800 hover:bg-slate-100 hover:text-slate-900"
-                              }
-                            >
-                              {item.label}
-                            </Link>
-                          );
-                        })}
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                className={
+                                  itemActive
+                                    ? "block rounded-lg px-6 py-2 text-[15px] font-normal text-[#1697ea]"
+                                    : "block rounded-lg px-6 py-2 text-[15px] font-normal text-slate-800 hover:bg-slate-100 hover:text-slate-900"
+                                }
+                              >
+                                {item.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ) : null}
-                </div>
+                    ) : null}
+                  </div>
+                  {index === 0
+                    ? directNavItems.map((item) => {
+                        const itemActive = matchesNavItem(pathname, item.href);
+
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className={itemActive ? "py-2.5 text-[#1697ea]" : "py-2.5 text-slate-800 hover:text-[#1697ea]"}
+                          >
+                            {item.label}
+                          </Link>
+                        );
+                      })
+                    : null}
+                </>
               );
             })}
           </nav>
 
           <div className="flex flex-wrap items-center justify-end gap-3">
+            {mode === "evm" ? <ActiveEvmKeySelector /> : null}
             <div className="h-6 w-px bg-slate-200" aria-hidden="true" />
             <Link href="/login">
               <Button variant="ghost" className="h-8 gap-2 px-2 text-[15px] font-normal text-slate-700">

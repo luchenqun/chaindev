@@ -4,6 +4,7 @@ import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -336,19 +337,17 @@ function EvmAccountsPageContent() {
                           <div className="flex items-center">
                             {nameTagsByAddress[account.address] ? (
                               <>
-                                <button
-                                  type="button"
-                                  className="inline-flex size-7 items-center justify-center text-slate-400 transition hover:text-slate-700"
-                                  title="Edit name tag"
+                                <ActionIconButton
+                                  className="text-slate-400 hover:text-slate-700"
+                                  tooltip="Edit name tag"
                                   aria-label="Edit name tag"
                                   onClick={() => handleStartTagEdit(account.address)}
                                 >
                                   <IconPencil className="size-4" stroke={1.8} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="inline-flex size-7 items-center justify-center text-slate-400 transition hover:text-rose-600"
-                                  title="Delete name tag"
+                                </ActionIconButton>
+                                <ActionIconButton
+                                  className="text-slate-400 hover:text-rose-600"
+                                  tooltip="Delete name tag"
                                   aria-label="Delete name tag"
                                   onClick={() =>
                                     setDeleteTarget({
@@ -358,18 +357,17 @@ function EvmAccountsPageContent() {
                                   }
                                 >
                                   <IconTrash className="size-4" stroke={1.8} />
-                                </button>
+                                </ActionIconButton>
                               </>
                             ) : (
-                              <button
-                                type="button"
-                                className="inline-flex size-7 items-center justify-center text-slate-400 transition hover:text-slate-700"
-                                title="Add name tag"
+                              <ActionIconButton
+                                className="text-slate-400 hover:text-slate-700"
+                                tooltip="Add name tag"
                                 aria-label="Add name tag"
                                 onClick={() => handleStartTagEdit(account.address)}
                               >
                                 <IconPlus className="size-4" stroke={1.8} />
-                              </button>
+                              </ActionIconButton>
                             )}
                           </div>
                         )}

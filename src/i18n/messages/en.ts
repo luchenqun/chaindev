@@ -2,10 +2,13 @@ export const en = {
   navigation: {
     home: "Home",
     blockchain: "Blockchain",
+    contracts: "Contracts",
     developerTools: "Developer Tools",
     settings: "Settings",
     cache: "Cache",
+    privateKeys: "Private Keys",
     nameTags: "Name Tags",
+    registry: "Registry",
     overview: "Overview",
     blocks: "Blocks",
     pendingTransactions: "Pending Transactions",

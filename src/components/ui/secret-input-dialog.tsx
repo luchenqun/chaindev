@@ -3,26 +3,37 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
-type ConfirmDialogProps = {
+type SecretInputDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  placeholder?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  confirmDisabled?: boolean;
+  errorMessage?: string | null;
   onConfirm: () => void;
 };
 
-export function ConfirmDialog({
+export function SecretInputDialog({
   open,
   onOpenChange,
   title,
   description,
+  value,
+  onValueChange,
+  placeholder,
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
+  confirmDisabled = false,
+  errorMessage,
   onConfirm,
-}: ConfirmDialogProps) {
+}: SecretInputDialogProps) {
   useEffect(() => {
     if (!open) {
       return;
@@ -53,7 +64,7 @@ export function ConfirmDialog({
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16">
       <button
         type="button"
-        aria-label="Close confirmation dialog"
+        aria-label="Close secret input dialog"
         className="absolute inset-0 bg-slate-900/45"
         onClick={() => onOpenChange(false)}
       />
@@ -62,18 +73,21 @@ export function ConfirmDialog({
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           {description ? <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p> : null}
         </div>
+        <div className="mt-5">
+          <Input
+            autoFocus
+            type="password"
+            value={value}
+            onChange={(event) => onValueChange(event.target.value)}
+            placeholder={placeholder}
+          />
+          {errorMessage ? <p className="mt-2 text-sm text-rose-600">{errorMessage}</p> : null}
+        </div>
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {cancelLabel}
           </Button>
-          <Button
-            type="button"
-            className="bg-rose-600 text-white hover:bg-rose-700"
-            onClick={() => {
-              onConfirm();
-              onOpenChange(false);
-            }}
-          >
+          <Button type="button" onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel}
           </Button>
         </div>
