@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
+import { PendingTransactionsSkeleton } from "@/components/ui/loading-placeholders";
 import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
@@ -113,7 +113,7 @@ export default function EvmPendingTransactionsPage() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-48" rows={8} columns={7} />
+        <PendingTransactionsSkeleton />
       </AppShell>
     );
   }
