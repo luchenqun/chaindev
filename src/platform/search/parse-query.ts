@@ -1,5 +1,5 @@
 export type QueryMatch =
-  | { type: "evm-tx"; value: string }
+  | { type: "evm-hash"; value: string }
   | { type: "evm-address"; value: string }
   | { type: "cosmos-tx"; value: string }
   | { type: "cosmos-address"; value: string }
@@ -10,7 +10,7 @@ export function parseQuery(raw: string): QueryMatch {
   const value = raw.trim();
 
   if (/^0x[a-fA-F0-9]{64}$/.test(value)) {
-    return { type: "evm-tx", value };
+    return { type: "evm-hash", value };
   }
 
   if (/^0x[a-fA-F0-9]{40}$/.test(value)) {

@@ -1,6 +1,13 @@
 "use client";
 
-import { IconEdit, IconListDetails, IconPlugConnected, IconPlus, IconX } from "@tabler/icons-react";
+import {
+  IconChevronDown,
+  IconEdit,
+  IconListDetails,
+  IconPlugConnected,
+  IconPlus,
+  IconX,
+} from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { PlatformMode } from "@/config/chains";
@@ -241,11 +248,6 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
     }
   }
 
-  function handleSelect(profileId: string) {
-    const profile = modeProfiles.find((item) => item.id === profileId) ?? null;
-    handleUse(profile ?? null);
-  }
-
   function handleUse(profile: RpcProfile | null) {
     if (!profile) {
       return;
@@ -270,42 +272,33 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
 
   return (
     <>
-      <div className="flex items-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <label className="flex h-10 items-center pr-1 text-[13px] text-slate-600">
-          <Select
-            value={activeProfile?.id}
-            disabled={loading || modeProfiles.length === 0}
-            onValueChange={handleSelect}
-          >
-            <SelectTrigger className="h-9 min-w-[220px] border-0 bg-transparent px-4 text-[13px] shadow-none focus:ring-0">
-              {activeProfile ? (
-                <div className="flex items-center gap-2 overflow-hidden">
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                    {getModeLabel(activeProfile.mode)}
-                  </span>
-                  <span className="truncate text-[13px] text-slate-900">{activeProfile.name}</span>
-                </div>
-              ) : (
-                <SelectValue placeholder="No provider" />
-              )}
-            </SelectTrigger>
-            <SelectContent className="min-w-[220px]">
-              {modeProfiles.map((profile) => (
-                <SelectItem key={profile.id} value={profile.id}>
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                      {getModeLabel(profile.mode)}
-                    </span>
-                    <span>{profile.name}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
+      <div className="flex items-center gap-0 rounded-xl border border-slate-200 bg-white pr-1 shadow-sm">
         <button
           type="button"
-          className="inline-flex size-10 items-center justify-center border-l border-slate-200 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+          className="inline-flex h-10 items-center gap-2 px-4 text-[13px] text-slate-600 transition hover:text-slate-900"
+          onClick={() => {
+            setError(null);
+            setListOpen(true);
+          }}
+        >
+          {activeProfile ? (
+            <>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                {getModeLabel(activeProfile.mode)}
+              </span>
+              <span className="text-[13px] text-slate-900">{activeProfile.name}</span>
+              <IconChevronDown className="size-3.5 text-slate-400" stroke={2} />
+            </>
+          ) : (
+            <>
+              <span className="text-[13px] text-slate-500">No provider</span>
+              <IconChevronDown className="size-3.5 text-slate-400" stroke={2} />
+            </>
+          )}
+        </button>
+        <button
+          type="button"
+          className="inline-flex h-6 items-center justify-center px-0.5 text-slate-500 transition hover:text-slate-900"
           onClick={() => {
             setDraft(getInitialDraft(mode));
             setEditingId(null);
@@ -313,17 +306,17 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
             setOpen(true);
           }}
         >
-          <IconPlus className="size-4" stroke={2} />
+          <IconPlus className="size-3.5" stroke={2} />
         </button>
         <button
           type="button"
-          className="inline-flex size-10 items-center justify-center border-l border-slate-200 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+          className="inline-flex h-6 items-center justify-center px-0.5 text-slate-500 transition hover:text-slate-900"
           onClick={() => {
             setError(null);
             setListOpen(true);
           }}
         >
-          <IconListDetails className="size-4" stroke={2} />
+          <IconListDetails className="size-3.5" stroke={2} />
         </button>
       </div>
 
@@ -370,7 +363,7 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
                     }))
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-4/5">
                     <SelectValue placeholder="Select chain type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -382,6 +375,7 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
               <label className="grid gap-2">
                 <span className="text-sm font-medium text-slate-700">Provider Name</span>
                 <Input
+                  className="w-4/5"
                   value={draft.name}
                   onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
                   placeholder={draft.mode === "evm" ? "Local EVM" : "Local Cosmos"}
@@ -391,6 +385,7 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
                 <label className="grid gap-2 md:col-span-2">
                   <span className="text-sm font-medium text-slate-700">Currency Name</span>
                   <Input
+                    className="w-4/5"
                     value={draft.nativeCurrencySymbol}
                     onChange={(event) =>
                       setDraft((current) => ({ ...current, nativeCurrencySymbol: event.target.value }))
@@ -402,6 +397,7 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
               <label className="grid gap-2 md:col-span-2">
                 <span className="text-sm font-medium text-slate-700">RPC URL</span>
                 <Input
+                  className="w-4/5"
                   value={draft.rpcUrl}
                   onChange={(event) => setDraft((current) => ({ ...current, rpcUrl: event.target.value }))}
                   placeholder={draft.mode === "evm" ? "http://127.0.0.1:8545" : "http://127.0.0.1:26657"}
@@ -411,6 +407,7 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
                 <label className="grid gap-2 md:col-span-2">
                   <span className="text-sm font-medium text-slate-700">REST URL</span>
                   <Input
+                    className="w-4/5"
                     value={draft.restUrl}
                     onChange={(event) => setDraft((current) => ({ ...current, restUrl: event.target.value }))}
                     placeholder="http://127.0.0.1:1317"

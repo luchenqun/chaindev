@@ -6,6 +6,7 @@ export const en = {
     developerTools: "Developer Tools",
     settings: "Settings",
     cache: "Cache",
+    providers: "Providers",
     privateKeys: "Private Keys",
     nameTags: "Name Tags",
     registry: "Registry",

@@ -2,6 +2,7 @@
 
 import {
   IconCheck,
+  IconInfoCircle,
   IconLock,
   IconLockOpen,
   IconPencil,
@@ -171,33 +172,56 @@ export default function EvmPrivateKeysPage() {
           </p>
         </div>
 
-        <section className="grid gap-4 lg:grid-cols-3">
-          <article className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Total Keys
-            </p>
-            <p className="mt-3 text-4xl font-semibold text-slate-900">{items.length}</p>
-            <p className="mt-2 text-sm text-slate-500">Stored locally in the current browser.</p>
+        <section className="grid gap-3 lg:grid-cols-3">
+          <article className="rounded-3xl border border-slate-200 bg-white px-5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Total Keys
+              </p>
+              <ActionIconButton
+                tooltip="Stored locally in the current browser."
+                className="text-slate-400 hover:text-slate-600"
+                wrapperClassName="shrink-0"
+              >
+                <IconInfoCircle className="size-3.5" stroke={1.8} />
+              </ActionIconButton>
+            </div>
+            <p className="mt-2 text-3xl font-semibold leading-none text-slate-900">{items.length}</p>
           </article>
-          <article className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Selected Key
-            </p>
-            <p className="mt-3 text-lg font-semibold text-slate-900">
+          <article className="rounded-3xl border border-slate-200 bg-white px-5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Selected Key
+              </p>
+              <ActionIconButton
+                tooltip="Choose one key for global EVM actions."
+                className="text-slate-400 hover:text-slate-600"
+                wrapperClassName="shrink-0"
+              >
+                <IconInfoCircle className="size-3.5" stroke={1.8} />
+              </ActionIconButton>
+            </div>
+            <p className="mt-2 text-xl font-semibold text-slate-900">
               {activeItem ? activeItem.name : "Not Selected"}
             </p>
-            <p className="mt-2 text-sm text-slate-500">
-              {activeItem ? formatAddressLabel(activeItem.address) : "Choose one key for global EVM actions."}
+            <p className="mt-1 text-sm text-slate-500">
+              {activeItem ? formatAddressLabel(activeItem.address) : "No active key"}
             </p>
           </article>
-          <article className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Unlocked Keys
-            </p>
-            <p className="mt-3 text-4xl font-semibold text-slate-900">{unlockedCount}</p>
-            <p className="mt-2 text-sm text-slate-500">
-              Plain keys are always available. Encrypted keys need manual unlock.
-            </p>
+          <article className="rounded-3xl border border-slate-200 bg-white px-5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Unlocked Keys
+              </p>
+              <ActionIconButton
+                tooltip="Plain keys are always available. Encrypted keys need manual unlock."
+                className="text-slate-400 hover:text-slate-600"
+                wrapperClassName="shrink-0"
+              >
+                <IconInfoCircle className="size-3.5" stroke={1.8} />
+              </ActionIconButton>
+            </div>
+            <p className="mt-2 text-3xl font-semibold leading-none text-slate-900">{unlockedCount}</p>
           </article>
         </section>
 

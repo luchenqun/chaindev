@@ -18,7 +18,7 @@ type GlobalSearchProps = {
 
 export function GlobalSearch({
   mode,
-  placeholder = "Search by block, tx, address or proposal",
+  placeholder = "Search by block, tx, or address",
   variant = "hero",
   showLabel = true,
 }: GlobalSearchProps) {

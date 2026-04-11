@@ -3,7 +3,6 @@
 import {
   IconChevronDown,
   IconMoonStars,
-  IconSettings,
   IconUserCircle,
 } from "@tabler/icons-react";
 import Image from "next/image";
@@ -152,17 +151,10 @@ export function TopNav() {
             mode={mode}
             variant="topbar"
             showLabel={false}
-            placeholder="Search by Address / Txn Hash / Block / Token / Domain Name"
+            placeholder="Search by Address / Txn Hash / Block"
           />
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-10 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-          >
-            <IconSettings className="size-4" stroke={2} />
-          </Button>
           <Button
             size="icon"
             variant="ghost"
@@ -193,9 +185,8 @@ export function TopNav() {
               const active = matchesNavGroup(pathname, group.id);
 
               return (
-                <>
+                <div key={group.id} className="contents">
                   <div
-                    key={group.id}
                     className="relative"
                     onMouseEnter={() => setOpenGroup(group.id)}
                     onMouseLeave={() => setOpenGroup((current) => (current === group.id ? null : current))}
@@ -251,7 +242,7 @@ export function TopNav() {
                         );
                       })
                     : null}
-                </>
+                </div>
               );
             })}
           </nav>
