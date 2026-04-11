@@ -2,22 +2,30 @@
 
 import JsonView from "@uiw/react-json-view";
 import {
+  IconBrandTelegram,
   IconChevronDown,
   IconCopy,
-  IconEye,
-  IconLink,
   IconLoader2,
   IconPlayerPlay,
   IconRefresh,
   IconSparkles,
-  IconWriting,
 } from "@tabler/icons-react";
-import { type CSSProperties, type Dispatch, type SetStateAction, useEffect, useMemo, useState } from "react";
+import {
+  type CSSProperties,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import Link from "next/link";
 import { toFunctionSelector } from "viem";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { FlashMessage } from "@/components/ui/flash-message";
 import { Input } from "@/components/ui/input";
+import { ModalDialog } from "@/components/ui/modal-dialog";
 import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
 import {
   getReadContractFunctions,
@@ -25,6 +33,8 @@ import {
   type EvmContractFunctionDescriptor,
 } from "@/domains/evm/client/abi-utils";
 import {
+  forceWriteEvmContractMethodDirect,
+  getEvmContractWriteManualDefaultsDirect,
   prepareEvmContractWriteDirect,
   readEvmContractMethodDirect,
   writeEvmContractMethodDirect,
@@ -52,6 +62,21 @@ type EnvironmentState = {
 };
 
 type ContractSubview = "code" | "read" | "write";
+
+type WritePreviewState = {
+  accountAddress: string;
+  functionSignature: string;
+  estimatedGas: string;
+  gasPriceLabel: string;
+  valueLabel: string;
+};
+
+type ManualWriteDialogState = {
+  value: string;
+  gasPrice: string;
+  gasLimit: string;
+  nonce: string;
+};
 
 function stringifyResult(value: unknown) {
   return JSON.stringify(
@@ -149,16 +174,152 @@ function ValuePreview({ value }: { value: string }) {
   );
 }
 
+function formatMiddleEllipsis(value: string, leading = 10, trailing = 8) {
+  if (value.length <= leading + trailing + 3) {
+    return value;
+  }
+
+  return `${value.slice(0, leading)}...${value.slice(-trailing)}`;
+}
+
+function getReceiptStatusClasses(status: string) {
+  if (status === "success") {
+    return "bg-emerald-50 text-emerald-700";
+  }
+
+  if (status === "reverted") {
+    return "bg-rose-50 text-rose-700";
+  }
+
+  return "bg-amber-50 text-amber-700";
+}
+
+function toWritePreviewState(input: {
+  accountAddress: string;
+  functionSignature: string;
+  estimatedGas: string;
+  gasPriceLabel: string;
+  valueLabel: string;
+}): WritePreviewState {
+  return {
+    accountAddress: input.accountAddress,
+    functionSignature: input.functionSignature,
+    estimatedGas: input.estimatedGas,
+    gasPriceLabel: input.gasPriceLabel,
+    valueLabel: input.valueLabel,
+  };
+}
+
+function WriteExecutionPreview({
+  preview,
+  result,
+  error,
+}: {
+  preview: WritePreviewState | null;
+  result: Awaited<ReturnType<typeof writeEvmContractMethodDirect>> | null;
+  error?: string | null;
+}) {
+  if (!preview && !result && !error) {
+    return (
+      <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-400">
+        Write the transaction to view the result.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {preview ? (
+        <div className="px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Simulated Transaction
+          </p>
+          <dl className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
+            <div className="min-w-0">
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">From</dt>
+              <dd className="mt-1 break-all text-sm text-slate-900 mono">{preview.accountAddress}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</dt>
+              <dd className="mt-1 text-sm text-slate-900">{preview.functionSignature}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Estimated Gas</dt>
+              <dd className="mt-1 text-sm text-slate-900">{preview.estimatedGas || "Unavailable"}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Price</dt>
+              <dd className="mt-1 text-sm text-slate-900">{preview.gasPriceLabel}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Value</dt>
+              <dd className="mt-1 text-sm text-slate-900">{preview.valueLabel}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+      {preview && (result || error) ? <div className="border-t border-slate-200" /> : null}
+      {result ? (
+        <div className="px-4 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Submitted Transaction
+          </p>
+          <dl className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
+            <div className="min-w-0">
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Transaction Hash</dt>
+              <dd className="mt-1 text-sm font-medium text-slate-900">
+                <Link href={`/evm/tx/${result.hash}`} className="mono text-sky-600 hover:text-sky-700">
+                  {formatMiddleEllipsis(result.hash)}
+                </Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Status</dt>
+              <dd className="mt-1">
+                <span
+                  className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getReceiptStatusClasses(result.receipt.status)}`}
+                >
+                  {result.receipt.status}
+                </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Block Number</dt>
+              <dd className="mt-1 text-sm font-medium text-slate-900">
+                <Link href={`/evm/block/${result.receipt.blockNumber}`} className="text-sky-600 hover:text-sky-700">
+                  {result.receipt.blockNumber}
+                </Link>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Used</dt>
+              <dd className="mt-1 text-sm text-slate-900">{result.receipt.gasUsed}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Effective Gas Price</dt>
+              <dd className="mt-1 text-sm text-slate-900">{result.receipt.effectiveGasPrice}</dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+      {error ? (
+        <div className="px-4 py-4 text-sm text-rose-700">{error}</div>
+      ) : null}
+    </div>
+  );
+}
+
 type FunctionListSectionProps = {
   title: string;
   functions: EvmContractFunctionDescriptor[];
   expandedSignatures: string[];
   onToggle: (signature: string) => void;
   onExpandAll: () => void;
+  onCollapseAll: () => void;
   onReset: () => void;
   onCopySignature: (fn: EvmContractFunctionDescriptor) => void;
-  onCopyLink: (fn: EvmContractFunctionDescriptor) => void;
   renderHeaderActions?: (fn: EvmContractFunctionDescriptor) => React.ReactNode;
+  headerTrailingContent?: ReactNode;
   inputBadgeLabel?: string;
   renderExpanded: (fn: EvmContractFunctionDescriptor) => React.ReactNode;
   emptyText: string;
@@ -170,10 +331,11 @@ function FunctionListSection({
   expandedSignatures,
   onToggle,
   onExpandAll,
+  onCollapseAll,
   onReset,
   onCopySignature,
-  onCopyLink,
   renderHeaderActions,
+  headerTrailingContent,
   inputBadgeLabel,
   renderExpanded,
   emptyText,
@@ -186,19 +348,26 @@ function FunctionListSection({
     );
   }
 
+  const allExpanded = functions.length > 0 && expandedSignatures.length === functions.length;
+
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
       <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
         <p className="text-lg font-semibold text-slate-900">{title}</p>
         <div className="flex items-center gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={onExpandAll}>
-            <IconSparkles className="mr-1.5 size-3.5" stroke={1.8} />
-            Expand All
+          <Button type="button" size="sm" variant="outline" onClick={allExpanded ? onCollapseAll : onExpandAll}>
+            {allExpanded ? (
+              <IconChevronDown className="mr-1.5 size-3.5 rotate-180" stroke={1.8} />
+            ) : (
+              <IconSparkles className="mr-1.5 size-3.5" stroke={1.8} />
+            )}
+            {allExpanded ? "Collapse All" : "Expand All"}
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={onReset}>
             <IconRefresh className="mr-1.5 size-3.5" stroke={1.8} />
             Reset
           </Button>
+          {headerTrailingContent}
         </div>
       </div>
       <div className="divide-y divide-slate-200">
@@ -208,7 +377,10 @@ function FunctionListSection({
 
           return (
             <div key={fn.signature}>
-              <div className="flex items-center justify-between gap-4 px-5 py-4">
+              <div
+                className="flex cursor-pointer items-center justify-between gap-4 px-4 py-3"
+                onClick={() => onToggle(fn.signature)}
+              >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-slate-900">
@@ -221,7 +393,12 @@ function FunctionListSection({
                     ) : null}
                   </div>
                 </div>
-                <div className="flex items-center gap-0">
+                <div
+                  className="flex items-center gap-0"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                  }}
+                >
                   <ActionIconButton
                     className="text-slate-400 hover:text-slate-700"
                     tooltip="Copy signature"
@@ -229,14 +406,6 @@ function FunctionListSection({
                     onClick={() => onCopySignature(fn)}
                   >
                     <IconCopy className="size-4" stroke={1.8} />
-                  </ActionIconButton>
-                  <ActionIconButton
-                    className="text-slate-400 hover:text-slate-700"
-                    tooltip="Copy contract link"
-                    aria-label="Copy contract link"
-                    onClick={() => onCopyLink(fn)}
-                  >
-                    <IconLink className="size-4" stroke={1.8} />
                   </ActionIconButton>
                   <ActionIconButton
                     className="text-slate-400 hover:text-slate-700"
@@ -252,7 +421,7 @@ function FunctionListSection({
                   {renderHeaderActions ? renderHeaderActions(fn) : null}
                 </div>
               </div>
-              {isExpanded ? <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-5">{renderExpanded(fn)}</div> : null}
+              {isExpanded ? <div className="border-t border-slate-200 bg-slate-50/70 px-4 py-4">{renderExpanded(fn)}</div> : null}
             </div>
           );
         })}
@@ -278,12 +447,15 @@ export function AddressContractPanel({
   const [expandedWriteSignatures, setExpandedWriteSignatures] = useState<string[]>([]);
   const [readArgumentValues, setReadArgumentValues] = useState<Record<string, string[]>>({});
   const [writeArgumentValues, setWriteArgumentValues] = useState<Record<string, string[]>>({});
+  const [manualWriteMode, setManualWriteMode] = useState(false);
   const [writeValueBySignature, setWriteValueBySignature] = useState<Record<string, string>>({});
   const [readResults, setReadResults] = useState<Record<string, string>>({});
-  const [writeResults, setWriteResults] = useState<Record<string, string>>({});
-  const [writePreviews, setWritePreviews] = useState<
-    Record<string, Awaited<ReturnType<typeof prepareEvmContractWriteDirect>>>
+  const [readErrors, setReadErrors] = useState<Record<string, string>>({});
+  const [writePreviews, setWritePreviews] = useState<Record<string, WritePreviewState>>({});
+  const [writeResults, setWriteResults] = useState<
+    Record<string, Awaited<ReturnType<typeof writeEvmContractMethodDirect>>>
   >({});
+  const [writeErrors, setWriteErrors] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
@@ -295,8 +467,16 @@ export function AddressContractPanel({
   } | null>(null);
   const [pendingWriteAction, setPendingWriteAction] = useState<{
     signature: string;
-    type: "prepare" | "write";
+    type: "write" | "manual-open" | "manual-confirm";
   } | null>(null);
+  const [manualWriteTarget, setManualWriteTarget] = useState<string | null>(null);
+  const [manualWriteDialogValues, setManualWriteDialogValues] = useState<ManualWriteDialogState>({
+    value: "0",
+    gasPrice: "",
+    gasLimit: "",
+    nonce: "",
+  });
+  const [manualWriteDialogError, setManualWriteDialogError] = useState<string | null>(null);
 
   const readFunctions = useMemo(
     () => getReadContractFunctions(artifact.abiJson),
@@ -323,17 +503,27 @@ export function AddressContractPanel({
   }, []);
 
   useEffect(() => {
-    setExpandedReadSignatures(readFunctions[0] ? [readFunctions[0].signature] : []);
+    setExpandedReadSignatures([]);
     setReadArgumentValues(getInitialValues(readFunctions));
     setReadResults({});
+    setReadErrors({});
   }, [readFunctions]);
 
   useEffect(() => {
-    setExpandedWriteSignatures(writeFunctions[0] ? [writeFunctions[0].signature] : []);
+    setExpandedWriteSignatures([]);
     setWriteArgumentValues(getInitialValues(writeFunctions));
-    setWriteResults({});
     setWritePreviews({});
+    setWriteResults({});
+    setWriteErrors({});
     setWriteValueBySignature({});
+    setManualWriteTarget(null);
+    setManualWriteDialogError(null);
+    setManualWriteDialogValues({
+      value: "0",
+      gasPrice: "",
+      gasLimit: "",
+      nonce: "",
+    });
   }, [writeFunctions]);
 
   useEffect(() => {
@@ -360,7 +550,11 @@ export function AddressContractPanel({
       delete next[signature];
       return next;
     });
-    setErrorMessage(null);
+    setReadErrors((current) => {
+      const next = { ...current };
+      delete next[signature];
+      return next;
+    });
   }
 
   function updateWriteArgumentValue(signature: string, index: number, value: string) {
@@ -374,6 +568,11 @@ export function AddressContractPanel({
       return next;
     });
     setWriteResults((current) => {
+      const next = { ...current };
+      delete next[signature];
+      return next;
+    });
+    setWriteErrors((current) => {
       const next = { ...current };
       delete next[signature];
       return next;
@@ -396,6 +595,11 @@ export function AddressContractPanel({
       delete next[signature];
       return next;
     });
+    setWriteErrors((current) => {
+      const next = { ...current };
+      delete next[signature];
+      return next;
+    });
     setErrorMessage(null);
   }
 
@@ -407,7 +611,11 @@ export function AddressContractPanel({
     }
 
     setActionLoadingKey(`read:${signature}`);
-    setErrorMessage(null);
+    setReadErrors((current) => {
+      const next = { ...current };
+      delete next[signature];
+      return next;
+    });
 
     try {
       const result = await readEvmContractMethodDirect({
@@ -427,17 +635,16 @@ export function AddressContractPanel({
         delete next[signature];
         return next;
       });
-      setErrorMessage(error instanceof Error ? error.message : "Failed to read contract method.");
+      setReadErrors((current) => ({
+        ...current,
+        [signature]: error instanceof Error ? error.message : "Failed to read contract method.",
+      }));
     } finally {
       setActionLoadingKey(null);
     }
   }
 
-  async function executeWriteAction(
-    signature: string,
-    type: "prepare" | "write",
-    password?: string,
-  ) {
+  async function executeWriteAction(signature: string, password?: string) {
     const fn = writeFunctions.find((item) => item.signature === signature);
 
     if (!fn) {
@@ -449,35 +656,29 @@ export function AddressContractPanel({
       return;
     }
 
-    setActionLoadingKey(`${type}:${signature}`);
-    setErrorMessage(null);
+    setActionLoadingKey(`write:${signature}`);
+    setWriteErrors((current) => {
+      const next = { ...current };
+      delete next[signature];
+      return next;
+    });
 
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
       const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map(() => "");
       const value = writeValueBySignature[signature] ?? "";
-
-      if (type === "prepare") {
-        const preview = await prepareEvmContractWriteDirect({
-          address: binding.address,
-          abiJson: artifact.abiJson,
-          functionSignature: signature,
-          rawArgs,
-          privateKey,
-          value,
-        });
-
-        setWritePreviews((current) => ({
-          ...current,
-          [signature]: preview,
-        }));
-        setWriteResults((current) => {
-          const next = { ...current };
-          delete next[signature];
-          return next;
-        });
-        return;
-      }
+      const preview = await prepareEvmContractWriteDirect({
+        address: binding.address,
+        abiJson: artifact.abiJson,
+        functionSignature: signature,
+        rawArgs,
+        privateKey,
+        value,
+      });
+      setWritePreviews((current) => ({
+        ...current,
+        [signature]: toWritePreviewState(preview),
+      }));
 
       const result = await writeEvmContractMethodDirect({
         address: binding.address,
@@ -490,9 +691,9 @@ export function AddressContractPanel({
 
       setWriteResults((current) => ({
         ...current,
-        [signature]: stringifyResult(result),
+        [signature]: result,
       }));
-      setWritePreviews((current) => {
+      setWriteErrors((current) => {
         const next = { ...current };
         delete next[signature];
         return next;
@@ -501,14 +702,158 @@ export function AddressContractPanel({
       const message = error instanceof Error ? error.message : "Failed to submit contract transaction.";
 
       if (message === "Password is required.") {
-        setPendingWriteAction({ signature, type });
+        setPendingWriteAction({ signature, type: "write" });
         setUnlockPassword("");
         setUnlockError(null);
         setUnlockDialogOpen(true);
         return;
       }
 
-      setErrorMessage(message);
+      setWriteErrors((current) => ({
+        ...current,
+        [signature]: message,
+      }));
+    } finally {
+      setActionLoadingKey(null);
+    }
+  }
+
+  async function openManualWriteDialog(signature: string, password?: string) {
+    const fn = writeFunctions.find((item) => item.signature === signature);
+
+    if (!fn) {
+      return;
+    }
+
+    if (!activeKey) {
+      setErrorMessage("Select a global private key first.");
+      return;
+    }
+
+    setActionLoadingKey(`manual:${signature}`);
+    setManualWriteDialogError(null);
+    setWriteResults((current) => {
+      const next = { ...current };
+      delete next[signature];
+      return next;
+    });
+    setWriteErrors((current) => {
+      const next = { ...current };
+      delete next[signature];
+      return next;
+    });
+    setErrorMessage(null);
+
+    try {
+      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
+      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map(() => "");
+      const value = fn.stateMutability === "payable" ? (writeValueBySignature[signature] ?? "0") : "0";
+      const defaults = await getEvmContractWriteManualDefaultsDirect({
+        address: binding.address,
+        abiJson: artifact.abiJson,
+        functionSignature: signature,
+        rawArgs,
+        privateKey,
+        value,
+      });
+
+      setWritePreviews((current) => ({
+        ...current,
+        [signature]: toWritePreviewState(defaults),
+      }));
+      setManualWriteDialogValues({
+        value: defaults.value,
+        gasPrice: defaults.gasPrice,
+        gasLimit: defaults.estimatedGas,
+        nonce: defaults.nonce,
+      });
+      setManualWriteDialogError(defaults.simulationError);
+      setManualWriteTarget(signature);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to prepare manual contract transaction.";
+
+      if (message === "Password is required.") {
+        setPendingWriteAction({ signature, type: "manual-open" });
+        setUnlockPassword("");
+        setUnlockError(null);
+        setUnlockDialogOpen(true);
+        return;
+      }
+
+      setWriteErrors((current) => ({
+        ...current,
+        [signature]: message,
+      }));
+    } finally {
+      setActionLoadingKey(null);
+    }
+  }
+
+  async function executeManualWriteAction(signature: string, password?: string) {
+    const fn = writeFunctions.find((item) => item.signature === signature);
+
+    if (!fn) {
+      return;
+    }
+
+    if (!activeKey) {
+      setErrorMessage("Select a global private key first.");
+      return;
+    }
+
+    setActionLoadingKey(`manual-confirm:${signature}`);
+    setWriteErrors((current) => {
+      const next = { ...current };
+      delete next[signature];
+      return next;
+    });
+
+    try {
+      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
+      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map(() => "");
+      const result = await forceWriteEvmContractMethodDirect({
+        address: binding.address,
+        abiJson: artifact.abiJson,
+        functionSignature: signature,
+        rawArgs,
+        privateKey,
+        value: manualWriteDialogValues.value,
+        gasLimit: manualWriteDialogValues.gasLimit,
+        gasPrice: manualWriteDialogValues.gasPrice,
+        nonce: manualWriteDialogValues.nonce,
+      });
+
+      setWriteResults((current) => ({
+        ...current,
+        [signature]: result,
+      }));
+      setWriteValueBySignature((current) => ({
+        ...current,
+        [signature]: manualWriteDialogValues.value,
+      }));
+      setWriteErrors((current) => {
+        const next = { ...current };
+        delete next[signature];
+        return next;
+      });
+      setManualWriteTarget(null);
+      setManualWriteDialogError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to force-send contract transaction.";
+
+      if (message === "Password is required.") {
+        setPendingWriteAction({ signature, type: "manual-confirm" });
+        setUnlockPassword("");
+        setUnlockError(null);
+        setUnlockDialogOpen(true);
+        return;
+      }
+
+      setWriteErrors((current) => ({
+        ...current,
+        [signature]: message,
+      }));
+      setManualWriteDialogError(message);
     } finally {
       setActionLoadingKey(null);
     }
@@ -521,7 +866,13 @@ export function AddressContractPanel({
 
     try {
       setUnlockError(null);
-      await executeWriteAction(pendingWriteAction.signature, pendingWriteAction.type, unlockPassword);
+      if (pendingWriteAction.type === "manual-open") {
+        await openManualWriteDialog(pendingWriteAction.signature, unlockPassword);
+      } else if (pendingWriteAction.type === "manual-confirm") {
+        await executeManualWriteAction(pendingWriteAction.signature, unlockPassword);
+      } else {
+        await executeWriteAction(pendingWriteAction.signature, unlockPassword);
+      }
       setUnlockDialogOpen(false);
       setUnlockPassword("");
       setPendingWriteAction(null);
@@ -548,18 +899,27 @@ export function AddressContractPanel({
   }
 
   function resetReadView() {
-    setExpandedReadSignatures(readFunctions[0] ? [readFunctions[0].signature] : []);
+    setExpandedReadSignatures([]);
     setReadArgumentValues(getInitialValues(readFunctions));
     setReadResults({});
-    setErrorMessage(null);
+    setReadErrors({});
   }
 
   function resetWriteView() {
-    setExpandedWriteSignatures(writeFunctions[0] ? [writeFunctions[0].signature] : []);
+    setExpandedWriteSignatures([]);
     setWriteArgumentValues(getInitialValues(writeFunctions));
-    setWriteResults({});
     setWritePreviews({});
+    setWriteResults({});
+    setWriteErrors({});
     setWriteValueBySignature({});
+    setManualWriteTarget(null);
+    setManualWriteDialogError(null);
+    setManualWriteDialogValues({
+      value: "0",
+      gasPrice: "",
+      gasLimit: "",
+      nonce: "",
+    });
     setErrorMessage(null);
   }
 
@@ -571,13 +931,34 @@ export function AddressContractPanel({
     });
   }
 
-  function copyFunctionLink(fn: EvmContractFunctionDescriptor, tab: "read" | "write") {
-    const url = `${window.location.origin}/evm/address/${binding.address}?tab=contract&contractTab=${tab}&fn=${encodeURIComponent(fn.signature)}`;
-    void copyText(url);
-    setFlashMessage({
-      title: "Link copied",
-      description: `${fn.name} link was copied successfully.`,
+  function handleToggleReadSignature(signature: string) {
+    const fn = readFunctions.find((item) => item.signature === signature);
+
+    setExpandedReadSignatures((current) => {
+      const isExpanded = current.includes(signature);
+
+      if (isExpanded) {
+        return current.filter((item) => item !== signature);
+      }
+
+      return [...current, signature];
     });
+
+    if (fn && fn.inputs.length === 0) {
+      void handleRead(signature);
+    }
+  }
+
+  function handleQueryAction(fn: EvmContractFunctionDescriptor) {
+    const isExpanded = expandedReadSignatures.includes(fn.signature);
+
+    if (!isExpanded) {
+      setExpandedReadSignatures((current) => [...current, fn.signature]);
+    }
+
+    if (fn.inputs.length === 0 || isExpanded) {
+      void handleRead(fn.signature);
+    }
   }
 
   return (
@@ -696,34 +1077,41 @@ export function AddressContractPanel({
 
       {activeTab === "read" ? (
         <div className="mt-4 grid gap-4">
-          {errorMessage ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-              {errorMessage}
-            </div>
-          ) : null}
           <FunctionListSection
             title="Read Contract"
             functions={readFunctions}
             expandedSignatures={expandedReadSignatures}
-            onToggle={(signature) => toggleExpandedSignature(signature, setExpandedReadSignatures)}
+            onToggle={handleToggleReadSignature}
             onExpandAll={() => setExpandedReadSignatures(readFunctions.map((fn) => fn.signature))}
+            onCollapseAll={() => setExpandedReadSignatures([])}
             onReset={resetReadView}
             onCopySignature={copyFunctionSignature}
-            onCopyLink={(fn) => copyFunctionLink(fn, "read")}
             renderHeaderActions={(fn) => (
-              <ActionIconButton
-                className="text-slate-400 hover:text-slate-700"
-                tooltip={actionLoadingKey === `read:${fn.signature}` ? "Querying..." : "Query"}
-                aria-label={actionLoadingKey === `read:${fn.signature}` ? "Querying..." : "Query"}
-                onClick={() => void handleRead(fn.signature)}
-                disabled={actionLoadingKey !== null}
-              >
-                {actionLoadingKey === `read:${fn.signature}` ? (
-                  <IconLoader2 className="size-4 animate-spin" />
-                ) : (
-                  <IconPlayerPlay className="size-4" stroke={1.8} />
-                )}
-              </ActionIconButton>
+              (() => {
+                const isExpanded = expandedReadSignatures.includes(fn.signature);
+                const canQuery = fn.inputs.length === 0 || isExpanded;
+                const isLoading = actionLoadingKey === `read:${fn.signature}`;
+
+                return (
+                  <ActionIconButton
+                    className={
+                      canQuery
+                        ? "text-slate-400 hover:text-slate-700"
+                        : "text-slate-300 hover:text-slate-300"
+                    }
+                    tooltip={isLoading ? "Querying..." : "Query"}
+                    aria-label={isLoading ? "Querying..." : "Query"}
+                    onClick={() => handleQueryAction(fn)}
+                    disabled={!canQuery || actionLoadingKey !== null}
+                  >
+                    {isLoading ? (
+                      <IconLoader2 className="size-4 animate-spin" />
+                    ) : (
+                      <IconPlayerPlay className="size-4" stroke={1.8} />
+                    )}
+                  </ActionIconButton>
+                );
+              })()
             )}
             inputBadgeLabel="Input"
             emptyText="No read methods are available for this contract."
@@ -736,6 +1124,10 @@ export function AddressContractPanel({
                 />
                 {readResults[fn.signature] ? (
                   <ValuePreview value={readResults[fn.signature]} />
+                ) : readErrors[fn.signature] ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+                    {readErrors[fn.signature]}
+                  </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-400">
                     Query the method to view the returned result.
@@ -789,38 +1181,50 @@ export function AddressContractPanel({
             expandedSignatures={expandedWriteSignatures}
             onToggle={(signature) => toggleExpandedSignature(signature, setExpandedWriteSignatures)}
             onExpandAll={() => setExpandedWriteSignatures(writeFunctions.map((fn) => fn.signature))}
+            onCollapseAll={() => setExpandedWriteSignatures([])}
             onReset={resetWriteView}
             onCopySignature={copyFunctionSignature}
-            onCopyLink={(fn) => copyFunctionLink(fn, "write")}
+            headerTrailingContent={
+              <label className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  className="size-3.5 rounded border-slate-300 text-sky-600 focus-visible:ring-2 focus-visible:ring-sky-400"
+                  checked={manualWriteMode}
+                  onChange={(event) => setManualWriteMode(event.target.checked)}
+                />
+                Manual Send
+              </label>
+            }
             renderHeaderActions={(fn) => (
-              <>
-                <ActionIconButton
-                  className="text-slate-400 hover:text-slate-700"
-                  tooltip={actionLoadingKey === `prepare:${fn.signature}` ? "Previewing..." : "Preview"}
-                  aria-label={actionLoadingKey === `prepare:${fn.signature}` ? "Previewing..." : "Preview"}
-                  onClick={() => void executeWriteAction(fn.signature, "prepare")}
-                  disabled={!activeKey || actionLoadingKey !== null}
-                >
-                  {actionLoadingKey === `prepare:${fn.signature}` ? (
-                    <IconLoader2 className="size-4 animate-spin" />
-                  ) : (
-                    <IconEye className="size-4" stroke={1.8} />
-                  )}
-                </ActionIconButton>
-                <ActionIconButton
-                  className="text-slate-400 hover:text-slate-700"
-                  tooltip={actionLoadingKey === `write:${fn.signature}` ? "Writing..." : "Write"}
-                  aria-label={actionLoadingKey === `write:${fn.signature}` ? "Writing..." : "Write"}
-                  onClick={() => void executeWriteAction(fn.signature, "write")}
-                  disabled={!activeKey || !writePreviews[fn.signature] || actionLoadingKey !== null}
-                >
-                  {actionLoadingKey === `write:${fn.signature}` ? (
-                    <IconLoader2 className="size-4 animate-spin" />
-                  ) : (
-                    <IconWriting className="size-4" stroke={1.8} />
-                  )}
-                </ActionIconButton>
-              </>
+              (() => {
+                const canWrite = fn.inputs.length === 0 || expandedWriteSignatures.includes(fn.signature);
+                const isLoading =
+                  actionLoadingKey === `write:${fn.signature}` ||
+                  actionLoadingKey === `manual:${fn.signature}` ||
+                  actionLoadingKey === `manual-confirm:${fn.signature}`;
+
+                return (
+                  <ActionIconButton
+                    className={
+                      canWrite
+                        ? "text-slate-400 hover:text-slate-700"
+                        : "text-slate-300 hover:text-slate-300"
+                    }
+                    tooltip={isLoading ? "Writing..." : manualWriteMode ? "Manual Write" : "Write"}
+                    aria-label={isLoading ? "Writing..." : manualWriteMode ? "Manual Write" : "Write"}
+                    onClick={() =>
+                      void (manualWriteMode ? openManualWriteDialog(fn.signature) : executeWriteAction(fn.signature))
+                    }
+                    disabled={!activeKey || !canWrite || actionLoadingKey !== null}
+                  >
+                    {isLoading ? (
+                      <IconLoader2 className="size-4 animate-spin" />
+                    ) : (
+                      <IconBrandTelegram className="size-4" stroke={1.8} />
+                    )}
+                  </ActionIconButton>
+                );
+              })()
             )}
             inputBadgeLabel="Input"
             emptyText="No write methods are available for this contract."
@@ -831,55 +1235,23 @@ export function AddressContractPanel({
                   values={writeArgumentValues[fn.signature] ?? fn.inputs.map(() => "")}
                   onChange={(index, value) => updateWriteArgumentValue(fn.signature, index, value)}
                 />
-                <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Native Value ({environment.nativeCurrency})
-                  </label>
-                  <Input
-                    value={writeValueBySignature[fn.signature] ?? ""}
-                    onChange={(event) => updateWriteValue(fn.signature, event.target.value)}
-                    placeholder="0"
-                  />
-                </div>
-                {writePreviews[fn.signature] ? (
-                  <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Prepared Transaction
-                    </p>
-                    <dl className="mt-3 grid gap-3 md:grid-cols-2">
-                      <div className="min-w-0">
-                        <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">From</dt>
-                        <dd className="mt-1 break-all text-sm text-slate-900 mono">
-                          {writePreviews[fn.signature]?.accountAddress}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</dt>
-                        <dd className="mt-1 text-sm text-slate-900">{writePreviews[fn.signature]?.functionSignature}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Estimated Gas</dt>
-                        <dd className="mt-1 text-sm text-slate-900">{writePreviews[fn.signature]?.estimatedGas}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Price</dt>
-                        <dd className="mt-1 text-sm text-slate-900">{writePreviews[fn.signature]?.gasPriceLabel}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Value</dt>
-                        <dd className="mt-1 text-sm text-slate-900">{writePreviews[fn.signature]?.valueLabel}</dd>
-                      </div>
-                    </dl>
+                {fn.stateMutability === "payable" && !manualWriteMode ? (
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium text-slate-700">
+                      Native Value ({environment.nativeCurrency})
+                    </label>
+                    <Input
+                      value={writeValueBySignature[fn.signature] ?? ""}
+                      onChange={(event) => updateWriteValue(fn.signature, event.target.value)}
+                      placeholder="0"
+                    />
                   </div>
                 ) : null}
-
-                {writeResults[fn.signature] ? (
-                  <ValuePreview value={writeResults[fn.signature]} />
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-400">
-                    Preview the transaction first, then write to view the result.
-                  </div>
-                )}
+                <WriteExecutionPreview
+                  preview={writePreviews[fn.signature] ?? null}
+                  result={writeResults[fn.signature] ?? null}
+                  error={writeErrors[fn.signature] ?? null}
+                />
               </div>
             )}
           />
@@ -911,6 +1283,138 @@ export function AddressContractPanel({
         confirmDisabled={!unlockPassword.trim()}
         onConfirm={() => void handleConfirmUnlock()}
       />
+      <ModalDialog
+        open={manualWriteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setManualWriteTarget(null);
+            setManualWriteDialogError(null);
+          }
+        }}
+        title="Manual Write"
+        description="Review the simulated values, adjust them if needed, then confirm to force-send the transaction."
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setManualWriteTarget(null);
+                setManualWriteDialogError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (manualWriteTarget) {
+                  void executeManualWriteAction(manualWriteTarget);
+                }
+              }}
+              className="bg-rose-600 text-white hover:bg-rose-700"
+              disabled={
+                !manualWriteTarget ||
+                !manualWriteDialogValues.value.trim() ||
+                !manualWriteDialogValues.gasPrice.trim() ||
+                !manualWriteDialogValues.gasLimit.trim() ||
+                !manualWriteDialogValues.nonce.trim() ||
+                actionLoadingKey === `manual-confirm:${manualWriteTarget}`
+              }
+            >
+              {manualWriteTarget && actionLoadingKey === `manual-confirm:${manualWriteTarget}` ? (
+                <>
+                  <IconLoader2 className="mr-2 size-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Confirm Force Send"
+              )}
+            </Button>
+          </>
+        }
+        maxWidthClassName="max-w-lg"
+      >
+        {manualWriteTarget ? (
+          <div className="grid gap-4">
+            <div className="grid gap-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
+              <p className="break-all text-sm text-slate-900 mono">{binding.address}</p>
+            </div>
+            <div className="grid gap-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
+              <p className="text-sm text-slate-900">{manualWriteTarget}</p>
+            </div>
+            <div className="grid gap-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
+              <p className="text-sm text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
+            </div>
+            <div className="grid gap-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Chain ID</p>
+              <p className="text-sm text-slate-900">{environment.chainId}</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Value ({environment.nativeCurrency})</label>
+                <Input
+                  value={manualWriteDialogValues.value}
+                  onChange={(event) =>
+                    setManualWriteDialogValues((current) => ({
+                      ...current,
+                      value: event.target.value,
+                    }))
+                  }
+                  placeholder="0"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                <Input
+                  value={manualWriteDialogValues.gasPrice}
+                  onChange={(event) =>
+                    setManualWriteDialogValues((current) => ({
+                      ...current,
+                      gasPrice: event.target.value,
+                    }))
+                  }
+                  placeholder="0.001"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <Input
+                  value={manualWriteDialogValues.gasLimit}
+                  onChange={(event) =>
+                    setManualWriteDialogValues((current) => ({
+                      ...current,
+                      gasLimit: event.target.value,
+                    }))
+                  }
+                  placeholder="0"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <Input
+                  value={manualWriteDialogValues.nonce}
+                  onChange={(event) =>
+                    setManualWriteDialogValues((current) => ({
+                      ...current,
+                      nonce: event.target.value,
+                    }))
+                  }
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            {manualWriteDialogError ? (
+              <div className="max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {manualWriteDialogError}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </ModalDialog>
       <style jsx global>{`
         .json-view-wrap .w-rjv-value {
           white-space: pre-wrap;

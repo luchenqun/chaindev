@@ -4,9 +4,11 @@ import {
   createPublicClient,
   createWalletClient,
   encodeDeployData,
+  encodeFunctionData,
   formatEther,
   formatGwei,
   parseEther,
+  parseGwei,
   type Hex,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -58,6 +60,54 @@ function parseNativeValue(value: string) {
   return value.trim() ? parseEther(value.trim()) : 0n;
 }
 
+function parseGasLimit(gasLimit: string) {
+  const value = gasLimit.trim();
+
+  if (!value) {
+    throw new Error("Gas limit is required for force send.");
+  }
+
+  if (!/^\d+$/.test(value)) {
+    throw new Error("Gas limit must be a positive integer.");
+  }
+
+  const normalizedValue = BigInt(value);
+
+  if (normalizedValue <= 0n) {
+    throw new Error("Gas limit must be greater than zero.");
+  }
+
+  return normalizedValue;
+}
+
+function parseGasPrice(gasPrice: string) {
+  const value = gasPrice.trim();
+
+  if (!value) {
+    throw new Error("Gas price is required for force send.");
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(value)) {
+    throw new Error("Gas price must be a valid Gwei value.");
+  }
+
+  return parseGwei(value);
+}
+
+function parseNonce(nonce: string) {
+  const value = nonce.trim();
+
+  if (!value) {
+    throw new Error("Nonce is required for force send.");
+  }
+
+  if (!/^\d+$/.test(value)) {
+    throw new Error("Nonce must be a non-negative integer.");
+  }
+
+  return Number(value);
+}
+
 function normalizeDeployBytecode(bytecode: string) {
   const value = bytecode.trim();
 
@@ -70,6 +120,10 @@ function normalizeDeployBytecode(bytecode: string) {
   }
 
   return value as Hex;
+}
+
+function formatGweiValue(value: bigint) {
+  return Number(formatGwei(value)).toFixed(3).replace(/\.?0+$/, "");
 }
 
 export async function getActiveEvmContractEnvironmentDirect() {
@@ -127,7 +181,7 @@ export async function prepareEvmContractWriteDirect(input: {
     throw new Error("Only payable contract methods can send native value.");
   }
 
-  const simulation = await publicClient.simulateContract({
+  const estimatedGas = await publicClient.estimateContractGas({
     account,
     address: input.address as `0x${string}`,
     abi: JSON.parse(input.abiJson),
@@ -142,10 +196,79 @@ export async function prepareEvmContractWriteDirect(input: {
     functionName: fn.name,
     functionSignature: fn.signature,
     args,
-    estimatedGas: simulation.request.gas?.toString() ?? "Unavailable",
-    gasPriceLabel: `${Number(formatGwei(gasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`,
+    estimatedGas: estimatedGas.toString(),
+    gasPrice: gasPrice.toString(),
+    gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
     valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
   };
+}
+
+export async function getEvmContractWriteManualDefaultsDirect(input: {
+  address: string;
+  abiJson: string;
+  functionSignature: string;
+  rawArgs: string[];
+  privateKey: string;
+  value: string;
+}) {
+  const { profile, publicClient } = getActiveEvmClients();
+  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
+  const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
+  const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
+  const account = privateKeyToAccount(normalizedPrivateKey);
+  const value = input.value.trim() ? parseEther(input.value.trim()) : 0n;
+
+  if (fn.stateMutability !== "payable" && value > 0n) {
+    throw new Error("Only payable contract methods can send native value.");
+  }
+
+  const [gasPrice, nonce] = await Promise.all([
+    publicClient.getGasPrice(),
+    publicClient.getTransactionCount({ address: account.address }),
+  ]);
+
+  try {
+    const estimatedGas = await publicClient.estimateContractGas({
+      account,
+      address: input.address as `0x${string}`,
+      abi: JSON.parse(input.abiJson),
+      functionName: fn.name,
+      args,
+      value: value > 0n ? value : undefined,
+    } as never);
+
+    return {
+      accountAddress: account.address,
+      functionName: fn.name,
+      functionSignature: fn.signature,
+      estimatedGas: estimatedGas.toString(),
+      gasPrice: formatGweiValue(gasPrice),
+      gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
+      nonce: String(nonce),
+      value: input.value.trim() || "0",
+      valueLabel:
+        value > 0n
+          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: null,
+    };
+  } catch (error) {
+    return {
+      accountAddress: account.address,
+      functionName: fn.name,
+      functionSignature: fn.signature,
+      estimatedGas: "",
+      gasPrice: formatGweiValue(gasPrice),
+      gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
+      nonce: String(nonce),
+      value: input.value.trim() || "0",
+      valueLabel:
+        value > 0n
+          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: error instanceof Error ? error.message : "Simulation failed.",
+    };
+  }
 }
 
 export async function writeEvmContractMethodDirect(input: {
@@ -189,7 +312,62 @@ export async function writeEvmContractMethodDirect(input: {
       status: receipt.status,
       blockNumber: receipt.blockNumber.toString(),
       gasUsed: receipt.gasUsed.toString(),
-      effectiveGasPrice: receipt.effectiveGasPrice
+      effectiveGasPrice: receipt.effectiveGasPrice !== null
+        ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
+        : "Unavailable",
+    },
+  };
+}
+
+export async function forceWriteEvmContractMethodDirect(input: {
+  address: string;
+  abiJson: string;
+  functionSignature: string;
+  rawArgs: string[];
+  privateKey: string;
+  value: string;
+  gasLimit: string;
+  gasPrice?: string;
+  nonce?: string;
+}) {
+  const { profile, publicClient } = getActiveEvmClients();
+  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
+  const abi = parseContractAbiJson(input.abiJson);
+  const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
+  const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
+  const account = privateKeyToAccount(normalizedPrivateKey);
+  const walletClient = createWalletClient({
+    account,
+    transport: createEvmTransport(profile.rpcUrl),
+  });
+  const value = input.value.trim() ? parseEther(input.value.trim()) : 0n;
+  const gas = parseGasLimit(input.gasLimit);
+  const gasPrice = input.gasPrice?.trim() ? parseGasPrice(input.gasPrice) : undefined;
+  const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
+
+  const data = encodeFunctionData({
+    abi,
+    functionName: fn.name,
+    args,
+  });
+  const hash = await walletClient.sendTransaction({
+    account,
+    to: input.address as `0x${string}`,
+    data,
+    value: value > 0n ? value : undefined,
+    gas,
+    gasPrice,
+    nonce,
+  });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+  return {
+    hash,
+    receipt: {
+      status: receipt.status,
+      blockNumber: receipt.blockNumber.toString(),
+      gasUsed: receipt.gasUsed.toString(),
+      effectiveGasPrice: receipt.effectiveGasPrice !== null
         ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
         : "Unavailable",
     },
