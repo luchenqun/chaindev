@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { clearEvmTransactionCache, subscribeEvmTransactionCache } from "@/domains/evm/client/transaction-cache";
@@ -49,7 +50,7 @@ export default function EvmCacheSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [actionState, setActionState] = useState<CacheValidationResult | null>(null);
   const [actionLoading, setActionLoading] = useState<"validate" | "clear" | null>(null);
-  const [clearConfirmArmed, setClearConfirmArmed] = useState(false);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [transactionPage, setTransactionPage] = useState(1);
   const [accountPage, setAccountPage] = useState(1);
@@ -135,7 +136,7 @@ export default function EvmCacheSettingsPage() {
 
     const handleProfileChanged = () => {
       setActionState(null);
-      setClearConfirmArmed(false);
+      setClearDialogOpen(false);
       setTransactionPage(1);
       setAccountPage(1);
       void (async () => {
@@ -190,7 +191,7 @@ export default function EvmCacheSettingsPage() {
     try {
       const result = await validateActiveEvmCacheDirect();
       setActionState(result);
-      setClearConfirmArmed(false);
+      setClearDialogOpen(false);
       await reloadCurrentPages();
     } catch (error) {
       setActionState({
@@ -203,11 +204,6 @@ export default function EvmCacheSettingsPage() {
   }
 
   async function handleClear() {
-    if (!clearConfirmArmed) {
-      setClearConfirmArmed(true);
-      return;
-    }
-
     setActionLoading("clear");
 
     try {
@@ -216,7 +212,7 @@ export default function EvmCacheSettingsPage() {
         status: "cleared",
         label: "Cleared current local EVM cache.",
       });
-      setClearConfirmArmed(false);
+      setClearDialogOpen(false);
       await reloadCurrentPages();
     } catch (error) {
       setActionState({
@@ -284,18 +280,12 @@ export default function EvmCacheSettingsPage() {
               className={`inline-flex h-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition ${
                 actionLoading === "clear"
                   ? "cursor-wait border-rose-200 bg-rose-50 text-rose-600"
-                  : clearConfirmArmed
-                    ? "border-rose-300 bg-rose-50 text-rose-700"
-                    : "border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
+                  : "border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
               }`}
               disabled={actionLoading != null}
-              onClick={() => void handleClear()}
+              onClick={() => setClearDialogOpen(true)}
             >
-              {actionLoading === "clear"
-                ? "Clearing..."
-                : clearConfirmArmed
-                  ? "Click Again to Confirm"
-                  : "Clear Cache"}
+              {actionLoading === "clear" ? "Clearing..." : "Clear Cache"}
             </button>
           </div>
         </div>
@@ -509,6 +499,16 @@ export default function EvmCacheSettingsPage() {
             </table>
           </div>
         </section>
+        <ConfirmDialog
+          open={clearDialogOpen}
+          onOpenChange={setClearDialogOpen}
+          title="Clear Cache"
+          description="Clear all locally cached EVM transactions and observed accounts from IndexedDB?"
+          confirmLabel="Clear Cache"
+          onConfirm={() => {
+            void handleClear();
+          }}
+        />
       </main>
     </AppShell>
   );

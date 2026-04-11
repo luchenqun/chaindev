@@ -67,14 +67,12 @@ function matchesNavGroup(pathname: string, groupId: string) {
 
   if (groupId === "browser") {
     return [
-      "/evm/overview",
       "/evm/blocks",
       "/evm/block/",
       "/evm/accounts",
       "/evm/txs",
       "/evm/tx/",
       "/evm/address/",
-      "/cosmos/overview",
       "/cosmos/blocks",
       "/cosmos/block/",
       "/cosmos/tx/",
@@ -95,13 +93,11 @@ export function TopNav() {
   const blockchainItems: NavItem[] =
     mode === "cosmos"
       ? [
-          { href: "/cosmos/overview", label: "Overview" },
           { href: "/cosmos/blocks", label: "Blocks" },
           { href: "/cosmos/validators", label: "Validators" },
           { href: "/cosmos/proposals", label: "Proposals" },
         ]
       : [
-          { href: "/evm/overview", label: "Overview" },
           { href: "/evm/blocks", label: "Blocks" },
           { href: "/evm/accounts", label: "Accounts" },
           { href: "/evm/txs", label: "Transactions" },
@@ -129,7 +125,10 @@ export function TopNav() {
           {
             id: "settings",
             label: messages.navigation.settings,
-            items: [{ href: "/evm/settings/cache", label: messages.navigation.cache }],
+            items: [
+              { href: "/evm/settings/cache", label: messages.navigation.cache },
+              { href: "/evm/settings/name-tags", label: messages.navigation.nameTags },
+            ],
           } satisfies NavGroup,
         ]
       : []),

@@ -1,13 +1,19 @@
 "use client";
 
+import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Input } from "@/components/ui/input";
 import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
+  deleteEvmAddressTag,
   getEvmAddressTags,
   subscribeEvmAddressTags,
+  upsertEvmAddressTag,
 } from "@/domains/evm/client/address-tags";
 import { getEvmObservedAccountsPage } from "@/domains/evm/client/transaction-cache";
 import { getEvmAddressBalancesDirect } from "@/domains/evm/client/queries";
@@ -51,6 +57,10 @@ function EvmAccountsPageContent() {
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [balancesByAddress, setBalancesByAddress] = useState<Record<string, string>>({});
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const [editingTagAddress, setEditingTagAddress] = useState<string | null>(null);
+  const [tagInputValue, setTagInputValue] = useState("");
+  const [tagErrorMessage, setTagErrorMessage] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ address: string; nameTag: string } | null>(null);
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -89,6 +99,10 @@ function EvmAccountsPageContent() {
     void load();
 
     const handleProfileChanged = () => {
+      setEditingTagAddress(null);
+      setTagInputValue("");
+      setTagErrorMessage(null);
+      setDeleteTarget(null);
       void load();
     };
 
@@ -143,10 +157,44 @@ function EvmAccountsPageContent() {
     }
   }
 
+  function handleStartTagEdit(address: string) {
+    setEditingTagAddress(address);
+    setTagInputValue(nameTagsByAddress[address] ?? "");
+    setTagErrorMessage(null);
+    setDeleteTarget(null);
+  }
+
+  function handleCancelTagEdit() {
+    setEditingTagAddress(null);
+    setTagInputValue("");
+    setTagErrorMessage(null);
+  }
+
+  function handleSaveTag(address: string) {
+    try {
+      upsertEvmAddressTag(address, tagInputValue);
+      setEditingTagAddress(null);
+      setTagInputValue("");
+      setTagErrorMessage(null);
+    } catch (error) {
+      setTagErrorMessage(error instanceof Error ? error.message : "Failed to save name tag.");
+    }
+  }
+
+  function handleDeleteTag(address: string) {
+    deleteEvmAddressTag(address);
+
+    if (editingTagAddress === address) {
+      setEditingTagAddress(null);
+      setTagInputValue("");
+      setTagErrorMessage(null);
+    }
+  }
+
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-24" rows={8} columns={6} />
+        <ListPageSkeleton titleWidth="w-24" rows={8} columns={7} />
       </AppShell>
     );
   }
@@ -223,7 +271,10 @@ function EvmAccountsPageContent() {
                     Last Seen
                   </th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Observed Txn Count
+                    Txn Count
+                  </th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Tag Action
                   </th>
                 </tr>
               </thead>
@@ -243,7 +294,28 @@ function EvmAccountsPageContent() {
                         />
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-500">
-                        {nameTagsByAddress[account.address] ?? "-"}
+                        {editingTagAddress === account.address ? (
+                          <div className="flex min-w-[220px] flex-col gap-2">
+                            <Input
+                              value={tagInputValue}
+                              onChange={(event) => setTagInputValue(event.target.value)}
+                              placeholder="Name tag"
+                            />
+                            <div className="flex gap-2">
+                              <Button size="sm" type="button" onClick={() => handleSaveTag(account.address)}>
+                                Save
+                              </Button>
+                              <Button size="sm" type="button" variant="ghost" onClick={handleCancelTagEdit}>
+                                Cancel
+                              </Button>
+                            </div>
+                            {tagErrorMessage ? <span className="text-xs text-rose-600">{tagErrorMessage}</span> : null}
+                          </div>
+                        ) : (
+                          <span className={nameTagsByAddress[account.address] ? "font-medium text-slate-900" : ""}>
+                            {nameTagsByAddress[account.address] ?? "-"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
                         {balancesByAddress[account.address] ?? "Not loaded"}
@@ -259,11 +331,54 @@ function EvmAccountsPageContent() {
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
                         {account.totalTxCount.toLocaleString("en-US")}
                       </td>
+                      <td className="px-5 py-3 text-sm text-slate-500">
+                        {editingTagAddress === account.address ? null : (
+                          <div className="flex items-center">
+                            {nameTagsByAddress[account.address] ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="inline-flex size-7 items-center justify-center text-slate-400 transition hover:text-slate-700"
+                                  title="Edit name tag"
+                                  aria-label="Edit name tag"
+                                  onClick={() => handleStartTagEdit(account.address)}
+                                >
+                                  <IconPencil className="size-4" stroke={1.8} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="inline-flex size-7 items-center justify-center text-slate-400 transition hover:text-rose-600"
+                                  title="Delete name tag"
+                                  aria-label="Delete name tag"
+                                  onClick={() =>
+                                    setDeleteTarget({
+                                      address: account.address,
+                                      nameTag: nameTagsByAddress[account.address] ?? "",
+                                    })
+                                  }
+                                >
+                                  <IconTrash className="size-4" stroke={1.8} />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                className="inline-flex size-7 items-center justify-center text-slate-400 transition hover:text-slate-700"
+                                title="Add name tag"
+                                aria-label="Add name tag"
+                                onClick={() => handleStartTagEdit(account.address)}
+                              >
+                                <IconPlus className="size-4" stroke={1.8} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-500">
+                    <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">
                       No observed accounts yet. Browse recent blocks or transactions first so addresses can be indexed into IndexedDB.
                     </td>
                   </tr>
@@ -272,6 +387,26 @@ function EvmAccountsPageContent() {
             </table>
           </div>
         </section>
+        <ConfirmDialog
+          open={deleteTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeleteTarget(null);
+            }
+          }}
+          title="Delete Name Tag"
+          description={
+            deleteTarget
+              ? `Delete the label "${deleteTarget.nameTag}" for ${deleteTarget.address.slice(0, 8)}...${deleteTarget.address.slice(-6)}?`
+              : undefined
+          }
+          confirmLabel="Delete"
+          onConfirm={() => {
+            if (deleteTarget) {
+              handleDeleteTag(deleteTarget.address);
+            }
+          }}
+        />
       </main>
     </AppShell>
   );
@@ -282,7 +417,7 @@ export default function EvmAccountsPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-24" rows={8} columns={6} />
+          <ListPageSkeleton titleWidth="w-24" rows={8} columns={7} />
         </AppShell>
       }
     >

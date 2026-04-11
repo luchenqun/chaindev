@@ -14,6 +14,13 @@ type EvmAddressTagRecord = {
 
 type EvmAddressTagScopeMap = Record<string, Record<string, EvmAddressTagRecord>>;
 
+export type EvmAddressTagItem = {
+  address: string;
+  addressLower: string;
+  nameTag: string;
+  updatedAt: number;
+};
+
 const STORAGE_KEY = "chaindev-evm-address-tags-v1";
 const listeners = new Set<() => void>();
 
@@ -79,6 +86,21 @@ export function getEvmAddressTags(addresses: string[]) {
   ) as Record<string, string | null>;
 }
 
+export function listEvmAddressTags(): EvmAddressTagItem[] {
+  const scope = getActiveTagScope();
+  const store = readTagStore();
+  const scopeEntries = Object.values(store[scope] ?? {});
+
+  return scopeEntries
+    .map((entry) => ({
+      address: entry.address,
+      addressLower: entry.addressLower,
+      nameTag: entry.nameTag,
+      updatedAt: entry.updatedAt,
+    }))
+    .sort((left, right) => right.updatedAt - left.updatedAt || left.address.localeCompare(right.address));
+}
+
 export function upsertEvmAddressTag(address: string, nameTag: string) {
   const normalizedNameTag = nameTag.trim();
 
@@ -125,6 +147,20 @@ export function deleteEvmAddressTag(address: string) {
     ...store,
     [scope]: scopeEntries,
   });
+  emitChange();
+}
+
+export function clearEvmAddressTags() {
+  const scope = getActiveTagScope();
+  const store = readTagStore();
+
+  if (!(scope in store)) {
+    return;
+  }
+
+  const nextStore = { ...store };
+  delete nextStore[scope];
+  writeTagStore(nextStore);
   emitChange();
 }
 

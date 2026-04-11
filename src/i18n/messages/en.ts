@@ -5,6 +5,7 @@ export const en = {
     developerTools: "Developer Tools",
     settings: "Settings",
     cache: "Cache",
+    nameTags: "Name Tags",
     overview: "Overview",
     blocks: "Blocks",
     transaction: "Transaction",
