@@ -8,6 +8,11 @@ import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
 import { RelativeTime } from "@/components/relative-time";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
+  getEvmAddressTags,
+  subscribeEvmAddressTags,
+} from "@/domains/evm/client/address-tags";
+import { AddressLink } from "@/domains/evm/ui/address-link";
+import {
   getEvmTransactionReceiptSummariesDirect,
   getEvmTransactionsPageDirect,
 } from "@/domains/evm/client/queries";
@@ -53,10 +58,21 @@ function EvmTransactionsPageContent() {
   const [receiptDetailsByHash, setReceiptDetailsByHash] = useState<
     Record<string, { status: string; statusLabel: string; feeLabel: string }>
   >({});
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const transactionHashesKey = useMemo(
     () => data?.transactions.map((transaction) => transaction.hash).join(",") ?? "",
+    [data],
+  );
+  const visibleAddresses = useMemo(
+    () =>
+      [...new Set(
+        data?.transactions.flatMap((transaction) => [
+          transaction.from,
+          ...(transaction.to ? [transaction.to] : []),
+        ]) ?? [],
+      )],
     [data],
   );
 
@@ -179,6 +195,29 @@ function EvmTransactionsPageContent() {
       cancelled = true;
     };
   }, [data, receiptLookupEnabled, transactionHashesKey]);
+
+  useEffect(() => {
+    function loadVisibleTags() {
+      setNameTagsByAddress(getEvmAddressTags(visibleAddresses));
+    }
+
+    loadVisibleTags();
+
+    const unsubscribe = subscribeEvmAddressTags(() => {
+      loadVisibleTags();
+    });
+
+    const handleProfileChanged = () => {
+      loadVisibleTags();
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, [visibleAddresses]);
 
   if (loading) {
     return (
@@ -319,15 +358,21 @@ function EvmTransactionsPageContent() {
                         <RelativeTime timestampMs={transaction.timestampMs} />
                       </td>
                       <td className="px-5 py-3 text-sm">
-                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/address/${transaction.from}`}>
-                          {transaction.fromLabel}
-                        </Link>
+                        <AddressLink
+                          address={transaction.from}
+                          href={`/evm/address/${transaction.from}`}
+                          label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
+                          className="font-medium text-sky-600 hover:text-sky-700"
+                        />
                       </td>
                       <td className="px-5 py-3 text-sm">
                         {transaction.to ? (
-                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/address/${transaction.to}`}>
-                            {transaction.toLabel}
-                          </Link>
+                          <AddressLink
+                            address={transaction.to}
+                            href={`/evm/address/${transaction.to}`}
+                            label={nameTagsByAddress[transaction.to] ?? transaction.toLabel}
+                            className="font-medium text-sky-600 hover:text-sky-700"
+                          />
                         ) : (
                           <span className="text-slate-500">Contract Creation</span>
                         )}

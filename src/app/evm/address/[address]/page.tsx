@@ -4,12 +4,22 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  deleteEvmAddressTag,
+  getEvmAddressTag,
+  getEvmAddressTags,
+  subscribeEvmAddressTags,
+  upsertEvmAddressTag,
+} from "@/domains/evm/client/address-tags";
 import {
   getEvmAddressCacheSnapshot,
   MAX_CACHED_EVM_TRANSACTIONS,
   subscribeEvmTransactionCache,
 } from "@/domains/evm/client/transaction-cache";
+import { AddressLink } from "@/domains/evm/ui/address-link";
 import { getActiveEvmCurrencyNameClient, getEvmAddressSummaryDirect } from "@/domains/evm/client/queries";
 import { AppShell } from "@/platform/layout/app-shell";
 
@@ -107,7 +117,7 @@ function formatBalanceLabel(balance: string, currencyName: string) {
 }
 
 function formatAddressLabel(address: string) {
-  return `${address.slice(0, 10)}...${address.slice(-8)}`;
+  return `${address.slice(0, 8)}...${address.slice(-6)}`;
 }
 
 function getDirection(transaction: {
@@ -152,6 +162,9 @@ export default function EvmAddressPage() {
   const isValid = useMemo(() => /^0x[a-fA-F0-9]{40}$/.test(address), [address]);
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof getEvmAddressSummaryDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [nameTag, setNameTag] = useState<string | null>(null);
+  const [tagInput, setTagInput] = useState("");
+  const [tagEditorOpen, setTagEditorOpen] = useState(false);
   const [addressCacheSnapshot, setAddressCacheSnapshot] = useState<Awaited<ReturnType<typeof getEvmAddressCacheSnapshot>>>({
     totalTransactions: 0,
     transactions: [],
@@ -161,6 +174,7 @@ export default function EvmAddressPage() {
     outboundCount: 0,
     selfCount: 0,
   });
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const currencyName = getActiveEvmCurrencyNameClient();
 
   useEffect(() => {
@@ -187,6 +201,35 @@ export default function EvmAddressPage() {
     return () => {
       cancelled = true;
       unsubscribe();
+    };
+  }, [address, isValid]);
+
+  useEffect(() => {
+    if (!isValid) {
+      return;
+    }
+
+    function loadTag() {
+      const nextTag = getEvmAddressTag(address);
+      setNameTag(nextTag);
+      setTagInput(nextTag ?? "");
+    }
+
+    loadTag();
+
+    const unsubscribe = subscribeEvmAddressTags(() => {
+      loadTag();
+    });
+
+    const handleProfileChanged = () => {
+      loadTag();
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
     };
   }, [address, isValid]);
 
@@ -229,6 +272,55 @@ export default function EvmAddressPage() {
   const inboundCount = addressCacheSnapshot.inboundCount;
   const outboundCount = addressCacheSnapshot.outboundCount;
   const selfCount = addressCacheSnapshot.selfCount;
+  const visibleAddresses = useMemo(
+    () =>
+      [...new Set(
+        visibleTransactions.flatMap((transaction) => [
+          transaction.from,
+          ...(transaction.to ? [transaction.to] : []),
+        ]),
+      )],
+    [visibleTransactions],
+  );
+
+  useEffect(() => {
+    function loadVisibleTags() {
+      setNameTagsByAddress(getEvmAddressTags(visibleAddresses));
+    }
+
+    loadVisibleTags();
+
+    const unsubscribe = subscribeEvmAddressTags(() => {
+      loadVisibleTags();
+    });
+
+    const handleProfileChanged = () => {
+      loadVisibleTags();
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, [visibleAddresses]);
+
+  function handleSaveTag() {
+    if (tagInput.trim()) {
+      upsertEvmAddressTag(address, tagInput);
+    } else {
+      deleteEvmAddressTag(address);
+    }
+
+    setTagEditorOpen(false);
+  }
+
+  function handleRemoveTag() {
+    deleteEvmAddressTag(address);
+    setTagInput("");
+    setTagEditorOpen(false);
+  }
 
   if (!isValid) {
     return (
@@ -267,7 +359,40 @@ export default function EvmAddressPage() {
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[1.171875rem] font-semibold text-slate-900">Address</h1>
             <span className="text-sm font-medium text-slate-500 mono">{summary.address}</span>
+            {nameTag ? (
+              <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
+                {nameTag}
+              </span>
+            ) : null}
+            <button
+              type="button"
+              className="text-xs font-medium text-sky-600 hover:text-sky-700"
+              onClick={() => {
+                setTagInput(nameTag ?? "");
+                setTagEditorOpen((current) => !current);
+              }}
+            >
+              {tagEditorOpen ? "Cancel" : nameTag ? "Edit Tag" : "Add Tag"}
+            </button>
           </div>
+          {tagEditorOpen ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Input
+                className="h-8 w-[240px]"
+                value={tagInput}
+                onChange={(event) => setTagInput(event.target.value)}
+                placeholder="Enter name tag"
+              />
+              <Button size="sm" type="button" onClick={handleSaveTag}>
+                Save
+              </Button>
+              {nameTag ? (
+                <Button size="sm" type="button" variant="outline" onClick={handleRemoveTag}>
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <section className="grid gap-4 xl:grid-cols-3">
@@ -435,15 +560,27 @@ export default function EvmAddressPage() {
                           </span>
                         </td>
                         <td className="px-5 py-3 text-sm">
-                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/address/${transaction.from}`}>
-                            {transaction.from.toLowerCase() === normalizedAddress ? formatAddressLabel(transaction.from) : transaction.fromLabel}
-                          </Link>
+                          <AddressLink
+                            address={transaction.from}
+                            href={`/evm/address/${transaction.from}`}
+                            label={
+                              nameTagsByAddress[transaction.from] ??
+                              (transaction.from.toLowerCase() === normalizedAddress ? formatAddressLabel(transaction.from) : transaction.fromLabel)
+                            }
+                            className="font-medium text-sky-600 hover:text-sky-700"
+                          />
                         </td>
                         <td className="px-5 py-3 text-sm">
                           {transaction.to ? (
-                            <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/address/${transaction.to}`}>
-                              {transaction.to.toLowerCase() === normalizedAddress ? formatAddressLabel(transaction.to) : transaction.toLabel}
-                            </Link>
+                            <AddressLink
+                              address={transaction.to}
+                              href={`/evm/address/${transaction.to}`}
+                              label={
+                                nameTagsByAddress[transaction.to] ??
+                                (transaction.to.toLowerCase() === normalizedAddress ? formatAddressLabel(transaction.to) : transaction.toLabel)
+                              }
+                              className="font-medium text-sky-600 hover:text-sky-700"
+                            />
                           ) : (
                             <span className="text-slate-500">Contract Creation</span>
                           )}

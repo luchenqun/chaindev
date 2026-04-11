@@ -9,7 +9,6 @@ import {
 import {
   getEvmLatestFeedDirect,
   getEvmHomeSnapshotDirect,
-  getEvmLatestBlockActivityDirect,
   hasEvmTransactionByHashDirect,
 } from "@/domains/evm/client/queries";
 
@@ -83,36 +82,6 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       }, delayMs);
     }
 
-    function updateSnapshotWithLatestBlock(
-      current: EvmHomeSnapshot,
-      latest: Awaited<ReturnType<typeof getEvmLatestBlockActivityDirect>>,
-    ): EvmHomeSnapshot {
-      return {
-        ...current,
-        metrics: current.metrics.map((metric) => {
-          if (metric.label === "Latest Block") {
-            return { ...metric, value: latest.latestBlock };
-          }
-
-          if (metric.label === "Latest Block Time") {
-            return { ...metric, value: latest.latestBlockTime };
-          }
-
-          return metric;
-        }),
-        activity: {
-          blocks: [latest.block, ...current.activity.blocks.filter((block) => block.number !== latest.block.number)].slice(0, 6),
-          transactions: [
-            ...latest.transactions,
-            ...current.activity.transactions.filter(
-              (transaction) => !latest.transactions.some((item) => item.hash === transaction.hash),
-            ),
-          ].slice(0, 6),
-        },
-        latestBlockTimestamp: latest.latestBlockTimestamp,
-      };
-    }
-
     async function bootstrapHome() {
       const next = await getEvmHomeSnapshotDirect();
       const resolvedPollIntervalMs = resolvePollInterval(next.pollIntervalMs);
@@ -137,47 +106,24 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
     }
 
     async function refreshHome() {
-      const latest = await getEvmLatestBlockActivityDirect();
+      const next = await getEvmHomeSnapshotDirect();
 
       if (disposed) {
         return;
       }
 
+      const resolvedPollIntervalMs = resolvePollInterval(next.pollIntervalMs);
+
       setStatus({
-        latestBlock: latest.latestBlock,
-        latestBlockNumber: latest.latestBlockNumber,
-        latestBlockTime: latest.latestBlockTime,
-        latestBlockTimestamp: latest.latestBlockTimestamp,
-        pollIntervalMs: pollIntervalRef.current,
+        latestBlock: next.metrics.find((metric) => metric.label === "Latest Block")?.value ?? "Unavailable",
+        latestBlockNumber: next.latestBlockNumber,
+        latestBlockTime: next.metrics.find((metric) => metric.label === "Latest Block Time")?.value ?? "Unavailable",
+        latestBlockTimestamp: next.latestBlockTimestamp,
+        pollIntervalMs: resolvedPollIntervalMs,
       });
-      setSnapshot((current) => {
-        if (!current) {
-          return current;
-        }
-
-        const currentLatestBlock = current.metrics.find((metric) => metric.label === "Latest Block")?.value;
-
-        if (currentLatestBlock === latest.latestBlock) {
-          const nextSnapshot = {
-            ...current,
-            metrics: current.metrics.map((metric) => {
-              if (metric.label === "Latest Block Time") {
-                return { ...metric, value: latest.latestBlockTime };
-              }
-
-              return metric;
-            }),
-            latestBlockTimestamp: latest.latestBlockTimestamp,
-          };
-
-          snapshotRef.current = nextSnapshot;
-          return nextSnapshot;
-        }
-
-        const nextSnapshot = updateSnapshotWithLatestBlock(current, latest);
-        snapshotRef.current = nextSnapshot;
-        return nextSnapshot;
-      });
+      snapshotRef.current = next;
+      setSnapshot(next);
+      setPollIntervalMs(resolvedPollIntervalMs);
       setErrorMessage(null);
       scheduleNextPoll(pollIntervalRef.current);
     }

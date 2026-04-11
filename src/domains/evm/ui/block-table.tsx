@@ -1,5 +1,13 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import {
+  getEvmAddressTags,
+  subscribeEvmAddressTags,
+} from "@/domains/evm/client/address-tags";
+import { AddressLink } from "@/domains/evm/ui/address-link";
 
 type BlockTableProps = {
   blocks: Array<{
@@ -19,6 +27,35 @@ type BlockTableProps = {
 };
 
 export function EvmBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const minerAddresses = useMemo(
+    () => [...new Set(blocks.map((block) => block.miner))],
+    [blocks],
+  );
+
+  useEffect(() => {
+    function loadMinerTags() {
+      setNameTagsByAddress(getEvmAddressTags(minerAddresses));
+    }
+
+    loadMinerTags();
+
+    const unsubscribe = subscribeEvmAddressTags(() => {
+      loadMinerTags();
+    });
+
+    const handleProfileChanged = () => {
+      loadMinerTags();
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, [minerAddresses]);
+
   return (
     <div className="overflow-hidden bg-white">
       <table className="w-full border-collapse">
@@ -46,9 +83,12 @@ export function EvmBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
               </td>
               <td className="px-4 py-2.5 text-[14px] leading-6 font-medium text-sky-600 tabular-nums">{block.txCount}</td>
               <td className="px-4 py-2.5 text-[14px] leading-6">
-                <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/address/${block.miner}`}>
-                  {block.minerLabel}
-                </Link>
+                <AddressLink
+                  address={block.miner}
+                  href={`/evm/address/${block.miner}`}
+                  label={nameTagsByAddress[block.miner] ?? block.minerLabel}
+                  className="font-medium text-sky-600 hover:text-sky-700"
+                />
               </td>
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700 tabular-nums">
                 {block.gasUsedLabel} <span className="text-slate-500">({block.gasUsedPercent})</span>

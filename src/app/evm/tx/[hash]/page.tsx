@@ -10,9 +10,14 @@ import { DetailPageSkeleton } from "@/components/ui/loading-placeholders";
 import { RelativeTime } from "@/components/relative-time";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  getEvmAddressTags,
+  subscribeEvmAddressTags,
+} from "@/domains/evm/client/address-tags";
+import {
   getEvmTransactionByHashDirect,
   getEvmTransactionDebugTraceDirect,
 } from "@/domains/evm/client/queries";
+import { AddressLink } from "@/domains/evm/ui/address-link";
 import { useEvmHomeData } from "@/domains/evm/ui/home-data-provider";
 import { AppShell } from "@/platform/layout/app-shell";
 
@@ -88,6 +93,18 @@ export default function EvmTxPage() {
   const [traceData, setTraceData] = useState<unknown>(null);
   const [traceErrorMessage, setTraceErrorMessage] = useState<string | null>(null);
   const [traceLoading, setTraceLoading] = useState(false);
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const visibleAddresses = useMemo(
+    () =>
+      transaction
+        ? [
+            transaction.from,
+            ...(transaction.to ? [transaction.to] : []),
+            ...(transaction.interactedWith ? [transaction.interactedWith] : []),
+          ]
+        : [],
+    [transaction],
+  );
 
   useEffect(() => {
     if (!isValid) {
@@ -124,6 +141,29 @@ export default function EvmTxPage() {
       window.removeEventListener("chaindev:active-rpc-profile-changed", load);
     };
   }, [hash, isValid]);
+
+  useEffect(() => {
+    function loadVisibleTags() {
+      setNameTagsByAddress(getEvmAddressTags(visibleAddresses));
+    }
+
+    loadVisibleTags();
+
+    const unsubscribe = subscribeEvmAddressTags(() => {
+      loadVisibleTags();
+    });
+
+    const handleProfileChanged = () => {
+      loadVisibleTags();
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, [visibleAddresses]);
 
   async function handleOpenDebugTraceTab() {
     setActiveTab("debugTrace");
@@ -311,21 +351,26 @@ export default function EvmTxPage() {
                     <DetailRow
                       label="From"
                       value={
-                        <Link className="font-medium text-sky-600 hover:text-sky-700 mono" href={`/evm/address/${transaction.from}`}>
-                          {transaction.from}
-                        </Link>
+                        <AddressLink
+                          address={transaction.from}
+                          href={`/evm/address/${transaction.from}`}
+                          label={nameTagsByAddress[transaction.from] ?? transaction.from}
+                          className="font-medium text-sky-600 hover:text-sky-700 mono"
+                          tooltipClassName="max-w-[90vw]"
+                        />
                       }
                     />
                     <DetailRow
                       label="Interacted With (To)"
                       value={
                         transaction.interactedWith ? (
-                          <Link
-                            className="font-medium text-sky-600 hover:text-sky-700 mono"
+                          <AddressLink
+                            address={transaction.interactedWith}
                             href={`/evm/address/${transaction.interactedWith}`}
-                          >
-                            {transaction.interactedWith}
-                          </Link>
+                            label={nameTagsByAddress[transaction.interactedWith] ?? transaction.interactedWith}
+                            className="font-medium text-sky-600 hover:text-sky-700 mono"
+                            tooltipClassName="max-w-[90vw]"
+                          />
                         ) : (
                           "Contract Creation"
                         )
@@ -386,9 +431,50 @@ export default function EvmTxPage() {
                   <div className="mt-0 pt-0">
                     <dl>
                       <DetailRow label="Hash" value={transaction.hash} mono />
-                      <DetailRow label="From" value={transaction.from} mono />
-                      <DetailRow label="To" value={transaction.to ?? "Contract Creation"} mono />
-                      <DetailRow label="Interacted With" value={transaction.interactedWith ?? "Unavailable"} mono />
+                      <DetailRow
+                        label="From"
+                        value={
+                          <AddressLink
+                            address={transaction.from}
+                            href={`/evm/address/${transaction.from}`}
+                            label={nameTagsByAddress[transaction.from] ?? transaction.from}
+                            className="font-medium text-sky-600 hover:text-sky-700 mono"
+                            tooltipClassName="max-w-[90vw]"
+                          />
+                        }
+                      />
+                      <DetailRow
+                        label="To"
+                        value={
+                          transaction.to ? (
+                            <AddressLink
+                              address={transaction.to}
+                              href={`/evm/address/${transaction.to}`}
+                              label={nameTagsByAddress[transaction.to] ?? transaction.to}
+                              className="font-medium text-sky-600 hover:text-sky-700 mono"
+                              tooltipClassName="max-w-[90vw]"
+                            />
+                          ) : (
+                            "Contract Creation"
+                          )
+                        }
+                      />
+                      <DetailRow
+                        label="Interacted With"
+                        value={
+                          transaction.interactedWith ? (
+                            <AddressLink
+                              address={transaction.interactedWith}
+                              href={`/evm/address/${transaction.interactedWith}`}
+                              label={nameTagsByAddress[transaction.interactedWith] ?? transaction.interactedWith}
+                              className="font-medium text-sky-600 hover:text-sky-700 mono"
+                              tooltipClassName="max-w-[90vw]"
+                            />
+                          ) : (
+                            "Unavailable"
+                          )
+                        }
+                      />
                       <DetailRow label="Input Data" value={transaction.inputData} mono />
                     </dl>
 

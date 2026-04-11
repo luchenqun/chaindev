@@ -5,6 +5,9 @@ import { getEvmCurrencyName } from "@/platform/workbench/rpc-profile";
 import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
 import { createEvmClient } from "@/domains/evm/server/client";
 import {
+  clearEvmTransactionCache,
+  getEvmTransactionCacheSummary,
+  getLatestCachedTransactionHash,
   rememberEvmTransactionCache,
   type EvmCachedTransactionItem,
 } from "@/domains/evm/client/transaction-cache";
@@ -145,6 +148,36 @@ function formatTransactionFee(value: bigint | null | undefined, currencyName: st
   return `${amount.toFixed(9).replace(/\.?0+$/, "")} ${currencyName}`;
 }
 
+function formatAccountBalance(value: bigint, currencyName: string) {
+  const amount = Number(formatEther(value));
+
+  if (amount === 0) {
+    return `0 ${currencyName}`;
+  }
+
+  if (amount < 0.000001) {
+    return `<0.000001 ${currencyName}`;
+  }
+
+  return `${amount.toFixed(amount < 1 ? 6 : 4).replace(/\.?0+$/, "")} ${currencyName}`;
+}
+
+function formatIntervalSeconds(seconds: number | null | undefined) {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) {
+    return "Unavailable";
+  }
+
+  if (seconds < 1) {
+    return `${seconds.toFixed(2).replace(/\.?0+$/, "")}s`;
+  }
+
+  if (seconds < 10) {
+    return `${seconds.toFixed(1).replace(/\.0$/, "")}s`;
+  }
+
+  return `${Math.round(seconds)}s`;
+}
+
 function derivePollIntervalMs(timestamps: bigint[]) {
   if (timestamps.length < 2) {
     return 12_000;
@@ -166,6 +199,18 @@ function derivePollIntervalMsFromRange(latestTimestamp: bigint, oldestTimestamp:
   const averageSeconds = (Number(latestTimestamp - oldestTimestamp) / blockSpan) * 0.8;
 
   return Math.max(1_000, Math.min(30_000, Math.round(averageSeconds * 1_000)));
+}
+
+function parseHexQuantity(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  try {
+    return BigInt(value);
+  } catch {
+    return null;
+  }
 }
 
 function formatHomeBlockItem(block: {
@@ -525,6 +570,8 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
   let latestBlockTimestamp: bigint | undefined;
   const timestamps: bigint[] = [];
+  let recentTransactionCount = 0;
+  const cacheCandidates: EvmCachedTransactionItem[] = [];
 
   for (let cursor = latestNumber; cursor >= 0n; cursor -= 1n) {
     const includeTransactions = transactions.length < txLimit;
@@ -541,16 +588,20 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
       timestamps.push(block.timestamp);
     }
 
+    if (timestamps.length <= 10) {
+      recentTransactionCount += block.transactions.length;
+    }
+
     if (blocks.length < blockLimit) {
       blocks.push(formatHomeBlockItem(block));
     }
 
     if (includeTransactions) {
       transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
-      void rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(block, currencyName));
+      cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
     }
 
-    if (blocks.length >= blockLimit && transactions.length >= txLimit) {
+    if (timestamps.length >= 11 && blocks.length >= blockLimit && transactions.length >= txLimit) {
       break;
     }
 
@@ -559,12 +610,74 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
     }
   }
 
+  await rememberEvmTransactionCache(cacheCandidates);
+  const intervalSamples = timestamps
+    .slice(0, 10)
+    .map((timestamp, index) => {
+      const previousTimestamp = timestamps[index + 1];
+
+      if (previousTimestamp == null) {
+        return null;
+      }
+
+      return Number(timestamp - previousTimestamp);
+    })
+    .filter((value): value is number => value != null);
+  const averageBlockTimeSeconds = intervalSamples.length
+    ? intervalSamples.reduce((sum, value) => sum + value, 0) / intervalSamples.length
+    : null;
+  const pendingTransactionCountHex = await client.transport
+    .request({
+      method: "eth_getBlockTransactionCountByNumber",
+      params: ["pending"] as never,
+    })
+    .catch(() => null);
+  const pendingTransactionCount = parseHexQuantity(pendingTransactionCountHex);
+  const cacheSummary = await getEvmTransactionCacheSummary();
+
   return {
+    header: {
+      connection: "Direct JSON-RPC",
+      providerName: profile.name,
+      nativeCurrency: currencyName,
+      chainId: String(chainId),
+    },
     metrics: [
-      { label: "Latest Block", value: latestNumber.toString() },
-      { label: "Latest Block Time", value: formatLocalDateTime(latestBlockTimestamp) },
-      { label: "Gas Price", value: `${Number(formatGwei(gasPrice)).toFixed(3)} Gwei` },
-      { label: "Chain ID", value: String(chainId) },
+      { label: "Latest Block", value: latestNumber.toString(), subtext: "Current head" },
+      { label: "Latest Block Time", value: formatLocalDateTime(latestBlockTimestamp), subtext: "Local formatted time" },
+      {
+        label: "Average Block Time",
+        value: formatIntervalSeconds(averageBlockTimeSeconds),
+        subtext: "Sampled from recent blocks",
+      },
+      {
+        label: "Gas Price",
+        value: `${Number(formatGwei(gasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`,
+        subtext: "Quoted in gwei",
+      },
+      {
+        label: "Pending Tx Count",
+        value: pendingTransactionCount != null ? formatInteger(pendingTransactionCount) : "Unavailable",
+        subtext:
+          pendingTransactionCount != null
+            ? "Pending pool snapshot"
+            : "Provider does not expose pending pool",
+      },
+      {
+        label: "Recent Tx Count",
+        value: formatInteger(recentTransactionCount),
+        subtext: `Last ${Math.min(10, timestamps.length)} blocks`,
+      },
+      {
+        label: "Cached Transactions",
+        value: formatInteger(cacheSummary.totalTransactions),
+        subtext: "Local IndexedDB",
+      },
+      {
+        label: "Observed Accounts",
+        value: formatInteger(cacheSummary.totalObservedAccounts),
+        subtext: "Derived from cached transactions",
+      },
     ],
     activity: {
       blocks,
@@ -764,6 +877,181 @@ export async function getLatestEvmTransactionsDirect(limit = 20) {
   };
 }
 
+export async function getEvmOverviewDirect() {
+  const { client, profile } = await getEvmClientWithProfile();
+  const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
+  const [chainId, gasPrice, latestNumber] = await Promise.all([
+    client.getChainId(),
+    client.getGasPrice(),
+    client.getBlockNumber(),
+  ]);
+  const latestCachedTransactionHash = await getLatestCachedTransactionHash();
+  let cacheValidationLabel = "Valid under current provider";
+
+  if (latestCachedTransactionHash) {
+    const existingTransaction = await client.transport.request({
+      method: "eth_getTransactionByHash",
+      params: [latestCachedTransactionHash] as never,
+    });
+
+    if (existingTransaction == null) {
+      await clearEvmTransactionCache();
+      cacheValidationLabel = "Cleared on provider mismatch";
+    }
+  }
+
+  const recentBlocks: Array<{
+    number: bigint;
+    hash: string | null;
+    miner: string;
+    transactions: readonly unknown[];
+    timestamp?: bigint | null;
+    gasUsed?: bigint | null;
+  }> = [];
+  const recentTransactions: Array<{
+    hash: string;
+    hashLabel: string;
+    from: string;
+    fromLabel: string;
+    to: string | null;
+    toLabel: string;
+    value: string;
+    timestampMs: number | null;
+  }> = [];
+  const cacheCandidates: EvmCachedTransactionItem[] = [];
+
+  for (let cursor = latestNumber; cursor >= 0n; cursor -= 1n) {
+    const includeTransactions = recentTransactions.length < 5;
+    const block = await client.getBlock({
+      blockNumber: cursor,
+      includeTransactions,
+    });
+
+    if (recentBlocks.length < 11) {
+      recentBlocks.push({
+        number: block.number,
+        hash: block.hash ?? null,
+        miner: block.miner,
+        transactions: block.transactions,
+        timestamp: block.timestamp,
+        gasUsed: block.gasUsed,
+      });
+    }
+
+    if (includeTransactions) {
+      recentTransactions.push(
+        ...formatHomeTransactions(
+          block.transactions,
+          block.timestamp,
+          currencyName,
+          5 - recentTransactions.length,
+        ),
+      );
+      cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
+    }
+
+    if (recentBlocks.length >= 11 && recentTransactions.length >= 5) {
+      break;
+    }
+
+    if (cursor === 0n) {
+      break;
+    }
+  }
+
+  await rememberEvmTransactionCache(cacheCandidates);
+
+  const activityBlocks = recentBlocks.slice(0, 5).map((block) => formatHomeBlockItem(block));
+  const rhythmRows = recentBlocks.slice(0, 10).map((block, index) => {
+    const previousBlock = recentBlocks[index + 1];
+    const intervalSeconds =
+      block.timestamp != null && previousBlock?.timestamp != null
+        ? Number(block.timestamp - previousBlock.timestamp)
+        : null;
+
+    return {
+      number: block.number.toString(),
+      hash: block.hash ?? "",
+      intervalSeconds,
+      intervalLabel: formatIntervalSeconds(intervalSeconds),
+      txCount: block.transactions.length,
+      gasUsedLabel: formatGasUsed(block.gasUsed),
+      timestampMs: block.timestamp ? Number(block.timestamp) * 1000 : null,
+    };
+  });
+  const intervalSamples = rhythmRows
+    .map((row) => row.intervalSeconds)
+    .filter((value): value is number => value != null);
+  const averageIntervalSeconds = intervalSamples.length
+    ? intervalSamples.reduce((sum, value) => sum + value, 0) / intervalSamples.length
+    : null;
+  const fastestIntervalSeconds = intervalSamples.length ? Math.min(...intervalSamples) : null;
+  const slowestIntervalSeconds = intervalSamples.length ? Math.max(...intervalSamples) : null;
+  const latestBlock = recentBlocks[0] ?? null;
+  const pendingTransactionCountHex = await client.transport
+    .request({
+      method: "eth_getBlockTransactionCountByNumber",
+      params: ["pending"] as never,
+    })
+    .catch(() => null);
+  const pendingTransactionCount = parseHexQuantity(pendingTransactionCountHex);
+  const cacheSummary = await getEvmTransactionCacheSummary();
+
+  return {
+    header: {
+      providerName: profile.name,
+      nativeCurrency: currencyName,
+    },
+    core: {
+      latestBlock: latestNumber.toString(),
+      latestBlockTimestampMs: latestBlock?.timestamp ? Number(latestBlock.timestamp) * 1000 : null,
+      latestBlockTime: formatLocalDateTime(latestBlock?.timestamp),
+      averageBlockTime: formatIntervalSeconds(averageIntervalSeconds),
+      gasPrice: `${Number(formatGwei(gasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`,
+      chainId: String(chainId),
+      pendingTransactionCount:
+        pendingTransactionCount != null ? formatInteger(pendingTransactionCount) : "Unavailable",
+    },
+    activity: {
+      blocks: activityBlocks,
+      transactions: recentTransactions,
+    },
+    rhythm: {
+      averageInterval: formatIntervalSeconds(averageIntervalSeconds),
+      fastestInterval: formatIntervalSeconds(fastestIntervalSeconds),
+      slowestInterval: formatIntervalSeconds(slowestIntervalSeconds),
+      recentTransactionCount: formatInteger(
+        rhythmRows.reduce((sum, row) => sum + row.txCount, 0),
+      ),
+      blocks: rhythmRows,
+    },
+    cache: {
+      cachedTransactions: formatInteger(cacheSummary.totalTransactions),
+      observedAccounts: formatInteger(cacheSummary.totalObservedAccounts),
+      latestCachedTransaction: cacheSummary.latestSeenTransaction
+        ? {
+            hash: cacheSummary.latestSeenTransaction.hash,
+            hashLabel: shortenHash(cacheSummary.latestSeenTransaction.hash, 14, 8),
+            blockNumber: cacheSummary.latestSeenTransaction.blockNumber,
+            timestampMs: cacheSummary.latestSeenTransaction.timestampMs,
+          }
+        : null,
+      validation: cacheValidationLabel,
+    },
+    pollIntervalMs: latestBlock?.timestamp != null && recentBlocks[10]?.timestamp != null
+      ? derivePollIntervalMsFromRange(
+          latestBlock.timestamp,
+          recentBlocks[10].timestamp,
+          Number(latestBlock.number - recentBlocks[10].number),
+        )
+      : derivePollIntervalMs(
+          recentBlocks
+            .map((block) => block.timestamp)
+            .filter((value): value is bigint => value != null),
+        ),
+  };
+}
+
 export async function getEvmLatestFeedDirect(txLimit = 20, includePollSample = true) {
   const { client, profile } = await getEvmClientWithProfile();
   const latestBlock = await client.getBlock({
@@ -915,6 +1203,32 @@ export async function getEvmAddressSummaryDirect(address: string) {
     balance,
     nonce,
   });
+}
+
+export async function getEvmAddressBalancesDirect(addresses: string[]) {
+  const uniqueAddresses = [...new Set(addresses)].filter((address): address is `0x${string}` => isAddress(address));
+
+  if (!uniqueAddresses.length) {
+    return {};
+  }
+
+  const { client, profile } = await getEvmClientWithProfile();
+  const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
+  const settled = await Promise.allSettled(
+    uniqueAddresses.map(async (address) => [address, await client.getBalance({ address })] as const),
+  );
+
+  return Object.fromEntries(
+    settled.map((result, index) => {
+      const address = uniqueAddresses[index];
+
+      if (result.status === "fulfilled") {
+        return [address, formatAccountBalance(result.value[1], currencyName)];
+      }
+
+      return [address, "Unavailable"];
+    }),
+  ) as Record<string, string>;
 }
 
 export async function requestEvmRpcDirect(method: string, params: unknown[] = []) {

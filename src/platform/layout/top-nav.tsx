@@ -32,37 +32,81 @@ function inferMode(pathname: string): PlatformMode {
   return pathname.startsWith("/cosmos") ? "cosmos" : "evm";
 }
 
+function matchesNavItem(pathname: string, href: string) {
+  if (pathname === href || pathname.startsWith(href + "/")) {
+    return true;
+  }
+
+  if (href.startsWith("/evm/tx/")) {
+    return pathname.startsWith("/evm/tx/");
+  }
+
+  if (href.startsWith("/evm/address/")) {
+    return pathname.startsWith("/evm/address/");
+  }
+
+  if (href.startsWith("/cosmos/tx/")) {
+    return pathname.startsWith("/cosmos/tx/");
+  }
+
+  if (href.startsWith("/cosmos/account/")) {
+    return pathname.startsWith("/cosmos/account/");
+  }
+
+  return false;
+}
+
+function matchesNavGroup(pathname: string, groupId: string) {
+  if (groupId === "tools") {
+    return pathname.startsWith("/evm/tools") || pathname.startsWith("/cosmos/tools");
+  }
+
+  if (groupId === "browser") {
+    return [
+      "/evm/overview",
+      "/evm/blocks",
+      "/evm/block/",
+      "/evm/accounts",
+      "/evm/txs",
+      "/evm/tx/",
+      "/evm/address/",
+      "/cosmos/overview",
+      "/cosmos/blocks",
+      "/cosmos/block/",
+      "/cosmos/tx/",
+      "/cosmos/account/",
+      "/cosmos/validators",
+      "/cosmos/proposals",
+    ].some((prefix) => pathname === prefix || pathname.startsWith(prefix));
+  }
+
+  return false;
+}
+
 export function TopNav() {
   const messages = getMessages();
   const pathname = usePathname();
   const mode = inferMode(pathname);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const blockchainItems: NavItem[] =
+    mode === "cosmos"
+      ? [
+          { href: "/cosmos/overview", label: "Overview" },
+          { href: "/cosmos/blocks", label: "Blocks" },
+          { href: "/cosmos/validators", label: "Validators" },
+          { href: "/cosmos/proposals", label: "Proposals" },
+        ]
+      : [
+          { href: "/evm/overview", label: "Overview" },
+          { href: "/evm/blocks", label: "Blocks" },
+          { href: "/evm/accounts", label: "Accounts" },
+          { href: "/evm/txs", label: "Transactions" },
+        ];
   const activeNavGroups: NavGroup[] = [
     {
       id: "browser",
       label: messages.navigation.blockchain,
-      items: [
-        { href: "/evm/overview", label: "EVM Overview" },
-        { href: "/evm/blocks", label: "EVM Blocks" },
-        { href: "/evm/txs", label: "EVM Transactions" },
-        {
-          href: "/evm/tx/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          label: "EVM Transaction",
-        },
-        { href: "/evm/address/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", label: "EVM Address" },
-        { href: "/cosmos/overview", label: "Cosmos Overview" },
-        { href: "/cosmos/blocks", label: "Cosmos Blocks" },
-        {
-          href: "/cosmos/tx/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-          label: "Cosmos Transaction",
-        },
-        {
-          href: "/cosmos/account/cosmos1qyqszqgpqyqszqgpqyqszqgpqyqszqgph8n7u4",
-          label: "Cosmos Account",
-        },
-        { href: "/cosmos/validators", label: "Cosmos Validators" },
-        { href: "/cosmos/proposals", label: "Cosmos Proposals" },
-      ],
+      items: blockchainItems,
     },
     {
       id: "tools",
@@ -110,7 +154,7 @@ export function TopNav() {
       </div>
 
       <div className="border-t border-slate-100">
-        <div className="mx-auto grid max-w-7xl gap-6 px-5 py-1.5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+        <div className="mx-auto grid max-w-7xl gap-5 px-5 py-0.5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3">
               <Image alt="Chaindev" className="h-[52px] w-auto" height={52} src="/brand-lockup.svg" width={223} />
@@ -119,13 +163,13 @@ export function TopNav() {
 
           <nav className="flex flex-wrap items-center justify-end gap-8 text-[15px] font-normal text-slate-800">
             <Link
-              className={pathname === "/" ? "py-4 text-sky-600" : "py-4 text-slate-800 hover:text-sky-600"}
+              className={pathname === "/" ? "py-2.5 text-[#1697ea]" : "py-2.5 text-slate-800 hover:text-[#1697ea]"}
               href="/"
             >
               {messages.navigation.home}
             </Link>
             {activeNavGroups.map((group) => {
-              const active = group.items.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"));
+              const active = matchesNavGroup(pathname, group.id);
 
               return (
                 <div
@@ -138,8 +182,8 @@ export function TopNav() {
                     type="button"
                     className={
                       active || openGroup === group.id
-                        ? "inline-flex items-center gap-1 py-4 text-sky-600"
-                        : "inline-flex items-center gap-1 py-4 text-slate-800 hover:text-sky-600"
+                        ? "inline-flex items-center gap-1 py-2.5 text-[#1697ea]"
+                        : "inline-flex items-center gap-1 py-2.5 text-slate-800 hover:text-[#1697ea]"
                     }
                   >
                     {group.label}
@@ -147,10 +191,10 @@ export function TopNav() {
                   </button>
                   {openGroup === group.id ? (
                     <div className="absolute left-0 top-full z-20 min-w-[220px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
-                      <div className="border-t-[3px] border-sky-500" />
+                      <div className="border-t-[3px] border-[#19a7f2]" />
                       <div className="py-2">
                         {group.items.map((item) => {
-                          const itemActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                          const itemActive = matchesNavItem(pathname, item.href);
 
                           return (
                             <Link
@@ -158,8 +202,8 @@ export function TopNav() {
                               href={item.href}
                               className={
                                 itemActive
-                                  ? "block px-7 py-3 text-[15px] font-normal text-sky-600"
-                                  : "block px-7 py-3 text-[15px] font-normal text-slate-800 hover:bg-slate-50 hover:text-sky-600"
+                                  ? "block rounded-lg px-6 py-2 text-[15px] font-normal text-[#1697ea]"
+                                  : "block rounded-lg px-6 py-2 text-[15px] font-normal text-slate-800 hover:bg-slate-100 hover:text-slate-900"
                               }
                             >
                               {item.label}

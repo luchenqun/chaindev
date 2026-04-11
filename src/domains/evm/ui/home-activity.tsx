@@ -2,8 +2,14 @@
 
 import { IconBox, IconFileText } from "@tabler/icons-react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { HomeActivitySkeleton } from "@/components/ui/loading-placeholders";
+import {
+  getEvmAddressTags,
+  subscribeEvmAddressTags,
+} from "@/domains/evm/client/address-tags";
+import { AddressLink } from "@/domains/evm/ui/address-link";
 import { useEvmHomeData } from "@/domains/evm/ui/home-data-provider";
 
 function EmptyState({ title, message }: { title: string; message: string }) {
@@ -45,6 +51,43 @@ function formatRelativeAge(timestampMs: number | null, nowMs: number) {
 export function EvmHomeActivity() {
   const { snapshot, errorMessage, nowMs } = useEvmHomeData();
   const activity = snapshot?.activity ?? null;
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const visibleAddresses = useMemo(
+    () =>
+      [...new Set(
+        [
+          ...(activity?.blocks.map((block) => block.miner) ?? []),
+          ...(activity?.transactions.flatMap((transaction) => [
+            transaction.from,
+            ...(transaction.to ? [transaction.to] : []),
+          ]) ?? []),
+        ],
+      )],
+    [activity],
+  );
+
+  useEffect(() => {
+    function loadVisibleTags() {
+      setNameTagsByAddress(getEvmAddressTags(visibleAddresses));
+    }
+
+    loadVisibleTags();
+
+    const unsubscribe = subscribeEvmAddressTags(() => {
+      loadVisibleTags();
+    });
+
+    const handleProfileChanged = () => {
+      loadVisibleTags();
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, [visibleAddresses]);
 
   if (!snapshot && !errorMessage) {
     return <HomeActivitySkeleton />;
@@ -81,9 +124,12 @@ export function EvmHomeActivity() {
                   <div className="min-w-0">
                     <p className="truncate text-sm text-slate-600">
                       Miner{" "}
-                      <Link className="font-semibold text-sky-600 hover:text-sky-700" href={`/evm/address/${block.miner}`}>
-                        {block.minerLabel}
-                      </Link>
+                      <AddressLink
+                        address={block.miner}
+                        href={`/evm/address/${block.miner}`}
+                        label={nameTagsByAddress[block.miner] ?? block.minerLabel}
+                        className="font-semibold text-sky-600 hover:text-sky-700"
+                      />
                     </p>
                     <p className="mt-1 text-sm text-slate-500">{block.txCount}</p>
                   </div>
@@ -131,16 +177,22 @@ export function EvmHomeActivity() {
                   <div className="min-w-0">
                     <p className="truncate text-sm text-slate-600">
                       From{" "}
-                      <Link className="font-semibold text-sky-600 hover:text-sky-700" href={`/evm/address/${transaction.from}`}>
-                        {transaction.fromLabel}
-                      </Link>
+                      <AddressLink
+                        address={transaction.from}
+                        href={`/evm/address/${transaction.from}`}
+                        label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
+                        className="font-semibold text-sky-600 hover:text-sky-700"
+                      />
                     </p>
                     <p className="truncate text-sm text-slate-600">
                       To{" "}
                       {transaction.to ? (
-                        <Link className="font-semibold text-sky-600 hover:text-sky-700" href={`/evm/address/${transaction.to}`}>
-                          {transaction.toLabel}
-                        </Link>
+                        <AddressLink
+                          address={transaction.to}
+                          href={`/evm/address/${transaction.to}`}
+                          label={nameTagsByAddress[transaction.to] ?? transaction.toLabel}
+                          className="font-semibold text-sky-600 hover:text-sky-700"
+                        />
                       ) : (
                         <span className="text-slate-500">{transaction.toLabel}</span>
                       )}
