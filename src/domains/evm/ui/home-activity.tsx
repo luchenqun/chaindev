@@ -129,6 +129,7 @@ export function EvmHomeActivity() {
                         href={`/evm/address/${block.miner}`}
                         label={nameTagsByAddress[block.miner] ?? block.minerLabel}
                         className="font-semibold text-sky-600 hover:text-sky-700"
+                        showCopyButton={false}
                       />
                     </p>
                     <p className="mt-1 text-sm text-slate-500">{block.txCount}</p>
@@ -182,6 +183,7 @@ export function EvmHomeActivity() {
                         href={`/evm/address/${transaction.from}`}
                         label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
                         className="font-semibold text-sky-600 hover:text-sky-700"
+                        showCopyButton={false}
                       />
                     </p>
                     <p className="truncate text-sm text-slate-600">
@@ -192,6 +194,7 @@ export function EvmHomeActivity() {
                           href={`/evm/address/${transaction.to}`}
                           label={nameTagsByAddress[transaction.to] ?? transaction.toLabel}
                           className="font-semibold text-sky-600 hover:text-sky-700"
+                          showCopyButton={false}
                         />
                       ) : (
                         <span className="text-slate-500">{transaction.toLabel}</span>

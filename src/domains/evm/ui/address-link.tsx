@@ -11,9 +11,17 @@ type AddressLinkProps = {
   label: string;
   className?: string;
   tooltipClassName?: string;
+  showCopyButton?: boolean;
 };
 
-export function AddressLink({ address, href, label, className, tooltipClassName }: AddressLinkProps) {
+export function AddressLink({
+  address,
+  href,
+  label,
+  className,
+  tooltipClassName,
+  showCopyButton = true,
+}: AddressLinkProps) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<number | null>(null);
 
@@ -68,25 +76,27 @@ export function AddressLink({ address, href, label, className, tooltipClassName 
           <span className="block whitespace-nowrap">{address}</span>
         </span>
       </span>
-      <span className="relative inline-flex">
-        <button
-          type="button"
-          className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
-          aria-label="Copy address"
-          onClick={() => void handleCopy()}
-        >
-          <IconCopy className="size-4" stroke={1.8} />
-        </button>
-        <span
-          className={cn(
-            "pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.28)] transition-opacity",
-            "after:absolute after:left-1/2 after:top-full after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-8 after:border-t-8 after:border-x-transparent after:border-t-slate-800 after:content-['']",
-            copied ? "opacity-100" : "",
-          )}
-        >
-          <span className="block whitespace-nowrap">Copied!</span>
+      {showCopyButton ? (
+        <span className="relative inline-flex">
+          <button
+            type="button"
+            className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
+            aria-label="Copy address"
+            onClick={() => void handleCopy()}
+          >
+            <IconCopy className="size-4" stroke={1.8} />
+          </button>
+          <span
+            className={cn(
+              "pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.28)] transition-opacity",
+              "after:absolute after:left-1/2 after:top-full after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-8 after:border-t-8 after:border-x-transparent after:border-t-slate-800 after:content-['']",
+              copied ? "opacity-100" : "",
+            )}
+          >
+            <span className="block whitespace-nowrap">Copied!</span>
+          </span>
         </span>
-      </span>
+      ) : null}
     </span>
   );
 }

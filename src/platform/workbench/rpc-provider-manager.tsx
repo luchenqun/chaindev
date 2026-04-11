@@ -261,7 +261,7 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
     writeActiveRpcProfileCookie(profile);
 
     if (profile.mode !== mode) {
-      router.push(`/${profile.mode}/overview`);
+      router.push(`/${profile.mode}/blocks`);
       return;
     }
 
