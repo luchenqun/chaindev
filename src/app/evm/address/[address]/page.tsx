@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { IconInfoCircle } from "@tabler/icons-react";
 import { RelativeTime } from "@/components/relative-time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import {
   subscribeEvmAddressTags,
   upsertEvmAddressTag,
 } from "@/domains/evm/client/address-tags";
+import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
 import {
   getEvmAddressCacheSnapshot,
   MAX_CACHED_EVM_TRANSACTIONS,
@@ -26,10 +28,15 @@ import {
   type EvmContractArtifact,
   type EvmContractBinding,
 } from "@/domains/evm/client/contract-registry";
+import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transaction-decoder";
 import { getActiveEvmContractEnvironmentDirect } from "@/domains/evm/client/contract-executor";
 import { AddressLink } from "@/domains/evm/ui/address-link";
 import { AddressContractPanel } from "@/domains/evm/ui/address-contract-panel";
-import { getActiveEvmCurrencyNameClient, getEvmAddressSummaryDirect } from "@/domains/evm/client/queries";
+import {
+  getActiveEvmCurrencyNameClient,
+  getEvmAddressSummaryDirect,
+  hydrateEvmCachedTransactionInputsByHashDirect,
+} from "@/domains/evm/client/queries";
 import { AppShell } from "@/platform/layout/app-shell";
 
 const VISIBLE_TRANSACTIONS = 25;
@@ -159,14 +166,28 @@ function AddressMetric({
   label,
   value,
   subtext,
+  tooltip,
 }: {
   label: string;
   value: React.ReactNode;
   subtext?: React.ReactNode;
+  tooltip?: React.ReactNode;
 }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</p>
+      <div className="flex items-center gap-1.5">
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</p>
+        {tooltip ? (
+          <span className="group relative inline-flex">
+            <span className="inline-flex items-center justify-center text-slate-300">
+              <IconInfoCircle className="size-3.5" stroke={1.8} />
+            </span>
+            <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 w-[260px] -translate-x-1/2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-medium leading-5 text-white opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.28)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+              {tooltip}
+            </span>
+          </span>
+        ) : null}
+      </div>
       <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
       {subtext ? <p className="mt-1 text-sm text-slate-500">{subtext}</p> : null}
     </div>
@@ -356,6 +377,37 @@ export default function EvmAddressPage() {
       )],
     [visibleTransactions],
   );
+  const decodedMethodLabelByHash = useMemo(
+    () => {
+      void contractBinding;
+      void contractArtifact;
+      void contractEnvironment;
+
+      return Object.fromEntries(
+        visibleTransactions.map((transaction) => [
+          transaction.hash,
+          resolveEvmTransactionMethodLabel({
+            to: transaction.to,
+            inputData: transaction.inputData,
+            fallbackMethodLabel: transaction.methodLabel,
+          }),
+        ]),
+      );
+    },
+    [visibleTransactions, contractBinding, contractArtifact, contractEnvironment],
+  );
+
+  useEffect(() => {
+    const hashesNeedingInputData = visibleTransactions
+      .filter((transaction) => transaction.to && !transaction.inputData)
+      .map((transaction) => transaction.hash);
+
+    if (!hashesNeedingInputData.length) {
+      return;
+    }
+
+    void hydrateEvmCachedTransactionInputsByHashDirect(hashesNeedingInputData);
+  }, [visibleTransactions]);
 
   useEffect(() => {
     function loadVisibleTags() {
@@ -489,78 +541,72 @@ export default function EvmAddressPage() {
           ) : null}
         </div>
 
-        <section className="grid gap-4 xl:grid-cols-3">
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <h2 className="text-lg font-semibold text-slate-900">Overview</h2>
-            <div className="mt-5 space-y-5">
-              <AddressMetric label={`${currencyName} Balance`} value={formatBalanceLabel(summary.balance, currencyName)} />
-              <AddressMetric label="Nonce" value={summary.nonce.toLocaleString("en-US")} />
-              <AddressMetric
-                label="Observed Transactions"
-                value={addressCacheSnapshot.totalTransactions.toLocaleString("en-US")}
-                subtext={`Showing latest ${visibleTransactions.length} cached records`}
-              />
-            </div>
-          </article>
-
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <h2 className="text-lg font-semibold text-slate-900">More Info</h2>
-            <div className="mt-5 space-y-5">
-              <AddressMetric
-                label="Latest Seen"
-                value={
-                  latestSeenTransaction ? (
-                    <span className="text-base font-semibold text-slate-900">
-                      <RelativeTime timestampMs={latestSeenTransaction.timestampMs} />
-                    </span>
-                  ) : (
-                    "Not cached yet"
-                  )
-                }
-                subtext={
-                  latestSeenTransaction ? `Block #${latestSeenTransaction.blockNumber}` : "Browse blocks or txs first"
-                }
-              />
-              <AddressMetric
-                label="First Seen In Cache"
-                value={
-                  firstSeenTransaction ? (
-                    <span className="text-base font-semibold text-slate-900">
-                      <RelativeTime timestampMs={firstSeenTransaction.timestampMs} />
-                    </span>
-                  ) : (
-                    "Not cached yet"
-                  )
-                }
-                subtext={
-                  firstSeenTransaction ? `Block #${firstSeenTransaction.blockNumber}` : "No cached transaction history yet"
-                }
-              />
-              <AddressMetric
-                label="Directions"
-                value={`${inboundCount} In / ${outboundCount} Out / ${selfCount} Self`}
-              />
-            </div>
-          </article>
-
-          <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <h2 className="text-lg font-semibold text-slate-900">Cache Window</h2>
-            <div className="mt-5 space-y-5">
-              <AddressMetric
-                label="Cached Transactions"
-                value={addressCacheSnapshot.totalTransactions.toLocaleString("en-US")}
-                subtext={`IndexedDB cap: ${MAX_CACHED_EVM_TRANSACTIONS.toLocaleString("en-US")}`}
-              />
-              <AddressMetric
-                label="Address Coverage"
-                value={addressCacheSnapshot.totalTransactions ? `${addressCacheSnapshot.totalTransactions} matched` : "No cached matches"}
-                subtext="Only transactions seen from recent block queries are cached locally"
-              />
-              <AddressMetric
-                label="Refresh Note"
-                value="IndexedDB cache"
-                subtext="If the newest cached transaction hash no longer resolves on the current provider, the local cache is cleared"
-              />
+        <section>
+          <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+            <div className="grid sm:grid-cols-2 xl:grid-cols-4">
+              <div className="border-b border-slate-200 p-5 sm:border-r xl:border-r">
+                <AddressMetric label={`${currencyName} Balance`} value={formatBalanceLabel(summary.balance, currencyName)} />
+              </div>
+              <div className="border-b border-slate-200 p-5 xl:border-r">
+                <AddressMetric label="Nonce" value={summary.nonce.toLocaleString("en-US")} />
+              </div>
+              <div className="border-b border-slate-200 p-5 sm:border-r xl:border-r">
+                <AddressMetric
+                  label="Latest Seen"
+                  value={
+                    latestSeenTransaction ? (
+                      <span className="text-base font-semibold text-slate-900">
+                        <RelativeTime timestampMs={latestSeenTransaction.timestampMs} />
+                      </span>
+                    ) : (
+                      "Not cached yet"
+                    )
+                  }
+                  tooltip={latestSeenTransaction ? "Most recent cached transaction involving this address" : "Browse blocks or transactions first to populate the local cache"}
+                />
+              </div>
+              <div className="border-b border-slate-200 p-5">
+                <AddressMetric
+                  label="First Seen"
+                  value={
+                    firstSeenTransaction ? (
+                      <span className="text-base font-semibold text-slate-900">
+                        <RelativeTime timestampMs={firstSeenTransaction.timestampMs} />
+                      </span>
+                    ) : (
+                      "Not cached yet"
+                    )
+                  }
+                  tooltip="Earliest cached transaction currently retained for this address"
+                />
+              </div>
+              <div className="border-b border-slate-200 p-5 sm:border-b-0 sm:border-r xl:border-r">
+                <AddressMetric
+                  label="Observed Transactions"
+                  value={addressCacheSnapshot.totalTransactions.toLocaleString("en-US")}
+                  tooltip={`Showing latest ${visibleTransactions.length} cached records`}
+                />
+              </div>
+              <div className="border-b border-slate-200 p-5 xl:border-b-0 xl:border-r">
+                <AddressMetric
+                  label="Directions"
+                  value={`${inboundCount} In / ${outboundCount} Out / ${selfCount} Self`}
+                />
+              </div>
+              <div className="p-5 sm:border-r xl:border-r">
+                <AddressMetric
+                  label="Cached Transactions"
+                  value={addressCacheSnapshot.totalTransactions.toLocaleString("en-US")}
+                  tooltip={`IndexedDB cap: ${MAX_CACHED_EVM_TRANSACTIONS.toLocaleString("en-US")}. If the newest cached transaction hash no longer resolves on the current provider, the local cache is cleared.`}
+                />
+              </div>
+              <div className="p-5">
+                <AddressMetric
+                  label="Address Coverage"
+                  value={addressCacheSnapshot.totalTransactions ? `${addressCacheSnapshot.totalTransactions} matched` : "No cached matches"}
+                  tooltip="Only transactions seen from recent block queries are cached locally"
+                />
+              </div>
             </div>
           </article>
         </section>
@@ -646,7 +692,7 @@ export default function EvmAddressPage() {
                         </td>
                         <td className="px-5 py-3 text-sm">
                           <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                            {transaction.methodLabel}
+                            {decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-sm tabular-nums">
@@ -678,10 +724,10 @@ export default function EvmAddressPage() {
                             <AddressLink
                               address={transaction.to}
                               href={`/evm/address/${transaction.to}`}
-                              label={
-                                nameTagsByAddress[transaction.to] ??
-                                (transaction.to.toLowerCase() === normalizedAddress ? formatAddressLabel(transaction.to) : transaction.toLabel)
-                              }
+                              label={resolvePreferredToAddressLabel(transaction.to, {
+                                nameTagsByAddress,
+                                fallbackLabel: transaction.toLabel,
+                              })}
                               className="font-medium text-sky-600 hover:text-sky-700"
                             />
                           ) : (

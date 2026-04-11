@@ -9,6 +9,7 @@ import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
 } from "@/domains/evm/client/address-tags";
+import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
 import { AddressLink } from "@/domains/evm/ui/address-link";
 import { useEvmHomeData } from "@/domains/evm/ui/home-data-provider";
 
@@ -192,7 +193,10 @@ export function EvmHomeActivity() {
                         <AddressLink
                           address={transaction.to}
                           href={`/evm/address/${transaction.to}`}
-                          label={nameTagsByAddress[transaction.to] ?? transaction.toLabel}
+                          label={resolvePreferredToAddressLabel(transaction.to, {
+                            nameTagsByAddress,
+                            fallbackLabel: transaction.toLabel,
+                          })}
                           className="font-semibold text-sky-600 hover:text-sky-700"
                           showCopyButton={false}
                         />

@@ -11,6 +11,7 @@ import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
 } from "@/domains/evm/client/address-tags";
+import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
 import {
   getEvmCacheDashboardDirect,
   getEvmCacheSummaryDirect,
@@ -401,7 +402,10 @@ export default function EvmCacheSettingsPage() {
                           <AddressLink
                             address={transaction.to}
                             href={`/evm/address/${transaction.to}`}
-                            label={nameTagsByAddress[transaction.to] ?? transaction.toLabel}
+                            label={resolvePreferredToAddressLabel(transaction.to, {
+                              nameTagsByAddress,
+                              fallbackLabel: transaction.toLabel,
+                            })}
                             className="font-medium text-sky-600 hover:text-sky-700"
                           />
                         ) : (

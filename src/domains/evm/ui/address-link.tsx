@@ -10,7 +10,6 @@ type AddressLinkProps = {
   href: string;
   label: string;
   className?: string;
-  tooltipClassName?: string;
   showCopyButton?: boolean;
 };
 
@@ -19,7 +18,6 @@ export function AddressLink({
   href,
   label,
   className,
-  tooltipClassName,
   showCopyButton = true,
 }: AddressLinkProps) {
   const [copied, setCopied] = useState(false);
@@ -66,15 +64,6 @@ export function AddressLink({
         <Link className={className} href={href}>
           {label}
         </Link>
-        <span
-          className={cn(
-            "pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.28)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100",
-            "after:absolute after:left-1/2 after:top-full after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-8 after:border-t-8 after:border-x-transparent after:border-t-slate-800 after:content-['']",
-            tooltipClassName,
-          )}
-        >
-          <span className="block whitespace-nowrap">{address}</span>
-        </span>
       </span>
       {showCopyButton ? (
         <span className="relative inline-flex">
@@ -88,8 +77,7 @@ export function AddressLink({
           </button>
           <span
             className={cn(
-              "pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.28)] transition-opacity",
-              "after:absolute after:left-1/2 after:top-full after:h-0 after:w-0 after:-translate-x-1/2 after:border-x-8 after:border-t-8 after:border-x-transparent after:border-t-slate-800 after:content-['']",
+              "pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition-opacity",
               copied ? "opacity-100" : "",
             )}
           >

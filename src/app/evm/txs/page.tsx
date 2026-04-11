@@ -11,6 +11,9 @@ import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
 } from "@/domains/evm/client/address-tags";
+import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
+import { subscribeEvmContractRegistry } from "@/domains/evm/client/contract-registry";
+import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transaction-decoder";
 import { AddressLink } from "@/domains/evm/ui/address-link";
 import {
   getEvmTransactionReceiptSummariesDirect,
@@ -59,6 +62,7 @@ function EvmTransactionsPageContent() {
     Record<string, { status: string; statusLabel: string; feeLabel: string }>
   >({});
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const [decodeVersion, setDecodeVersion] = useState(0);
   const [receiptLoading, setReceiptLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const transactionHashesKey = useMemo(
@@ -74,6 +78,23 @@ function EvmTransactionsPageContent() {
         ]) ?? [],
       )],
     [data],
+  );
+  const decodedMethodLabelByHash = useMemo(
+    () => {
+      void decodeVersion;
+
+      return Object.fromEntries(
+        (data?.transactions ?? []).map((transaction) => [
+          transaction.hash,
+          resolveEvmTransactionMethodLabel({
+            to: transaction.to,
+            inputData: transaction.inputData,
+            fallbackMethodLabel: transaction.methodLabel,
+          }),
+        ]),
+      );
+    },
+    [data, decodeVersion],
   );
 
   function handlePageChange(page: number) {
@@ -195,6 +216,23 @@ function EvmTransactionsPageContent() {
       cancelled = true;
     };
   }, [data, receiptLookupEnabled, transactionHashesKey]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeEvmContractRegistry(() => {
+      setDecodeVersion((current) => current + 1);
+    });
+
+    const handleProfileChanged = () => {
+      setDecodeVersion((current) => current + 1);
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, []);
 
   useEffect(() => {
     function loadVisibleTags() {
@@ -346,7 +384,7 @@ function EvmTransactionsPageContent() {
                       </td>
                       <td className="px-5 py-3 text-sm">
                         <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                          {transaction.methodLabel}
+                          {decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel}
                         </span>
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums">
@@ -370,7 +408,10 @@ function EvmTransactionsPageContent() {
                           <AddressLink
                             address={transaction.to}
                             href={`/evm/address/${transaction.to}`}
-                            label={nameTagsByAddress[transaction.to] ?? transaction.toLabel}
+                            label={resolvePreferredToAddressLabel(transaction.to, {
+                              nameTagsByAddress,
+                              fallbackLabel: transaction.toLabel,
+                            })}
                             className="font-medium text-sky-600 hover:text-sky-700"
                           />
                         ) : (

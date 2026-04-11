@@ -28,6 +28,13 @@ import { Input } from "@/components/ui/input";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   getReadContractFunctions,
   getWriteContractFunctions,
   type EvmContractFunctionDescriptor,
@@ -71,9 +78,14 @@ type WritePreviewState = {
   valueLabel: string;
 };
 
+type ManualWriteTransactionType = "LEGACY" | "EIP1559";
+
 type ManualWriteDialogState = {
+  transactionType: ManualWriteTransactionType;
   value: string;
   gasPrice: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
   gasLimit: string;
   nonce: string;
 };
@@ -208,6 +220,30 @@ function toWritePreviewState(input: {
     gasPriceLabel: input.gasPriceLabel,
     valueLabel: input.valueLabel,
   };
+}
+
+function createInitialManualWriteDialogState(): ManualWriteDialogState {
+  return {
+    transactionType: "EIP1559",
+    value: "0",
+    gasPrice: "",
+    maxFeePerGas: "",
+    maxPriorityFeePerGas: "",
+    gasLimit: "",
+    nonce: "",
+  };
+}
+
+function isManualWriteDialogReady(state: ManualWriteDialogState) {
+  if (!state.value.trim() || !state.gasLimit.trim() || !state.nonce.trim()) {
+    return false;
+  }
+
+  if (state.transactionType === "LEGACY") {
+    return !!state.gasPrice.trim();
+  }
+
+  return !!state.maxFeePerGas.trim() && !!state.maxPriorityFeePerGas.trim();
 }
 
 function WriteExecutionPreview({
@@ -470,12 +506,9 @@ export function AddressContractPanel({
     type: "write" | "manual-open" | "manual-confirm";
   } | null>(null);
   const [manualWriteTarget, setManualWriteTarget] = useState<string | null>(null);
-  const [manualWriteDialogValues, setManualWriteDialogValues] = useState<ManualWriteDialogState>({
-    value: "0",
-    gasPrice: "",
-    gasLimit: "",
-    nonce: "",
-  });
+  const [manualWriteDialogValues, setManualWriteDialogValues] = useState<ManualWriteDialogState>(
+    createInitialManualWriteDialogState(),
+  );
   const [manualWriteDialogError, setManualWriteDialogError] = useState<string | null>(null);
 
   const readFunctions = useMemo(
@@ -518,12 +551,7 @@ export function AddressContractPanel({
     setWriteValueBySignature({});
     setManualWriteTarget(null);
     setManualWriteDialogError(null);
-    setManualWriteDialogValues({
-      value: "0",
-      gasPrice: "",
-      gasLimit: "",
-      nonce: "",
-    });
+    setManualWriteDialogValues(createInitialManualWriteDialogState());
   }, [writeFunctions]);
 
   useEffect(() => {
@@ -762,8 +790,11 @@ export function AddressContractPanel({
         [signature]: toWritePreviewState(defaults),
       }));
       setManualWriteDialogValues({
+        transactionType: defaults.transactionType,
         value: defaults.value,
         gasPrice: defaults.gasPrice,
+        maxFeePerGas: defaults.maxFeePerGas,
+        maxPriorityFeePerGas: defaults.maxPriorityFeePerGas,
         gasLimit: defaults.estimatedGas,
         nonce: defaults.nonce,
       });
@@ -817,9 +848,12 @@ export function AddressContractPanel({
         functionSignature: signature,
         rawArgs,
         privateKey,
+        transactionType: manualWriteDialogValues.transactionType,
         value: manualWriteDialogValues.value,
         gasLimit: manualWriteDialogValues.gasLimit,
         gasPrice: manualWriteDialogValues.gasPrice,
+        maxFeePerGas: manualWriteDialogValues.maxFeePerGas,
+        maxPriorityFeePerGas: manualWriteDialogValues.maxPriorityFeePerGas,
         nonce: manualWriteDialogValues.nonce,
       });
 
@@ -914,12 +948,7 @@ export function AddressContractPanel({
     setWriteValueBySignature({});
     setManualWriteTarget(null);
     setManualWriteDialogError(null);
-    setManualWriteDialogValues({
-      value: "0",
-      gasPrice: "",
-      gasLimit: "",
-      nonce: "",
-    });
+    setManualWriteDialogValues(createInitialManualWriteDialogState());
     setErrorMessage(null);
   }
 
@@ -1315,10 +1344,7 @@ export function AddressContractPanel({
               className="bg-rose-600 text-white hover:bg-rose-700"
               disabled={
                 !manualWriteTarget ||
-                !manualWriteDialogValues.value.trim() ||
-                !manualWriteDialogValues.gasPrice.trim() ||
-                !manualWriteDialogValues.gasLimit.trim() ||
-                !manualWriteDialogValues.nonce.trim() ||
+                !isManualWriteDialogReady(manualWriteDialogValues) ||
                 actionLoadingKey === `manual-confirm:${manualWriteTarget}`
               }
             >
@@ -1355,6 +1381,26 @@ export function AddressContractPanel({
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <Select
+                  value={manualWriteDialogValues.transactionType}
+                  onValueChange={(value) =>
+                    setManualWriteDialogValues((current) => ({
+                      ...current,
+                      transactionType: value as ManualWriteTransactionType,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select transaction type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EIP1559">EIP1559</SelectItem>
+                    <SelectItem value="LEGACY">LEGACY</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
                 <label className="text-sm font-medium text-slate-700">Value ({environment.nativeCurrency})</label>
                 <Input
                   value={manualWriteDialogValues.value}
@@ -1367,19 +1413,50 @@ export function AddressContractPanel({
                   placeholder="0"
                 />
               </div>
-              <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
-                <Input
-                  value={manualWriteDialogValues.gasPrice}
-                  onChange={(event) =>
-                    setManualWriteDialogValues((current) => ({
-                      ...current,
-                      gasPrice: event.target.value,
-                    }))
-                  }
-                  placeholder="0.001"
-                />
-              </div>
+              {manualWriteDialogValues.transactionType === "LEGACY" ? (
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <Input
+                    value={manualWriteDialogValues.gasPrice}
+                    onChange={(event) =>
+                      setManualWriteDialogValues((current) => ({
+                        ...current,
+                        gasPrice: event.target.value,
+                      }))
+                    }
+                    placeholder="0.001"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <Input
+                      value={manualWriteDialogValues.maxFeePerGas}
+                      onChange={(event) =>
+                        setManualWriteDialogValues((current) => ({
+                          ...current,
+                          maxFeePerGas: event.target.value,
+                        }))
+                      }
+                      placeholder="0.001"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <Input
+                      value={manualWriteDialogValues.maxPriorityFeePerGas}
+                      onChange={(event) =>
+                        setManualWriteDialogValues((current) => ({
+                          ...current,
+                          maxPriorityFeePerGas: event.target.value,
+                        }))
+                      }
+                      placeholder="0.001"
+                    />
+                  </div>
+                </>
+              )}
               <div className="grid gap-2">
                 <label className="text-sm font-medium text-slate-700">Gas Limit</label>
                 <Input

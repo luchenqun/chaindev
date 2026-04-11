@@ -94,6 +94,20 @@ function parseGasPrice(gasPrice: string) {
   return parseGwei(value);
 }
 
+function parseFeePerGas(value: string, fieldLabel: string) {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    throw new Error(`${fieldLabel} is required for force send.`);
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(normalizedValue)) {
+    throw new Error(`${fieldLabel} must be a valid Gwei value.`);
+  }
+
+  return parseGwei(normalizedValue);
+}
+
 function parseNonce(nonce: string) {
   const value = nonce.trim();
 
@@ -124,6 +138,37 @@ function normalizeDeployBytecode(bytecode: string) {
 
 function formatGweiValue(value: bigint) {
   return Number(formatGwei(value)).toFixed(3).replace(/\.?0+$/, "");
+}
+
+function formatEip1559GasLabel(maxFeePerGas: bigint, maxPriorityFeePerGas: bigint) {
+  return `Max Fee ${formatGweiValue(maxFeePerGas)} Gwei / Priority Fee ${formatGweiValue(maxPriorityFeePerGas)} Gwei`;
+}
+
+async function getManualWriteFeeDefaults(publicClient: ReturnType<typeof getActiveEvmClients>["publicClient"]) {
+  try {
+    const fees = await publicClient.estimateFeesPerGas({
+      chain: undefined,
+      type: "eip1559",
+    });
+
+    return {
+      transactionType: "EIP1559" as const,
+      gasPrice: "",
+      maxFeePerGas: formatGweiValue(fees.maxFeePerGas),
+      maxPriorityFeePerGas: formatGweiValue(fees.maxPriorityFeePerGas),
+      gasPriceLabel: formatEip1559GasLabel(fees.maxFeePerGas, fees.maxPriorityFeePerGas),
+    };
+  } catch {
+    const gasPrice = await publicClient.getGasPrice();
+
+    return {
+      transactionType: "LEGACY" as const,
+      gasPrice: formatGweiValue(gasPrice),
+      maxFeePerGas: "",
+      maxPriorityFeePerGas: "",
+      gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
+    };
+  }
 }
 
 export async function getActiveEvmContractEnvironmentDirect() {
@@ -222,8 +267,8 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
     throw new Error("Only payable contract methods can send native value.");
   }
 
-  const [gasPrice, nonce] = await Promise.all([
-    publicClient.getGasPrice(),
+  const [feeDefaults, nonce] = await Promise.all([
+    getManualWriteFeeDefaults(publicClient),
     publicClient.getTransactionCount({ address: account.address }),
   ]);
 
@@ -242,8 +287,11 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
       functionName: fn.name,
       functionSignature: fn.signature,
       estimatedGas: estimatedGas.toString(),
-      gasPrice: formatGweiValue(gasPrice),
-      gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
+      transactionType: feeDefaults.transactionType,
+      gasPrice: feeDefaults.gasPrice,
+      maxFeePerGas: feeDefaults.maxFeePerGas,
+      maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
+      gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
       value: input.value.trim() || "0",
       valueLabel:
@@ -258,8 +306,11 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
       functionName: fn.name,
       functionSignature: fn.signature,
       estimatedGas: "",
-      gasPrice: formatGweiValue(gasPrice),
-      gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
+      transactionType: feeDefaults.transactionType,
+      gasPrice: feeDefaults.gasPrice,
+      maxFeePerGas: feeDefaults.maxFeePerGas,
+      maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
+      gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
       value: input.value.trim() || "0",
       valueLabel:
@@ -325,9 +376,12 @@ export async function forceWriteEvmContractMethodDirect(input: {
   functionSignature: string;
   rawArgs: string[];
   privateKey: string;
+  transactionType: "LEGACY" | "EIP1559";
   value: string;
   gasLimit: string;
   gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
   nonce?: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
@@ -342,8 +396,30 @@ export async function forceWriteEvmContractMethodDirect(input: {
   });
   const value = input.value.trim() ? parseEther(input.value.trim()) : 0n;
   const gas = parseGasLimit(input.gasLimit);
-  const gasPrice = input.gasPrice?.trim() ? parseGasPrice(input.gasPrice) : undefined;
   const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
+  const feeParameters =
+    input.transactionType === "LEGACY"
+      ? {
+          type: "legacy" as const,
+          gasPrice: parseGasPrice(input.gasPrice ?? ""),
+        }
+      : (() => {
+          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? "", "Max fee per gas");
+          const maxPriorityFeePerGas = parseFeePerGas(
+            input.maxPriorityFeePerGas ?? "",
+            "Max priority fee per gas",
+          );
+
+          if (maxFeePerGas < maxPriorityFeePerGas) {
+            throw new Error("Max fee per gas cannot be less than max priority fee per gas.");
+          }
+
+          return {
+            type: "eip1559" as const,
+            maxFeePerGas,
+            maxPriorityFeePerGas,
+          };
+        })();
 
   const data = encodeFunctionData({
     abi,
@@ -351,13 +427,14 @@ export async function forceWriteEvmContractMethodDirect(input: {
     args,
   });
   const hash = await walletClient.sendTransaction({
+    chain: undefined,
     account,
     to: input.address as `0x${string}`,
     data,
     value: value > 0n ? value : undefined,
     gas,
-    gasPrice,
     nonce,
+    ...feeParameters,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 

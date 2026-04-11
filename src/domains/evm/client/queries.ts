@@ -9,6 +9,7 @@ import {
   getEvmCachedTransactionsPage,
   getEvmObservedAccountsPage,
   getEvmTransactionCacheSummary,
+  hydrateEvmCachedTransactionInputData,
   getLatestCachedTransactionHash,
   rememberEvmTransactionCache,
   type EvmCachedTransactionItem,
@@ -372,6 +373,7 @@ function finalizeTransactionsPageItems(
     to: string | null;
     toLabel: string;
     methodLabel: string;
+    inputData: string;
     amountLabel: string;
     gas: bigint | null;
     gasPrice: bigint | null;
@@ -388,6 +390,7 @@ function finalizeTransactionsPageItems(
       to: transaction.to,
       toLabel: transaction.toLabel,
       methodLabel: transaction.methodLabel,
+      inputData: transaction.inputData,
       amountLabel: transaction.amountLabel,
       maxTxCostLabel:
         transaction.gas != null && transaction.gasPrice != null
@@ -415,6 +418,7 @@ function formatTransactionsPageItemsForBlock(
     to: string | null;
     toLabel: string;
     methodLabel: string;
+    inputData: string;
     amountLabel: string;
     gas: bigint | null;
     gasPrice: bigint | null;
@@ -438,6 +442,7 @@ function formatTransactionsPageItemsForBlock(
       to: transaction.to ?? null,
       toLabel: shortenAddress(transaction.to),
       methodLabel: formatMethodLabel(transaction.input, transaction.to),
+      inputData: transaction.input ?? "0x",
       amountLabel: formatTxValue(transaction.value, currencyName),
       gas: transaction.gas ?? null,
       gasPrice: transaction.gasPrice ?? null,
@@ -455,6 +460,7 @@ type FormattedPendingTransactionItem = {
   to: string | null;
   toLabel: string;
   methodLabel: string;
+  inputData: string;
   amountLabel: string;
   nonceLabel: string;
   gasPriceLabel: string;
@@ -495,6 +501,7 @@ function formatPendingTransactions(
       to: transaction.to ?? null,
       toLabel: shortenAddress(transaction.to),
       methodLabel: formatMethodLabel(transaction.input, transaction.to),
+      inputData: transaction.input ?? "0x",
       amountLabel: formatTxValue(transaction.value, currencyName),
       nonceLabel: formatInteger(transaction.nonce),
       gasPriceLabel: formatPendingGasPrice(effectiveGasPrice),
@@ -1380,6 +1387,30 @@ export async function getEvmTransactionByHashDirect(hash: string) {
     receipt,
     block,
   });
+}
+
+export async function hydrateEvmCachedTransactionInputsByHashDirect(hashes: string[]) {
+  const uniqueHashes = [...new Set(hashes.filter((hash) => /^0x[a-fA-F0-9]{64}$/.test(hash)))];
+
+  if (!uniqueHashes.length) {
+    return;
+  }
+
+  const { client } = await getEvmClientWithProfile();
+  const settled = await Promise.allSettled(
+    uniqueHashes.map(async (hash) => {
+      const transaction = await client.getTransaction({ hash: hash as `0x${string}` });
+
+      return {
+        hash,
+        inputData: transaction.input ?? "0x",
+      };
+    }),
+  );
+
+  await hydrateEvmCachedTransactionInputData(
+    settled.flatMap((result) => (result.status === "fulfilled" ? [result.value] : [])),
+  );
 }
 
 export async function getEvmTransactionDebugTraceDirect(hash: string) {

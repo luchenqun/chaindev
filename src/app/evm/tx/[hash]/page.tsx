@@ -4,15 +4,30 @@ import JsonView from "@uiw/react-json-view";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { IconMinus, IconPlus } from "@tabler/icons-react";
+import { IconArrowsExchange, IconCode } from "@tabler/icons-react";
 import { decodeErrorResult } from "viem";
+import { Button } from "@/components/ui/button";
 import { DetailPageSkeleton } from "@/components/ui/loading-placeholders";
 import { RelativeTime } from "@/components/relative-time";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
 } from "@/domains/evm/client/address-tags";
+import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
+import { subscribeEvmContractRegistry } from "@/domains/evm/client/contract-registry";
+import {
+  decodeBoundEvmTransactionInput,
+  decodeHexToUtf8,
+  resolveEvmTransactionMethodLabel,
+} from "@/domains/evm/client/transaction-decoder";
 import {
   getEvmTransactionByHashDirect,
   getEvmTransactionDebugTraceDirect,
@@ -81,6 +96,42 @@ function decodeTraceReturnValue(returnValue: string | null) {
   }
 }
 
+function splitInputDataWords(inputData: string) {
+  if (!inputData.startsWith("0x") || inputData.length <= 10) {
+    return [];
+  }
+
+  const payload = inputData.slice(10);
+  const words: string[] = [];
+
+  for (let index = 0; index < payload.length; index += 64) {
+    const word = payload.slice(index, index + 64);
+
+    if (word) {
+      words.push(word);
+    }
+  }
+
+  return words;
+}
+
+function buildDefaultInputDataView(inputData: string, functionSignature?: string, selector?: string) {
+  const lines: string[] = [];
+
+  if (functionSignature) {
+    lines.push(`Function: ${functionSignature}`);
+    lines.push("");
+  }
+
+  lines.push(`MethodID: ${selector ?? inputData.slice(0, 10)}`);
+
+  for (const [index, word] of splitInputDataWords(inputData).entries()) {
+    lines.push(`[${index}]:  ${word}`);
+  }
+
+  return lines.join("\n");
+}
+
 export default function EvmTxPage() {
   const params = useParams<{ hash: string }>();
   const hash = params.hash;
@@ -89,11 +140,13 @@ export default function EvmTxPage() {
   const [transaction, setTransaction] = useState<Awaited<ReturnType<typeof getEvmTransactionByHashDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "logs" | "debugTrace" | "json">("overview");
-  const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [traceData, setTraceData] = useState<unknown>(null);
   const [traceErrorMessage, setTraceErrorMessage] = useState<string | null>(null);
   const [traceLoading, setTraceLoading] = useState(false);
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const [inputDataView, setInputDataView] = useState<"default" | "utf8" | "original">("default");
+  const [showDecodedInputTable, setShowDecodedInputTable] = useState(false);
+  const [decodeVersion, setDecodeVersion] = useState(0);
   const visibleAddresses = useMemo(
     () =>
       transaction
@@ -104,6 +157,48 @@ export default function EvmTxPage() {
           ]
         : [],
     [transaction],
+  );
+  const decodedTransactionInput = useMemo(
+    () => {
+      void decodeVersion;
+
+      return transaction
+        ? decodeBoundEvmTransactionInput({
+            to: transaction.interactedWith ?? transaction.to,
+            inputData: transaction.inputData,
+          })
+        : null;
+    },
+    [transaction, decodeVersion],
+  );
+  const decodedMethodLabel = useMemo(
+    () => {
+      void decodeVersion;
+
+      return transaction
+        ? resolveEvmTransactionMethodLabel({
+            to: transaction.interactedWith ?? transaction.to,
+            inputData: transaction.inputData,
+            fallbackMethodLabel: transaction.methodLabel,
+          })
+        : "";
+    },
+    [transaction, decodeVersion],
+  );
+  const utf8InputData = useMemo(
+    () => (transaction ? decodeHexToUtf8(transaction.inputData) : null),
+    [transaction],
+  );
+  const defaultInputDataView = useMemo(
+    () =>
+      transaction
+        ? buildDefaultInputDataView(
+            transaction.inputData,
+            decodedTransactionInput?.functionSignature,
+            decodedTransactionInput?.selector,
+          )
+        : "",
+    [transaction, decodedTransactionInput],
   );
 
   useEffect(() => {
@@ -124,6 +219,8 @@ export default function EvmTxPage() {
           setTraceErrorMessage(null);
           setTraceLoading(false);
           setActiveTab("overview");
+          setInputDataView("default");
+          setShowDecodedInputTable(false);
         }
       } catch (error) {
         if (!cancelled) {
@@ -141,6 +238,23 @@ export default function EvmTxPage() {
       window.removeEventListener("chaindev:active-rpc-profile-changed", load);
     };
   }, [hash, isValid]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeEvmContractRegistry(() => {
+      setDecodeVersion((current) => current + 1);
+    });
+
+    const handleProfileChanged = () => {
+      setDecodeVersion((current) => current + 1);
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, []);
 
   useEffect(() => {
     function loadVisibleTags() {
@@ -367,7 +481,7 @@ export default function EvmTxPage() {
                           <AddressLink
                             address={transaction.interactedWith}
                             href={`/evm/address/${transaction.interactedWith}`}
-                            label={nameTagsByAddress[transaction.interactedWith] ?? transaction.interactedWith}
+                            label={resolvePreferredToAddressLabel(transaction.interactedWith, { nameTagsByAddress })}
                             className="font-medium text-sky-600 hover:text-sky-700 mono"
                             tooltipClassName="max-w-[90vw]"
                           />
@@ -376,7 +490,21 @@ export default function EvmTxPage() {
                         )
                       }
                     />
-                    <DetailRow label="Method" value={transaction.methodLabel} />
+                    <DetailRow
+                      label="Method"
+                      value={
+                        decodedTransactionInput ? (
+                          <span className="inline-flex flex-wrap items-center gap-2">
+                            <span>{decodedMethodLabel}</span>
+                            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500 mono">
+                              {decodedTransactionInput.selector}
+                            </span>
+                          </span>
+                        ) : (
+                          decodedMethodLabel
+                        )
+                      }
+                    />
                   </dl>
                 </DetailGroup>
 
@@ -384,7 +512,7 @@ export default function EvmTxPage() {
                   <dl>
                     <DetailRow label="Value" value={transaction.valueLabel} />
                     <DetailRow label="Transaction Fee" value={transaction.feeLabel} />
-                    <DetailRow label="Gas Price" value={transaction.gasPriceLabel} />
+                    <DetailRow label="Gas Fees" value={transaction.gasFeesLabel} />
                     <DetailRow
                       label="Gas Limit & Usage by Txn"
                       value={`${transaction.gasLimitLabel} | ${transaction.gasUsedLabel} (${transaction.gasUsedPercent})`}
@@ -400,9 +528,99 @@ export default function EvmTxPage() {
                     <DetailRow
                       label="Input Data"
                       value={
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 mono text-[13px] leading-6 text-slate-700">
-                          {transaction.inputData}
-                        </div>
+                        showDecodedInputTable && decodedTransactionInput ? (
+                          <div className="space-y-3">
+                            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                              <div className="max-h-[360px] overflow-auto">
+                                <table className="w-full border-collapse">
+                                  <thead className="bg-slate-50">
+                                    <tr>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">#</th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Data</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {decodedTransactionInput.args.map((arg, index) => (
+                                      <tr key={`${arg.name}-${index}`} className="border-t border-slate-200">
+                                        <td className="px-4 py-3 align-top text-sm text-slate-900 mono">{index}</td>
+                                        <td className="px-4 py-3 align-top text-sm text-slate-900 mono">{arg.name}</td>
+                                        <td className="px-4 py-3 align-top text-sm text-slate-900 mono">{arg.type}</td>
+                                        <td className="px-4 py-3 align-top text-sm text-slate-900 mono">
+                                          {arg.type === "address" ? (
+                                            <Link
+                                              href={`/evm/address/${arg.value}`}
+                                              className="break-all text-[#6d4aff] hover:text-[#5935ff]"
+                                            >
+                                              {arg.value}
+                                            </Link>
+                                          ) : (
+                                            <span className="break-all whitespace-pre-wrap">
+                                              {arg.value}
+                                            </span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setShowDecodedInputTable(false)}
+                            >
+                              <IconArrowsExchange className="mr-1.5 size-3.5" stroke={1.8} />
+                              Switch Back
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <textarea
+                              readOnly
+                              className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[14px] font-medium leading-6 text-slate-500 mono outline-none"
+                              value={
+                                inputDataView === "default"
+                                  ? defaultInputDataView
+                                  : inputDataView === "utf8"
+                                    ? utf8InputData || "Unable to decode input data as UTF-8."
+                                    : transaction.inputData
+                              }
+                            />
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="w-[170px]">
+                                <Select
+                                  value={inputDataView}
+                                  onValueChange={(value) =>
+                                    setInputDataView(value as "default" | "utf8" | "original")
+                                  }
+                                >
+                                  <SelectTrigger className="h-8 rounded-md px-3 text-xs">
+                                    <SelectValue placeholder="View Input As" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="default">Default View</SelectItem>
+                                    <SelectItem value="utf8">UTF-8</SelectItem>
+                                    <SelectItem value="original">Original</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                disabled={!decodedTransactionInput}
+                                onClick={() => setShowDecodedInputTable(true)}
+                              >
+                                <IconCode className="mr-1.5 size-3.5" stroke={1.8} />
+                                Decode Input Data
+                              </Button>
+                            </div>
+                          </div>
+                        )
                       }
                       mono
                     />
@@ -411,92 +629,6 @@ export default function EvmTxPage() {
               </div>
             </section>
 
-            <section className="mt-2 rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-              <div className="p-5">
-                {!showMoreDetails ? (
-                  <div className="grid gap-1 md:grid-cols-[180px_minmax(0,1fr)] md:gap-4">
-                    <dt className="text-sm font-medium text-slate-500">More Details</dt>
-                    <dd>
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-2 text-sm font-medium text-sky-600 transition hover:text-sky-700"
-                        onClick={() => setShowMoreDetails(true)}
-                      >
-                        <IconPlus className="size-4" stroke={2} />
-                        Click to show more
-                      </button>
-                    </dd>
-                  </div>
-                ) : (
-                  <div className="mt-0 pt-0">
-                    <dl>
-                      <DetailRow label="Hash" value={transaction.hash} mono />
-                      <DetailRow
-                        label="From"
-                        value={
-                          <AddressLink
-                            address={transaction.from}
-                            href={`/evm/address/${transaction.from}`}
-                            label={nameTagsByAddress[transaction.from] ?? transaction.from}
-                            className="font-medium text-sky-600 hover:text-sky-700 mono"
-                            tooltipClassName="max-w-[90vw]"
-                          />
-                        }
-                      />
-                      <DetailRow
-                        label="To"
-                        value={
-                          transaction.to ? (
-                            <AddressLink
-                              address={transaction.to}
-                              href={`/evm/address/${transaction.to}`}
-                              label={nameTagsByAddress[transaction.to] ?? transaction.to}
-                              className="font-medium text-sky-600 hover:text-sky-700 mono"
-                              tooltipClassName="max-w-[90vw]"
-                            />
-                          ) : (
-                            "Contract Creation"
-                          )
-                        }
-                      />
-                      <DetailRow
-                        label="Interacted With"
-                        value={
-                          transaction.interactedWith ? (
-                            <AddressLink
-                              address={transaction.interactedWith}
-                              href={`/evm/address/${transaction.interactedWith}`}
-                              label={nameTagsByAddress[transaction.interactedWith] ?? transaction.interactedWith}
-                              className="font-medium text-sky-600 hover:text-sky-700 mono"
-                              tooltipClassName="max-w-[90vw]"
-                            />
-                          ) : (
-                            "Unavailable"
-                          )
-                        }
-                      />
-                      <DetailRow label="Input Data" value={transaction.inputData} mono />
-                    </dl>
-
-                    <div className="mt-4 border-t border-slate-200 pt-4">
-                      <div className="grid gap-1 md:grid-cols-[180px_minmax(0,1fr)] md:gap-4">
-                        <dt className="text-sm font-medium text-slate-500">More Details</dt>
-                        <dd>
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-2 text-sm font-medium text-sky-600 transition hover:text-sky-700"
-                            onClick={() => setShowMoreDetails(false)}
-                          >
-                            <IconMinus className="size-4" stroke={2} />
-                            Click to show less
-                          </button>
-                        </dd>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
           </>
         ) : activeTab === "logs" ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">

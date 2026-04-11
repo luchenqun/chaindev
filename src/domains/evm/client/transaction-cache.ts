@@ -10,6 +10,7 @@ export type EvmCachedTransactionItem = {
   to: string | null;
   toLabel: string;
   methodLabel: string;
+  inputData?: string;
   amountLabel: string;
   maxTxCostLabel: string;
 };
@@ -144,6 +145,7 @@ function toPublicTransaction(record: EvmCachedTransactionRecord): EvmCachedTrans
     to: record.to,
     toLabel: record.toLabel,
     methodLabel: record.methodLabel,
+    inputData: record.inputData,
     amountLabel: record.amountLabel,
     maxTxCostLabel: record.maxTxCostLabel,
   };
@@ -539,6 +541,14 @@ export async function rememberEvmTransactionCache(items: EvmCachedTransactionIte
     const existingRecord = await toPromise(transactionsStore.get(item.hash));
 
     if (existingRecord) {
+      if (existingRecord.inputData || !item.inputData) {
+        continue;
+      }
+
+      transactionsStore.put({
+        ...existingRecord,
+        inputData: item.inputData,
+      });
       continue;
     }
 
@@ -582,6 +592,40 @@ export async function rememberEvmTransactionCache(items: EvmCachedTransactionIte
   await waitForTransaction(transaction);
   await trimCachedTransactionsIfNeeded();
   emitChange();
+}
+
+export async function hydrateEvmCachedTransactionInputData(
+  items: Array<{ hash: string; inputData: string }>,
+) {
+  if (!items.length) {
+    return;
+  }
+
+  const uniqueItems = [...new Map(items.map((item) => [item.hash, item])).values()];
+  const database = await getDatabase();
+  const transaction = database.transaction(TRANSACTIONS_STORE, "readwrite");
+  const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
+  let updated = false;
+
+  for (const item of uniqueItems) {
+    const existingRecord = await toPromise(transactionsStore.get(item.hash));
+
+    if (!existingRecord || existingRecord.inputData === item.inputData) {
+      continue;
+    }
+
+    transactionsStore.put({
+      ...existingRecord,
+      inputData: item.inputData,
+    });
+    updated = true;
+  }
+
+  await waitForTransaction(transaction);
+
+  if (updated) {
+    emitChange();
+  }
 }
 
 export async function clearEvmTransactionCache() {

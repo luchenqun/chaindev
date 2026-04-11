@@ -157,6 +157,7 @@ export function formatEvmBlock(block: {
       to: transaction.to ?? null,
       toLabel: shortenAddress(transaction.to),
       methodLabel: formatMethodLabel(transaction.input, transaction.to),
+      inputData: transaction.input ?? "0x",
       valueLabel: formatDisplayAmount(transaction.value, block.currencyName ?? "ETH"),
       maxTxCostLabel:
         transaction.gas != null && transaction.gasPrice != null
@@ -267,6 +268,44 @@ function formatTransactionTypeLabel(value: string | null | undefined) {
   return value.toUpperCase();
 }
 
+function formatGasFeeValue(value: bigint | null | undefined) {
+  if (value == null) {
+    return null;
+  }
+
+  return `${formatGwei(value)} Gwei`;
+}
+
+function formatTransactionGasFeesLabel(input: {
+  type?: string | null;
+  baseFeePerGas?: bigint | null;
+  gasPrice?: bigint | null;
+  maxFeePerGas?: bigint | null;
+  maxPriorityFeePerGas?: bigint | null;
+  effectiveGasPrice?: bigint | null;
+}) {
+  const type = input.type?.toLowerCase();
+
+  if (type === "eip1559") {
+    const parts = [
+      ["Base", formatGasFeeValue(input.baseFeePerGas)],
+      ["Max", formatGasFeeValue(input.maxFeePerGas ?? input.effectiveGasPrice)],
+      [
+        "Max Priority",
+        formatGasFeeValue(input.maxPriorityFeePerGas ?? input.effectiveGasPrice),
+      ],
+    ]
+      .filter(([, value]) => value !== null)
+      .map(([label, value]) => `${label}: ${value}`);
+
+    return parts.length ? parts.join(" | ") : "Unavailable";
+  }
+
+  const baseLabel = formatGasFeeValue(input.gasPrice ?? input.effectiveGasPrice);
+
+  return baseLabel ? `Base: ${baseLabel}` : "Unavailable";
+}
+
 export function formatEvmTransactionDetail(input: {
   currencyName: string;
   latestBlockNumber: bigint | null;
@@ -279,6 +318,8 @@ export function formatEvmTransactionDetail(input: {
     nonce?: number;
     gas?: bigint;
     gasPrice?: bigint | null;
+    maxFeePerGas?: bigint | null;
+    maxPriorityFeePerGas?: bigint | null;
     input?: string;
     transactionIndex?: number | null;
     type?: string | null;
@@ -292,6 +333,7 @@ export function formatEvmTransactionDetail(input: {
   } | null;
   block: {
     timestamp?: bigint | null;
+    baseFeePerGas?: bigint | null;
   } | null;
 }) {
   const { transaction, receipt, block, latestBlockNumber, currencyName } = input;
@@ -330,6 +372,14 @@ export function formatEvmTransactionDetail(input: {
     valueLabel: formatDetailedAmount(transaction.value, currencyName),
     feeLabel: formatDetailedFee(feeValue, currencyName),
     gasPriceLabel: effectiveGasPrice != null ? `${formatGwei(effectiveGasPrice)} Gwei` : "Unavailable",
+    gasFeesLabel: formatTransactionGasFeesLabel({
+      type: transaction.type,
+      baseFeePerGas: block?.baseFeePerGas,
+      gasPrice: transaction.gasPrice,
+      maxFeePerGas: transaction.maxFeePerGas,
+      maxPriorityFeePerGas: transaction.maxPriorityFeePerGas,
+      effectiveGasPrice,
+    }),
     gasLimitLabel: formatInteger(gasLimit),
     gasUsedLabel: formatInteger(gasUsed),
     gasUsedPercent: gasUsedRatio != null ? formatPercent(gasUsedRatio) : "Unavailable",
