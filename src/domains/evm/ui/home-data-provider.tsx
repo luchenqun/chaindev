@@ -3,13 +3,9 @@
 import { usePathname } from "next/navigation";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  clearEvmTransactionCache,
-  getLatestCachedTransactionHash,
-} from "@/domains/evm/client/transaction-cache";
-import {
   getEvmLatestFeedDirect,
   getEvmHomeSnapshotDirect,
-  hasEvmTransactionByHashDirect,
+  validateActiveEvmCacheDirect,
 } from "@/domains/evm/client/queries";
 
 type EvmHomeSnapshot = Awaited<ReturnType<typeof getEvmHomeSnapshotDirect>>;
@@ -165,15 +161,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         }
 
         if (!hasValidatedCacheRef.current) {
-          const latestCachedTransactionHash = await getLatestCachedTransactionHash();
-
-          if (
-            latestCachedTransactionHash &&
-            !(await hasEvmTransactionByHashDirect(latestCachedTransactionHash))
-          ) {
-            await clearEvmTransactionCache();
-          }
-
+          await validateActiveEvmCacheDirect();
           hasValidatedCacheRef.current = true;
         }
 

@@ -3,6 +3,8 @@ export const en = {
     home: "Home",
     blockchain: "Blockchain",
     developerTools: "Developer Tools",
+    settings: "Settings",
+    cache: "Cache",
     overview: "Overview",
     blocks: "Blocks",
     transaction: "Transaction",

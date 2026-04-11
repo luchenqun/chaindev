@@ -6,6 +6,8 @@ import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-cli
 import { createEvmClient } from "@/domains/evm/server/client";
 import {
   clearEvmTransactionCache,
+  getEvmCachedTransactionsPage,
+  getEvmObservedAccountsPage,
   getEvmTransactionCacheSummary,
   getLatestCachedTransactionHash,
   rememberEvmTransactionCache,
@@ -352,6 +354,10 @@ function formatBlocksPageItem(block: {
 }
 
 type FormattedTransactionsPageItem = EvmCachedTransactionItem;
+export type EvmCacheValidationResult = {
+  status: "empty" | "valid" | "cleared" | "failed";
+  label: string;
+};
 
 function finalizeTransactionsPageItems(
   currencyName: string,
@@ -886,7 +892,7 @@ export async function getEvmOverviewDirect() {
     client.getBlockNumber(),
   ]);
   const latestCachedTransactionHash = await getLatestCachedTransactionHash();
-  let cacheValidationLabel = "Valid under current provider";
+  let cacheValidationLabel = "Verified";
 
   if (latestCachedTransactionHash) {
     const existingTransaction = await client.transport.request({
@@ -1031,7 +1037,7 @@ export async function getEvmOverviewDirect() {
       latestCachedTransaction: cacheSummary.latestSeenTransaction
         ? {
             hash: cacheSummary.latestSeenTransaction.hash,
-            hashLabel: shortenHash(cacheSummary.latestSeenTransaction.hash, 14, 8),
+            hashLabel: shortenHash(cacheSummary.latestSeenTransaction.hash, 18, 0),
             blockNumber: cacheSummary.latestSeenTransaction.blockNumber,
             timestampMs: cacheSummary.latestSeenTransaction.timestampMs,
           }
@@ -1049,6 +1055,100 @@ export async function getEvmOverviewDirect() {
             .map((block) => block.timestamp)
             .filter((value): value is bigint => value != null),
         ),
+  };
+}
+
+export async function validateActiveEvmCacheDirect(): Promise<EvmCacheValidationResult> {
+  const { client } = await getEvmClientWithProfile();
+  const latestCachedTransactionHash = await getLatestCachedTransactionHash();
+
+  if (!latestCachedTransactionHash) {
+    return {
+      status: "empty" as const,
+      label: "No cached transactions to validate",
+    };
+  }
+
+  const existingTransaction = await client.transport
+    .request({
+      method: "eth_getTransactionByHash",
+      params: [latestCachedTransactionHash] as never,
+    })
+    .catch(() => null);
+
+  if (existingTransaction == null) {
+    await clearEvmTransactionCache();
+    return {
+      status: "cleared" as const,
+      label: "Cleared on provider mismatch",
+    };
+  }
+
+  return {
+    status: "valid" as const,
+    label: "Verified",
+  };
+}
+
+export async function getEvmCacheDashboardDirect(cachedTransactionsPage = 1, observedAccountsPage = 1) {
+  const { client, profile } = await getEvmClientWithProfile();
+  const [chainId, cacheSummary, observedAccounts, cachedTransactions] = await Promise.all([
+    client.getChainId(),
+    getEvmTransactionCacheSummary(),
+    getEvmObservedAccountsPage(observedAccountsPage, 10),
+    getEvmCachedTransactionsPage(cachedTransactionsPage, 10),
+  ]);
+
+  return {
+    header: {
+      connection: "Direct JSON-RPC",
+      providerName: profile.name,
+      nativeCurrency: getEvmCurrencyName(profile.nativeCurrencySymbol),
+      chainId: String(chainId),
+    },
+    summary: {
+      cachedTransactions: cacheSummary.totalTransactions,
+      observedAccounts: cacheSummary.totalObservedAccounts,
+      latestCachedTransaction: cacheSummary.latestSeenTransaction
+        ? {
+            hash: cacheSummary.latestSeenTransaction.hash,
+            hashLabel: shortenHash(cacheSummary.latestSeenTransaction.hash, 18, 0),
+            blockNumber: cacheSummary.latestSeenTransaction.blockNumber,
+            timestampMs: cacheSummary.latestSeenTransaction.timestampMs,
+          }
+        : null,
+    },
+    cachedTransactions,
+    observedAccounts,
+  };
+}
+
+export async function getEvmCacheSummaryDirect() {
+  const { client, profile } = await getEvmClientWithProfile();
+  const [chainId, cacheSummary] = await Promise.all([
+    client.getChainId(),
+    getEvmTransactionCacheSummary(),
+  ]);
+
+  return {
+    header: {
+      connection: "Direct JSON-RPC",
+      providerName: profile.name,
+      nativeCurrency: getEvmCurrencyName(profile.nativeCurrencySymbol),
+      chainId: String(chainId),
+    },
+    summary: {
+      cachedTransactions: cacheSummary.totalTransactions,
+      observedAccounts: cacheSummary.totalObservedAccounts,
+      latestCachedTransaction: cacheSummary.latestSeenTransaction
+        ? {
+            hash: cacheSummary.latestSeenTransaction.hash,
+            hashLabel: shortenHash(cacheSummary.latestSeenTransaction.hash, 18, 0),
+            blockNumber: cacheSummary.latestSeenTransaction.blockNumber,
+            timestampMs: cacheSummary.latestSeenTransaction.timestampMs,
+          }
+        : null,
+    },
   };
 }
 

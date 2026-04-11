@@ -75,6 +75,16 @@ export type EvmTransactionCacheSummary = {
   latestSeenTransaction: EvmCachedTransactionItem | null;
 };
 
+export type EvmCachedTransactionsPage = {
+  page: number;
+  pageSize: number;
+  totalTransactions: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  transactions: EvmCachedTransactionItem[];
+};
+
 export const MAX_CACHED_EVM_TRANSACTIONS = 200_000;
 
 const DB_NAME = "chaindev-evm-transaction-cache";
@@ -714,6 +724,59 @@ export async function getEvmObservedAccountsPage(
     hasPreviousPage: safePage > 1,
     hasNextPage: safePage < totalPages,
     accounts,
+  };
+}
+
+export async function getEvmCachedTransactionsPage(
+  page = 1,
+  pageSize = 25,
+): Promise<EvmCachedTransactionsPage> {
+  const normalizedPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const normalizedPageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 25;
+  const database = await getDatabase();
+  const transaction = database.transaction(TRANSACTIONS_STORE, "readonly");
+  const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
+  const index = transactionsStore.index(TRANSACTIONS_BY_TIMESTAMP_INDEX);
+  const totalTransactions = await toPromise(transactionsStore.count());
+  const totalPages = Math.max(1, Math.ceil(totalTransactions / normalizedPageSize));
+  const safePage = Math.min(normalizedPage, totalPages);
+  const offset = (safePage - 1) * normalizedPageSize;
+
+  const transactions = await new Promise<EvmCachedTransactionItem[]>((resolve, reject) => {
+    const items: EvmCachedTransactionItem[] = [];
+    let skipped = 0;
+    const request = index.openCursor(null, "prev");
+
+    request.onerror = () => reject(request.error ?? new Error("Failed to read cached transactions."));
+    request.onsuccess = () => {
+      const cursor = request.result;
+
+      if (!cursor || items.length >= normalizedPageSize) {
+        resolve(items);
+        return;
+      }
+
+      if (skipped < offset) {
+        skipped += 1;
+        cursor.continue();
+        return;
+      }
+
+      items.push(toPublicTransaction(cursor.value as EvmCachedTransactionRecord));
+      cursor.continue();
+    };
+  });
+
+  await waitForTransaction(transaction);
+
+  return {
+    page: safePage,
+    pageSize: normalizedPageSize,
+    totalTransactions,
+    totalPages,
+    hasPreviousPage: safePage > 1,
+    hasNextPage: safePage < totalPages,
+    transactions,
   };
 }
 

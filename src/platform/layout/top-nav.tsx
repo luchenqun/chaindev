@@ -61,6 +61,10 @@ function matchesNavGroup(pathname: string, groupId: string) {
     return pathname.startsWith("/evm/tools") || pathname.startsWith("/cosmos/tools");
   }
 
+  if (groupId === "settings") {
+    return pathname.startsWith("/evm/settings") || pathname.startsWith("/cosmos/settings");
+  }
+
   if (groupId === "browser") {
     return [
       "/evm/overview",
@@ -120,6 +124,15 @@ export function TopNav() {
         { href: "/cosmos/tools/encode-decode", label: "Cosmos Encode / Decode" },
       ],
     },
+    ...(mode === "evm"
+      ? [
+          {
+            id: "settings",
+            label: messages.navigation.settings,
+            items: [{ href: "/evm/settings/cache", label: messages.navigation.cache }],
+          } satisfies NavGroup,
+        ]
+      : []),
   ];
 
   return (
