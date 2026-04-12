@@ -91,7 +91,7 @@ function AddressPageSkeleton() {
           <Skeleton className="mt-2 h-4 w-[520px]" />
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="data-table">
             <thead>
               <tr>
                 {Array.from({ length: 9 }).map((_, index) => (
@@ -706,7 +706,7 @@ export default function EvmAddressPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">

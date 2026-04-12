@@ -1,17 +1,26 @@
 "use client";
 
+import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transaction-decoder";
+
 export type EvmCachedTransactionItem = {
   hash: string;
   hashLabel: string;
   blockNumber: string;
+  blockNumberValue: number;
   timestampMs: number | null;
   from: string;
   fromLabel: string;
+  fromLower: string;
   to: string | null;
   toLabel: string;
+  toLower: string | null;
   methodLabel: string;
+  methodKey: string;
+  methodSelector: string | null;
   inputData?: string;
   amountLabel: string;
+  valueWei: string;
+  valueWeiSortKey: string;
   maxTxCostLabel: string;
 };
 
@@ -86,18 +95,39 @@ export type EvmCachedTransactionsPage = {
   transactions: EvmCachedTransactionItem[];
 };
 
+export type EvmCachedTransactionSearchFilters = {
+  fromAddress?: string | null;
+  toAddress?: string | null;
+  methodQuery?: string | null;
+  startTimeMs?: number | null;
+  endTimeMs?: number | null;
+  startBlockNumber?: number | null;
+  endBlockNumber?: number | null;
+  minValueWei?: bigint | null;
+  maxValueWei?: bigint | null;
+};
+
 export const MAX_CACHED_EVM_TRANSACTIONS = 200_000;
+export const EVM_VALUE_WEI_SORT_KEY_WIDTH = 80;
 
 const DB_NAME = "chaindev-evm-transaction-cache";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const TRANSACTIONS_STORE = "transactions";
 const ADDRESS_TRANSACTIONS_STORE = "addressTransactions";
 const ADDRESS_SUMMARIES_STORE = "addressSummaries";
 const TRANSACTIONS_BY_TIMESTAMP_INDEX = "bySortTimestamp";
+const TRANSACTIONS_BY_BLOCK_INDEX = "byBlockNumberAndTimestamp";
+const TRANSACTIONS_BY_FROM_TIMESTAMP_INDEX = "byFromAndTimestamp";
+const TRANSACTIONS_BY_TO_TIMESTAMP_INDEX = "byToAndTimestamp";
+const TRANSACTIONS_BY_METHOD_TIMESTAMP_INDEX = "byMethodAndTimestamp";
+const TRANSACTIONS_BY_METHOD_SELECTOR_TIMESTAMP_INDEX = "byMethodSelectorAndTimestamp";
+const TRANSACTIONS_BY_VALUE_INDEX = "byValueAndTimestamp";
 const ADDRESS_BY_HASH_INDEX = "byHash";
 const ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX = "byAddressAndTimestamp";
 const ADDRESS_SUMMARIES_BY_LAST_SEEN_INDEX = "byLastSeen";
 const ADDRESS_SUMMARIES_BY_TX_COUNT_INDEX = "byTxCount";
+const CURSOR_MIN_STRING = "";
+const CURSOR_MAX_STRING = "\uffff";
 
 let databasePromise: Promise<IDBDatabase> | null = null;
 const listeners = new Set<() => void>();
@@ -121,6 +151,11 @@ function waitForTransaction(transaction: IDBTransaction) {
   });
 }
 
+export function formatEvmValueWeiSortKey(value: bigint | string) {
+  const normalized = typeof value === "bigint" ? value.toString() : value;
+  return normalized.padStart(EVM_VALUE_WEI_SORT_KEY_WIDTH, "0");
+}
+
 function getSortTimestamp(item: Pick<EvmCachedTransactionItem, "timestampMs" | "blockNumber">) {
   if (item.timestampMs != null) {
     return item.timestampMs;
@@ -139,14 +174,21 @@ function toPublicTransaction(record: EvmCachedTransactionRecord): EvmCachedTrans
     hash: record.hash,
     hashLabel: record.hashLabel,
     blockNumber: record.blockNumber,
+    blockNumberValue: record.blockNumberValue,
     timestampMs: record.timestampMs,
     from: record.from,
     fromLabel: record.fromLabel,
+    fromLower: record.fromLower,
     to: record.to,
     toLabel: record.toLabel,
+    toLower: record.toLower,
     methodLabel: record.methodLabel,
+    methodKey: record.methodKey,
+    methodSelector: record.methodSelector,
     inputData: record.inputData,
     amountLabel: record.amountLabel,
+    valueWei: record.valueWei,
+    valueWeiSortKey: record.valueWeiSortKey,
     maxTxCostLabel: record.maxTxCostLabel,
   };
 }
@@ -200,38 +242,55 @@ async function getDatabase() {
 
       request.onupgradeneeded = () => {
         const database = request.result;
+        const storeNames = [
+          TRANSACTIONS_STORE,
+          ADDRESS_TRANSACTIONS_STORE,
+          ADDRESS_SUMMARIES_STORE,
+        ];
+        const hasLegacyStores = storeNames.some((storeName) => database.objectStoreNames.contains(storeName));
 
-        if (!database.objectStoreNames.contains(TRANSACTIONS_STORE)) {
-          const transactionsStore = database.createObjectStore(TRANSACTIONS_STORE, {
-            keyPath: "hash",
+        if (hasLegacyStores) {
+          storeNames.forEach((storeName) => {
+            if (database.objectStoreNames.contains(storeName)) {
+              database.deleteObjectStore(storeName);
+            }
           });
-          transactionsStore.createIndex(TRANSACTIONS_BY_TIMESTAMP_INDEX, ["sortTimestamp", "hash"]);
         }
 
-        if (!database.objectStoreNames.contains(ADDRESS_TRANSACTIONS_STORE)) {
-          const addressTransactionsStore = database.createObjectStore(ADDRESS_TRANSACTIONS_STORE, {
-            keyPath: "id",
-          });
-          addressTransactionsStore.createIndex(
-            ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX,
-            ["addressLower", "sortTimestamp", "hash"],
-          );
-          addressTransactionsStore.createIndex(ADDRESS_BY_HASH_INDEX, "hash");
-        }
+        const transactionsStore = database.createObjectStore(TRANSACTIONS_STORE, {
+          keyPath: "hash",
+        });
+        transactionsStore.createIndex(TRANSACTIONS_BY_TIMESTAMP_INDEX, ["sortTimestamp", "hash"]);
+        transactionsStore.createIndex(TRANSACTIONS_BY_BLOCK_INDEX, ["blockNumberValue", "sortTimestamp", "hash"]);
+        transactionsStore.createIndex(TRANSACTIONS_BY_FROM_TIMESTAMP_INDEX, ["fromLower", "sortTimestamp", "hash"]);
+        transactionsStore.createIndex(TRANSACTIONS_BY_TO_TIMESTAMP_INDEX, ["toLower", "sortTimestamp", "hash"]);
+        transactionsStore.createIndex(TRANSACTIONS_BY_METHOD_TIMESTAMP_INDEX, ["methodKey", "sortTimestamp", "hash"]);
+        transactionsStore.createIndex(
+          TRANSACTIONS_BY_METHOD_SELECTOR_TIMESTAMP_INDEX,
+          ["methodSelector", "sortTimestamp", "hash"],
+        );
+        transactionsStore.createIndex(TRANSACTIONS_BY_VALUE_INDEX, ["valueWeiSortKey", "sortTimestamp", "hash"]);
 
-        if (!database.objectStoreNames.contains(ADDRESS_SUMMARIES_STORE)) {
-          const addressSummariesStore = database.createObjectStore(ADDRESS_SUMMARIES_STORE, {
-            keyPath: "addressLower",
-          });
-          addressSummariesStore.createIndex(
-            ADDRESS_SUMMARIES_BY_LAST_SEEN_INDEX,
-            ["lastSeenSort", "addressLower"],
-          );
-          addressSummariesStore.createIndex(
-            ADDRESS_SUMMARIES_BY_TX_COUNT_INDEX,
-            ["totalTxCount", "lastSeenSort", "addressLower"],
-          );
-        }
+        const addressTransactionsStore = database.createObjectStore(ADDRESS_TRANSACTIONS_STORE, {
+          keyPath: "id",
+        });
+        addressTransactionsStore.createIndex(
+          ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX,
+          ["addressLower", "sortTimestamp", "hash"],
+        );
+        addressTransactionsStore.createIndex(ADDRESS_BY_HASH_INDEX, "hash");
+
+        const addressSummariesStore = database.createObjectStore(ADDRESS_SUMMARIES_STORE, {
+          keyPath: "addressLower",
+        });
+        addressSummariesStore.createIndex(
+          ADDRESS_SUMMARIES_BY_LAST_SEEN_INDEX,
+          ["lastSeenSort", "addressLower"],
+        );
+        addressSummariesStore.createIndex(
+          ADDRESS_SUMMARIES_BY_TX_COUNT_INDEX,
+          ["totalTxCount", "lastSeenSort", "addressLower"],
+        );
       };
 
       request.onsuccess = () => resolve(request.result);
@@ -722,6 +781,266 @@ export async function getEvmTransactionCacheSummary(): Promise<EvmTransactionCac
     totalTransactions,
     totalObservedAccounts,
     latestSeenTransaction,
+  };
+}
+
+function normalizeMethodQuery(query: string | null | undefined) {
+  const normalized = query?.trim().toLowerCase() ?? "";
+  return normalized || null;
+}
+
+function isMethodSelectorQuery(query: string | null | undefined) {
+  return Boolean(query && /^0x[0-9a-f]{8}$/i.test(query));
+}
+
+function buildTimestampRange(startTimeMs: number | null | undefined, endTimeMs: number | null | undefined) {
+  const lower = startTimeMs != null ? Math.max(0, startTimeMs) : 0;
+  const upper = endTimeMs != null ? Math.max(lower, endTimeMs) : Number.MAX_SAFE_INTEGER;
+  return { lower, upper };
+}
+
+function buildSearchCursorRequest(
+  store: IDBObjectStore,
+  filters: Required<EvmCachedTransactionSearchFilters>,
+) {
+  const timestampRange = buildTimestampRange(filters.startTimeMs, filters.endTimeMs);
+
+  if (filters.fromAddress) {
+    const index = store.index(TRANSACTIONS_BY_FROM_TIMESTAMP_INDEX);
+    return index.openCursor(
+      IDBKeyRange.bound(
+        [filters.fromAddress, timestampRange.lower, CURSOR_MIN_STRING],
+        [filters.fromAddress, timestampRange.upper, CURSOR_MAX_STRING],
+      ),
+      "prev",
+    );
+  }
+
+  if (filters.toAddress) {
+    const index = store.index(TRANSACTIONS_BY_TO_TIMESTAMP_INDEX);
+    return index.openCursor(
+      IDBKeyRange.bound(
+        [filters.toAddress, timestampRange.lower, CURSOR_MIN_STRING],
+        [filters.toAddress, timestampRange.upper, CURSOR_MAX_STRING],
+      ),
+      "prev",
+    );
+  }
+
+  if (filters.methodQuery && isMethodSelectorQuery(filters.methodQuery)) {
+    const normalizedMethod = normalizeMethodQuery(filters.methodQuery);
+    const index = store.index(TRANSACTIONS_BY_METHOD_SELECTOR_TIMESTAMP_INDEX);
+    return index.openCursor(
+      IDBKeyRange.bound(
+        [normalizedMethod, timestampRange.lower, CURSOR_MIN_STRING],
+        [normalizedMethod, timestampRange.upper, CURSOR_MAX_STRING],
+      ),
+      "prev",
+    );
+  }
+
+  if (filters.methodQuery && (filters.methodQuery === "transfer" || filters.methodQuery === "create")) {
+    const normalizedMethod = normalizeMethodQuery(filters.methodQuery);
+    const index = store.index(TRANSACTIONS_BY_METHOD_TIMESTAMP_INDEX);
+    return index.openCursor(
+      IDBKeyRange.bound(
+        [normalizedMethod, timestampRange.lower, CURSOR_MIN_STRING],
+        [normalizedMethod, timestampRange.upper, CURSOR_MAX_STRING],
+      ),
+      "prev",
+    );
+  }
+
+  if (filters.startBlockNumber != null || filters.endBlockNumber != null) {
+    const lower = Math.max(0, filters.startBlockNumber ?? 0);
+    const upper = Math.max(lower, filters.endBlockNumber ?? Number.MAX_SAFE_INTEGER);
+    const index = store.index(TRANSACTIONS_BY_BLOCK_INDEX);
+    return index.openCursor(
+      IDBKeyRange.bound(
+        [lower, timestampRange.lower, CURSOR_MIN_STRING],
+        [upper, timestampRange.upper, CURSOR_MAX_STRING],
+      ),
+      "prev",
+    );
+  }
+
+  if (filters.startTimeMs != null || filters.endTimeMs != null) {
+    const index = store.index(TRANSACTIONS_BY_TIMESTAMP_INDEX);
+    return index.openCursor(
+      IDBKeyRange.bound(
+        [timestampRange.lower, CURSOR_MIN_STRING],
+        [timestampRange.upper, CURSOR_MAX_STRING],
+      ),
+      "prev",
+    );
+  }
+
+  return store.index(TRANSACTIONS_BY_TIMESTAMP_INDEX).openCursor(null, "prev");
+}
+
+function matchesSearchFilters(
+  record: EvmCachedTransactionRecord,
+  filters: Required<EvmCachedTransactionSearchFilters>,
+) {
+  if (filters.fromAddress && record.fromLower !== filters.fromAddress) {
+    return false;
+  }
+
+  if (filters.toAddress && record.toLower !== filters.toAddress) {
+    return false;
+  }
+
+  if (filters.methodQuery) {
+    const normalizedMethod = normalizeMethodQuery(filters.methodQuery);
+
+    if (!normalizedMethod) {
+      return false;
+    }
+
+    if (isMethodSelectorQuery(normalizedMethod)) {
+      if (record.methodSelector !== normalizedMethod) {
+        return false;
+      }
+    } else {
+      const resolvedMethodLabel = resolveEvmTransactionMethodLabel({
+        to: record.to,
+        inputData: record.inputData,
+        fallbackMethodLabel: record.methodLabel,
+      }).toLowerCase();
+
+      if (
+        !resolvedMethodLabel.includes(normalizedMethod) &&
+        !record.methodKey.includes(normalizedMethod)
+      ) {
+        return false;
+      }
+    }
+  }
+
+  if (filters.startTimeMs != null && (record.timestampMs == null || record.timestampMs < filters.startTimeMs)) {
+    return false;
+  }
+
+  if (filters.endTimeMs != null && (record.timestampMs == null || record.timestampMs > filters.endTimeMs)) {
+    return false;
+  }
+
+  if (filters.startBlockNumber != null && record.blockNumberValue < filters.startBlockNumber) {
+    return false;
+  }
+
+  if (filters.endBlockNumber != null && record.blockNumberValue > filters.endBlockNumber) {
+    return false;
+  }
+
+  if (filters.minValueWei != null || filters.maxValueWei != null) {
+    const valueWei = BigInt(record.valueWei);
+
+    if (filters.minValueWei != null && valueWei < filters.minValueWei) {
+      return false;
+    }
+
+    if (filters.maxValueWei != null && valueWei > filters.maxValueWei) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function collectMatchingTransactionsPage(input: {
+  store: IDBObjectStore;
+  filters: Required<EvmCachedTransactionSearchFilters>;
+  offset: number;
+  limit: number;
+}) {
+  const { store, filters, offset, limit } = input;
+
+  return new Promise<{ totalMatches: number; transactions: EvmCachedTransactionItem[] }>((resolve, reject) => {
+    const transactions: EvmCachedTransactionItem[] = [];
+    let totalMatches = 0;
+    const request = buildSearchCursorRequest(store, filters);
+
+    request.onerror = () => reject(request.error ?? new Error("Failed to search cached transactions."));
+    request.onsuccess = () => {
+      const cursor = request.result;
+
+      if (!cursor) {
+        resolve({
+          totalMatches,
+          transactions,
+        });
+        return;
+      }
+
+      const record = cursor.value as EvmCachedTransactionRecord;
+
+      if (matchesSearchFilters(record, filters)) {
+        if (totalMatches >= offset && transactions.length < limit) {
+          transactions.push(toPublicTransaction(record));
+        }
+
+        totalMatches += 1;
+      }
+
+      cursor.continue();
+    };
+  });
+}
+
+export async function searchEvmCachedTransactions(
+  input: EvmCachedTransactionSearchFilters & {
+    page?: number;
+    pageSize?: number;
+  },
+): Promise<EvmCachedTransactionsPage> {
+  const normalizedPage = Number.isFinite(input.page) && (input.page ?? 0) > 0 ? Math.floor(input.page ?? 1) : 1;
+  const normalizedPageSize =
+    Number.isFinite(input.pageSize) && (input.pageSize ?? 0) > 0 ? Math.floor(input.pageSize ?? 25) : 25;
+  const filters: Required<EvmCachedTransactionSearchFilters> = {
+    fromAddress: input.fromAddress?.trim().toLowerCase() || null,
+    toAddress: input.toAddress?.trim().toLowerCase() || null,
+    methodQuery: normalizeMethodQuery(input.methodQuery),
+    startTimeMs: input.startTimeMs ?? null,
+    endTimeMs: input.endTimeMs ?? null,
+    startBlockNumber: input.startBlockNumber ?? null,
+    endBlockNumber: input.endBlockNumber ?? null,
+    minValueWei: input.minValueWei ?? null,
+    maxValueWei: input.maxValueWei ?? null,
+  };
+  const database = await getDatabase();
+  const transaction = database.transaction(TRANSACTIONS_STORE, "readonly");
+  const store = transaction.objectStore(TRANSACTIONS_STORE);
+  const offset = (normalizedPage - 1) * normalizedPageSize;
+
+  let result = await collectMatchingTransactionsPage({
+    store,
+    filters,
+    offset,
+    limit: normalizedPageSize,
+  });
+  const totalPages = Math.max(1, Math.ceil(result.totalMatches / normalizedPageSize));
+  const safePage = Math.min(normalizedPage, totalPages);
+
+  if (safePage !== normalizedPage) {
+    result = await collectMatchingTransactionsPage({
+      store,
+      filters,
+      offset: (safePage - 1) * normalizedPageSize,
+      limit: normalizedPageSize,
+    });
+  }
+
+  await waitForTransaction(transaction);
+
+  return {
+    page: safePage,
+    pageSize: normalizedPageSize,
+    totalTransactions: result.totalMatches,
+    totalPages,
+    hasPreviousPage: safePage > 1,
+    hasNextPage: safePage < totalPages,
+    transactions: result.transactions,
   };
 }
 

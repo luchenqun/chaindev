@@ -1,11 +1,13 @@
 "use client";
 
-import { IconFileDots, IconRefresh } from "@tabler/icons-react";
+import { IconFileDots, IconRefresh, IconSearch } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { isAddress, parseEther } from "viem";
 import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
 import { RelativeTime } from "@/components/relative-time";
+import { ModalDialog } from "@/components/ui/modal-dialog";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
   getEvmAddressTags,
@@ -16,6 +18,7 @@ import { subscribeEvmContractRegistry } from "@/domains/evm/client/contract-regi
 import {
   getEvmCachedTransactionsPage,
   getEvmTransactionCacheSummary,
+  searchEvmCachedTransactions,
 } from "@/domains/evm/client/transaction-cache";
 import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transaction-decoder";
 import { AddressLink } from "@/domains/evm/ui/address-link";
@@ -40,6 +43,56 @@ type TransactionsPageData = {
   title: string;
   subtitle: string;
   transactions: Awaited<ReturnType<typeof getEvmCachedTransactionsPage>>["transactions"];
+};
+
+type TransactionSearchFormState = {
+  from: string;
+  to: string;
+  method: string;
+  startTime: string;
+  endTime: string;
+  startBlock: string;
+  endBlock: string;
+  minAmount: string;
+  maxAmount: string;
+};
+
+type AppliedTransactionSearchFilters = {
+  hasFilters: boolean;
+  fromAddress: string | null;
+  toAddress: string | null;
+  methodQuery: string | null;
+  startTimeMs: number | null;
+  endTimeMs: number | null;
+  startBlockNumber: number | null;
+  endBlockNumber: number | null;
+  minValueWei: bigint | null;
+  maxValueWei: bigint | null;
+};
+
+const EMPTY_TRANSACTION_SEARCH_FORM: TransactionSearchFormState = {
+  from: "",
+  to: "",
+  method: "",
+  startTime: "",
+  endTime: "",
+  startBlock: "",
+  endBlock: "",
+  minAmount: "",
+  maxAmount: "",
+};
+
+const EMPTY_APPLIED_TRANSACTION_SEARCH: AppliedTransactionSearchFilters = {
+  hasFilters: false,
+  fromAddress: null,
+  toAddress: null,
+  methodQuery: null,
+  startTimeMs: null,
+  endTimeMs: null,
+  startBlockNumber: null,
+  endBlockNumber: null,
+  minValueWei: null,
+  maxValueWei: null,
 };
 
 function parsePageParam(rawPage: string | null) {
@@ -88,6 +141,139 @@ function buildCachedTransactionsPageData(input: {
   };
 }
 
+function buildFilteredTransactionsPageData(input: {
+  page: Awaited<ReturnType<typeof searchEvmCachedTransactions>>;
+  latestCachedTransaction: Awaited<ReturnType<typeof getEvmTransactionCacheSummary>>["latestSeenTransaction"];
+  filters: AppliedTransactionSearchFilters;
+}): TransactionsPageData {
+  const { page, latestCachedTransaction, filters } = input;
+  const latestBlockNumber = latestCachedTransaction?.blockNumber ?? "Unavailable";
+  const oldestBlockNumber =
+    page.transactions[page.transactions.length - 1]?.blockNumber ?? latestCachedTransaction?.blockNumber ?? "Unavailable";
+  const activeParts = [
+    filters.fromAddress ? `from ${filters.fromAddress}` : null,
+    filters.toAddress ? `to ${filters.toAddress}` : null,
+    filters.methodQuery ? `method ${filters.methodQuery}` : null,
+    filters.startTimeMs != null || filters.endTimeMs != null ? "time range" : null,
+    filters.startBlockNumber != null || filters.endBlockNumber != null ? "block range" : null,
+    filters.minValueWei != null || filters.maxValueWei != null ? "amount range" : null,
+  ].filter(Boolean);
+
+  return {
+    ...page,
+    latestBlockNumber,
+    oldestBlockNumber,
+    title: page.totalTransactions
+      ? `${page.totalTransactions.toLocaleString("en-US")} cached matching transactions`
+      : "No cached transactions matched",
+    subtitle: activeParts.length
+      ? `Searching cached transactions by ${activeParts.join(", ")}`
+      : "Searching cached transactions.",
+    transactions: page.transactions,
+  };
+}
+
+function parseTransactionSearchForm(form: TransactionSearchFormState): {
+  error: string | null;
+  filters: AppliedTransactionSearchFilters;
+} {
+  const from = form.from.trim();
+  const to = form.to.trim();
+  const method = form.method.trim().toLowerCase();
+  const hasFilters = Object.values(form).some((value) => value.trim() !== "");
+
+  if (!hasFilters) {
+    return {
+      error: null,
+      filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+    };
+  }
+
+  if (from && !isAddress(from)) {
+    return {
+      error: "From must be a valid EVM address.",
+      filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+    };
+  }
+
+  if (to && !isAddress(to)) {
+    return {
+      error: "To must be a valid EVM address.",
+      filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+    };
+  }
+
+  const startTimeMs = form.startTime ? new Date(form.startTime).getTime() : null;
+  const endTimeMs = form.endTime ? new Date(form.endTime).getTime() : null;
+
+  if ((form.startTime && !Number.isFinite(startTimeMs)) || (form.endTime && !Number.isFinite(endTimeMs))) {
+    return {
+      error: "Time range is invalid.",
+      filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+    };
+  }
+
+  if (startTimeMs != null && endTimeMs != null && startTimeMs > endTimeMs) {
+    return {
+      error: "Start time must not be later than end time.",
+      filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+    };
+  }
+
+  const startBlockNumber = form.startBlock ? Number.parseInt(form.startBlock, 10) : null;
+  const endBlockNumber = form.endBlock ? Number.parseInt(form.endBlock, 10) : null;
+
+  if ((form.startBlock && !/^\d+$/.test(form.startBlock.trim())) ||
+      (form.endBlock && !/^\d+$/.test(form.endBlock.trim())) ||
+      (startBlockNumber != null && startBlockNumber < 0) ||
+      (endBlockNumber != null && endBlockNumber < 0)) {
+    return {
+      error: "Block range must use non-negative integers.",
+      filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+    };
+  }
+
+  if (startBlockNumber != null && endBlockNumber != null && startBlockNumber > endBlockNumber) {
+    return {
+      error: "Start block must not be greater than end block.",
+      filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+    };
+  }
+
+  try {
+    const minValueWei = form.minAmount.trim() ? parseEther(form.minAmount.trim()) : null;
+    const maxValueWei = form.maxAmount.trim() ? parseEther(form.maxAmount.trim()) : null;
+
+    if (minValueWei != null && maxValueWei != null && minValueWei > maxValueWei) {
+      return {
+        error: "Min amount must not be greater than max amount.",
+        filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+      };
+    }
+
+    return {
+      error: null,
+      filters: {
+        hasFilters: true,
+        fromAddress: from || null,
+        toAddress: to || null,
+        methodQuery: method || null,
+        startTimeMs,
+        endTimeMs,
+        startBlockNumber,
+        endBlockNumber,
+        minValueWei,
+        maxValueWei,
+      },
+    };
+  } catch {
+    return {
+      error: "Amount range is invalid.",
+      filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
+    };
+  }
+}
+
 function TransactionsAutoRefreshBridge(props: {
   enabled: boolean;
   onLatestFeed: (latestFeed: NonNullable<ReturnType<typeof useEvmHomeData>["latestFeed"]>) => void;
@@ -118,6 +304,12 @@ function EvmTransactionsPageContent() {
   const currentPage = parsePageParam(searchParams.get("page"));
   const [data, setData] = useState<TransactionsPageData | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [searchForm, setSearchForm] = useState<TransactionSearchFormState>(EMPTY_TRANSACTION_SEARCH_FORM);
+  const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
+  const [activeSearchFilters, setActiveSearchFilters] = useState<AppliedTransactionSearchFilters>(
+    EMPTY_APPLIED_TRANSACTION_SEARCH,
+  );
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [receiptLookupEnabled, setReceiptLookupEnabled] = useState(false);
   const [receiptDetailsByHash, setReceiptDetailsByHash] = useState<
@@ -176,15 +368,35 @@ function EvmTransactionsPageContent() {
 
       try {
         const [cachedPage, cacheSummary] = await Promise.all([
-          getEvmCachedTransactionsPage(currentPage, PAGE_SIZE),
+          activeSearchFilters.hasFilters
+            ? searchEvmCachedTransactions({
+                page: currentPage,
+                pageSize: PAGE_SIZE,
+                fromAddress: activeSearchFilters.fromAddress,
+                toAddress: activeSearchFilters.toAddress,
+                methodQuery: activeSearchFilters.methodQuery,
+                startTimeMs: activeSearchFilters.startTimeMs,
+                endTimeMs: activeSearchFilters.endTimeMs,
+                startBlockNumber: activeSearchFilters.startBlockNumber,
+                endBlockNumber: activeSearchFilters.endBlockNumber,
+                minValueWei: activeSearchFilters.minValueWei,
+                maxValueWei: activeSearchFilters.maxValueWei,
+              })
+            : getEvmCachedTransactionsPage(currentPage, PAGE_SIZE),
           getEvmTransactionCacheSummary(),
         ]);
 
         if (!cancelled) {
-          const next = buildCachedTransactionsPageData({
-            page: cachedPage,
-            latestCachedTransaction: cacheSummary.latestSeenTransaction,
-          });
+          const next = activeSearchFilters.hasFilters
+            ? buildFilteredTransactionsPageData({
+                page: cachedPage,
+                latestCachedTransaction: cacheSummary.latestSeenTransaction,
+                filters: activeSearchFilters,
+              })
+            : buildCachedTransactionsPageData({
+                page: cachedPage,
+                latestCachedTransaction: cacheSummary.latestSeenTransaction,
+              });
 
           setData(next);
           setErrorMessage(null);
@@ -205,7 +417,7 @@ function EvmTransactionsPageContent() {
       }
     }
 
-    void load(true);
+    void load(!data);
 
     const handleProfileChanged = () => {
       void load(true);
@@ -217,7 +429,7 @@ function EvmTransactionsPageContent() {
       cancelled = true;
       window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
     };
-  }, [cacheRefreshVersion, currentPage, pathname, router, searchParamsText]);
+  }, [activeSearchFilters, cacheRefreshVersion, currentPage, pathname, router, searchParamsText]);
 
   useEffect(() => {
     let cancelled = false;
@@ -273,7 +485,7 @@ function EvmTransactionsPageContent() {
   }, []);
 
   function handleAutoRefreshFeed(latestFeed: NonNullable<ReturnType<typeof useEvmHomeData>["latestFeed"]>) {
-    if (currentPage !== 1) {
+    if (currentPage !== 1 || activeSearchFilters.hasFilters) {
       return;
     }
 
@@ -306,6 +518,43 @@ function EvmTransactionsPageContent() {
         transactions: mergedTransactions,
       };
     });
+  }
+
+  function handleSearchInputChange<Key extends keyof TransactionSearchFormState>(
+    key: Key,
+    value: TransactionSearchFormState[Key],
+  ) {
+    setSearchErrorMessage(null);
+    setSearchForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
+
+  function handleApplySearch() {
+    const next = parseTransactionSearchForm(searchForm);
+    setSearchErrorMessage(next.error);
+
+    if (next.error) {
+      return;
+    }
+
+    setActiveSearchFilters(next.filters);
+    setSearchDialogOpen(false);
+
+    if (currentPage !== 1) {
+      router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), 1));
+    }
+  }
+
+  function handleClearSearch() {
+    setSearchForm(EMPTY_TRANSACTION_SEARCH_FORM);
+    setSearchErrorMessage(null);
+    setActiveSearchFilters(EMPTY_APPLIED_TRANSACTION_SEARCH);
+
+    if (currentPage !== 1) {
+      router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), 1));
+    }
   }
 
   useEffect(() => {
@@ -404,7 +653,7 @@ function EvmTransactionsPageContent() {
 
   return (
     <AppShell>
-      {autoRefreshEnabled ? (
+      {autoRefreshEnabled && !activeSearchFilters.hasFilters ? (
         <TransactionsAutoRefreshBridge
           enabled={currentPage === 1}
           onLatestFeed={handleAutoRefreshFeed}
@@ -437,14 +686,35 @@ function EvmTransactionsPageContent() {
               />
               <button
                 type="button"
+                aria-label={activeSearchFilters.hasFilters ? "Edit cache search filters" : "Search cached transactions"}
+                aria-pressed={activeSearchFilters.hasFilters}
+                title={activeSearchFilters.hasFilters ? "Cache search filters active" : "Search cached transactions"}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
+                  activeSearchFilters.hasFilters
+                    ? "border-sky-200 bg-sky-50 text-sky-600"
+                    : "border-slate-200 bg-white text-slate-400 hover:text-slate-600"
+                }`}
+                onClick={() => setSearchDialogOpen(true)}
+              >
+                <IconSearch className="size-4" stroke={1.8} />
+              </button>
+              <button
+                type="button"
                 aria-label={autoRefreshEnabled ? "Disable auto refresh" : "Enable auto refresh"}
                 aria-pressed={autoRefreshEnabled}
-                title={autoRefreshEnabled ? "Auto refresh enabled" : "Auto refresh disabled"}
+                title={
+                  activeSearchFilters.hasFilters
+                    ? "Auto refresh is unavailable while cache search filters are active."
+                    : autoRefreshEnabled
+                      ? "Auto refresh enabled"
+                      : "Auto refresh disabled"
+                }
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
                   autoRefreshEnabled
                     ? "border-sky-200 bg-sky-50 text-sky-600"
                     : "border-slate-200 bg-white text-slate-400 hover:text-slate-600"
-                }`}
+                } ${activeSearchFilters.hasFilters ? "cursor-not-allowed opacity-40" : ""}`}
+                disabled={activeSearchFilters.hasFilters}
                 onClick={() => setAutoRefreshEnabled((current) => !current)}
               >
                 <IconRefresh className="size-4" stroke={1.8} />
@@ -467,7 +737,7 @@ function EvmTransactionsPageContent() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
@@ -601,6 +871,123 @@ function EvmTransactionsPageContent() {
           </div>
         </section>
       </main>
+      <ModalDialog
+        open={searchDialogOpen}
+        onOpenChange={setSearchDialogOpen}
+        title="Search Cached Transactions"
+        description="Filter cached transactions by address, method, time, block range, or amount range."
+        maxWidthClassName="max-w-2xl"
+        footer={
+          <>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              onClick={handleClearSearch}
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              onClick={() => setSearchDialogOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white transition hover:bg-slate-800"
+              onClick={handleApplySearch}
+            >
+              Search
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-3 pb-1 md:grid-cols-2">
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">From</span>
+            <input
+              value={searchForm.from}
+              onChange={(event) => handleSearchInputChange("from", event.target.value)}
+              placeholder="0x..."
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">To</span>
+            <input
+              value={searchForm.to}
+              onChange={(event) => handleSearchInputChange("to", event.target.value)}
+              placeholder="0x..."
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Time</span>
+            <input
+              type="datetime-local"
+              value={searchForm.startTime}
+              onChange={(event) => handleSearchInputChange("startTime", event.target.value)}
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">End Time</span>
+            <input
+              type="datetime-local"
+              value={searchForm.endTime}
+              onChange={(event) => handleSearchInputChange("endTime", event.target.value)}
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Block</span>
+            <input
+              value={searchForm.startBlock}
+              onChange={(event) => handleSearchInputChange("startBlock", event.target.value)}
+              placeholder="0"
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">End Block</span>
+            <input
+              value={searchForm.endBlock}
+              onChange={(event) => handleSearchInputChange("endBlock", event.target.value)}
+              placeholder="0"
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Min Amount</span>
+            <input
+              value={searchForm.minAmount}
+              onChange={(event) => handleSearchInputChange("minAmount", event.target.value)}
+              placeholder="0"
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Max Amount</span>
+            <input
+              value={searchForm.maxAmount}
+              onChange={(event) => handleSearchInputChange("maxAmount", event.target.value)}
+              placeholder="0"
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Method</span>
+            <input
+              value={searchForm.method}
+              onChange={(event) => handleSearchInputChange("method", event.target.value)}
+              placeholder="transfer / create / 0xa9059cbb"
+              className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
+            />
+          </label>
+        </div>
+        {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{searchErrorMessage}</p> : null}
+      </ModalDialog>
     </AppShell>
   );
 }

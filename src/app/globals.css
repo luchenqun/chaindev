@@ -77,6 +77,10 @@
     @apply p-5;
   }
 
+  .table-card {
+    @apply overflow-x-auto;
+  }
+
   .card-grid {
     @apply grid gap-4 md:grid-cols-3;
   }
@@ -113,7 +117,7 @@
   }
 
   .table-shell {
-    @apply w-full border-collapse;
+    @apply min-w-full w-max border-collapse whitespace-nowrap;
   }
 
   .table-shell thead th {
@@ -122,6 +126,18 @@
 
   .table-shell tbody td {
     @apply border-t border-slate-200 px-3 py-3 text-sm text-slate-700;
+  }
+
+  .data-table {
+    @apply min-w-full w-max border-collapse whitespace-nowrap;
+  }
+
+  .data-table thead th {
+    @apply whitespace-nowrap;
+  }
+
+  .data-table tbody td {
+    @apply whitespace-nowrap;
   }
 
   .tool-form {

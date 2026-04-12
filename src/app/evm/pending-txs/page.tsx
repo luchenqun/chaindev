@@ -12,9 +12,11 @@ import { subscribeEvmContractRegistry } from "@/domains/evm/client/contract-regi
 import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transaction-decoder";
 import { getEvmPendingTransactionsDirect } from "@/domains/evm/client/queries";
 import { AddressLink } from "@/domains/evm/ui/address-link";
+import { useEvmHomeData } from "@/domains/evm/ui/home-data-provider";
 import { AppShell } from "@/platform/layout/app-shell";
 
 export default function EvmPendingTransactionsPage() {
+  const { pollIntervalMs } = useEvmHomeData();
   const [data, setData] = useState<Awaited<ReturnType<typeof getEvmPendingTransactionsDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ export default function EvmPendingTransactionsPage() {
       clearScheduledLoad();
 
       try {
-        const next = await getEvmPendingTransactionsDirect();
+        const next = await getEvmPendingTransactionsDirect(100, pollIntervalMs);
 
         if (cancelled) {
           return;
@@ -103,7 +105,7 @@ export default function EvmPendingTransactionsPage() {
       clearScheduledLoad();
       window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
     };
-  }, []);
+  }, [pollIntervalMs]);
 
   useEffect(() => {
     const unsubscribe = subscribeEvmContractRegistry(() => {
@@ -183,7 +185,7 @@ export default function EvmPendingTransactionsPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">

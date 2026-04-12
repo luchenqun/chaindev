@@ -169,7 +169,7 @@ export function PendingTransactionsSkeleton() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="data-table">
             <thead>
               <tr>
                 {Array.from({ length: 8 }).map((_, index) => (
@@ -260,7 +260,7 @@ export function ListPageSkeleton({
           ) : null}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="data-table">
             <thead>
               <tr>
                 {Array.from({ length: columns }).map((_, index) => (

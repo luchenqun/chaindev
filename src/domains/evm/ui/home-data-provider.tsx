@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
+  getEvmHomeBootstrapDirect,
   getEvmLatestFeedDirect,
   getEvmHomeMetricsSupplementDirect,
   getEvmHomeSnapshotDirect,
@@ -11,18 +12,13 @@ import {
 
 type EvmHomeSnapshot = Awaited<ReturnType<typeof getEvmHomeSnapshotDirect>>;
 type EvmLatestFeed = Awaited<ReturnType<typeof getEvmLatestFeedDirect>>;
+type EvmHomeBootstrap = Awaited<ReturnType<typeof getEvmHomeBootstrapDirect>>;
 type EvmHomeMetricsSupplement = Awaited<ReturnType<typeof getEvmHomeMetricsSupplementDirect>>;
 type EvmLiveStatus = Pick<
   EvmLatestFeed,
   "latestBlock" | "latestBlockNumber" | "latestBlockTime" | "latestBlockTimestamp" | "pollIntervalMs"
 >;
-type RecentHomeBlock = {
-  blockNumber: number;
-  timestampMs: number | null;
-  txCount: number;
-  block: EvmLatestFeed["block"];
-  transactions: EvmLatestFeed["transactions"];
-};
+type RecentHomeBlock = EvmHomeBootstrap["recentBlocks"][number];
 
 type EvmHomeDataContextValue = {
   status: EvmLiveStatus | null;
@@ -72,17 +68,23 @@ function mergeRecentHomeBlocks(current: RecentHomeBlock[], feed: EvmLatestFeed) 
 }
 
 function buildDerivedHomeSnapshot(input: {
-  feed: EvmLatestFeed;
+  feed: EvmLiveStatus;
   supplement: EvmHomeMetricsSupplement;
   recentBlocks: RecentHomeBlock[];
   chainId: string | null;
   pollIntervalMs: number;
+  activityTransactions?: EvmHomeBootstrap["transactions"];
 }): EvmHomeSnapshot {
   const activityBlocks = input.recentBlocks.slice(0, HOME_BLOCK_LIST_LIMIT).map((item) => item.block);
-  const activityTransactions = input.recentBlocks
-    .flatMap((item) => item.transactions)
-    .filter((transaction, index, transactions) => transactions.findIndex((candidate) => candidate.hash === transaction.hash) === index)
-    .slice(0, HOME_TRANSACTION_LIST_LIMIT);
+  const activityTransactions =
+    input.activityTransactions ??
+    input.recentBlocks
+      .flatMap((item) => item.transactions)
+      .filter(
+        (transaction, index, transactions) =>
+          transactions.findIndex((candidate) => candidate.hash === transaction.hash) === index,
+      )
+      .slice(0, HOME_TRANSACTION_LIST_LIMIT);
   const recentBlocksForMetrics = input.recentBlocks.slice(0, RECENT_HOME_BLOCK_WINDOW);
   const timestampSamples = recentBlocksForMetrics
     .map((item) => item.timestampMs)
@@ -265,6 +267,35 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       );
     }
 
+    async function bootstrapHome() {
+      const [bootstrap, supplement] = await Promise.all([
+        getEvmHomeBootstrapDirect(HOME_BLOCK_LIST_LIMIT, HOME_TRANSACTION_LIST_LIMIT),
+        getEvmHomeMetricsSupplementDirect(homeChainIdRef.current == null),
+      ]);
+
+      if (disposed) {
+        return;
+      }
+
+      recentHomeBlocksRef.current = bootstrap.recentBlocks;
+
+      if (supplement.header.chainId) {
+        homeChainIdRef.current = supplement.header.chainId;
+      }
+
+      setSnapshot(
+        buildDerivedHomeSnapshot({
+          feed: bootstrap.status,
+          supplement,
+          recentBlocks: bootstrap.recentBlocks,
+          chainId: homeChainIdRef.current,
+          pollIntervalMs: bootstrap.status.pollIntervalMs,
+          activityTransactions: bootstrap.transactions,
+        }),
+      );
+      setErrorMessage(null);
+    }
+
     async function load() {
       try {
         if (!isEvmRoute) {
@@ -284,6 +315,12 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
           hasValidatedCacheRef.current = true;
         }
 
+        const needsHomeBootstrap = isHomePage && recentHomeBlocksRef.current.length < HOME_BLOCK_LIST_LIMIT;
+
+        if (needsHomeBootstrap) {
+          await bootstrapHome();
+        }
+
         const nextFeed = await refreshLatestFeed();
 
         if (!nextFeed) {
@@ -291,6 +328,11 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         }
 
         if (isHomePage) {
+          if (needsHomeBootstrap) {
+            scheduleNextPoll(pollIntervalRef.current);
+            return;
+          }
+
           await refreshHome(nextFeed);
           scheduleNextPoll(pollIntervalRef.current);
           return;
@@ -303,7 +345,9 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         }
 
         setStatus(null);
-        setSnapshot(null);
+        if (!isHomePage || recentHomeBlocksRef.current.length === 0) {
+          setSnapshot(null);
+        }
         setErrorMessage(error instanceof Error ? error.message : "Failed to load homepage activity.");
         setPollIntervalMs(12_000);
         scheduleNextPoll(12_000);

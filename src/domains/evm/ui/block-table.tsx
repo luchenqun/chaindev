@@ -57,8 +57,8 @@ export function EvmBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
   }, [minerAddresses]);
 
   return (
-    <div className="overflow-hidden bg-white">
-      <table className="w-full border-collapse">
+    <div className="overflow-x-auto bg-white">
+      <table className="data-table">
         <thead>
           <tr>
             <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Block</th>

@@ -918,7 +918,7 @@ export default function EvmContractsRegistryPage() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
@@ -1002,7 +1002,7 @@ export default function EvmContractsRegistryPage() {
             <p className="mt-1 text-sm text-slate-500">Deployed contracts bound to the active provider and chain scope.</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="data-table">
               <thead>
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Label</th>

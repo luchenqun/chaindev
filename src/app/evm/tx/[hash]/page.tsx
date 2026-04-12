@@ -1120,7 +1120,7 @@ export default function EvmTxPage() {
                           <div className="space-y-3">
                             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                               <div className="max-h-[360px] overflow-auto">
-                                <table className="w-full border-collapse">
+                                <table className="data-table">
                                   <thead className="bg-slate-50">
                                     <tr>
                                       <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">#</th>

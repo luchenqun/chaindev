@@ -50,6 +50,10 @@ For table action columns that use icon-only controls, keep icons tightly grouped
 between items, use a compact `3px` visual padding per icon button, and provide an immediate
 hover label with a custom tooltip instead of relying on the browser's delayed native `title`.
 
+By default, data tables should keep cell content on a single line. Do not wrap values like
+ages, amounts, addresses, or gas labels onto multiple lines. When a table becomes wider than
+its container, prefer horizontal scrolling over text wrapping.
+
 ## Testing Guidelines
 
 There is no automated test suite in the first version yet. Until one is introduced, use:
