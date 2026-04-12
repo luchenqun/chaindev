@@ -227,18 +227,8 @@ function getAddressFromPrivateKey(privateKey: Hex) {
   return privateKeyToAccount(privateKey).address;
 }
 
-function sortItems(items: EvmStoredPrivateKey[], activeKeyId: string | null) {
-  return [...items].sort((left, right) => {
-    if (left.id === activeKeyId) {
-      return -1;
-    }
-
-    if (right.id === activeKeyId) {
-      return 1;
-    }
-
-    return right.updatedAt - left.updatedAt || left.name.localeCompare(right.name);
-  });
+function sortItems(items: EvmStoredPrivateKey[]) {
+  return [...items];
 }
 
 function markItemUsed(store: z.infer<typeof keyringStoreSchema>, itemId: string) {
@@ -256,13 +246,13 @@ function markItemUsed(store: z.infer<typeof keyringStoreSchema>, itemId: string)
 
   return {
     ...store,
-    items: [updated, ...store.items.filter((item) => item.id !== itemId)],
+    items: store.items.map((item) => (item.id === itemId ? updated : item)),
   };
 }
 
 export function listEvmStoredPrivateKeys() {
   const store = readKeyringStore();
-  return sortItems(store.items, store.activeKeyId);
+  return sortItems(store.items);
 }
 
 export function getEvmStoredPrivateKey(itemId: string) {
@@ -381,7 +371,7 @@ export function renameEvmStoredPrivateKey(itemId: string, name: string) {
 
   writeKeyringStore({
     ...store,
-    items: [updated, ...store.items.filter((item) => item.id !== itemId)],
+    items: store.items.map((item) => (item.id === itemId ? updated : item)),
   });
   emitChange();
   return updated;

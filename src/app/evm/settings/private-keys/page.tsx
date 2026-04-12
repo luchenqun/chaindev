@@ -9,6 +9,7 @@ import {
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
@@ -290,10 +291,12 @@ export default function EvmPrivateKeysPage() {
                           )}
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-700">
-                          <div className="flex flex-col gap-0.5">
-                            <span className="font-medium text-sky-600">{formatAddressLabel(item.address)}</span>
-                            <span className="text-xs text-slate-400">{item.address}</span>
-                          </div>
+                          <Link
+                            href={`/evm/address/${item.address}`}
+                            className="font-medium text-sky-600 hover:text-sky-700"
+                          >
+                            {formatAddressLabel(item.address)}
+                          </Link>
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-700">
                           <div className="flex items-center gap-2">
