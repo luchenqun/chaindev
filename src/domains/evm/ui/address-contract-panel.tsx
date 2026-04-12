@@ -194,6 +194,40 @@ function formatMiddleEllipsis(value: string, leading = 10, trailing = 8) {
   return `${value.slice(0, leading)}...${value.slice(-trailing)}`;
 }
 
+function formatChainTimestamp(timestamp: number) {
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date(timestamp * 1000));
+}
+
+function normalizeContractActionErrorMessage(message: string, fallback: string) {
+  const roleMissingMatch = message.match(/missing role\s+(0x[a-fA-F0-9]+)/i);
+
+  if (roleMissingMatch) {
+    return `Transaction rejected. The current account is missing required role ${roleMissingMatch[1]}.`;
+  }
+
+  const revertReasonMatch = message.match(/execution reverted:\s*(.+?)(?:\s+Version:|$)/i);
+
+  if (revertReasonMatch?.[1]) {
+    return `Transaction reverted: ${revertReasonMatch[1].trim()}.`;
+  }
+
+  const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
+
+  if (rpcDescMatch?.[1]) {
+    return `${fallback} ${rpcDescMatch[1].trim()}.`;
+  }
+
+  return message;
+}
+
 function getReceiptStatusClasses(status: string) {
   if (status === "success") {
     return "bg-emerald-50 text-emerald-700";
@@ -227,15 +261,20 @@ function createInitialManualWriteDialogState(): ManualWriteDialogState {
     transactionType: "EIP1559",
     value: "0",
     gasPrice: "",
-    maxFeePerGas: "",
-    maxPriorityFeePerGas: "",
+    maxFeePerGas: "auto",
+    maxPriorityFeePerGas: "auto",
     gasLimit: "",
-    nonce: "",
+    nonce: "auto",
   };
 }
 
+function isAutoFieldValue(value: string) {
+  const normalizedValue = value.trim().toLowerCase();
+  return !normalizedValue || normalizedValue === "auto";
+}
+
 function isManualWriteDialogReady(state: ManualWriteDialogState) {
-  if (!state.value.trim() || !state.gasLimit.trim() || !state.nonce.trim()) {
+  if (!state.value.trim() || !state.gasLimit.trim()) {
     return false;
   }
 
@@ -243,7 +282,11 @@ function isManualWriteDialogReady(state: ManualWriteDialogState) {
     return !!state.gasPrice.trim();
   }
 
-  return !!state.maxFeePerGas.trim() && !!state.maxPriorityFeePerGas.trim();
+  return (
+    (isAutoFieldValue(state.nonce) || !!state.nonce.trim()) &&
+    (isAutoFieldValue(state.maxFeePerGas) || !!state.maxFeePerGas.trim()) &&
+    (isAutoFieldValue(state.maxPriorityFeePerGas) || !!state.maxPriorityFeePerGas.trim())
+  );
 }
 
 function WriteExecutionPreview({
@@ -328,6 +371,10 @@ function WriteExecutionPreview({
               </dd>
             </div>
             <div>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Included At</dt>
+              <dd className="mt-1 text-sm text-slate-900">{formatChainTimestamp(result.receipt.blockTimestamp)}</dd>
+            </div>
+            <div>
               <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Used</dt>
               <dd className="mt-1 text-sm text-slate-900">{result.receipt.gasUsed}</dd>
             </div>
@@ -339,7 +386,11 @@ function WriteExecutionPreview({
         </div>
       ) : null}
       {error ? (
-        <div className="px-4 py-4 text-sm text-rose-700">{error}</div>
+        <div className="max-h-32 overflow-auto border-t border-slate-200 px-4 py-4">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <p className="break-all whitespace-pre-wrap">{error}</p>
+          </div>
+        </div>
       ) : null}
     </div>
   );
@@ -500,6 +551,7 @@ export function AddressContractPanel({
   const [flashMessage, setFlashMessage] = useState<{
     title: string;
     description?: string;
+    tone?: "success" | "info";
   } | null>(null);
   const [pendingWriteAction, setPendingWriteAction] = useState<{
     signature: string;
@@ -726,6 +778,19 @@ export function AddressContractPanel({
         delete next[signature];
         return next;
       });
+      setFlashMessage(
+        result.receipt.status === "success"
+          ? {
+              title: "Transaction submitted",
+              description: `${fn.name} was sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              tone: "success",
+            }
+          : {
+              title: "Transaction reverted",
+              description: `${fn.name} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              tone: "info",
+            },
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to submit contract transaction.";
 
@@ -739,7 +804,7 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: message,
+        [signature]: normalizeContractActionErrorMessage(message, "Failed to submit contract transaction."),
       }));
     } finally {
       setActionLoadingKey(null);
@@ -793,12 +858,19 @@ export function AddressContractPanel({
         transactionType: defaults.transactionType,
         value: defaults.value,
         gasPrice: defaults.gasPrice,
-        maxFeePerGas: defaults.maxFeePerGas,
-        maxPriorityFeePerGas: defaults.maxPriorityFeePerGas,
+        maxFeePerGas: "auto",
+        maxPriorityFeePerGas: "auto",
         gasLimit: defaults.estimatedGas,
-        nonce: defaults.nonce,
+        nonce: "auto",
       });
-      setManualWriteDialogError(defaults.simulationError);
+      setManualWriteDialogError(
+        defaults.simulationError
+          ? normalizeContractActionErrorMessage(
+              defaults.simulationError,
+              "Failed to prepare manual contract transaction.",
+            )
+          : null,
+      );
       setManualWriteTarget(signature);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to prepare manual contract transaction.";
@@ -813,7 +885,7 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: message,
+        [signature]: normalizeContractActionErrorMessage(message, "Failed to prepare manual contract transaction."),
       }));
     } finally {
       setActionLoadingKey(null);
@@ -842,19 +914,57 @@ export function AddressContractPanel({
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
       const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map(() => "");
+      const value = manualWriteDialogValues.value;
+      const latestDefaults =
+        manualWriteDialogValues.transactionType === "EIP1559" &&
+        (isAutoFieldValue(manualWriteDialogValues.maxFeePerGas) ||
+          isAutoFieldValue(manualWriteDialogValues.maxPriorityFeePerGas) ||
+          isAutoFieldValue(manualWriteDialogValues.nonce))
+          ? await getEvmContractWriteManualDefaultsDirect({
+              address: binding.address,
+              abiJson: artifact.abiJson,
+              functionSignature: signature,
+              rawArgs,
+              privateKey,
+              value,
+            })
+          : isAutoFieldValue(manualWriteDialogValues.nonce)
+            ? await getEvmContractWriteManualDefaultsDirect({
+                address: binding.address,
+                abiJson: artifact.abiJson,
+                functionSignature: signature,
+                rawArgs,
+                privateKey,
+                value,
+              })
+            : null;
+      const resolvedDialogValues = {
+        ...manualWriteDialogValues,
+        value,
+        maxFeePerGas: isAutoFieldValue(manualWriteDialogValues.maxFeePerGas)
+          ? (latestDefaults?.maxFeePerGas ?? manualWriteDialogValues.maxFeePerGas)
+          : manualWriteDialogValues.maxFeePerGas,
+        maxPriorityFeePerGas: isAutoFieldValue(manualWriteDialogValues.maxPriorityFeePerGas)
+          ? (latestDefaults?.maxPriorityFeePerGas ?? manualWriteDialogValues.maxPriorityFeePerGas)
+          : manualWriteDialogValues.maxPriorityFeePerGas,
+        nonce: isAutoFieldValue(manualWriteDialogValues.nonce)
+          ? (latestDefaults?.nonce ?? manualWriteDialogValues.nonce)
+          : manualWriteDialogValues.nonce,
+      };
+      setManualWriteDialogValues(resolvedDialogValues);
       const result = await forceWriteEvmContractMethodDirect({
         address: binding.address,
         abiJson: artifact.abiJson,
         functionSignature: signature,
         rawArgs,
         privateKey,
-        transactionType: manualWriteDialogValues.transactionType,
-        value: manualWriteDialogValues.value,
-        gasLimit: manualWriteDialogValues.gasLimit,
-        gasPrice: manualWriteDialogValues.gasPrice,
-        maxFeePerGas: manualWriteDialogValues.maxFeePerGas,
-        maxPriorityFeePerGas: manualWriteDialogValues.maxPriorityFeePerGas,
-        nonce: manualWriteDialogValues.nonce,
+        transactionType: resolvedDialogValues.transactionType,
+        value: resolvedDialogValues.value,
+        gasLimit: resolvedDialogValues.gasLimit,
+        gasPrice: resolvedDialogValues.gasPrice,
+        maxFeePerGas: resolvedDialogValues.maxFeePerGas,
+        maxPriorityFeePerGas: resolvedDialogValues.maxPriorityFeePerGas,
+        nonce: resolvedDialogValues.nonce,
       });
 
       setWriteResults((current) => ({
@@ -863,7 +973,7 @@ export function AddressContractPanel({
       }));
       setWriteValueBySignature((current) => ({
         ...current,
-        [signature]: manualWriteDialogValues.value,
+        [signature]: resolvedDialogValues.value,
       }));
       setWriteErrors((current) => {
         const next = { ...current };
@@ -872,6 +982,19 @@ export function AddressContractPanel({
       });
       setManualWriteTarget(null);
       setManualWriteDialogError(null);
+      setFlashMessage(
+        result.receipt.status === "success"
+          ? {
+              title: "Force-send submitted",
+              description: `${fn.name} was force-sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              tone: "success",
+            }
+          : {
+              title: "Force-send reverted",
+              description: `${fn.name} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              tone: "info",
+            },
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to force-send contract transaction.";
 
@@ -885,9 +1008,11 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: message,
+        [signature]: normalizeContractActionErrorMessage(message, "Failed to force-send contract transaction."),
       }));
-      setManualWriteDialogError(message);
+      setManualWriteDialogError(
+        normalizeContractActionErrorMessage(message, "Failed to force-send contract transaction."),
+      );
     } finally {
       setActionLoadingKey(null);
     }
@@ -911,7 +1036,12 @@ export function AddressContractPanel({
       setUnlockPassword("");
       setPendingWriteAction(null);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : "Failed to unlock private key.");
+      setUnlockError(
+        normalizeContractActionErrorMessage(
+          error instanceof Error ? error.message : "Failed to unlock private key.",
+          "Failed to unlock private key.",
+        ),
+      );
     }
   }
 
@@ -992,7 +1122,13 @@ export function AddressContractPanel({
 
   return (
     <>
-      {flashMessage ? <FlashMessage title={flashMessage.title} description={flashMessage.description} /> : null}
+      {flashMessage ? (
+        <FlashMessage
+          title={flashMessage.title}
+          description={flashMessage.description}
+          tone={flashMessage.tone}
+        />
+      ) : null}
       <div className="inline-flex flex-wrap rounded-[14px] bg-slate-100 p-1">
         {[
           { value: "code" as const, label: "Code" },
@@ -1362,22 +1498,24 @@ export function AddressContractPanel({
         maxWidthClassName="max-w-lg"
       >
         {manualWriteTarget ? (
-          <div className="grid gap-4">
-            <div className="grid gap-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
-              <p className="break-all text-sm text-slate-900 mono">{binding.address}</p>
-            </div>
-            <div className="grid gap-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
-              <p className="text-sm text-slate-900">{manualWriteTarget}</p>
-            </div>
-            <div className="grid gap-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
-              <p className="text-sm text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
-            </div>
-            <div className="grid gap-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Chain ID</p>
-              <p className="text-sm text-slate-900">{environment.chainId}</p>
+          <div className="grid gap-4 pb-1">
+            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
+                <p className="mt-1 break-all text-sm text-slate-900 mono">{binding.address}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
+                <p className="mt-1 text-sm text-slate-900">{manualWriteTarget}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
+                <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Chain ID</p>
+                <p className="mt-1 text-sm text-slate-900">{environment.chainId}</p>
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">

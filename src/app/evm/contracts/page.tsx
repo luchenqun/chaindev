@@ -43,13 +43,14 @@ import {
   type EvmContractBinding,
 } from "@/domains/evm/client/contract-registry";
 import {
-  deployEvmContractDirect,
+  forceDeployEvmContractDirect,
   getActiveEvmContractEnvironmentDirect,
-  prepareEvmContractDeployDirect,
+  getEvmContractDeployManualDefaultsDirect,
 } from "@/domains/evm/client/contract-executor";
 import {
   getActiveEvmStoredPrivateKey,
   isEvmStoredPrivateKeyUnlocked,
+  peekEvmStoredPrivateKey,
   resolveEvmStoredPrivateKey,
   subscribeEvmKeyring,
   type EvmStoredPrivateKey,
@@ -66,6 +67,18 @@ type EnvironmentState = {
   chainId: string;
   nativeCurrency: string;
 } | null;
+
+type DeployTransactionType = "LEGACY" | "EIP1559";
+
+type DeployDialogState = {
+  transactionType: DeployTransactionType;
+  value: string;
+  gasPrice: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+  gasLimit: string;
+  nonce: string;
+};
 
 function ContractInputsForm({
   inputs,
@@ -122,6 +135,79 @@ function formatTimestamp(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
+function normalizeDeployErrorMessage(message: string) {
+  if (/only developer can create contract/i.test(message)) {
+    return "Deployment rejected by the current chain. Only developer-authorized accounts can create contracts.";
+  }
+
+  const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
+
+  if (rpcDescMatch?.[1]) {
+    return `Deployment failed: ${rpcDescMatch[1].trim()}.`;
+  }
+
+  if (/Missing or invalid parameters\./i.test(message)) {
+    return "Deployment failed. The current RPC node rejected the request parameters.";
+  }
+
+  return message;
+}
+
+function normalizeWorkbenchErrorMessage(message: string, fallback: string) {
+  if (/only developer can create contract/i.test(message)) {
+    return "Deployment rejected by the current chain. Only developer-authorized accounts can create contracts.";
+  }
+
+  const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
+
+  if (rpcDescMatch?.[1]) {
+    return `${fallback} ${rpcDescMatch[1].trim()}.`;
+  }
+
+  if (/Missing or invalid parameters\./i.test(message)) {
+    return `${fallback} The current RPC node rejected the request parameters.`;
+  }
+
+  return message;
+}
+
+function createInitialDeployDialogState(): DeployDialogState {
+  return {
+    transactionType: "EIP1559",
+    value: "0",
+    gasPrice: "",
+    maxFeePerGas: "auto",
+    maxPriorityFeePerGas: "auto",
+    gasLimit: "",
+    nonce: "auto",
+  };
+}
+
+function isAutoFieldValue(value: string) {
+  const normalizedValue = value.trim().toLowerCase();
+  return !normalizedValue || normalizedValue === "auto";
+}
+
+function isDeployDialogReady(state: DeployDialogState) {
+  if (!state.value.trim() || !state.gasLimit.trim()) {
+    return false;
+  }
+
+  if (state.transactionType === "LEGACY") {
+    return !!state.gasPrice.trim();
+  }
+
+  return (
+    (isAutoFieldValue(state.nonce) || !!state.nonce.trim()) &&
+    (isAutoFieldValue(state.maxFeePerGas) || !!state.maxFeePerGas.trim()) &&
+    (isAutoFieldValue(state.maxPriorityFeePerGas) || !!state.maxPriorityFeePerGas.trim())
+  );
+}
+
+function areDeployConstructorArgsReady(inputs: readonly AbiParameter[], values: string[]) {
+  return inputs.every((_, index) => !!values[index]?.trim());
+}
+
 export default function EvmContractsRegistryPage() {
   const [environment, setEnvironment] = useState<EnvironmentState>(null);
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
@@ -144,21 +230,20 @@ export default function EvmContractsRegistryPage() {
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false);
   const [deployArtifactId, setDeployArtifactId] = useState<string | null>(null);
   const [deployArgumentValues, setDeployArgumentValues] = useState<string[]>([]);
-  const [deployValue, setDeployValue] = useState("");
-  const [deployAutoBind, setDeployAutoBind] = useState(true);
+  const [deployDialogValues, setDeployDialogValues] = useState<DeployDialogState>(createInitialDeployDialogState());
+  const [deployBindingLabel, setDeployBindingLabel] = useState("");
   const [deployError, setDeployError] = useState<string | null>(null);
-  const [deployPreview, setDeployPreview] = useState<Awaited<ReturnType<typeof prepareEvmContractDeployDirect>> | null>(null);
   const [deployResult, setDeployResult] = useState<{
     hash: string;
     contractAddress: string;
     bindingId: string | null;
     bindingError: string | null;
   } | null>(null);
-  const [deployActionLoading, setDeployActionLoading] = useState<"prepare" | "deploy" | null>(null);
+  const [deployActionLoading, setDeployActionLoading] = useState<"fill" | "deploy" | null>(null);
   const [deployUnlockDialogOpen, setDeployUnlockDialogOpen] = useState(false);
   const [deployUnlockPassword, setDeployUnlockPassword] = useState("");
   const [deployUnlockError, setDeployUnlockError] = useState<string | null>(null);
-  const [pendingDeployAction, setPendingDeployAction] = useState<"prepare" | "deploy" | null>(null);
+  const [pendingDeployAction, setPendingDeployAction] = useState<"fill" | "deploy" | null>(null);
   const [flashMessage, setFlashMessage] = useState<{
     title: string;
     description?: string;
@@ -172,6 +257,7 @@ export default function EvmContractsRegistryPage() {
   >(null);
   const [loading, setLoading] = useState(true);
   const environmentRef = useRef<EnvironmentState>(null);
+  const deployDefaultsRequestIdRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,6 +351,10 @@ export default function EvmContractsRegistryPage() {
     () => (deployArtifact ? getContractConstructor(deployArtifact.abiJson) : null),
     [deployArtifact],
   );
+  const isDeploySimulationReady = useMemo(
+    () => areDeployConstructorArgsReady(deployConstructor?.inputs ?? [], deployArgumentValues),
+    [deployConstructor, deployArgumentValues],
+  );
 
   function resetArtifactForm() {
     setArtifactForm({
@@ -290,10 +380,9 @@ export default function EvmContractsRegistryPage() {
   function resetDeployState() {
     setDeployArtifactId(null);
     setDeployArgumentValues([]);
-    setDeployValue("");
-    setDeployAutoBind(true);
+    setDeployDialogValues(createInitialDeployDialogState());
+    setDeployBindingLabel("");
     setDeployError(null);
-    setDeployPreview(null);
     setDeployResult(null);
     setDeployActionLoading(null);
     setDeployUnlockDialogOpen(false);
@@ -345,10 +434,9 @@ export default function EvmContractsRegistryPage() {
     setDeployArtifactId(artifact.id);
     const constructorItem = getContractConstructor(artifact.abiJson);
     setDeployArgumentValues(constructorItem.inputs.map(() => ""));
-    setDeployValue("");
-    setDeployAutoBind(true);
+    setDeployDialogValues(createInitialDeployDialogState());
+    setDeployBindingLabel(artifact.name);
     setDeployError(null);
-    setDeployPreview(null);
     setDeployResult(null);
     setDeployActionLoading(null);
     setDeployUnlockDialogOpen(false);
@@ -356,6 +444,30 @@ export default function EvmContractsRegistryPage() {
     setDeployUnlockError(null);
     setPendingDeployAction(null);
   }
+
+  useEffect(() => {
+    if (
+      !deployArtifact ||
+      !deployArtifact.bytecode ||
+      !activeKey ||
+      (activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
+      !isDeploySimulationReady
+    ) {
+      setDeployError(null);
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void fillDeployDefaults(undefined, {
+        rawArgs: deployArgumentValues,
+        value: deployDialogValues.value,
+      });
+    }, 240);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [activeKey, deployArtifact, deployArgumentValues, deployDialogValues.value, isDeploySimulationReady]);
 
   function handleSaveArtifact() {
     try {
@@ -376,7 +488,12 @@ export default function EvmContractsRegistryPage() {
       resetArtifactForm();
       setArtifactDialogOpen(false);
     } catch (error) {
-      setArtifactError(error instanceof Error ? error.message : "Failed to save contract artifact.");
+      setArtifactError(
+        normalizeWorkbenchErrorMessage(
+          error instanceof Error ? error.message : "Failed to save contract artifact.",
+          "Failed to save contract artifact.",
+        ),
+      );
     }
   }
 
@@ -392,7 +509,12 @@ export default function EvmContractsRegistryPage() {
       }));
       setArtifactError(null);
     } catch (error) {
-      setArtifactError(error instanceof Error ? error.message : "Failed to parse contract artifact.");
+      setArtifactError(
+        normalizeWorkbenchErrorMessage(
+          error instanceof Error ? error.message : "Failed to parse contract artifact.",
+          "Failed to parse contract artifact.",
+        ),
+      );
     }
   }
 
@@ -451,22 +573,30 @@ export default function EvmContractsRegistryPage() {
       resetBindingForm();
       setBindingDialogOpen(false);
     } catch (error) {
-      setBindingError(error instanceof Error ? error.message : "Failed to save contract binding.");
+      setBindingError(
+        normalizeWorkbenchErrorMessage(
+          error instanceof Error ? error.message : "Failed to save contract binding.",
+          "Failed to save contract binding.",
+        ),
+      );
     }
   }
 
   function updateDeployArgumentValue(index: number, value: string) {
-    setDeployArgumentValues((current) => {
-      const next = [...current];
-      next[index] = value;
-      return next;
-    });
-    setDeployPreview(null);
+    const nextArgs = [...deployArgumentValues];
+    nextArgs[index] = value;
+    setDeployArgumentValues(nextArgs);
     setDeployResult(null);
     setDeployError(null);
   }
 
-  async function executeDeployAction(action: "prepare" | "deploy") {
+  async function fillDeployDefaults(
+    password?: string,
+    overrides?: {
+      rawArgs?: string[];
+      value?: string;
+    },
+  ) {
     if (!deployArtifact) {
       setDeployError("Select a contract artifact first.");
       return;
@@ -482,50 +612,151 @@ export default function EvmContractsRegistryPage() {
       return;
     }
 
-    setDeployActionLoading(action);
+    setDeployActionLoading("fill");
+    setDeployError(null);
+    const requestId = deployDefaultsRequestIdRef.current + 1;
+    deployDefaultsRequestIdRef.current = requestId;
+
+    try {
+      const privateKey = password
+        ? await resolveEvmStoredPrivateKey(activeKey.id, password)
+        : await peekEvmStoredPrivateKey(activeKey.id);
+      const rawArgs = overrides?.rawArgs ?? deployArgumentValues;
+      const value = overrides?.value ?? deployDialogValues.value;
+      const defaults = await getEvmContractDeployManualDefaultsDirect({
+        abiJson: deployArtifact.abiJson,
+        bytecode: deployArtifact.bytecode,
+        rawArgs,
+        privateKey,
+        value,
+      });
+
+      if (requestId !== deployDefaultsRequestIdRef.current) {
+        return;
+      }
+
+      setDeployDialogValues((current) => ({
+        ...current,
+        transactionType: defaults.transactionType,
+        value: defaults.value,
+        gasPrice: defaults.gasPrice,
+        maxFeePerGas: isAutoFieldValue(current.maxFeePerGas) ? "auto" : current.maxFeePerGas,
+        maxPriorityFeePerGas: isAutoFieldValue(current.maxPriorityFeePerGas)
+          ? "auto"
+          : current.maxPriorityFeePerGas,
+        gasLimit: defaults.estimatedGas || current.gasLimit,
+        nonce: isAutoFieldValue(current.nonce) ? "auto" : current.nonce,
+      }));
+
+      if (defaults.simulationError) {
+        setDeployError(normalizeDeployErrorMessage(defaults.simulationError));
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to simulate deployment.";
+
+      if (message === "Password is required.") {
+        setPendingDeployAction("fill");
+        setDeployUnlockPassword("");
+        setDeployUnlockError(null);
+        setDeployUnlockDialogOpen(true);
+        return;
+      }
+
+      setDeployError(normalizeDeployErrorMessage(message));
+    } finally {
+      setDeployActionLoading(null);
+    }
+  }
+
+  async function executeDeployAction() {
+    if (!deployArtifact) {
+      setDeployError("Select a contract artifact first.");
+      return;
+    }
+
+    if (!deployArtifact.bytecode) {
+      setDeployError("This artifact does not include deployable bytecode.");
+      return;
+    }
+
+    if (!activeKey) {
+      setDeployError("Select a global private key first.");
+      return;
+    }
+
+    setDeployActionLoading("deploy");
     setDeployError(null);
 
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id);
+      const latestDefaults =
+        deployDialogValues.transactionType === "EIP1559" &&
+        (isAutoFieldValue(deployDialogValues.maxFeePerGas) ||
+          isAutoFieldValue(deployDialogValues.maxPriorityFeePerGas) ||
+          isAutoFieldValue(deployDialogValues.nonce))
+          ? await getEvmContractDeployManualDefaultsDirect({
+              abiJson: deployArtifact.abiJson,
+              bytecode: deployArtifact.bytecode,
+              rawArgs: deployArgumentValues,
+              privateKey,
+              value: deployDialogValues.value,
+            })
+          : isAutoFieldValue(deployDialogValues.nonce)
+            ? await getEvmContractDeployManualDefaultsDirect({
+                abiJson: deployArtifact.abiJson,
+                bytecode: deployArtifact.bytecode,
+                rawArgs: deployArgumentValues,
+                privateKey,
+                value: deployDialogValues.value,
+              })
+            : null;
+      const resolvedDialogValues = {
+        ...deployDialogValues,
+        maxFeePerGas: isAutoFieldValue(deployDialogValues.maxFeePerGas)
+          ? (latestDefaults?.maxFeePerGas ?? deployDialogValues.maxFeePerGas)
+          : deployDialogValues.maxFeePerGas,
+        maxPriorityFeePerGas: isAutoFieldValue(deployDialogValues.maxPriorityFeePerGas)
+          ? (latestDefaults?.maxPriorityFeePerGas ?? deployDialogValues.maxPriorityFeePerGas)
+          : deployDialogValues.maxPriorityFeePerGas,
+        nonce: isAutoFieldValue(deployDialogValues.nonce)
+          ? (latestDefaults?.nonce ?? deployDialogValues.nonce)
+          : deployDialogValues.nonce,
+      };
+      setDeployDialogValues(resolvedDialogValues);
 
-      if (action === "prepare") {
-        const preview = await prepareEvmContractDeployDirect({
-          abiJson: deployArtifact.abiJson,
-          bytecode: deployArtifact.bytecode,
-          rawArgs: deployArgumentValues,
-          privateKey,
-          value: deployValue,
-        });
-        setDeployPreview(preview);
-        setDeployResult(null);
-        return;
-      }
-
-      const result = await deployEvmContractDirect({
+      const result = await forceDeployEvmContractDirect({
         abiJson: deployArtifact.abiJson,
         bytecode: deployArtifact.bytecode,
         rawArgs: deployArgumentValues,
         privateKey,
-        value: deployValue,
+        transactionType: resolvedDialogValues.transactionType,
+        value: resolvedDialogValues.value,
+        gasLimit: resolvedDialogValues.gasLimit,
+        gasPrice: resolvedDialogValues.gasPrice,
+        maxFeePerGas: resolvedDialogValues.maxFeePerGas,
+        maxPriorityFeePerGas: resolvedDialogValues.maxPriorityFeePerGas,
+        nonce: resolvedDialogValues.nonce,
       });
 
       let bindingId: string | null = null;
       let deployBindingError: string | null = null;
 
-      if (deployAutoBind && environment) {
+      if (deployBindingLabel.trim() && environment) {
         try {
           const binding = createEvmContractBinding({
             artifactId: deployArtifact.id,
             address: result.contractAddress,
-            label: deployArtifact.name,
+            label: deployBindingLabel.trim(),
             chainId: environment.chainId,
             providerProfileId: environment.providerProfileId,
             providerName: environment.providerName,
           });
           bindingId = binding.id;
         } catch (error) {
-          deployBindingError =
-            error instanceof Error ? error.message : "Failed to create a binding for the deployed contract.";
+          deployBindingError = normalizeWorkbenchErrorMessage(
+            error instanceof Error ? error.message : "Failed to create a binding for the deployed contract.",
+            "Failed to create a binding for the deployed contract.",
+          );
         }
       }
 
@@ -538,19 +769,18 @@ export default function EvmContractsRegistryPage() {
             : `Deployed to ${result.contractAddress}.`,
       });
       resetDeployState();
-      setDeployPreview(null);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to deploy contract.";
 
       if (message === "Password is required.") {
-        setPendingDeployAction(action);
+        setPendingDeployAction("deploy");
         setDeployUnlockPassword("");
         setDeployUnlockError(null);
         setDeployUnlockDialogOpen(true);
         return;
       }
 
-      setDeployError(message);
+      setDeployError(normalizeDeployErrorMessage(message));
     } finally {
       setDeployActionLoading(null);
     }
@@ -568,9 +798,18 @@ export default function EvmContractsRegistryPage() {
       setDeployUnlockDialogOpen(false);
       setDeployUnlockPassword("");
       setDeployUnlockError(null);
-      await executeDeployAction(nextAction);
+      if (nextAction === "fill") {
+        await fillDeployDefaults(deployUnlockPassword);
+      } else {
+        await executeDeployAction();
+      }
     } catch (error) {
-      setDeployUnlockError(error instanceof Error ? error.message : "Failed to unlock the selected private key.");
+      setDeployUnlockError(
+        normalizeWorkbenchErrorMessage(
+          error instanceof Error ? error.message : "Failed to unlock the selected private key.",
+          "Failed to unlock the selected private key.",
+        ),
+      );
     }
   }
 
@@ -597,9 +836,19 @@ export default function EvmContractsRegistryPage() {
       setDeleteTarget(null);
     } catch (error) {
       if (deleteTarget.type === "artifact") {
-        setArtifactError(error instanceof Error ? error.message : "Failed to delete contract artifact.");
+        setArtifactError(
+          normalizeWorkbenchErrorMessage(
+            error instanceof Error ? error.message : "Failed to delete contract artifact.",
+            "Failed to delete contract artifact.",
+          ),
+        );
       } else {
-        setBindingError(error instanceof Error ? error.message : "Failed to delete contract binding.");
+        setBindingError(
+          normalizeWorkbenchErrorMessage(
+            error instanceof Error ? error.message : "Failed to delete contract binding.",
+            "Failed to delete contract binding.",
+          ),
+        );
       }
     }
   }
@@ -852,7 +1101,7 @@ export default function EvmContractsRegistryPage() {
               </Button>
             </>
           }
-          maxWidthClassName="max-w-3xl"
+          maxWidthClassName="max-w-4xl"
         >
           <div className="grid gap-4">
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
@@ -986,16 +1235,14 @@ export default function EvmContractsRegistryPage() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
-                onClick={() => void executeDeployAction("prepare")}
-                disabled={!deployArtifact || deployActionLoading !== null || !deployArtifact.bytecode}
-              >
-                {deployActionLoading === "prepare" ? "Preparing..." : "Preview Deployment"}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void executeDeployAction("deploy")}
-                disabled={!deployPreview || deployActionLoading !== null}
+                onClick={() => void executeDeployAction()}
+                disabled={
+                  !deployArtifact ||
+                  deployActionLoading !== null ||
+                  !deployArtifact.bytecode ||
+                  !isDeploySimulationReady ||
+                  !isDeployDialogReady(deployDialogValues)
+                }
                 aria-busy={deployActionLoading === "deploy"}
               >
                 {deployActionLoading === "deploy" ? (
@@ -1011,27 +1258,27 @@ export default function EvmContractsRegistryPage() {
           }
           maxWidthClassName="max-w-3xl"
         >
-          <div className="grid gap-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="grid max-h-[68vh] gap-4 overflow-y-auto pr-1">
+            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Artifact</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{deployArtifact?.name ?? "Unavailable"}</p>
-                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Constructor</p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{deployArtifact?.name ?? "Unavailable"}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Constructor</p>
                 <p className="mt-1 text-sm text-slate-700">
                   {deployConstructor?.inputs.length ? `${deployConstructor.inputs.length} argument(s)` : "No arguments"}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <div className="min-w-0">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Selected Key</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
-                <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Environment</p>
-                <p className="mt-1 text-sm text-slate-700">
-                  {environment ? `${environment.providerName} / Chain ${environment.chainId}` : "Unavailable"}
-                </p>
-                {activeKey && activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id) ? (
-                  <p className="mt-2 text-xs text-amber-600">This key is encrypted and will require unlock before deployment.</p>
-                ) : null}
+                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
               </div>
+              {activeKey && activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id) ? (
+                <p className="text-xs text-amber-600 sm:col-span-2 lg:col-span-3">
+                  This key is encrypted and will require unlock before deployment.
+                </p>
+              ) : null}
             </div>
 
             {!activeKey ? (
@@ -1052,63 +1299,141 @@ export default function EvmContractsRegistryPage() {
 
             <div className="grid gap-3">
               <p className="text-sm font-medium text-slate-700">Constructor Arguments</p>
-              <ContractInputsForm
-                inputs={deployConstructor?.inputs ?? []}
-                values={deployArgumentValues}
-                onChange={updateDeployArgumentValue}
-              />
+              <div className="max-h-64 overflow-y-auto pr-1">
+                <ContractInputsForm
+                  inputs={deployConstructor?.inputs ?? []}
+                  values={deployArgumentValues}
+                  onChange={updateDeployArgumentValue}
+                />
+              </div>
+              {deployConstructor?.inputs.length && !isDeploySimulationReady ? (
+                <p className="text-xs text-slate-500">
+                  Fill all constructor arguments first. Gas and nonce will be simulated automatically after that.
+                </p>
+              ) : null}
             </div>
 
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <Select
+                  value={deployDialogValues.transactionType}
+                  onValueChange={(value) =>
+                    setDeployDialogValues((current) => ({
+                      ...current,
+                      transactionType: value as DeployTransactionType,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select transaction type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EIP1559">EIP1559</SelectItem>
+                    <SelectItem value="LEGACY">LEGACY</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium text-slate-700">
                   Native Value ({environment?.nativeCurrency ?? "Native"})
                 </label>
                 <Input
-                  value={deployValue}
+                  value={deployDialogValues.value}
                   onChange={(event) => {
-                    setDeployValue(event.target.value);
-                    setDeployPreview(null);
+                    const nextValue = event.target.value;
+                    setDeployDialogValues((current) => ({
+                      ...current,
+                      value: nextValue,
+                    }));
                     setDeployResult(null);
                     setDeployError(null);
                   }}
                   placeholder="0"
                 />
               </div>
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded border-slate-300"
-                  checked={deployAutoBind}
-                  onChange={(event) => setDeployAutoBind(event.target.checked)}
+              {deployDialogValues.transactionType === "LEGACY" ? (
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <Input
+                    value={deployDialogValues.gasPrice}
+                    onChange={(event) =>
+                      setDeployDialogValues((current) => ({
+                        ...current,
+                        gasPrice: event.target.value,
+                      }))
+                    }
+                    placeholder="0.001"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <Input
+                      value={deployDialogValues.maxFeePerGas}
+                      onChange={(event) =>
+                        setDeployDialogValues((current) => ({
+                          ...current,
+                          maxFeePerGas: event.target.value,
+                        }))
+                      }
+                      placeholder="0.001"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <Input
+                      value={deployDialogValues.maxPriorityFeePerGas}
+                      onChange={(event) =>
+                        setDeployDialogValues((current) => ({
+                          ...current,
+                          maxPriorityFeePerGas: event.target.value,
+                        }))
+                      }
+                      placeholder="0.001"
+                    />
+                  </div>
+                </>
+              )}
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <Input
+                  value={deployDialogValues.gasLimit}
+                  onChange={(event) =>
+                    setDeployDialogValues((current) => ({
+                      ...current,
+                      gasLimit: event.target.value,
+                    }))
+                  }
+                  placeholder="0"
                 />
-                Auto-create binding
-              </label>
-            </div>
-
-            {deployPreview ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Deployment Preview</p>
-                <dl className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="min-w-0">
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">From</dt>
-                    <dd className="mt-1 break-all text-sm text-slate-900 mono">{deployPreview.accountAddress}</dd>
-                  </div>
-                  <div className="min-w-0">
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Estimated Gas</dt>
-                    <dd className="mt-1 text-sm text-slate-900">{deployPreview.estimatedGas}</dd>
-                  </div>
-                  <div className="min-w-0">
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Price</dt>
-                    <dd className="mt-1 text-sm text-slate-900">{deployPreview.gasPriceLabel}</dd>
-                  </div>
-                  <div className="min-w-0">
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Value</dt>
-                    <dd className="mt-1 text-sm text-slate-900">{deployPreview.valueLabel}</dd>
-                  </div>
-                </dl>
               </div>
-            ) : null}
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <Input
+                  value={deployDialogValues.nonce}
+                  onChange={(event) =>
+                    setDeployDialogValues((current) => ({
+                      ...current,
+                      nonce: event.target.value,
+                    }))
+                  }
+                  placeholder="0"
+                />
+              </div>
+              <div className="grid gap-2 sm:col-span-2">
+                <label className="text-sm font-medium text-slate-700">Binding Label</label>
+                <Input
+                  value={deployBindingLabel}
+                  onChange={(event) => setDeployBindingLabel(event.target.value)}
+                  placeholder={deployArtifact?.name ?? "Binding label"}
+                />
+                <p className="text-xs text-slate-500">
+                  Leave empty if you do not want to create a binding after deployment.
+                </p>
+              </div>
+            </div>
 
             {deployResult ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
@@ -1140,7 +1465,11 @@ export default function EvmContractsRegistryPage() {
               </div>
             ) : null}
 
-            {deployError ? <p className="text-sm text-rose-600">{deployError}</p> : null}
+            {deployError ? (
+              <div className="max-h-32 overflow-auto rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <p className="break-all whitespace-pre-wrap">{deployError}</p>
+              </div>
+            ) : null}
           </div>
         </ModalDialog>
 

@@ -22,6 +22,12 @@ import { createEvmTransport } from "@/domains/evm/lib/transport";
 import { getEvmCurrencyName } from "@/platform/workbench/rpc-profile";
 import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
 
+const EVM_GAS_LIMIT_MULTIPLIER = 1.35;
+const EVM_GAS_LIMIT_MULTIPLIER_SCALE = 100n;
+const EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR = BigInt(
+  Math.round(EVM_GAS_LIMIT_MULTIPLIER * Number(EVM_GAS_LIMIT_MULTIPLIER_SCALE)),
+);
+
 function getActiveEvmProfile() {
   const profile = readActiveRpcProfileCookie("evm");
 
@@ -78,6 +84,12 @@ function parseGasLimit(gasLimit: string) {
   }
 
   return normalizedValue;
+}
+
+function applyGasLimitMultiplier(gasLimit: bigint) {
+  return (
+    gasLimit * EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR + (EVM_GAS_LIMIT_MULTIPLIER_SCALE - 1n)
+  ) / EVM_GAS_LIMIT_MULTIPLIER_SCALE;
 }
 
 function parseGasPrice(gasPrice: string) {
@@ -142,6 +154,14 @@ function formatGweiValue(value: bigint) {
 
 function formatEip1559GasLabel(maxFeePerGas: bigint, maxPriorityFeePerGas: bigint) {
   return `Max Fee ${formatGweiValue(maxFeePerGas)} Gwei / Priority Fee ${formatGweiValue(maxPriorityFeePerGas)} Gwei`;
+}
+
+async function getReceiptBlockTimestamp(
+  publicClient: ReturnType<typeof getActiveEvmClients>["publicClient"],
+  blockNumber: bigint,
+) {
+  const block = await publicClient.getBlock({ blockNumber });
+  return Number(block.timestamp);
 }
 
 async function getManualWriteFeeDefaults(publicClient: ReturnType<typeof getActiveEvmClients>["publicClient"]) {
@@ -234,6 +254,7 @@ export async function prepareEvmContractWriteDirect(input: {
     args,
     value: value > 0n ? value : undefined,
   } as never);
+  const bufferedEstimatedGas = applyGasLimitMultiplier(estimatedGas);
   const gasPrice = await publicClient.getGasPrice();
 
   return {
@@ -241,7 +262,7 @@ export async function prepareEvmContractWriteDirect(input: {
     functionName: fn.name,
     functionSignature: fn.signature,
     args,
-    estimatedGas: estimatedGas.toString(),
+    estimatedGas: bufferedEstimatedGas.toString(),
     gasPrice: gasPrice.toString(),
     gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
     valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
@@ -281,12 +302,13 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
       args,
       value: value > 0n ? value : undefined,
     } as never);
+    const bufferedEstimatedGas = applyGasLimitMultiplier(estimatedGas);
 
     return {
       accountAddress: account.address,
       functionName: fn.name,
       functionSignature: fn.signature,
-      estimatedGas: estimatedGas.toString(),
+      estimatedGas: bufferedEstimatedGas.toString(),
       transactionType: feeDefaults.transactionType,
       gasPrice: feeDefaults.gasPrice,
       maxFeePerGas: feeDefaults.maxFeePerGas,
@@ -353,15 +375,32 @@ export async function writeEvmContractMethodDirect(input: {
     args,
     value: value > 0n ? value : undefined,
   } as never);
+  const gas = simulation.request.gas
+    ? applyGasLimitMultiplier(simulation.request.gas)
+    : applyGasLimitMultiplier(
+        await publicClient.estimateContractGas({
+          account,
+          address: input.address as `0x${string}`,
+          abi: JSON.parse(input.abiJson),
+          functionName: fn.name,
+          args,
+          value: value > 0n ? value : undefined,
+        } as never),
+      );
 
-  const hash = await walletClient.writeContract(simulation.request as never);
+  const hash = await walletClient.writeContract({
+    ...simulation.request,
+    gas,
+  } as never);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
 
   return {
     hash,
     receipt: {
       status: receipt.status,
       blockNumber: receipt.blockNumber.toString(),
+      blockTimestamp,
       gasUsed: receipt.gasUsed.toString(),
       effectiveGasPrice: receipt.effectiveGasPrice !== null
         ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
@@ -437,12 +476,14 @@ export async function forceWriteEvmContractMethodDirect(input: {
     ...feeParameters,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
 
   return {
     hash,
     receipt: {
       status: receipt.status,
       blockNumber: receipt.blockNumber.toString(),
+      blockTimestamp,
       gasUsed: receipt.gasUsed.toString(),
       effectiveGasPrice: receipt.effectiveGasPrice !== null
         ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
@@ -459,17 +500,13 @@ export async function prepareEvmContractDeployDirect(input: {
   value: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const constructorItem = getContractConstructor(input.abiJson);
   const abi = parseContractAbiJson(input.abiJson);
+  const constructorItem = getContractConstructor(input.abiJson);
   const args = parseContractFunctionArgs(constructorItem.inputs, input.rawArgs);
   const bytecode = normalizeDeployBytecode(input.bytecode);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
   const value = parseNativeValue(input.value);
-
-  if (constructorItem.stateMutability !== "payable" && value > 0n) {
-    throw new Error("Only payable constructors can send native value.");
-  }
 
   const data = encodeDeployData({
     abi,
@@ -481,18 +518,91 @@ export async function prepareEvmContractDeployDirect(input: {
     data,
     value: value > 0n ? value : undefined,
   });
+  const bufferedEstimatedGas = applyGasLimitMultiplier(estimatedGas);
   const gasPrice = await publicClient.getGasPrice();
 
   return {
     accountAddress: account.address,
     constructorArgCount: constructorItem.inputs.length,
-    estimatedGas: estimatedGas.toString(),
+    estimatedGas: bufferedEstimatedGas.toString(),
     gasPriceLabel: `${Number(formatGwei(gasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`,
     valueLabel:
       value > 0n
         ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
         : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
   };
+}
+
+export async function getEvmContractDeployManualDefaultsDirect(input: {
+  abiJson: string;
+  bytecode: string;
+  rawArgs: string[];
+  privateKey: string;
+  value: string;
+}) {
+  const { profile, publicClient } = getActiveEvmClients();
+  const abi = parseContractAbiJson(input.abiJson);
+  const constructorItem = getContractConstructor(input.abiJson);
+  const args = parseContractFunctionArgs(constructorItem.inputs, input.rawArgs);
+  const bytecode = normalizeDeployBytecode(input.bytecode);
+  const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
+  const account = privateKeyToAccount(normalizedPrivateKey);
+  const value = parseNativeValue(input.value);
+
+  const [feeDefaults, nonce] = await Promise.all([
+    getManualWriteFeeDefaults(publicClient),
+    publicClient.getTransactionCount({ address: account.address }),
+  ]);
+
+  try {
+    const data = encodeDeployData({
+      abi,
+      args,
+      bytecode,
+    });
+    const estimatedGas = await publicClient.estimateGas({
+      account,
+      data,
+      value: value > 0n ? value : undefined,
+    });
+    const bufferedEstimatedGas = applyGasLimitMultiplier(estimatedGas);
+
+    return {
+      accountAddress: account.address,
+      constructorArgCount: constructorItem.inputs.length,
+      estimatedGas: bufferedEstimatedGas.toString(),
+      transactionType: feeDefaults.transactionType,
+      gasPrice: feeDefaults.gasPrice,
+      maxFeePerGas: feeDefaults.maxFeePerGas,
+      maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
+      gasPriceLabel: feeDefaults.gasPriceLabel,
+      nonce: String(nonce),
+      value: input.value.trim() || "0",
+      valueLabel:
+        value > 0n
+          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: null,
+    };
+  } catch (error) {
+    return {
+      accountAddress: account.address,
+      constructorArgCount: constructorItem.inputs.length,
+      estimatedGas: "",
+      transactionType: feeDefaults.transactionType,
+      gasPrice: feeDefaults.gasPrice,
+      maxFeePerGas: feeDefaults.maxFeePerGas,
+      maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
+      gasPriceLabel: feeDefaults.gasPriceLabel,
+      nonce: String(nonce),
+      value: input.value.trim() || "0",
+      valueLabel:
+        value > 0n
+          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: error instanceof Error ? error.message : "Simulation failed.",
+    };
+  }
 }
 
 export async function deployEvmContractDirect(input: {
@@ -503,9 +613,8 @@ export async function deployEvmContractDirect(input: {
   value: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const constructorItem = getContractConstructor(input.abiJson);
   const abi = parseContractAbiJson(input.abiJson);
-  const args = parseContractFunctionArgs(constructorItem.inputs, input.rawArgs);
+  const args = parseContractFunctionArgs(getContractConstructor(input.abiJson).inputs, input.rawArgs);
   const bytecode = normalizeDeployBytecode(input.bytecode);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -515,17 +624,109 @@ export async function deployEvmContractDirect(input: {
   });
   const value = parseNativeValue(input.value);
 
-  if (constructorItem.stateMutability !== "payable" && value > 0n) {
-    throw new Error("Only payable constructors can send native value.");
-  }
+  const estimatedGas = await publicClient.estimateGas({
+    account,
+    data: encodeDeployData({
+      abi,
+      args,
+      bytecode,
+    }),
+    value: value > 0n ? value : undefined,
+  });
+  const gas = applyGasLimitMultiplier(estimatedGas);
 
   const hash = await walletClient.deployContract({
     abi,
     bytecode,
     args,
     value: value > 0n ? value : undefined,
+    gas,
     account,
   } as never);
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+  if (!receipt.contractAddress) {
+    throw new Error("Deployment completed without a contract address.");
+  }
+
+  return {
+    hash,
+    contractAddress: receipt.contractAddress,
+    receipt: {
+      status: receipt.status,
+      blockNumber: receipt.blockNumber.toString(),
+      gasUsed: receipt.gasUsed.toString(),
+      effectiveGasPrice: receipt.effectiveGasPrice
+        ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
+        : "Unavailable",
+    },
+  };
+}
+
+export async function forceDeployEvmContractDirect(input: {
+  abiJson: string;
+  bytecode: string;
+  rawArgs: string[];
+  privateKey: string;
+  transactionType: "LEGACY" | "EIP1559";
+  value: string;
+  gasLimit: string;
+  gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
+  nonce?: string;
+}) {
+  const { profile, publicClient } = getActiveEvmClients();
+  const abi = parseContractAbiJson(input.abiJson);
+  const args = parseContractFunctionArgs(getContractConstructor(input.abiJson).inputs, input.rawArgs);
+  const bytecode = normalizeDeployBytecode(input.bytecode);
+  const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
+  const account = privateKeyToAccount(normalizedPrivateKey);
+  const walletClient = createWalletClient({
+    account,
+    transport: createEvmTransport(profile.rpcUrl),
+  });
+  const value = parseNativeValue(input.value);
+  const gas = parseGasLimit(input.gasLimit);
+  const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
+  const feeParameters =
+    input.transactionType === "LEGACY"
+      ? {
+          type: "legacy" as const,
+          gasPrice: parseGasPrice(input.gasPrice ?? ""),
+        }
+      : (() => {
+          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? "", "Max fee per gas");
+          const maxPriorityFeePerGas = parseFeePerGas(
+            input.maxPriorityFeePerGas ?? "",
+            "Max priority fee per gas",
+          );
+
+          if (maxFeePerGas < maxPriorityFeePerGas) {
+            throw new Error("Max fee per gas cannot be less than max priority fee per gas.");
+          }
+
+          return {
+            type: "eip1559" as const,
+            maxFeePerGas,
+            maxPriorityFeePerGas,
+          };
+        })();
+
+  const data = encodeDeployData({
+    abi,
+    args,
+    bytecode,
+  });
+  const hash = await walletClient.sendTransaction({
+    chain: undefined,
+    account,
+    data,
+    value: value > 0n ? value : undefined,
+    gas,
+    nonce,
+    ...feeParameters,
+  });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
   if (!receipt.contractAddress) {

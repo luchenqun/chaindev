@@ -57,14 +57,20 @@ export function ModalDialog({
         onClick={() => onOpenChange(false)}
       />
       <div
-        className={`relative z-10 w-full ${maxWidthClassName} rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.24)]`}
+        className={`relative z-10 flex max-h-[calc(100vh-5rem)] w-full flex-col overflow-hidden ${maxWidthClassName} rounded-2xl border border-slate-200 bg-white shadow-[0_24px_64px_rgba(15,23,42,0.24)]`}
       >
-        <div>
+        <div className="shrink-0 px-6 pt-6">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           {description ? <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p> : null}
         </div>
-        <div className="mt-5">{children}</div>
-        {footer ? <div className="mt-6 flex justify-end gap-2">{footer}</div> : null}
+        <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-6">
+          {children}
+        </div>
+        {footer ? (
+          <div className="mt-5 shrink-0 border-t border-slate-200 px-6 py-4">
+            <div className="flex justify-end gap-2">{footer}</div>
+          </div>
+        ) : null}
       </div>
     </div>,
     document.body,

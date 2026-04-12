@@ -439,6 +439,34 @@ export function lockEvmStoredPrivateKey(itemId: string) {
   emitChange();
 }
 
+export async function peekEvmStoredPrivateKey(itemId: string, password?: string) {
+  const item = getEvmStoredPrivateKey(itemId);
+
+  if (!item) {
+    throw new Error("Private key entry not found.");
+  }
+
+  if (item.securityMode === "plain") {
+    if (!item.privateKey) {
+      throw new Error("Stored private key is unavailable.");
+    }
+
+    return normalizePrivateKey(item.privateKey);
+  }
+
+  const cachedPrivateKey = unlockedPrivateKeys.get(item.id);
+
+  if (cachedPrivateKey) {
+    return cachedPrivateKey;
+  }
+
+  if (!password) {
+    throw new Error("Password is required.");
+  }
+
+  return decryptPrivateKeyRecord(item, password);
+}
+
 export async function resolveEvmStoredPrivateKey(itemId: string, password?: string) {
   const item = getEvmStoredPrivateKey(itemId);
 
