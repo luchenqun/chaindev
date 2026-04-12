@@ -3,10 +3,19 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { IconFileDots, IconInfoCircle } from "@tabler/icons-react";
+import { IconBinaryTree2, IconFileDots, IconInfoCircle, IconTag } from "@tabler/icons-react";
 import { RelativeTime } from "@/components/relative-time";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ModalDialog } from "@/components/ui/modal-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   deleteEvmAddressTag,
@@ -22,9 +31,12 @@ import {
   subscribeEvmTransactionCache,
 } from "@/domains/evm/client/transaction-cache";
 import {
+  createEvmContractBinding,
   getEvmContractArtifact,
+  listEvmContractArtifacts,
   listEvmContractBindingsByScope,
   subscribeEvmContractRegistry,
+  updateEvmContractBinding,
   type EvmContractArtifact,
   type EvmContractBinding,
 } from "@/domains/evm/client/contract-registry";
@@ -207,7 +219,7 @@ export default function EvmAddressPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nameTag, setNameTag] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
-  const [tagEditorOpen, setTagEditorOpen] = useState(false);
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [addressCacheSnapshot, setAddressCacheSnapshot] = useState<Awaited<ReturnType<typeof getEvmAddressCacheSnapshot>>>({
     totalTransactions: 0,
     transactions: [],
@@ -218,9 +230,14 @@ export default function EvmAddressPage() {
     selfCount: 0,
   });
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
   const [contractEnvironment, setContractEnvironment] = useState<ContractEnvironmentState>(null);
   const [contractBinding, setContractBinding] = useState<EvmContractBinding | null>(null);
   const [contractArtifact, setContractArtifact] = useState<EvmContractArtifact | null>(null);
+  const [bindingDialogOpen, setBindingDialogOpen] = useState(false);
+  const [bindingArtifactId, setBindingArtifactId] = useState("");
+  const [bindingLabelInput, setBindingLabelInput] = useState("");
+  const [bindingError, setBindingError] = useState<string | null>(null);
   const [receiptLookupEnabled, setReceiptLookupEnabled] = useState(false);
   const [receiptDetailsByHash, setReceiptDetailsByHash] = useState<
     Record<string, { status: string; statusLabel: string; feeLabel: string }>
@@ -337,6 +354,7 @@ export default function EvmAddressPage() {
         ).find((binding) => binding.addressLower === address.toLowerCase()) ?? null;
 
       setContractEnvironment(nextEnvironment);
+      setArtifacts(listEvmContractArtifacts());
       setContractBinding(nextBinding);
       setContractArtifact(nextBinding ? getEvmContractArtifact(nextBinding.artifactId) : null);
     }
@@ -483,13 +501,69 @@ export default function EvmAddressPage() {
       deleteEvmAddressTag(address);
     }
 
-    setTagEditorOpen(false);
+    setTagDialogOpen(false);
   }
 
   function handleRemoveTag() {
     deleteEvmAddressTag(address);
     setTagInput("");
-    setTagEditorOpen(false);
+    setTagDialogOpen(false);
+  }
+
+  function openTagDialog() {
+    setTagInput(nameTag ?? "");
+    setTagDialogOpen(true);
+  }
+
+  function openBindingDialog() {
+    const defaultArtifact =
+      (contractBinding ? getEvmContractArtifact(contractBinding.artifactId) : contractArtifact) ?? artifacts[0] ?? null;
+
+    setBindingError(null);
+    setBindingArtifactId(defaultArtifact?.id ?? "");
+    setBindingLabelInput(contractBinding?.label ?? defaultArtifact?.name ?? "");
+    setBindingDialogOpen(true);
+  }
+
+  function handleBindingArtifactChange(nextArtifactId: string) {
+    setBindingArtifactId(nextArtifactId);
+    setBindingLabelInput(artifacts.find((artifact) => artifact.id === nextArtifactId)?.name ?? "");
+  }
+
+  function handleSaveBinding() {
+    if (!contractEnvironment) {
+      setBindingError("Current provider environment is unavailable.");
+      return;
+    }
+
+    const selectedArtifactId = bindingArtifactId.trim();
+
+    if (!selectedArtifactId) {
+      setBindingError("Select a saved artifact first.");
+      return;
+    }
+
+    try {
+      const payload = {
+        artifactId: selectedArtifactId,
+        address,
+        label: bindingLabelInput,
+        chainId: contractEnvironment.chainId,
+        providerProfileId: contractEnvironment.providerProfileId,
+        providerName: contractEnvironment.providerName,
+      };
+
+      if (contractBinding) {
+        updateEvmContractBinding(contractBinding.id, payload);
+      } else {
+        createEvmContractBinding(payload);
+      }
+
+      setBindingDialogOpen(false);
+      setBindingError(null);
+    } catch (error) {
+      setBindingError(error instanceof Error ? error.message : "Failed to bind artifact.");
+    }
   }
 
   function navigateToTab(nextTab: AddressPageTab) {
@@ -549,40 +623,26 @@ export default function EvmAddressPage() {
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[1.171875rem] font-semibold text-slate-900">Address</h1>
             <span className="text-sm font-medium text-slate-500 mono">{summary.address}</span>
+            <ActionIconButton
+              tooltip={nameTag ? "Edit tag" : "Add tag"}
+              className="text-slate-400 hover:text-sky-600"
+              onClick={openTagDialog}
+            >
+              <IconTag className="size-4" stroke={1.8} />
+            </ActionIconButton>
+            <ActionIconButton
+              tooltip={contractBinding ? "Edit artifact binding" : "Bind artifact"}
+              className="text-slate-400 hover:text-sky-600"
+              onClick={openBindingDialog}
+            >
+              <IconBinaryTree2 className="size-4" stroke={1.8} />
+            </ActionIconButton>
             {nameTag ? (
               <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
                 {nameTag}
               </span>
             ) : null}
-            <button
-              type="button"
-              className="text-xs font-medium text-sky-600 hover:text-sky-700"
-              onClick={() => {
-                setTagInput(nameTag ?? "");
-                setTagEditorOpen((current) => !current);
-              }}
-            >
-              {tagEditorOpen ? "Cancel" : nameTag ? "Edit Tag" : "Add Tag"}
-            </button>
           </div>
-          {tagEditorOpen ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <Input
-                className="h-8 w-[240px]"
-                value={tagInput}
-                onChange={(event) => setTagInput(event.target.value)}
-                placeholder="Enter name tag"
-              />
-              <Button size="sm" type="button" onClick={handleSaveTag}>
-                Save
-              </Button>
-              {nameTag ? (
-                <Button size="sm" type="button" variant="outline" onClick={handleRemoveTag}>
-                  Remove
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
         </div>
 
         <section>
@@ -859,6 +919,104 @@ export default function EvmAddressPage() {
             ) : null}
           </section>
         )}
+
+        <ModalDialog
+          open={tagDialogOpen}
+          onOpenChange={setTagDialogOpen}
+          title={nameTag ? "Edit Tag" : "Add Tag"}
+          description="Save a short label for this address under the current provider profile."
+          footer={
+            <>
+              {nameTag ? (
+                <Button type="button" variant="outline" onClick={handleRemoveTag}>
+                  Remove
+                </Button>
+              ) : null}
+              <Button type="button" variant="outline" onClick={() => setTagDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleSaveTag}>
+                Save
+              </Button>
+            </>
+          }
+          maxWidthClassName="max-w-lg"
+        >
+          <label className="grid gap-2 pb-1">
+            <span className="text-sm font-medium text-slate-700">Tag</span>
+            <Input
+              value={tagInput}
+              onChange={(event) => setTagInput(event.target.value)}
+              placeholder="Enter name tag"
+            />
+          </label>
+        </ModalDialog>
+
+        <ModalDialog
+          open={bindingDialogOpen}
+          onOpenChange={(open) => {
+            setBindingDialogOpen(open);
+            if (!open) {
+              setBindingError(null);
+            }
+          }}
+          title={contractBinding ? "Edit Artifact Binding" : "Bind Artifact"}
+          description="Associate this address with a saved artifact under the current provider scope."
+          footer={
+            <>
+              <Button type="button" variant="outline" onClick={() => setBindingDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleSaveBinding} disabled={!artifacts.length}>
+                Save
+              </Button>
+            </>
+          }
+          maxWidthClassName="max-w-xl"
+        >
+          <div className="grid gap-4 pb-1">
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">Artifact</span>
+              <Select value={bindingArtifactId} onValueChange={handleBindingArtifactChange} disabled={!artifacts.length}>
+                <SelectTrigger>
+                  <SelectValue placeholder={artifacts.length ? "Select artifact" : "No saved artifacts"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {artifacts.map((artifact) => (
+                    <SelectItem key={artifact.id} value={artifact.id}>
+                      {artifact.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">Label</span>
+              <Input
+                value={bindingLabelInput}
+                onChange={(event) => setBindingLabelInput(event.target.value)}
+                placeholder="Enter binding label"
+              />
+            </label>
+
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">Address</span>
+              <Input value={address} readOnly className="bg-slate-50 text-slate-500" />
+            </label>
+
+            {bindingError ? (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+                {bindingError}
+              </div>
+            ) : null}
+            {!artifacts.length ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                No saved artifacts yet. Create or import one in the contracts page first.
+              </div>
+            ) : null}
+          </div>
+        </ModalDialog>
       </main>
     </AppShell>
   );
