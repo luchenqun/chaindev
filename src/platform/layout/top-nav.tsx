@@ -2,6 +2,7 @@
 
 import {
   IconChevronDown,
+  IconLogout,
   IconMoonStars,
   IconUserCircle,
 } from "@tabler/icons-react";
@@ -9,6 +10,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { signOut, useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { type PlatformMode } from "@/config/chains";
 import { getMessages } from "@/i18n";
@@ -95,6 +97,7 @@ export function TopNav() {
   const pathname = usePathname();
   const mode = inferMode(pathname);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const { data: session, status } = useSession();
   const blockchainItems: NavItem[] =
     mode === "cosmos"
       ? [
@@ -250,12 +253,31 @@ export function TopNav() {
           <div className="flex flex-wrap items-center justify-end gap-3">
             {mode === "evm" ? <ActiveEvmKeySelector /> : null}
             <div className="h-6 w-px bg-slate-200" aria-hidden="true" />
-            <Link href="/login">
-              <Button variant="ghost" className="h-8 gap-2 px-2 text-[15px] font-normal text-slate-700">
-                <IconUserCircle className="size-4" stroke={2} />
-                {messages.navigation.signIn}
-              </Button>
-            </Link>
+            {status === "authenticated" ? (
+              <>
+                <span className="inline-flex items-center gap-2 text-[15px] font-normal text-slate-700">
+                  <IconUserCircle className="size-4" stroke={2} />
+                  {(session.user as { username?: string } | undefined)?.username ??
+                    session.user?.name ??
+                    session.user?.email}
+                </span>
+                <Button
+                  variant="ghost"
+                  className="h-8 gap-2 px-2 text-[15px] font-normal text-slate-700"
+                  onClick={() => void signOut({ callbackUrl: "/" })}
+                >
+                  <IconLogout className="size-4" stroke={2} />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <Link href="/login">
+                <Button variant="ghost" className="h-8 gap-2 px-2 text-[15px] font-normal text-slate-700">
+                  <IconUserCircle className="size-4" stroke={2} />
+                  {messages.navigation.signIn}
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>

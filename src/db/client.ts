@@ -16,6 +16,187 @@ mkdirSync(dirname(databasePath), { recursive: true });
 
 const sqlite = new Database(databasePath);
 
+function getTableColumns(tableName: string) {
+  return sqlite
+    .prepare(`PRAGMA table_info(${tableName})`)
+    .all() as Array<{ name: string }>;
+}
+
+function ensureAuthSchema() {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS user (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT,
+      username TEXT,
+      email TEXT,
+      password_hash TEXT,
+      email_verified INTEGER,
+      image TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS account (
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      provider_account_id TEXT NOT NULL,
+      refresh_token TEXT,
+      access_token TEXT,
+      expires_at INTEGER,
+      token_type TEXT,
+      scope TEXT,
+      id_token TEXT,
+      session_state TEXT,
+      PRIMARY KEY (provider, provider_account_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS session (
+      session_token TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      expires INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS verification_token (
+      identifier TEXT NOT NULL,
+      token TEXT NOT NULL,
+      expires INTEGER NOT NULL,
+      PRIMARY KEY (identifier, token)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS user_email_unique ON user(email);
+    CREATE UNIQUE INDEX IF NOT EXISTS user_username_unique ON user(username);
+  `);
+
+  const userColumns = new Set(getTableColumns("user").map((column) => column.name));
+
+  if (!userColumns.has("username")) {
+    sqlite.exec("ALTER TABLE user ADD COLUMN username TEXT");
+  }
+
+  if (!userColumns.has("password_hash")) {
+    sqlite.exec("ALTER TABLE user ADD COLUMN password_hash TEXT");
+  }
+
+  sqlite.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS user_email_unique ON user(email);
+    CREATE UNIQUE INDEX IF NOT EXISTS user_username_unique ON user(username);
+  `);
+}
+
+ensureAuthSchema();
+
+function ensureWorkbenchSchema() {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS rpc_profiles (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      name TEXT NOT NULL,
+      native_currency_symbol TEXT,
+      rpc_url TEXT NOT NULL,
+      rest_url TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS request_history (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      method TEXT NOT NULL,
+      params_json TEXT NOT NULL,
+      result_json TEXT,
+      error_json TEXT,
+      duration_ms INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tx_drafts (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      title TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS decode_records (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      decoder TEXT NOT NULL,
+      input TEXT NOT NULL,
+      output_json TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS favorites (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      value TEXT NOT NULL,
+      label TEXT,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS recent_items (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      item_type TEXT NOT NULL,
+      value TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS evm_address_tags (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      provider_profile_id TEXT NOT NULL,
+      provider_name TEXT,
+      address TEXT NOT NULL,
+      address_lower TEXT NOT NULL,
+      name_tag TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS evm_contract_artifacts (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      abi_json TEXT NOT NULL,
+      bytecode TEXT,
+      function_count INTEGER NOT NULL,
+      event_count INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS evm_contract_bindings (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      artifact_id TEXT NOT NULL,
+      address TEXT NOT NULL,
+      address_lower TEXT NOT NULL,
+      label TEXT NOT NULL,
+      chain_id TEXT NOT NULL,
+      provider_profile_id TEXT NOT NULL,
+      provider_name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS rpc_profiles_user_id_idx ON rpc_profiles(user_id);
+    CREATE INDEX IF NOT EXISTS evm_address_tags_user_id_idx ON evm_address_tags(user_id);
+    CREATE INDEX IF NOT EXISTS evm_contract_artifacts_user_id_idx ON evm_contract_artifacts(user_id);
+    CREATE INDEX IF NOT EXISTS evm_contract_bindings_user_id_idx ON evm_contract_bindings(user_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS evm_address_tags_scope_address_unique
+      ON evm_address_tags(user_id, provider_profile_id, address_lower);
+    CREATE UNIQUE INDEX IF NOT EXISTS evm_contract_bindings_scope_address_unique
+      ON evm_contract_bindings(user_id, provider_profile_id, chain_id, address_lower);
+  `);
+}
+
+ensureWorkbenchSchema();
+
 export const db = drizzle(sqlite, {
   schema: {
     ...authSchema,

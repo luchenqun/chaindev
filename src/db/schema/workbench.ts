@@ -60,3 +60,40 @@ export const recentItems = sqliteTable("recent_items", {
   value: text("value").notNull(),
   createdAt: integer("created_at").notNull(),
 });
+
+export const evmAddressTags = sqliteTable("evm_address_tags", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  providerProfileId: text("provider_profile_id").notNull(),
+  providerName: text("provider_name"),
+  address: text("address").notNull(),
+  addressLower: text("address_lower").notNull(),
+  nameTag: text("name_tag").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const evmContractArtifacts = sqliteTable("evm_contract_artifacts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  abiJson: text("abi_json").notNull(),
+  bytecode: text("bytecode"),
+  functionCount: integer("function_count").notNull(),
+  eventCount: integer("event_count").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const evmContractBindings = sqliteTable("evm_contract_bindings", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  artifactId: text("artifact_id").notNull(),
+  address: text("address").notNull(),
+  addressLower: text("address_lower").notNull(),
+  label: text("label").notNull(),
+  chainId: text("chain_id").notNull(),
+  providerProfileId: text("provider_profile_id").notNull(),
+  providerName: text("provider_name").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});

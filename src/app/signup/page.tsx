@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { AppShell } from "@/platform/layout/app-shell";
-import { SignInForm } from "@/platform/auth/sign-in-form";
+import { SignUpForm } from "@/platform/auth/sign-up-form";
 
-export default async function LoginPage() {
+export default async function SignUpPage() {
   const session = await auth();
 
   if (session?.user) {
@@ -13,7 +13,7 @@ export default async function LoginPage() {
   return (
     <AppShell>
       <main className="mx-auto max-w-4xl pb-10 pt-4">
-        <SignInForm />
+        <SignUpForm />
       </main>
     </AppShell>
   );

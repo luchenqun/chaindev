@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PlatformMode } from "@/config/chains";
 import { db } from "@/db/client";
 import { rpcProfiles } from "@/db/schema/workbench";
+import type { ImportedRpcProfile } from "@/server/schemas/workbench-migration";
 
 type RpcProfileInput = {
   userId: string;
@@ -28,6 +29,27 @@ export async function addRpcProfile(input: RpcProfileInput) {
 
   db.insert(rpcProfiles).values(row).run();
   return row;
+}
+
+export async function importRpcProfiles(userId: string, profiles: ImportedRpcProfile[]) {
+  for (const profile of profiles) {
+    const row = {
+      id: `${userId}:${profile.id}`,
+      userId,
+      mode: profile.mode,
+      name: profile.name,
+      nativeCurrencySymbol: profile.nativeCurrencySymbol ?? null,
+      rpcUrl: profile.rpcUrl,
+      restUrl: profile.restUrl ?? null,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    };
+
+    db.delete(rpcProfiles).where(eq(rpcProfiles.id, row.id)).run();
+    db.insert(rpcProfiles).values(row).run();
+  }
+
+  return listRpcProfiles(userId);
 }
 
 export async function listRpcProfiles(userId: string) {

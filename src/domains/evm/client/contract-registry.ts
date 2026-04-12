@@ -78,6 +78,14 @@ function writeRegistryStore(value: z.infer<typeof registryStoreSchema>) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
 }
 
+export function replaceEvmContractRegistryStore(value: {
+  artifacts: EvmContractArtifact[];
+  bindings: EvmContractBinding[];
+}) {
+  writeRegistryStore(registryStoreSchema.parse(value));
+  emitChange();
+}
+
 function normalizeBytecode(bytecode: string) {
   const value = bytecode.trim();
 

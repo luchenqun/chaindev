@@ -1,44 +1,69 @@
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import NextAuth from "next-auth";
-import GitHub from "next-auth/providers/github";
-import Nodemailer from "next-auth/providers/nodemailer";
+import Credentials from "next-auth/providers/credentials";
 import { db } from "@/db/client";
+import { verifyPassword } from "@/server/auth/password";
+import { findAuthUserByEmail } from "@/server/repositories/auth-users";
 
-const providers = [];
+const providers = [
+  Credentials({
+    name: "Credentials",
+    credentials: {
+      email: { label: "Email", type: "email" },
+      password: { label: "Password", type: "password" },
+    },
+    async authorize(credentials) {
+      const email = String(credentials?.email ?? "").trim().toLowerCase();
+      const password = String(credentials?.password ?? "");
 
-if (process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET) {
-  providers.push(
-    GitHub({
-      clientId: process.env.AUTH_GITHUB_ID,
-      clientSecret: process.env.AUTH_GITHUB_SECRET,
-    }),
-  );
-}
+      if (!email || !password) {
+        return null;
+      }
 
-if (process.env.SMTP_HOST && process.env.SMTP_PORT && process.env.SMTP_USER && process.env.SMTP_PASSWORD) {
-  providers.push(
-    Nodemailer({
-      server: {
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT),
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASSWORD,
-        },
-      },
-      from: process.env.SMTP_USER,
-    }),
-  );
-}
+      const user = await findAuthUserByEmail(email);
+
+      if (!user?.passwordHash || !user.email || !verifyPassword(password, user.passwordHash)) {
+        return null;
+      }
+
+      return {
+        id: user.id,
+        email: user.email,
+        username: user.username ?? user.name ?? user.email,
+        name: user.username ?? user.name ?? user.email,
+      };
+    },
+  }),
+];
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAdapter(db),
   session: {
-    strategy: "database",
+    strategy: "jwt",
   },
   providers,
   pages: {
     signIn: "/login",
+  },
+  callbacks: {
+    jwt({ token, user }) {
+      if (user) {
+        token.sub = user.id;
+        token.username = (user as { username?: string }).username ?? user.name ?? undefined;
+      }
+
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user) {
+        (session.user as { id?: string; username?: string }).id = token.sub;
+        (session.user as { id?: string; username?: string }).username =
+          (token as { username?: string }).username ?? session.user.name ?? undefined;
+        session.user.name = (token as { username?: string }).username ?? session.user.name;
+      }
+
+      return session;
+    },
   },
   trustHost: true,
 });

@@ -21,6 +21,10 @@ export type EvmAddressTagItem = {
   updatedAt: number;
 };
 
+export type EvmAddressTagMigrationItem = EvmAddressTagItem & {
+  providerProfileId: string;
+};
+
 const STORAGE_KEY = "chaindev-evm-address-tags-v1";
 const listeners = new Set<() => void>();
 
@@ -57,6 +61,27 @@ function writeTagStore(value: EvmAddressTagScopeMap) {
   }
 
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+}
+
+export function replaceAllEvmAddressTagsForMigration(items: EvmAddressTagMigrationItem[]) {
+  const nextStore = items.reduce<EvmAddressTagScopeMap>((accumulator, item) => {
+    const scopeEntries = accumulator[item.providerProfileId] ?? {};
+
+    scopeEntries[item.addressLower] = {
+      address: item.address,
+      addressLower: item.addressLower,
+      nameTag: item.nameTag,
+      tagType: "manual",
+      source: "user",
+      updatedAt: item.updatedAt,
+    };
+
+    accumulator[item.providerProfileId] = scopeEntries;
+    return accumulator;
+  }, {});
+
+  writeTagStore(nextStore);
+  emitChange();
 }
 
 function normalizeAddress(address: string) {
@@ -98,6 +123,22 @@ export function listEvmAddressTags(): EvmAddressTagItem[] {
       nameTag: entry.nameTag,
       updatedAt: entry.updatedAt,
     }))
+    .sort((left, right) => right.updatedAt - left.updatedAt || left.address.localeCompare(right.address));
+}
+
+export function listAllEvmAddressTagsForMigration(): EvmAddressTagMigrationItem[] {
+  const store = readTagStore();
+
+  return Object.entries(store)
+    .flatMap(([providerProfileId, scopeEntries]) =>
+      Object.values(scopeEntries).map((entry) => ({
+        providerProfileId,
+        address: entry.address,
+        addressLower: entry.addressLower,
+        nameTag: entry.nameTag,
+        updatedAt: entry.updatedAt,
+      })),
+    )
     .sort((left, right) => right.updatedAt - left.updatedAt || left.address.localeCompare(right.address));
 }
 

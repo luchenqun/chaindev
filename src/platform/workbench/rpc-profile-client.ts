@@ -62,6 +62,14 @@ export function getLocalSelectedRpcProfiles() {
   return readJsonStorage<SelectedRpcProfileMap>(LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY, {});
 }
 
+export function replaceLocalRpcProfiles(profiles: RpcProfile[]) {
+  writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, profiles);
+}
+
+export function replaceLocalSelectedRpcProfiles(selected: SelectedRpcProfileMap) {
+  writeJsonStorage(LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY, selected);
+}
+
 export function setLocalSelectedRpcProfile(mode: PlatformMode, profileId: string | null) {
   const next = {
     ...getLocalSelectedRpcProfiles(),
