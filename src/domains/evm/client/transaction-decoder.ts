@@ -1,9 +1,18 @@
 "use client";
 
-import { decodeFunctionData, toFunctionSelector, type Hex } from "viem";
+import {
+  decodeEventLog,
+  decodeFunctionData,
+  toEventSelector,
+  toFunctionSelector,
+  type Abi,
+  type AbiEvent,
+  type Hex,
+} from "viem";
 import { getContractFunctions, parseContractAbiJson } from "@/domains/evm/client/abi-utils";
 import {
   getEvmContractArtifact,
+  listEvmContractArtifacts,
   listEvmContractBindings,
 } from "@/domains/evm/client/contract-registry";
 import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
@@ -22,6 +31,137 @@ export type EvmDecodedTransactionInput = {
     value: string;
   }>;
 };
+
+export type EvmDecodedReceiptLog = {
+  eventName: string;
+  eventSignature: string;
+  topic0: string | null;
+  artifactName: string;
+  abiJson: string;
+  bindingLabel: string;
+  args: Array<{
+    name: string;
+    type: string;
+    indexed: boolean;
+    value: string;
+    rawHex: string | null;
+  }>;
+};
+
+type MatchedReceiptLogEvent = {
+  artifactName: string;
+  bindingLabel: string;
+  abiJson: string;
+  event: AbiEvent;
+};
+
+// TODO: Replace these hard-coded fallback event ABIs with the system artifacts
+// catalog once it is available in the app.
+const COMMON_EVM_EVENT_ARTIFACTS: Array<{
+  artifactName: string;
+  bindingLabel: string;
+  abiJson: string;
+}> = [
+  {
+    artifactName: "Common ERC20",
+    bindingLabel: "Standard ERC20 Event",
+    abiJson: JSON.stringify([
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: true, name: "from", type: "address" },
+          { indexed: true, name: "to", type: "address" },
+          { indexed: false, name: "value", type: "uint256" },
+        ],
+        name: "Transfer",
+        type: "event",
+      },
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: true, name: "owner", type: "address" },
+          { indexed: true, name: "spender", type: "address" },
+          { indexed: false, name: "value", type: "uint256" },
+        ],
+        name: "Approval",
+        type: "event",
+      },
+    ]),
+  },
+  {
+    artifactName: "Common WETH",
+    bindingLabel: "Standard WETH Event",
+    abiJson: JSON.stringify([
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: true, name: "dst", type: "address" },
+          { indexed: false, name: "wad", type: "uint256" },
+        ],
+        name: "Deposit",
+        type: "event",
+      },
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: true, name: "src", type: "address" },
+          { indexed: false, name: "wad", type: "uint256" },
+        ],
+        name: "Withdrawal",
+        type: "event",
+      },
+    ]),
+  },
+  {
+    artifactName: "Common UniswapV2Pair",
+    bindingLabel: "Standard AMM Pair Event",
+    abiJson: JSON.stringify([
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: true, name: "sender", type: "address" },
+          { indexed: false, name: "amount0In", type: "uint256" },
+          { indexed: false, name: "amount1In", type: "uint256" },
+          { indexed: false, name: "amount0Out", type: "uint256" },
+          { indexed: false, name: "amount1Out", type: "uint256" },
+          { indexed: true, name: "to", type: "address" },
+        ],
+        name: "Swap",
+        type: "event",
+      },
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: false, name: "reserve0", type: "uint112" },
+          { indexed: false, name: "reserve1", type: "uint112" },
+        ],
+        name: "Sync",
+        type: "event",
+      },
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: true, name: "sender", type: "address" },
+          { indexed: false, name: "amount0", type: "uint256" },
+          { indexed: false, name: "amount1", type: "uint256" },
+          { indexed: true, name: "to", type: "address" },
+        ],
+        name: "Burn",
+        type: "event",
+      },
+      {
+        anonymous: false,
+        inputs: [
+          { indexed: true, name: "sender", type: "address" },
+          { indexed: false, name: "amount0", type: "uint256" },
+          { indexed: false, name: "amount1", type: "uint256" },
+        ],
+        name: "Mint",
+        type: "event",
+      },
+    ]),
+  },
+];
 
 function stringifyDecodedValue(value: unknown) {
   if (typeof value === "string") {
@@ -86,6 +226,105 @@ function findBoundArtifact(address: string | null | undefined) {
     binding,
     artifact,
   };
+}
+
+function findMatchingEventInAbi(abiJson: string, topic0: string | null) {
+  if (!topic0) {
+    return null;
+  }
+
+  const abi = parseContractAbiJson(abiJson);
+  const events = abi.filter(isAbiEventItem);
+
+  return (
+    events.find((event) => !event.anonymous && toEventSelector(getEventSignature(event)).toLowerCase() === topic0) ?? null
+  );
+}
+
+function resolveReceiptLogEvent(input: {
+  address: string | null | undefined;
+  topic0: string | null;
+}): MatchedReceiptLogEvent | null {
+  const boundArtifact = findBoundArtifact(input.address);
+
+  if (boundArtifact) {
+    const matchedEvent = findMatchingEventInAbi(boundArtifact.artifact.abiJson, input.topic0);
+
+    if (matchedEvent) {
+      return {
+        artifactName: boundArtifact.artifact.name,
+        bindingLabel: boundArtifact.binding.label,
+        abiJson: boundArtifact.artifact.abiJson,
+        event: matchedEvent,
+      };
+    }
+  }
+
+  for (const artifact of listEvmContractArtifacts()) {
+    const matchedEvent = findMatchingEventInAbi(artifact.abiJson, input.topic0);
+
+    if (matchedEvent) {
+      return {
+        artifactName: artifact.name,
+        bindingLabel: "Imported Artifact Match",
+        abiJson: artifact.abiJson,
+        event: matchedEvent,
+      };
+    }
+  }
+
+  for (const artifact of COMMON_EVM_EVENT_ARTIFACTS) {
+    const matchedEvent = findMatchingEventInAbi(artifact.abiJson, input.topic0);
+
+    if (matchedEvent) {
+      return {
+        artifactName: artifact.artifactName,
+        bindingLabel: artifact.bindingLabel,
+        abiJson: artifact.abiJson,
+        event: matchedEvent,
+      };
+    }
+  }
+
+  return null;
+}
+
+function isAbiEventItem(item: Abi[number]): item is AbiEvent {
+  return item.type === "event";
+}
+
+function getEventSignature(event: AbiEvent) {
+  return `${event.name}(${event.inputs.map((input) => input.type).join(",")})`;
+}
+
+function readDecodedEventArgument(
+  decodedArgs: unknown,
+  input: AbiEvent["inputs"][number],
+  index: number,
+) {
+  if (Array.isArray(decodedArgs)) {
+    return decodedArgs[index];
+  }
+
+  if (decodedArgs && typeof decodedArgs === "object") {
+    if (input.name && input.name in decodedArgs) {
+      return (decodedArgs as Record<string, unknown>)[input.name];
+    }
+
+    if (String(index) in decodedArgs) {
+      return (decodedArgs as Record<string, unknown>)[String(index)];
+    }
+  }
+
+  return undefined;
+}
+
+function resolveIndexedTopicHex(event: AbiEvent, topics: string[], inputIndex: number) {
+  const indexedPosition = event.inputs
+    .slice(0, inputIndex + 1)
+    .filter((input) => input.indexed).length;
+
+  return topics[(event.anonymous ? 0 : 1) + indexedPosition - 1] ?? null;
 }
 
 export function decodeHexToUtf8(value: string) {
@@ -162,6 +401,72 @@ export function decodeBoundEvmTransactionInput(input: {
       abiJson: boundArtifact.artifact.abiJson,
       bindingLabel: boundArtifact.binding.label,
       args: [],
+    };
+  }
+}
+
+export function decodeBoundEvmReceiptLog(input: {
+  address: string | null | undefined;
+  topics: string[];
+  data: string | undefined;
+}): EvmDecodedReceiptLog | null {
+  if (!input.address || !input.topics.length) {
+    return null;
+  }
+
+  const topic0 = input.topics[0]?.toLowerCase() ?? null;
+  const matchedArtifact = resolveReceiptLogEvent({
+    address: input.address,
+    topic0,
+  });
+
+  if (!matchedArtifact) {
+    return null;
+  }
+
+  const normalizedTopics = input.topics.map((topic) => topic.toLowerCase()) as Hex[];
+  const normalizedData = (input.data ?? "0x") as Hex;
+
+  try {
+    const decoded = decodeEventLog({
+      abi: [matchedArtifact.event],
+      data: normalizedData,
+      topics: normalizedTopics,
+      strict: false,
+    });
+
+    return {
+      eventName: matchedArtifact.event.name,
+      eventSignature: getEventSignature(matchedArtifact.event),
+      topic0,
+      artifactName: matchedArtifact.artifactName,
+      abiJson: matchedArtifact.abiJson,
+      bindingLabel: matchedArtifact.bindingLabel,
+      args: matchedArtifact.event.inputs.map((eventInput, index) => ({
+        name: eventInput.name || `arg${index + 1}`,
+        type: eventInput.type,
+        indexed: Boolean(eventInput.indexed),
+        value: stringifyDecodedValue(readDecodedEventArgument(decoded.args, eventInput, index)),
+        rawHex: eventInput.indexed ? resolveIndexedTopicHex(matchedArtifact.event, normalizedTopics, index) : null,
+      })),
+    };
+  } catch {
+    return {
+      eventName: matchedArtifact.event.name,
+      eventSignature: getEventSignature(matchedArtifact.event),
+      topic0,
+      artifactName: matchedArtifact.artifactName,
+      abiJson: matchedArtifact.abiJson,
+      bindingLabel: matchedArtifact.bindingLabel,
+      args: matchedArtifact.event.inputs.map((eventInput, index) => ({
+        name: eventInput.name || `arg${index + 1}`,
+        type: eventInput.type,
+        indexed: Boolean(eventInput.indexed),
+        value: eventInput.indexed
+          ? resolveIndexedTopicHex(matchedArtifact.event, input.topics, index) ?? "Unavailable"
+          : input.data ?? "0x",
+        rawHex: eventInput.indexed ? resolveIndexedTopicHex(matchedArtifact.event, input.topics, index) : null,
+      })),
     };
   }
 }

@@ -43,6 +43,7 @@ import {
   type EvmStoredPrivateKey,
 } from "@/domains/evm/client/keyring";
 import {
+  decodeBoundEvmReceiptLog,
   decodeBoundEvmTransactionInput,
   decodeHexToUtf8,
   resolveEvmTransactionMethodLabel,
@@ -257,6 +258,297 @@ function formatMiddleEllipsis(value: string, leading = 10, trailing = 8) {
   return `${value.slice(0, leading)}...${value.slice(-trailing)}`;
 }
 
+type ReceiptLogRecord = {
+  address: string;
+  data: string;
+  topics: string[];
+  logIndex: number | null;
+};
+
+type DecodedLogViewMode = "dec" | "hex";
+
+function isAddressValue(value: string) {
+  return /^0x[a-fA-F0-9]{40}$/.test(value);
+}
+
+function isReceiptLogRecord(value: unknown): value is ReceiptLogRecord {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "address" in value &&
+    "data" in value &&
+    "topics" in value &&
+    typeof value.address === "string" &&
+    typeof value.data === "string" &&
+    Array.isArray(value.topics) &&
+    value.topics.every((topic) => typeof topic === "string")
+  );
+}
+
+function normalizeReceiptLogs(logs: unknown): ReceiptLogRecord[] {
+  if (!Array.isArray(logs)) {
+    return [];
+  }
+
+  return logs.flatMap((item, index) => {
+    if (!isReceiptLogRecord(item)) {
+      return [];
+    }
+
+    const logIndex =
+      "logIndex" in item && (typeof item.logIndex === "number" || typeof item.logIndex === "string")
+        ? Number(item.logIndex)
+        : index;
+
+    return [
+      {
+        address: item.address,
+        data: item.data,
+        topics: item.topics,
+        logIndex: Number.isFinite(logIndex) ? logIndex : index,
+      },
+    ];
+  });
+}
+
+function formatEventArgumentDisplayValue(value: string) {
+  if (value === "undefined") {
+    return "Unavailable";
+  }
+
+  return value;
+}
+
+function DecodedLogAddress({
+  address,
+  nameTagsByAddress,
+}: {
+  address: string;
+  nameTagsByAddress: Record<string, string | null>;
+}) {
+  return (
+    <AddressLink
+      address={address}
+      href={`/evm/address/${address}`}
+      label={nameTagsByAddress[address] ?? address}
+      className="break-all font-medium text-sky-600 hover:text-sky-700"
+    />
+  );
+}
+
+function DecodedReceiptLogsSection({
+  logs,
+  nameTagsByAddress,
+}: {
+  logs: Array<{
+    key: string;
+    raw: ReceiptLogRecord;
+    decoded: ReturnType<typeof decodeBoundEvmReceiptLog>;
+  }>;
+  nameTagsByAddress: Record<string, string | null>;
+}) {
+  const [topicViews, setTopicViews] = useState<Record<string, DecodedLogViewMode>>({});
+  const [dataViews, setDataViews] = useState<Record<string, DecodedLogViewMode>>({});
+
+  if (!logs.length) {
+    return null;
+  }
+
+  return (
+    <div className="mb-1">
+      <h3 className="mb-4 text-sm font-semibold text-slate-900">Transaction Receipt Event Logs</h3>
+      <div className="divide-y divide-slate-200">
+      {logs.map((log, index) => {
+        const decoded = log.decoded;
+
+        if (!decoded) {
+          return null;
+        }
+
+        const indexedArgs = decoded.args.filter((arg) => arg.indexed);
+        const nonIndexedArgs = decoded.args.filter((arg) => !arg.indexed);
+        const dataView = dataViews[log.key] ?? "dec";
+
+        return (
+          <section key={log.key} className={index === 0 ? "pb-3" : "pt-3 pb-3"}>
+            <dl className="space-y-2">
+              <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                <dt className="text-xs font-semibold text-slate-600">Address</dt>
+                <dd className="min-w-0 text-xs text-slate-900">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <DecodedLogAddress address={log.raw.address} nameTagsByAddress={nameTagsByAddress} />
+                  </div>
+                </dd>
+              </div>
+
+              <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                <dt className="text-xs font-semibold text-slate-600">Name</dt>
+                <dd className="min-w-0 text-xs text-slate-900">
+                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                    <span className="font-semibold text-slate-800">{decoded.eventName}</span>
+                    <span className="text-slate-500">({decoded.eventSignature.slice(decoded.eventName.length + 1, -1)})</span>
+                  </div>
+                </dd>
+              </div>
+
+              <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                <dt className="text-xs font-semibold text-slate-600">Topics</dt>
+                <dd className="min-w-0 space-y-2 text-xs text-slate-900">
+                  {decoded.topic0 ? (
+                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 mono text-xs text-slate-700">
+                      <span className="mr-2 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                        0
+                      </span>
+                      {decoded.topic0}
+                    </div>
+                  ) : null}
+
+                  {indexedArgs.map((arg, argIndex) => {
+                    const viewKey = `${log.key}-topic-${argIndex}`;
+                    const view = topicViews[viewKey] ?? "dec";
+                    const displayValue = view === "hex" ? (arg.rawHex ?? "Unavailable") : formatEventArgumentDisplayValue(arg.value);
+
+                    return (
+                      <div key={viewKey} className="flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex h-[30px] items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                          {argIndex + 1}: {arg.name}
+                        </span>
+                        <div className="relative min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-[132px] text-xs text-slate-700">
+                          <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
+                            <button
+                              type="button"
+                              className={
+                                view === "dec"
+                                  ? "h-full px-3 text-xs font-semibold text-slate-900"
+                                  : "h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                              }
+                              onClick={() =>
+                                setTopicViews((current) => ({
+                                  ...current,
+                                  [viewKey]: "dec",
+                                }))
+                              }
+                            >
+                              Dec
+                            </button>
+                            <button
+                              type="button"
+                              className={
+                                view === "hex"
+                                  ? "h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900"
+                                  : "h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                              }
+                              onClick={() =>
+                                setTopicViews((current) => ({
+                                  ...current,
+                                  [viewKey]: "hex",
+                                }))
+                              }
+                            >
+                              Hex
+                            </button>
+                          </div>
+                          {view === "dec" && isAddressValue(arg.value) ? (
+                            <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
+                          ) : (
+                            <span className="break-all mono">{displayValue}</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </dd>
+              </div>
+
+              <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                <dt className="text-xs font-semibold text-slate-600">Data</dt>
+                <dd className="min-w-0 text-xs text-slate-900">
+                  <div className="relative min-h-[30px] rounded-lg border border-slate-200 bg-white px-3 pr-[132px]">
+                    <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
+                      <button
+                        type="button"
+                        className={
+                          dataView === "dec"
+                            ? "h-full px-3 text-xs font-semibold text-slate-900"
+                            : "h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                        }
+                        onClick={() =>
+                          setDataViews((current) => ({
+                            ...current,
+                            [log.key]: "dec",
+                          }))
+                        }
+                      >
+                        Dec
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          dataView === "hex"
+                            ? "h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900"
+                            : "h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
+                        }
+                        onClick={() =>
+                          setDataViews((current) => ({
+                            ...current,
+                            [log.key]: "hex",
+                          }))
+                        }
+                      >
+                        Hex
+                      </button>
+                    </div>
+                    {dataView === "hex" ? (
+                      <p className="flex min-h-[30px] items-center break-all py-1.5 pr-2 mono text-xs text-slate-700">
+                        {log.raw.data || "0x"}
+                      </p>
+                    ) : nonIndexedArgs.length > 1 ? (
+                      <div className="space-y-1 py-2 pr-2">
+                        {nonIndexedArgs.map((arg, argIndex) => (
+                          <div key={`${log.key}-data-${argIndex}`} className="flex flex-wrap items-center gap-1.5 text-xs text-slate-700">
+                            <span className="font-medium text-slate-500">
+                              {arg.name} ({arg.type}) :
+                            </span>
+                            {isAddressValue(arg.value) ? (
+                              <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
+                            ) : (
+                              <span className="break-all mono">{formatEventArgumentDisplayValue(arg.value)}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : nonIndexedArgs.length === 1 ? (
+                      <div className="flex min-h-[30px] items-center py-1.5 pr-2 text-xs text-slate-700">
+                        {isAddressValue(nonIndexedArgs[0].value) ? (
+                          <>
+                            <span className="mr-1.5 font-medium text-slate-500">
+                              {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) :
+                            </span>
+                            <DecodedLogAddress address={nonIndexedArgs[0].value} nameTagsByAddress={nameTagsByAddress} />
+                          </>
+                        ) : (
+                          <span className="break-all mono">
+                            {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) : {formatEventArgumentDisplayValue(nonIndexedArgs[0].value)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="flex min-h-[30px] items-center py-1.5 pr-2 mono text-xs text-slate-500">
+                        No non-indexed event data.
+                      </p>
+                    )}
+                  </div>
+                </dd>
+              </div>
+            </dl>
+          </section>
+        );
+      })}
+      </div>
+    </div>
+  );
+}
+
 function extractTransactionRawField(rawJson: unknown, field: string) {
   if (!rawJson || typeof rawJson !== "object" || !("transaction" in rawJson)) {
     return null;
@@ -373,6 +665,23 @@ export default function EvmTxPage() {
     tone?: "success" | "info";
   } | null>(null);
   const rewriteDefaultsRequestIdRef = useRef(0);
+  const normalizedReceiptLogs = useMemo(
+    () => normalizeReceiptLogs(transaction?.logs),
+    [transaction],
+  );
+  const decodedReceiptLogs = useMemo(
+    () =>
+      normalizedReceiptLogs.map((log, index) => ({
+        key: `${log.logIndex ?? index}-${log.address}-${index}`,
+        raw: log,
+        decoded: decodeBoundEvmReceiptLog({
+          address: log.address,
+          topics: log.topics,
+          data: log.data,
+        }),
+      })),
+    [normalizedReceiptLogs, decodeVersion],
+  );
   const visibleAddresses = useMemo(
     () =>
       transaction
@@ -380,9 +689,15 @@ export default function EvmTxPage() {
             transaction.from,
             ...(transaction.to ? [transaction.to] : []),
             ...(transaction.interactedWith ? [transaction.interactedWith] : []),
+            ...decodedReceiptLogs.flatMap((log) => [
+              log.raw.address,
+              ...((log.decoded?.args ?? [])
+                .map((arg) => arg.value)
+                .filter((value) => isAddressValue(value))),
+            ]),
           ]
         : [],
-    [transaction],
+    [decodedReceiptLogs, transaction],
   );
   const decodedTransactionInput = useMemo(
     () => {
@@ -1228,42 +1543,54 @@ export default function EvmTxPage() {
 
           </>
         ) : activeTab === "logs" ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+          <div className="space-y-4">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              {transaction.logsCount ? (
+                <DecodedReceiptLogsSection
+                  logs={decodedReceiptLogs.filter((log) => log.decoded)}
+                  nameTagsByAddress={nameTagsByAddress}
+                />
+              ) : (
+                <p className="text-sm text-slate-500">No receipt logs were returned for this transaction.</p>
+              )}
+            </section>
+
             {transaction.logsCount ? (
-              <JsonView
-                className="json-view-wrap"
-                value={transaction.logs as object}
-                collapsed={2}
-                shortenTextAfterLength={0}
-                enableClipboard={false}
-                displayDataTypes={false}
-                displayObjectSize={false}
-                style={{
-                  "--w-rjv-background-color": "transparent",
-                  "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
-                  "--w-rjv-font-family":
-                    '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-                  "--w-rjv-color": "#0f172a",
-                  "--w-rjv-arrow-color": "#64748b",
-                  "--w-rjv-line-color": "rgba(148, 163, 184, 0.24)",
-                  "--w-rjv-curlybraces-color": "#475569",
-                  "--w-rjv-brackets-color": "#475569",
-                  "--w-rjv-colon-color": "#94a3b8",
-                  "--w-rjv-key-string": "#0369a1",
-                  "--w-rjv-key-number": "#0369a1",
-                  "--w-rjv-type-string-color": "#b45309",
-                  "--w-rjv-type-int-color": "#7c3aed",
-                  "--w-rjv-type-float-color": "#7c3aed",
-                  "--w-rjv-type-bigint-color": "#7c3aed",
-                  "--w-rjv-type-boolean-color": "#15803d",
-                  "--w-rjv-type-null-color": "#b91c1c",
-                  "--w-rjv-type-undefined-color": "#b91c1c",
-                } as React.CSSProperties}
-              />
-            ) : (
-              <p className="text-sm text-slate-500">No receipt logs were returned for this transaction.</p>
-            )}
-          </section>
+              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+                <h3 className="mb-4 text-sm font-semibold text-slate-900">Raw JSON</h3>
+                <JsonView
+                  className="json-view-wrap"
+                  value={transaction.logs as object}
+                  collapsed={2}
+                  shortenTextAfterLength={0}
+                  enableClipboard={false}
+                  displayDataTypes={false}
+                  displayObjectSize={false}
+                  style={{
+                    "--w-rjv-background-color": "transparent",
+                    "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
+                    "--w-rjv-font-family":
+                      '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                    "--w-rjv-color": "#0f172a",
+                    "--w-rjv-arrow-color": "#64748b",
+                    "--w-rjv-line-color": "rgba(148, 163, 184, 0.24)",
+                    "--w-rjv-curlybraces-color": "#475569",
+                    "--w-rjv-brackets-color": "#475569",
+                    "--w-rjv-colon-color": "#94a3b8",
+                    "--w-rjv-key-string": "#0369a1",
+                    "--w-rjv-key-number": "#0369a1",
+                    "--w-rjv-type-string-color": "#b45309",
+                    "--w-rjv-type-int-color": "#7c3aed",
+                    "--w-rjv-type-float-color": "#7c3aed",
+                    "--w-rjv-type-bigint-color": "#7c3aed",
+                    "--w-rjv-type-boolean-color": "#15803d",
+                    "--w-rjv-type-null-color": "#b91c1c",
+                    "--w-rjv-type-undefined-color": "#b91c1c",
+                  } as React.CSSProperties}
+                />
+              </section>
+            ) : null}
+          </div>
         ) : activeTab === "debugTrace" ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             {traceLoading ? (

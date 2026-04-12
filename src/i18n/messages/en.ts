@@ -3,7 +3,7 @@ export const en = {
     home: "Home",
     blockchain: "Blockchain",
     contracts: "Contracts",
-    developerTools: "Developer Tools",
+    developerTools: "Tools",
     settings: "Settings",
     cache: "Cache",
     providers: "Providers",
