@@ -188,8 +188,18 @@ function isAutoFieldValue(value: string) {
   return !normalizedValue || normalizedValue === "auto";
 }
 
+function isValidNativeValueInput(value: string) {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  return /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalizedValue);
+}
+
 function isDeployDialogReady(state: DeployDialogState) {
-  if (!state.value.trim() || !state.gasLimit.trim()) {
+  if (!isValidNativeValueInput(state.value) || !state.gasLimit.trim()) {
     return false;
   }
 
@@ -450,8 +460,10 @@ export default function EvmContractsRegistryPage() {
       !deployArtifact ||
       !deployArtifact.bytecode ||
       !activeKey ||
+      deployActionLoading === "deploy" ||
       (activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
-      !isDeploySimulationReady
+      !isDeploySimulationReady ||
+      !isValidNativeValueInput(deployDialogValues.value)
     ) {
       setDeployError(null);
       return;
@@ -467,7 +479,7 @@ export default function EvmContractsRegistryPage() {
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [activeKey, deployArtifact, deployArgumentValues, deployDialogValues.value, isDeploySimulationReady]);
+  }, [activeKey, deployActionLoading, deployArtifact, deployArgumentValues, deployDialogValues.value, isDeploySimulationReady]);
 
   function handleSaveArtifact() {
     try {
@@ -638,7 +650,6 @@ export default function EvmContractsRegistryPage() {
       setDeployDialogValues((current) => ({
         ...current,
         transactionType: defaults.transactionType,
-        value: defaults.value,
         gasPrice: defaults.gasPrice,
         maxFeePerGas: isAutoFieldValue(current.maxFeePerGas) ? "auto" : current.maxFeePerGas,
         maxPriorityFeePerGas: isAutoFieldValue(current.maxPriorityFeePerGas)
@@ -654,6 +665,10 @@ export default function EvmContractsRegistryPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to simulate deployment.";
 
+      if (requestId !== deployDefaultsRequestIdRef.current) {
+        return;
+      }
+
       if (message === "Password is required.") {
         setPendingDeployAction("fill");
         setDeployUnlockPassword("");
@@ -664,7 +679,9 @@ export default function EvmContractsRegistryPage() {
 
       setDeployError(normalizeDeployErrorMessage(message));
     } finally {
-      setDeployActionLoading(null);
+      if (requestId === deployDefaultsRequestIdRef.current) {
+        setDeployActionLoading(null);
+      }
     }
   }
 
@@ -686,6 +703,8 @@ export default function EvmContractsRegistryPage() {
 
     setDeployActionLoading("deploy");
     setDeployError(null);
+    deployDefaultsRequestIdRef.current += 1;
+    let deploySucceeded = false;
 
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id);
@@ -768,6 +787,7 @@ export default function EvmContractsRegistryPage() {
             ? `Deployed to ${result.contractAddress} and binding was created.`
             : `Deployed to ${result.contractAddress}.`,
       });
+      deploySucceeded = true;
       resetDeployState();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to deploy contract.";
@@ -782,7 +802,9 @@ export default function EvmContractsRegistryPage() {
 
       setDeployError(normalizeDeployErrorMessage(message));
     } finally {
-      setDeployActionLoading(null);
+      if (!deploySucceeded) {
+        setDeployActionLoading(null);
+      }
     }
   }
 
@@ -1238,9 +1260,8 @@ export default function EvmContractsRegistryPage() {
                 onClick={() => void executeDeployAction()}
                 disabled={
                   !deployArtifact ||
-                  deployActionLoading !== null ||
+                  deployActionLoading === "deploy" ||
                   !deployArtifact.bytecode ||
-                  !isDeploySimulationReady ||
                   !isDeployDialogReady(deployDialogValues)
                 }
                 aria-busy={deployActionLoading === "deploy"}
@@ -1378,7 +1399,7 @@ export default function EvmContractsRegistryPage() {
                           maxFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="0.001"
+                      placeholder="auto"
                     />
                   </div>
                   <div className="grid gap-2">
@@ -1391,7 +1412,7 @@ export default function EvmContractsRegistryPage() {
                           maxPriorityFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="0.001"
+                      placeholder="auto"
                     />
                   </div>
                 </>
@@ -1419,7 +1440,7 @@ export default function EvmContractsRegistryPage() {
                       nonce: event.target.value,
                     }))
                   }
-                  placeholder="0"
+                  placeholder="auto"
                 />
               </div>
               <div className="grid gap-2 sm:col-span-2">

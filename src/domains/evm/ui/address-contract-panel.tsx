@@ -1307,7 +1307,7 @@ export function AddressContractPanel({
       {activeTab === "write" ? (
         <div className="mt-4 grid gap-4">
           <article className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Selected Key</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{activeKeyStateLabel}</p>
@@ -1319,12 +1319,6 @@ export function AddressContractPanel({
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contract</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{artifact.name}</p>
-              </div>
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Environment</p>
-                <p className="mt-1 text-sm text-slate-700">
-                  {environment.providerName} / Chain {environment.chainId}
-                </p>
               </div>
             </div>
             {!activeKey ? (
@@ -1577,7 +1571,7 @@ export function AddressContractPanel({
                           maxFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="0.001"
+                      placeholder="auto"
                     />
                   </div>
                   <div className="grid gap-2">
@@ -1590,7 +1584,7 @@ export function AddressContractPanel({
                           maxPriorityFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="0.001"
+                      placeholder="auto"
                     />
                   </div>
                 </>
@@ -1618,7 +1612,7 @@ export function AddressContractPanel({
                       nonce: event.target.value,
                     }))
                   }
-                  placeholder="0"
+                  placeholder="auto"
                 />
               </div>
             </div>

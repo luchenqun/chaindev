@@ -204,6 +204,38 @@ function derivePollIntervalMsFromRange(latestTimestamp: bigint, oldestTimestamp:
   return Math.max(1_000, Math.min(30_000, Math.round(averageSeconds * 1_000)));
 }
 
+const HOME_BLOCK_FETCH_BATCH_SIZE = 12;
+
+type EvmPublicClient = Awaited<ReturnType<typeof getEvmClientWithProfile>>["client"];
+
+function buildDescendingBlockNumbers(start: bigint, limit: number) {
+  const numbers: bigint[] = [];
+
+  for (let cursor = start; cursor >= 0n && numbers.length < limit; cursor -= 1n) {
+    numbers.push(cursor);
+  }
+
+  return numbers;
+}
+
+async function getRecentBlocksChunk(
+  client: EvmPublicClient,
+  start: bigint,
+  limit: number,
+  includeTransactions = true,
+) {
+  const blockNumbers = buildDescendingBlockNumbers(start, limit);
+
+  return Promise.all(
+    blockNumbers.map((blockNumber) =>
+      client.getBlock({
+        blockNumber,
+        includeTransactions,
+      }),
+    ),
+  );
+}
+
 function parseHexQuantity(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -531,6 +563,36 @@ export async function getEvmHomeMetricsDirect() {
   };
 }
 
+export async function getEvmHomeMetricsSupplementDirect(includeChainId = false) {
+  const { client, profile } = await getEvmClientWithProfile();
+  const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
+  const [chainId, gasPrice, pendingTransactionCountHex, cacheSummary] = await Promise.all([
+    includeChainId ? client.getChainId() : Promise.resolve(null),
+    client.getGasPrice(),
+    client.transport
+      .request({
+        method: "eth_getBlockTransactionCountByNumber",
+        params: ["pending"] as never,
+      })
+      .catch(() => null),
+    getEvmTransactionCacheSummary(),
+  ]);
+  const pendingTransactionCount = parseHexQuantity(pendingTransactionCountHex);
+
+  return {
+    header: {
+      connection: "Direct JSON-RPC",
+      providerName: profile.name,
+      nativeCurrency: currencyName,
+      chainId: chainId != null ? String(chainId) : null,
+    },
+    gasPriceLabel: `${Number(formatGwei(gasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`,
+    pendingTransactionCountLabel:
+      pendingTransactionCount != null ? formatInteger(pendingTransactionCount) : "Unavailable",
+    cacheSummary,
+  };
+}
+
 export async function getEvmLiveStatusDirect() {
   const { client } = await getEvmClientWithProfile();
   const latestBlock = await client.getBlock({ blockTag: "latest" });
@@ -583,31 +645,43 @@ export async function getEvmHomeActivityDirect(blockLimit = 4, txLimit = 4) {
     timestampMs: number | null;
   }> = [];
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
+  const cacheCandidates: EvmCachedTransactionItem[] = [];
+  let cursor = latestNumber;
 
-  for (let cursor = latestNumber; cursor >= 0n; cursor -= 1n) {
-    const includeTransactions = transactions.length < txLimit;
-    const block = await client.getBlock({
-      blockNumber: cursor,
-      includeTransactions,
-    });
+  while (cursor >= 0n && (blocks.length < blockLimit || transactions.length < txLimit)) {
+    const nextBlocks = await getRecentBlocksChunk(
+      client,
+      cursor,
+      Math.max(HOME_BLOCK_FETCH_BATCH_SIZE, blockLimit, txLimit),
+      true,
+    );
 
-    if (blocks.length < blockLimit) {
-      blocks.push(formatHomeBlockItem(block));
+    for (const block of nextBlocks) {
+      if (blocks.length < blockLimit) {
+        blocks.push(formatHomeBlockItem(block));
+      }
+
+      if (transactions.length < txLimit) {
+        transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
+      }
+
+      cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
+
+      if (blocks.length >= blockLimit && transactions.length >= txLimit) {
+        break;
+      }
     }
 
-    if (includeTransactions) {
-      transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
-      void rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(block, currencyName));
-    }
+    const lastBlock = nextBlocks[nextBlocks.length - 1];
 
-    if (blocks.length >= blockLimit && transactions.length >= txLimit) {
+    if (!nextBlocks.length || lastBlock?.number === 0n) {
       break;
     }
 
-    if (cursor === 0n) {
-      break;
-    }
+    cursor = lastBlock.number - 1n;
   }
+
+  void rememberEvmTransactionCache(cacheCandidates);
 
   return {
     blocks,
@@ -648,42 +722,51 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
   const timestamps: bigint[] = [];
   let recentTransactionCount = 0;
   const cacheCandidates: EvmCachedTransactionItem[] = [];
+  let cursor = latestNumber;
 
-  for (let cursor = latestNumber; cursor >= 0n; cursor -= 1n) {
-    const includeTransactions = transactions.length < txLimit;
-    const block = await client.getBlock({
-      blockNumber: cursor,
-      includeTransactions,
-    });
+  while (cursor >= 0n && (timestamps.length < 11 || blocks.length < blockLimit || transactions.length < txLimit)) {
+    const nextBlocks = await getRecentBlocksChunk(
+      client,
+      cursor,
+      Math.max(HOME_BLOCK_FETCH_BATCH_SIZE, 11, blockLimit, txLimit),
+      true,
+    );
 
-    if (latestBlockTimestamp == null) {
-      latestBlockTimestamp = block.timestamp;
-    }
+    for (const block of nextBlocks) {
+      if (latestBlockTimestamp == null) {
+        latestBlockTimestamp = block.timestamp;
+      }
 
-    if (block.timestamp != null && timestamps.length < 11) {
-      timestamps.push(block.timestamp);
-    }
+      if (block.timestamp != null && timestamps.length < 11) {
+        timestamps.push(block.timestamp);
+      }
 
-    if (timestamps.length <= 10) {
-      recentTransactionCount += block.transactions.length;
-    }
+      if (timestamps.length <= 10) {
+        recentTransactionCount += block.transactions.length;
+      }
 
-    if (blocks.length < blockLimit) {
-      blocks.push(formatHomeBlockItem(block));
-    }
+      if (blocks.length < blockLimit) {
+        blocks.push(formatHomeBlockItem(block));
+      }
 
-    if (includeTransactions) {
-      transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
+      if (transactions.length < txLimit) {
+        transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
+      }
+
       cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
+
+      if (timestamps.length >= 11 && blocks.length >= blockLimit && transactions.length >= txLimit) {
+        break;
+      }
     }
 
-    if (timestamps.length >= 11 && blocks.length >= blockLimit && transactions.length >= txLimit) {
+    const lastBlock = nextBlocks[nextBlocks.length - 1];
+
+    if (!nextBlocks.length || lastBlock?.number === 0n) {
       break;
     }
 
-    if (cursor === 0n) {
-      break;
-    }
+    cursor = lastBlock.number - 1n;
   }
 
   await rememberEvmTransactionCache(cacheCandidates);
@@ -934,6 +1017,95 @@ export async function getEvmTransactionsPageDirect(page = 1, limit = 20) {
     title: `More than ${formatInteger(totalTransactions)} transactions found`,
     subtitle: `Showing recent transactions between block #${scannedOldestNumber.toString()} and #${latestNumber.toString()}`,
     transactions,
+  };
+}
+
+export async function syncLatestEvmTransactionsDirect(input?: {
+  latestCachedBlockNumber?: string | null;
+  maxBlocks?: number;
+  maxTransactions?: number;
+}) {
+  const { client, profile } = await getEvmClientWithProfile();
+  const latestBlock = await client.getBlock({
+    blockTag: "latest",
+    includeTransactions: true,
+  });
+  const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
+  const maxBlocks = input?.maxBlocks ?? 500;
+  const maxTransactions = input?.maxTransactions ?? 1000;
+  const cachedLatestBlockNumber =
+    input?.latestCachedBlockNumber && /^\d+$/.test(input.latestCachedBlockNumber)
+      ? BigInt(input.latestCachedBlockNumber)
+      : null;
+
+  if (cachedLatestBlockNumber != null && latestBlock.number <= cachedLatestBlockNumber) {
+    return {
+      latestBlockNumber: latestBlock.number.toString(),
+      scannedBlocks: 0,
+      syncedTransactions: 0,
+      truncatedByBlockWindow: false,
+      truncatedByTransactionLimit: false,
+    };
+  }
+
+  const floorBlockNumberByWindow =
+    latestBlock.number >= BigInt(maxBlocks - 1) ? latestBlock.number - BigInt(maxBlocks - 1) : 0n;
+  const floorBlockNumber =
+    cachedLatestBlockNumber != null && cachedLatestBlockNumber + 1n > floorBlockNumberByWindow
+      ? cachedLatestBlockNumber + 1n
+      : floorBlockNumberByWindow;
+  const cacheCandidates: EvmCachedTransactionItem[] = [];
+  let cursor = latestBlock.number;
+  let scannedBlocks = 0;
+  let syncedTransactions = 0;
+
+  while (cursor >= floorBlockNumber && syncedTransactions < maxTransactions) {
+    const remainingBlocks = Number(cursor - floorBlockNumber + 1n);
+    const nextBlocks = await getRecentBlocksChunk(
+      client,
+      cursor,
+      Math.min(HOME_BLOCK_FETCH_BATCH_SIZE, remainingBlocks),
+      true,
+    );
+
+    for (const block of nextBlocks) {
+      scannedBlocks += 1;
+
+      const remainingTransactions = maxTransactions - syncedTransactions;
+      const blockTransactions = formatTransactionsPageItemsForBlock(
+        block,
+        currencyName,
+        remainingTransactions,
+      );
+
+      cacheCandidates.push(...blockTransactions);
+      syncedTransactions += blockTransactions.length;
+
+      if (syncedTransactions >= maxTransactions || block.number <= floorBlockNumber) {
+        break;
+      }
+    }
+
+    const lastBlock = nextBlocks[nextBlocks.length - 1];
+
+    if (!nextBlocks.length || lastBlock?.number <= floorBlockNumber) {
+      break;
+    }
+
+    cursor = lastBlock.number - 1n;
+  }
+
+  await rememberEvmTransactionCache(cacheCandidates);
+
+  return {
+    latestBlockNumber: latestBlock.number.toString(),
+    scannedBlocks,
+    syncedTransactions,
+    truncatedByBlockWindow:
+      cachedLatestBlockNumber == null
+        ? latestBlock.number >= BigInt(maxBlocks)
+        : latestBlock.number - cachedLatestBlockNumber >= BigInt(maxBlocks),
+    truncatedByTransactionLimit: syncedTransactions >= maxTransactions,
   };
 }
 
@@ -1291,7 +1463,7 @@ export async function getEvmLatestFeedDirect(txLimit = 20, includePollSample = t
     pollIntervalMs,
     block: formatHomeBlockItem(latestBlock),
     blockPageItem: formatBlocksPageItem(latestBlock),
-    transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.timestamp, currencyName, 6),
+    transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.timestamp, currencyName, txLimit),
     transactionsPageItems,
   };
 }

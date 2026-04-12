@@ -3,7 +3,7 @@
 import { IconFileDots, IconRefresh } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
 import { RelativeTime } from "@/components/relative-time";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -13,16 +13,34 @@ import {
 } from "@/domains/evm/client/address-tags";
 import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
 import { subscribeEvmContractRegistry } from "@/domains/evm/client/contract-registry";
+import {
+  getEvmCachedTransactionsPage,
+  getEvmTransactionCacheSummary,
+} from "@/domains/evm/client/transaction-cache";
 import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transaction-decoder";
 import { AddressLink } from "@/domains/evm/ui/address-link";
 import {
   getEvmTransactionReceiptSummariesDirect,
-  getEvmTransactionsPageDirect,
+  syncLatestEvmTransactionsDirect,
 } from "@/domains/evm/client/queries";
 import { useEvmHomeData } from "@/domains/evm/ui/home-data-provider";
 import { AppShell } from "@/platform/layout/app-shell";
 
 const PAGE_SIZE = 20;
+
+type TransactionsPageData = {
+  page: number;
+  pageSize: number;
+  totalTransactions: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  latestBlockNumber: string;
+  oldestBlockNumber: string;
+  title: string;
+  subtitle: string;
+  transactions: Awaited<ReturnType<typeof getEvmCachedTransactionsPage>>["transactions"];
+};
 
 function parsePageParam(rawPage: string | null) {
   const parsed = Number.parseInt(rawPage ?? "1", 10);
@@ -47,14 +65,58 @@ function buildPageHref(pathname: string, searchParams: URLSearchParams, page: nu
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
+function buildCachedTransactionsPageData(input: {
+  page: Awaited<ReturnType<typeof getEvmCachedTransactionsPage>>;
+  latestCachedTransaction: Awaited<ReturnType<typeof getEvmTransactionCacheSummary>>["latestSeenTransaction"];
+}): TransactionsPageData {
+  const { page, latestCachedTransaction } = input;
+  const latestBlockNumber = latestCachedTransaction?.blockNumber ?? "Unavailable";
+  const oldestBlockNumber =
+    page.transactions[page.transactions.length - 1]?.blockNumber ?? latestCachedTransaction?.blockNumber ?? "Unavailable";
+
+  return {
+    ...page,
+    latestBlockNumber,
+    oldestBlockNumber,
+    title: page.totalTransactions
+      ? `${page.totalTransactions.toLocaleString("en-US")} cached recent transactions`
+      : "No cached transactions yet",
+    subtitle: page.totalTransactions
+      ? `Showing cached transactions up to block #${latestBlockNumber}`
+      : "Loading latest on-chain transactions will populate this table.",
+    transactions: page.transactions,
+  };
+}
+
+function TransactionsAutoRefreshBridge(props: {
+  enabled: boolean;
+  onLatestFeed: (latestFeed: NonNullable<ReturnType<typeof useEvmHomeData>["latestFeed"]>) => void;
+}) {
+  const { latestFeed } = useEvmHomeData();
+  const onLatestFeedRef = useRef(props.onLatestFeed);
+
+  useEffect(() => {
+    onLatestFeedRef.current = props.onLatestFeed;
+  }, [props.onLatestFeed]);
+
+  useEffect(() => {
+    if (!props.enabled || !latestFeed) {
+      return;
+    }
+
+    onLatestFeedRef.current(latestFeed);
+  }, [latestFeed, props.enabled]);
+
+  return null;
+}
+
 function EvmTransactionsPageContent() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { latestFeed } = useEvmHomeData();
   const searchParamsText = searchParams.toString();
   const currentPage = parsePageParam(searchParams.get("page"));
-  const [data, setData] = useState<Awaited<ReturnType<typeof getEvmTransactionsPageDirect>> | null>(null);
+  const [data, setData] = useState<TransactionsPageData | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [receiptLookupEnabled, setReceiptLookupEnabled] = useState(false);
@@ -64,7 +126,10 @@ function EvmTransactionsPageContent() {
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [decodeVersion, setDecodeVersion] = useState(0);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [syncingLatest, setSyncingLatest] = useState(false);
+  const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cacheRefreshVersion, setCacheRefreshVersion] = useState(0);
   const transactionHashesKey = useMemo(
     () => data?.transactions.map((transaction) => transaction.hash).join(",") ?? "",
     [data],
@@ -104,13 +169,23 @@ function EvmTransactionsPageContent() {
   useEffect(() => {
     let cancelled = false;
 
-    async function load() {
-      setLoading(true);
+    async function load(showSkeleton = false) {
+      if (showSkeleton || !data) {
+        setLoading(true);
+      }
 
       try {
-        const next = await getEvmTransactionsPageDirect(currentPage, PAGE_SIZE);
+        const [cachedPage, cacheSummary] = await Promise.all([
+          getEvmCachedTransactionsPage(currentPage, PAGE_SIZE),
+          getEvmTransactionCacheSummary(),
+        ]);
 
         if (!cancelled) {
+          const next = buildCachedTransactionsPageData({
+            page: cachedPage,
+            latestCachedTransaction: cacheSummary.latestSeenTransaction,
+          });
+
           setData(next);
           setErrorMessage(null);
 
@@ -130,10 +205,10 @@ function EvmTransactionsPageContent() {
       }
     }
 
-    void load();
+    void load(true);
 
     const handleProfileChanged = () => {
-      void load();
+      void load(true);
     };
 
     window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
@@ -142,10 +217,63 @@ function EvmTransactionsPageContent() {
       cancelled = true;
       window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
     };
-  }, [currentPage, pathname, router, searchParamsText]);
+  }, [cacheRefreshVersion, currentPage, pathname, router, searchParamsText]);
 
   useEffect(() => {
-    if (!autoRefreshEnabled || currentPage !== 1 || !latestFeed) {
+    let cancelled = false;
+
+    async function syncLatest() {
+      setSyncingLatest(true);
+      setSyncStatusMessage("Loading latest on-chain transactions...");
+
+      try {
+        const cacheSummary = await getEvmTransactionCacheSummary();
+        const result = await syncLatestEvmTransactionsDirect({
+          latestCachedBlockNumber: cacheSummary.latestSeenTransaction?.blockNumber ?? null,
+        });
+
+        if (cancelled) {
+          return;
+        }
+
+        if (result.syncedTransactions > 0) {
+          setCacheRefreshVersion((current) => current + 1);
+          setSyncStatusMessage(null);
+          return;
+        }
+
+        if (result.truncatedByBlockWindow || result.truncatedByTransactionLimit) {
+          setSyncStatusMessage("Latest sync reached the temporary scan limit.");
+        } else {
+          setSyncStatusMessage(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSyncStatusMessage(error instanceof Error ? error.message : "Failed to load latest transactions.");
+        }
+      } finally {
+        if (!cancelled) {
+          setSyncingLatest(false);
+        }
+      }
+    }
+
+    void syncLatest();
+
+    const handleProfileChanged = () => {
+      void syncLatest();
+    };
+
+    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    };
+  }, []);
+
+  function handleAutoRefreshFeed(latestFeed: NonNullable<ReturnType<typeof useEvmHomeData>["latestFeed"]>) {
+    if (currentPage !== 1) {
       return;
     }
 
@@ -160,13 +288,11 @@ function EvmTransactionsPageContent() {
           (transaction) => !latestFeed.transactionsPageItems.some((item) => item.hash === transaction.hash),
         ),
       ].slice(0, PAGE_SIZE);
-      const nextTotalTransactions = Math.min(
-        1000,
+      const nextTotalTransactions =
         current.totalTransactions +
-          latestFeed.transactionsPageItems.filter(
-            (transaction) => !current.transactions.some((item) => item.hash === transaction.hash),
-          ).length,
-      );
+        latestFeed.transactionsPageItems.filter(
+          (transaction) => !current.transactions.some((item) => item.hash === transaction.hash),
+        ).length;
       const totalPages = Math.max(1, Math.ceil(nextTotalTransactions / current.pageSize));
 
       return {
@@ -175,12 +301,12 @@ function EvmTransactionsPageContent() {
         totalPages,
         hasNextPage: totalPages > current.page,
         latestBlockNumber: latestFeed.latestBlock,
-        title: `More than ${nextTotalTransactions.toLocaleString("en-US")} transactions found`,
-        subtitle: `Showing recent transactions between block #${current.oldestBlockNumber} and #${latestFeed.latestBlock}`,
+        title: `${nextTotalTransactions.toLocaleString("en-US")} cached recent transactions`,
+        subtitle: `Showing cached transactions up to block #${latestFeed.latestBlock}`,
         transactions: mergedTransactions,
       };
     });
-  }, [autoRefreshEnabled, currentPage, latestFeed]);
+  }
 
   useEffect(() => {
     if (!receiptLookupEnabled || !data?.transactions.length) {
@@ -278,6 +404,12 @@ function EvmTransactionsPageContent() {
 
   return (
     <AppShell>
+      {autoRefreshEnabled ? (
+        <TransactionsAutoRefreshBridge
+          enabled={currentPage === 1}
+          onLatestFeed={handleAutoRefreshFeed}
+        />
+      ) : null}
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
           <h1 className="text-[1.171875rem] font-semibold text-slate-900">Transactions</h1>
@@ -288,6 +420,11 @@ function EvmTransactionsPageContent() {
             <div className="min-w-0">
               <p className="text-lg font-semibold text-slate-900">{data.title}</p>
               <p className="mt-1 text-sm text-slate-500">{data.subtitle}</p>
+              {syncingLatest || syncStatusMessage ? (
+                <p className="mt-2 text-xs text-sky-600">
+                  {syncingLatest ? "Loading latest on-chain transactions..." : syncStatusMessage}
+                </p>
+              ) : null}
             </div>
             <div className="flex items-center gap-2 lg:justify-end">
               <PaginationControls
@@ -376,86 +513,86 @@ function EvmTransactionsPageContent() {
                     const receiptDetail = receiptDetailsByHash[transaction.hash];
 
                     return (
-                    <tr key={transaction.hash} className="border-t border-slate-200">
-                      <td className="px-5 py-3 text-sm">
-                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
-                          {transaction.hashLabel}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-3 text-sm">
-                        <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                          {decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-sm tabular-nums">
-                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
-                          {transaction.blockNumber}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">
-                        <RelativeTime timestampMs={transaction.timestampMs} />
-                      </td>
-                      <td className="px-5 py-3 text-sm">
-                        <AddressLink
-                          address={transaction.from}
-                          href={`/evm/address/${transaction.from}`}
-                          label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
-                          className="font-medium text-sky-600 hover:text-sky-700"
-                        />
-                      </td>
-                      <td className="px-5 py-3 text-sm">
-                        {transaction.to ? (
+                      <tr key={transaction.hash} className="border-t border-slate-200">
+                        <td className="px-5 py-3 text-sm">
+                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
+                            {transaction.hashLabel}
+                          </Link>
+                        </td>
+                        <td className="px-5 py-3 text-sm">
+                          <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                            {decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-sm tabular-nums">
+                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
+                            {transaction.blockNumber}
+                          </Link>
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          <RelativeTime timestampMs={transaction.timestampMs} />
+                        </td>
+                        <td className="px-5 py-3 text-sm">
                           <AddressLink
-                            address={transaction.to}
-                            href={`/evm/address/${transaction.to}`}
-                            label={resolvePreferredToAddressLabel(transaction.to, {
-                              nameTagsByAddress,
-                              fallbackLabel: transaction.toLabel,
-                            })}
+                            address={transaction.from}
+                            href={`/evm/address/${transaction.from}`}
+                            label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
                             className="font-medium text-sky-600 hover:text-sky-700"
                           />
-                        ) : (
-                          <span className="text-slate-500">Contract Creation</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
-                        {transaction.amountLabel}
-                      </td>
-                      {receiptLookupEnabled ? (
-                        <>
-                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                            {receiptDetail ? receiptDetail.feeLabel : <span className="text-slate-400">--</span>}
-                          </td>
-                          <td className="px-5 py-3 text-sm">
-                            {receiptDetail ? (
-                              <span
-                                className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                                  receiptDetail.status === "success"
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : receiptDetail.status === "reverted"
-                                      ? "bg-rose-50 text-rose-700"
-                                      : "bg-slate-100 text-slate-500"
-                                }`}
-                              >
-                                {receiptDetail.statusLabel}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">--</span>
-                            )}
-                          </td>
-                        </>
-                      ) : (
-                        <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                          {transaction.maxTxCostLabel}
                         </td>
-                      )}
-                    </tr>
+                        <td className="px-5 py-3 text-sm">
+                          {transaction.to ? (
+                            <AddressLink
+                              address={transaction.to}
+                              href={`/evm/address/${transaction.to}`}
+                              label={resolvePreferredToAddressLabel(transaction.to, {
+                                nameTagsByAddress,
+                                fallbackLabel: transaction.toLabel,
+                              })}
+                              className="font-medium text-sky-600 hover:text-sky-700"
+                            />
+                          ) : (
+                            <span className="text-slate-500">Contract Creation</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
+                          {transaction.amountLabel}
+                        </td>
+                        {receiptLookupEnabled ? (
+                          <>
+                            <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
+                              {receiptDetail ? receiptDetail.feeLabel : <span className="text-slate-400">--</span>}
+                            </td>
+                            <td className="px-5 py-3 text-sm">
+                              {receiptDetail ? (
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                                    receiptDetail.status === "success"
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : receiptDetail.status === "reverted"
+                                        ? "bg-rose-50 text-rose-700"
+                                        : "bg-slate-100 text-slate-500"
+                                  }`}
+                                >
+                                  {receiptDetail.statusLabel}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">--</span>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
+                            {transaction.maxTxCostLabel}
+                          </td>
+                        )}
+                      </tr>
                     );
                   })
                 ) : (
                   <tr>
                     <td colSpan={receiptLookupEnabled ? 9 : 8} className="px-5 py-10 text-center text-sm text-slate-500">
-                      No transactions found in the current block window.
+                      No cached transactions available yet.
                     </td>
                   </tr>
                 )}

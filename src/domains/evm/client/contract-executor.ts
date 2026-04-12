@@ -148,6 +148,20 @@ function normalizeDeployBytecode(bytecode: string) {
   return value as Hex;
 }
 
+function normalizeTransactionData(data: string | undefined) {
+  const value = data?.trim();
+
+  if (!value || value === "0x") {
+    return undefined;
+  }
+
+  if (!/^0x[0-9a-fA-F]*$/.test(value) || value.length % 2 !== 0) {
+    throw new Error("Transaction data must be a valid hex string.");
+  }
+
+  return value as Hex;
+}
+
 function formatGweiValue(value: bigint) {
   return Number(formatGwei(value)).toFixed(3).replace(/\.?0+$/, "");
 }
@@ -344,6 +358,68 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
   }
 }
 
+export async function getEvmTransactionManualDefaultsDirect(input: {
+  to: string;
+  privateKey: string;
+  value: string;
+  data?: string;
+}) {
+  const { profile, publicClient } = getActiveEvmClients();
+  const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
+  const account = privateKeyToAccount(normalizedPrivateKey);
+  const value = parseNativeValue(input.value);
+  const data = normalizeTransactionData(input.data);
+
+  const [feeDefaults, nonce] = await Promise.all([
+    getManualWriteFeeDefaults(publicClient),
+    publicClient.getTransactionCount({ address: account.address }),
+  ]);
+
+  try {
+    const estimatedGas = await publicClient.estimateGas({
+      account,
+      to: input.to as `0x${string}`,
+      data,
+      value: value > 0n ? value : undefined,
+    });
+    const bufferedEstimatedGas = applyGasLimitMultiplier(estimatedGas);
+
+    return {
+      accountAddress: account.address,
+      estimatedGas: bufferedEstimatedGas.toString(),
+      transactionType: feeDefaults.transactionType,
+      gasPrice: feeDefaults.gasPrice,
+      maxFeePerGas: feeDefaults.maxFeePerGas,
+      maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
+      gasPriceLabel: feeDefaults.gasPriceLabel,
+      nonce: String(nonce),
+      value: input.value.trim() || "0",
+      valueLabel:
+        value > 0n
+          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: null,
+    };
+  } catch (error) {
+    return {
+      accountAddress: account.address,
+      estimatedGas: "",
+      transactionType: feeDefaults.transactionType,
+      gasPrice: feeDefaults.gasPrice,
+      maxFeePerGas: feeDefaults.maxFeePerGas,
+      maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
+      gasPriceLabel: feeDefaults.gasPriceLabel,
+      nonce: String(nonce),
+      value: input.value.trim() || "0",
+      valueLabel:
+        value > 0n
+          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: error instanceof Error ? error.message : "Simulation failed.",
+    };
+  }
+}
+
 export async function writeEvmContractMethodDirect(input: {
   address: string;
   abiJson: string;
@@ -469,6 +545,80 @@ export async function forceWriteEvmContractMethodDirect(input: {
     chain: undefined,
     account,
     to: input.address as `0x${string}`,
+    data,
+    value: value > 0n ? value : undefined,
+    gas,
+    nonce,
+    ...feeParameters,
+  });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
+
+  return {
+    hash,
+    receipt: {
+      status: receipt.status,
+      blockNumber: receipt.blockNumber.toString(),
+      blockTimestamp,
+      gasUsed: receipt.gasUsed.toString(),
+      effectiveGasPrice: receipt.effectiveGasPrice !== null
+        ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
+        : "Unavailable",
+    },
+  };
+}
+
+export async function forceSendEvmTransactionDirect(input: {
+  to: string;
+  privateKey: string;
+  transactionType: "LEGACY" | "EIP1559";
+  value: string;
+  gasLimit: string;
+  gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
+  nonce?: string;
+  data?: string;
+}) {
+  const { profile, publicClient } = getActiveEvmClients();
+  const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
+  const account = privateKeyToAccount(normalizedPrivateKey);
+  const walletClient = createWalletClient({
+    account,
+    transport: createEvmTransport(profile.rpcUrl),
+  });
+  const value = parseNativeValue(input.value);
+  const gas = parseGasLimit(input.gasLimit);
+  const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
+  const data = normalizeTransactionData(input.data);
+  const feeParameters =
+    input.transactionType === "LEGACY"
+      ? {
+          type: "legacy" as const,
+          gasPrice: parseGasPrice(input.gasPrice ?? ""),
+        }
+      : (() => {
+          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? "", "Max fee per gas");
+          const maxPriorityFeePerGas = parseFeePerGas(
+            input.maxPriorityFeePerGas ?? "",
+            "Max priority fee per gas",
+          );
+
+          if (maxFeePerGas < maxPriorityFeePerGas) {
+            throw new Error("Max fee per gas cannot be less than max priority fee per gas.");
+          }
+
+          return {
+            type: "eip1559" as const,
+            maxFeePerGas,
+            maxPriorityFeePerGas,
+          };
+        })();
+
+  const hash = await walletClient.sendTransaction({
+    chain: undefined,
+    account,
+    to: input.to as `0x${string}`,
     data,
     value: value > 0n ? value : undefined,
     gas,

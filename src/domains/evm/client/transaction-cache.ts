@@ -536,6 +536,7 @@ export async function rememberEvmTransactionCache(items: EvmCachedTransactionIte
   const addressTransactionsStore = transaction.objectStore(ADDRESS_TRANSACTIONS_STORE);
   const summariesStore = transaction.objectStore(ADDRESS_SUMMARIES_STORE);
   const addressSummaryUpdates = new Map<string, EvmObservedAccountRecord>();
+  let changed = false;
 
   for (const item of uniqueItems) {
     const existingRecord = await toPromise(transactionsStore.get(item.hash));
@@ -549,6 +550,7 @@ export async function rememberEvmTransactionCache(items: EvmCachedTransactionIte
         ...existingRecord,
         inputData: item.inputData,
       });
+      changed = true;
       continue;
     }
 
@@ -558,6 +560,7 @@ export async function rememberEvmTransactionCache(items: EvmCachedTransactionIte
     };
 
     transactionsStore.put(record);
+    changed = true;
 
     for (const addressRecord of getAddressRecords(record)) {
       addressTransactionsStore.put(addressRecord);
@@ -590,6 +593,11 @@ export async function rememberEvmTransactionCache(items: EvmCachedTransactionIte
   }
 
   await waitForTransaction(transaction);
+
+  if (!changed) {
+    return;
+  }
+
   await trimCachedTransactionsIfNeeded();
   emitChange();
 }

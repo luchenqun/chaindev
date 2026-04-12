@@ -3,12 +3,16 @@
 import JsonView from "@uiw/react-json-view";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { IconArrowsExchange, IconCode } from "@tabler/icons-react";
-import { decodeErrorResult } from "viem";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { IconArrowsExchange, IconCode, IconLoader2 } from "@tabler/icons-react";
+import { decodeErrorResult, formatEther } from "viem";
 import { Button } from "@/components/ui/button";
+import { FlashMessage } from "@/components/ui/flash-message";
+import { Input } from "@/components/ui/input";
 import { DetailPageSkeleton } from "@/components/ui/loading-placeholders";
+import { ModalDialog } from "@/components/ui/modal-dialog";
 import { RelativeTime } from "@/components/relative-time";
+import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
 import {
   Select,
   SelectContent,
@@ -23,6 +27,21 @@ import {
 } from "@/domains/evm/client/address-tags";
 import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
 import { subscribeEvmContractRegistry } from "@/domains/evm/client/contract-registry";
+import {
+  forceSendEvmTransactionDirect,
+  forceWriteEvmContractMethodDirect,
+  getActiveEvmContractEnvironmentDirect,
+  getEvmTransactionManualDefaultsDirect,
+  getEvmContractWriteManualDefaultsDirect,
+} from "@/domains/evm/client/contract-executor";
+import {
+  getActiveEvmStoredPrivateKey,
+  isEvmStoredPrivateKeyUnlocked,
+  peekEvmStoredPrivateKey,
+  resolveEvmStoredPrivateKey,
+  subscribeEvmKeyring,
+  type EvmStoredPrivateKey,
+} from "@/domains/evm/client/keyring";
 import {
   decodeBoundEvmTransactionInput,
   decodeHexToUtf8,
@@ -132,6 +151,196 @@ function buildDefaultInputDataView(inputData: string, functionSignature?: string
   return lines.join("\n");
 }
 
+type RewriteTransactionType = "LEGACY" | "EIP1559";
+
+type RewriteDialogState = {
+  transactionType: RewriteTransactionType;
+  value: string;
+  gasPrice: string;
+  maxFeePerGas: string;
+  maxPriorityFeePerGas: string;
+  gasLimit: string;
+  nonce: string;
+};
+
+type RewriteEnvironmentState = {
+  chainId: string;
+  nativeCurrency: string;
+} | null;
+
+function createInitialRewriteDialogState(input?: {
+  transactionType?: RewriteTransactionType;
+  value?: string;
+  gasLimit?: string;
+}): RewriteDialogState {
+  return {
+    transactionType: input?.transactionType ?? "EIP1559",
+    value: input?.value ?? "0",
+    gasPrice: "",
+    maxFeePerGas: "auto",
+    maxPriorityFeePerGas: "auto",
+    gasLimit: input?.gasLimit ?? "",
+    nonce: "auto",
+  };
+}
+
+function isAutoFieldValue(value: string) {
+  const normalizedValue = value.trim().toLowerCase();
+  return !normalizedValue || normalizedValue === "auto";
+}
+
+function isValidNativeValueInput(value: string) {
+  const normalizedValue = value.trim();
+
+  if (!normalizedValue) {
+    return false;
+  }
+
+  return /^(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalizedValue);
+}
+
+function isRewriteDialogReady(state: RewriteDialogState) {
+  if (!isValidNativeValueInput(state.value) || !state.gasLimit.trim()) {
+    return false;
+  }
+
+  if (state.transactionType === "LEGACY") {
+    return !!state.gasPrice.trim();
+  }
+
+  return (
+    (isAutoFieldValue(state.nonce) || !!state.nonce.trim()) &&
+    (isAutoFieldValue(state.maxFeePerGas) || !!state.maxFeePerGas.trim()) &&
+    (isAutoFieldValue(state.maxPriorityFeePerGas) || !!state.maxPriorityFeePerGas.trim())
+  );
+}
+
+function normalizeContractActionErrorMessage(message: string, fallback: string) {
+  const roleMissingMatch = message.match(/missing role\s+(0x[a-fA-F0-9]+)/i);
+
+  if (roleMissingMatch) {
+    return `Transaction rejected. The current account is missing required role ${roleMissingMatch[1]}.`;
+  }
+
+  const revertReasonMatch = message.match(/execution reverted:\s*(.+?)(?:\s+Version:|$)/i);
+
+  if (revertReasonMatch?.[1]) {
+    return `Transaction reverted: ${revertReasonMatch[1].trim()}.`;
+  }
+
+  const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
+
+  if (rpcDescMatch?.[1]) {
+    return `${fallback} ${rpcDescMatch[1].trim()}.`;
+  }
+
+  return message;
+}
+
+function formatChainTimestamp(timestamp: number) {
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).format(new Date(timestamp * 1000));
+}
+
+function formatMiddleEllipsis(value: string, leading = 10, trailing = 8) {
+  if (value.length <= leading + trailing + 3) {
+    return value;
+  }
+
+  return `${value.slice(0, leading)}...${value.slice(-trailing)}`;
+}
+
+function extractTransactionRawField(rawJson: unknown, field: string) {
+  if (!rawJson || typeof rawJson !== "object" || !("transaction" in rawJson)) {
+    return null;
+  }
+
+  const transaction = rawJson.transaction;
+
+  if (!transaction || typeof transaction !== "object" || !(field in transaction)) {
+    return null;
+  }
+
+  const value = transaction[field as keyof typeof transaction];
+  return typeof value === "string" || typeof value === "number" ? String(value) : null;
+}
+
+function extractTransactionValueInput(rawJson: unknown) {
+  const rawValue = extractTransactionRawField(rawJson, "value");
+
+  if (!rawValue) {
+    return "0";
+  }
+
+  try {
+    return formatEther(BigInt(rawValue));
+  } catch {
+    return "0";
+  }
+}
+
+function extractTransactionGasLimit(rawJson: unknown) {
+  const rawGas = extractTransactionRawField(rawJson, "gas");
+
+  return rawGas && /^\d+$/.test(rawGas) ? rawGas : "";
+}
+
+function resolveRewriteTransactionType(rawJson: unknown): RewriteTransactionType {
+  const rawType = extractTransactionRawField(rawJson, "type")?.toLowerCase();
+
+  if (rawType === "eip1559" || rawType === "0x2" || rawType === "2") {
+    return "EIP1559";
+  }
+
+  return "LEGACY";
+}
+
+function RewriteArgumentsForm({
+  args,
+  values,
+  onChange,
+}: {
+  args: Array<{ name: string; type: string }>;
+  values: string[];
+  onChange: (index: number, value: string) => void;
+}) {
+  return (
+    <div className="grid gap-3">
+      {args.map((arg, index) => {
+        const isComplex = arg.type.includes("[") || arg.type === "tuple";
+
+        return (
+          <div key={`${arg.name}-${arg.type}-${index}`} className="grid gap-2">
+            <label className="text-sm font-medium text-slate-700">
+              {arg.name} <span className="text-slate-400">({arg.type})</span>
+            </label>
+            {isComplex ? (
+              <textarea
+                className="min-h-24 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400"
+                value={values[index] ?? ""}
+                onChange={(event) => onChange(index, event.target.value)}
+              />
+            ) : (
+              <Input
+                value={values[index] ?? ""}
+                onChange={(event) => onChange(index, event.target.value)}
+                placeholder={arg.type}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function EvmTxPage() {
   const params = useParams<{ hash: string }>();
   const hash = params.hash;
@@ -147,6 +356,23 @@ export default function EvmTxPage() {
   const [inputDataView, setInputDataView] = useState<"default" | "utf8" | "original">("default");
   const [showDecodedInputTable, setShowDecodedInputTable] = useState(false);
   const [decodeVersion, setDecodeVersion] = useState(0);
+  const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
+  const [rewriteEnvironment, setRewriteEnvironment] = useState<RewriteEnvironmentState>(null);
+  const [rewriteDialogOpen, setRewriteDialogOpen] = useState(false);
+  const [rewriteArgumentValues, setRewriteArgumentValues] = useState<string[]>([]);
+  const [rewriteDialogValues, setRewriteDialogValues] = useState<RewriteDialogState>(createInitialRewriteDialogState());
+  const [rewriteError, setRewriteError] = useState<string | null>(null);
+  const [rewriteActionLoading, setRewriteActionLoading] = useState<"fill" | "rewrite" | null>(null);
+  const [rewriteUnlockDialogOpen, setRewriteUnlockDialogOpen] = useState(false);
+  const [rewriteUnlockPassword, setRewriteUnlockPassword] = useState("");
+  const [rewriteUnlockError, setRewriteUnlockError] = useState<string | null>(null);
+  const [pendingRewriteAction, setPendingRewriteAction] = useState<"fill" | "rewrite" | null>(null);
+  const [flashMessage, setFlashMessage] = useState<{
+    title: string;
+    description?: string;
+    tone?: "success" | "info";
+  } | null>(null);
+  const rewriteDefaultsRequestIdRef = useRef(0);
   const visibleAddresses = useMemo(
     () =>
       transaction
@@ -200,6 +426,12 @@ export default function EvmTxPage() {
         : "",
     [transaction, decodedTransactionInput],
   );
+  const rewriteTargetAddress = useMemo(
+    () => transaction?.interactedWith ?? transaction?.to ?? null,
+    [transaction],
+  );
+  const isRewriteTransfer = Boolean(transaction?.to && transaction.inputData === "0x");
+  const canRewriteTransaction = Boolean(rewriteTargetAddress && (decodedTransactionInput || isRewriteTransfer));
 
   useEffect(() => {
     if (!isValid) {
@@ -240,6 +472,59 @@ export default function EvmTxPage() {
   }, [hash, isValid]);
 
   useEffect(() => {
+    function loadActiveKey() {
+      setActiveKey(getActiveEvmStoredPrivateKey());
+    }
+
+    loadActiveKey();
+
+    return subscribeEvmKeyring(loadActiveKey);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadEnvironment() {
+      try {
+        const next = await getActiveEvmContractEnvironmentDirect();
+
+        if (!cancelled) {
+          setRewriteEnvironment({
+            chainId: next.chainId,
+            nativeCurrency: next.nativeCurrency,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setRewriteEnvironment(null);
+        }
+      }
+    }
+
+    void loadEnvironment();
+    window.addEventListener("chaindev:active-rpc-profile-changed", loadEnvironment);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("chaindev:active-rpc-profile-changed", loadEnvironment);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!flashMessage) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setFlashMessage(null);
+    }, 2600);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [flashMessage]);
+
+  useEffect(() => {
     const unsubscribe = subscribeEvmContractRegistry(() => {
       setDecodeVersion((current) => current + 1);
     });
@@ -278,6 +563,302 @@ export default function EvmTxPage() {
       window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
     };
   }, [visibleAddresses]);
+
+  useEffect(() => {
+    if (
+      !rewriteDialogOpen ||
+      !canRewriteTransaction ||
+      !rewriteTargetAddress ||
+      !activeKey ||
+      rewriteActionLoading === "rewrite" ||
+      (activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
+      !isValidNativeValueInput(rewriteDialogValues.value)
+    ) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void fillRewriteDefaults(undefined, {
+        rawArgs: rewriteArgumentValues,
+        value: rewriteDialogValues.value,
+      });
+    }, 240);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [
+    activeKey,
+    canRewriteTransaction,
+    decodedTransactionInput,
+    rewriteDialogOpen,
+    rewriteTargetAddress,
+    rewriteArgumentValues,
+    rewriteActionLoading,
+    rewriteDialogValues.value,
+  ]);
+
+  function openRewriteDialog() {
+    if (!canRewriteTransaction || !rewriteTargetAddress) {
+      return;
+    }
+
+    setRewriteArgumentValues(decodedTransactionInput?.args.map((arg) => arg.value) ?? []);
+    setRewriteDialogValues(
+      createInitialRewriteDialogState({
+        transactionType: resolveRewriteTransactionType(transaction.rawJson),
+        value: extractTransactionValueInput(transaction.rawJson),
+        gasLimit: extractTransactionGasLimit(transaction.rawJson),
+      }),
+    );
+    setRewriteError(null);
+    setRewriteActionLoading(null);
+    setRewriteUnlockDialogOpen(false);
+    setRewriteUnlockPassword("");
+    setRewriteUnlockError(null);
+    setPendingRewriteAction(null);
+    setRewriteDialogOpen(true);
+  }
+
+  async function fillRewriteDefaults(
+    password?: string,
+    overrides?: {
+      rawArgs?: string[];
+      value?: string;
+    },
+  ) {
+    if (!rewriteTargetAddress || !activeKey || !canRewriteTransaction) {
+      return;
+    }
+
+    setRewriteActionLoading("fill");
+    setRewriteError(null);
+    const requestId = rewriteDefaultsRequestIdRef.current + 1;
+    rewriteDefaultsRequestIdRef.current = requestId;
+
+    try {
+      const privateKey = password
+        ? await resolveEvmStoredPrivateKey(activeKey.id, password)
+        : await peekEvmStoredPrivateKey(activeKey.id);
+      const rawArgs = overrides?.rawArgs ?? rewriteArgumentValues;
+      const value = overrides?.value ?? rewriteDialogValues.value;
+      const defaults = decodedTransactionInput
+        ? await getEvmContractWriteManualDefaultsDirect({
+            address: rewriteTargetAddress,
+            abiJson: decodedTransactionInput.abiJson,
+            functionSignature: decodedTransactionInput.functionSignature,
+            rawArgs,
+            privateKey,
+            value,
+          })
+        : await getEvmTransactionManualDefaultsDirect({
+            to: rewriteTargetAddress,
+            privateKey,
+            value,
+            data: transaction.inputData,
+          });
+
+      if (requestId !== rewriteDefaultsRequestIdRef.current) {
+        return;
+      }
+
+      setRewriteDialogValues((current) => ({
+        ...current,
+        transactionType: defaults.transactionType,
+        gasPrice: defaults.gasPrice,
+        maxFeePerGas: isAutoFieldValue(current.maxFeePerGas) ? "auto" : current.maxFeePerGas,
+        maxPriorityFeePerGas: isAutoFieldValue(current.maxPriorityFeePerGas)
+          ? "auto"
+          : current.maxPriorityFeePerGas,
+        gasLimit: defaults.estimatedGas || current.gasLimit,
+        nonce: isAutoFieldValue(current.nonce) ? "auto" : current.nonce,
+      }));
+
+      if (defaults.simulationError) {
+        setRewriteError(
+          normalizeContractActionErrorMessage(
+            defaults.simulationError,
+            "Failed to prepare rewritten transaction.",
+          ),
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to prepare rewritten transaction.";
+
+      if (requestId !== rewriteDefaultsRequestIdRef.current) {
+        return;
+      }
+
+      if (message === "Password is required.") {
+        setPendingRewriteAction("fill");
+        setRewriteUnlockPassword("");
+        setRewriteUnlockError(null);
+        setRewriteUnlockDialogOpen(true);
+        return;
+      }
+
+      setRewriteError(normalizeContractActionErrorMessage(message, "Failed to prepare rewritten transaction."));
+    } finally {
+      if (requestId === rewriteDefaultsRequestIdRef.current) {
+        setRewriteActionLoading(null);
+      }
+    }
+  }
+
+  async function executeRewriteAction(password?: string) {
+    if (!rewriteTargetAddress || !activeKey || !canRewriteTransaction) {
+      return;
+    }
+
+    setRewriteActionLoading("rewrite");
+    setRewriteError(null);
+    rewriteDefaultsRequestIdRef.current += 1;
+    let rewriteSucceeded = false;
+
+    try {
+      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
+      const latestDefaults =
+        rewriteDialogValues.transactionType === "EIP1559" &&
+        (isAutoFieldValue(rewriteDialogValues.maxFeePerGas) ||
+          isAutoFieldValue(rewriteDialogValues.maxPriorityFeePerGas) ||
+          isAutoFieldValue(rewriteDialogValues.nonce))
+          ? decodedTransactionInput
+            ? await getEvmContractWriteManualDefaultsDirect({
+                address: rewriteTargetAddress,
+                abiJson: decodedTransactionInput.abiJson,
+                functionSignature: decodedTransactionInput.functionSignature,
+                rawArgs: rewriteArgumentValues,
+                privateKey,
+                value: rewriteDialogValues.value,
+              })
+            : await getEvmTransactionManualDefaultsDirect({
+                to: rewriteTargetAddress,
+                privateKey,
+                value: rewriteDialogValues.value,
+                data: transaction.inputData,
+              })
+          : isAutoFieldValue(rewriteDialogValues.nonce)
+            ? decodedTransactionInput
+              ? await getEvmContractWriteManualDefaultsDirect({
+                  address: rewriteTargetAddress,
+                  abiJson: decodedTransactionInput.abiJson,
+                  functionSignature: decodedTransactionInput.functionSignature,
+                  rawArgs: rewriteArgumentValues,
+                  privateKey,
+                  value: rewriteDialogValues.value,
+                })
+              : await getEvmTransactionManualDefaultsDirect({
+                  to: rewriteTargetAddress,
+                  privateKey,
+                  value: rewriteDialogValues.value,
+                  data: transaction.inputData,
+                })
+            : null;
+
+      const resolvedDialogValues = {
+        ...rewriteDialogValues,
+        maxFeePerGas: isAutoFieldValue(rewriteDialogValues.maxFeePerGas)
+          ? (latestDefaults?.maxFeePerGas ?? rewriteDialogValues.maxFeePerGas)
+          : rewriteDialogValues.maxFeePerGas,
+        maxPriorityFeePerGas: isAutoFieldValue(rewriteDialogValues.maxPriorityFeePerGas)
+          ? (latestDefaults?.maxPriorityFeePerGas ?? rewriteDialogValues.maxPriorityFeePerGas)
+          : rewriteDialogValues.maxPriorityFeePerGas,
+        nonce: isAutoFieldValue(rewriteDialogValues.nonce)
+          ? (latestDefaults?.nonce ?? rewriteDialogValues.nonce)
+          : rewriteDialogValues.nonce,
+      };
+
+      setRewriteDialogValues(resolvedDialogValues);
+
+      const result = decodedTransactionInput
+        ? await forceWriteEvmContractMethodDirect({
+            address: rewriteTargetAddress,
+            abiJson: decodedTransactionInput.abiJson,
+            functionSignature: decodedTransactionInput.functionSignature,
+            rawArgs: rewriteArgumentValues,
+            privateKey,
+            transactionType: resolvedDialogValues.transactionType,
+            value: resolvedDialogValues.value,
+            gasLimit: resolvedDialogValues.gasLimit,
+            gasPrice: resolvedDialogValues.gasPrice,
+            maxFeePerGas: resolvedDialogValues.maxFeePerGas,
+            maxPriorityFeePerGas: resolvedDialogValues.maxPriorityFeePerGas,
+            nonce: resolvedDialogValues.nonce,
+          })
+        : await forceSendEvmTransactionDirect({
+            to: rewriteTargetAddress,
+            privateKey,
+            transactionType: resolvedDialogValues.transactionType,
+            value: resolvedDialogValues.value,
+            gasLimit: resolvedDialogValues.gasLimit,
+            gasPrice: resolvedDialogValues.gasPrice,
+            maxFeePerGas: resolvedDialogValues.maxFeePerGas,
+            maxPriorityFeePerGas: resolvedDialogValues.maxPriorityFeePerGas,
+            nonce: resolvedDialogValues.nonce,
+            data: transaction.inputData,
+          });
+
+      setRewriteDialogOpen(false);
+      rewriteSucceeded = true;
+      setFlashMessage(
+        result.receipt.status === "success"
+          ? {
+              title: "Rewrite submitted",
+              description: `${decodedTransactionInput?.functionName ?? "Transfer"} was re-sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              tone: "success",
+            }
+          : {
+              title: "Rewrite reverted",
+              description: `${decodedTransactionInput?.functionName ?? "Transfer"} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              tone: "info",
+            },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to rewrite transaction.";
+
+      if (message === "Password is required.") {
+        setPendingRewriteAction("rewrite");
+        setRewriteUnlockPassword("");
+        setRewriteUnlockError(null);
+        setRewriteUnlockDialogOpen(true);
+        return;
+      }
+
+      setRewriteError(normalizeContractActionErrorMessage(message, "Failed to rewrite transaction."));
+    } finally {
+      if (!rewriteSucceeded) {
+        setRewriteActionLoading(null);
+      }
+    }
+  }
+
+  async function handleConfirmRewriteUnlock() {
+    if (!activeKey || !pendingRewriteAction) {
+      return;
+    }
+
+    try {
+      await resolveEvmStoredPrivateKey(activeKey.id, rewriteUnlockPassword);
+      const nextAction = pendingRewriteAction;
+      setPendingRewriteAction(null);
+      setRewriteUnlockDialogOpen(false);
+      setRewriteUnlockPassword("");
+      setRewriteUnlockError(null);
+
+      if (nextAction === "fill") {
+        await fillRewriteDefaults(rewriteUnlockPassword);
+      } else {
+        await executeRewriteAction(rewriteUnlockPassword);
+      }
+    } catch (error) {
+      setRewriteUnlockError(
+        normalizeContractActionErrorMessage(
+          error instanceof Error ? error.message : "Failed to unlock private key.",
+          "Failed to unlock private key.",
+        ),
+      );
+    }
+  }
 
   async function handleOpenDebugTraceTab() {
     setActiveTab("debugTrace");
@@ -344,6 +925,13 @@ export default function EvmTxPage() {
 
   return (
     <AppShell>
+      {flashMessage ? (
+        <FlashMessage
+          title={flashMessage.title}
+          description={flashMessage.description}
+          tone={flashMessage.tone}
+        />
+      ) : null}
       <main className="section-block">
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -618,6 +1206,15 @@ export default function EvmTxPage() {
                                 <IconCode className="mr-1.5 size-3.5" stroke={1.8} />
                                 Decode Input Data
                               </Button>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                disabled={!canRewriteTransaction}
+                                onClick={openRewriteDialog}
+                              >
+                                ReWrite
+                              </Button>
                             </div>
                           </div>
                         )
@@ -721,6 +1318,253 @@ export default function EvmTxPage() {
           </section>
         )}
       </main>
+      <ModalDialog
+        open={rewriteDialogOpen}
+        onOpenChange={(open) => {
+          setRewriteDialogOpen(open);
+
+          if (!open) {
+            setRewriteError(null);
+            setRewriteActionLoading(null);
+            setPendingRewriteAction(null);
+          }
+        }}
+        title="ReWrite Transaction"
+        description={
+          decodedTransactionInput
+            ? "Modify the decoded function arguments and resend this call as a force write."
+            : "Resend this transfer with updated value and transaction settings."
+        }
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setRewriteDialogOpen(false);
+                setRewriteError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-rose-600 text-white hover:bg-rose-700"
+              disabled={
+                !activeKey ||
+                !canRewriteTransaction ||
+                !isRewriteDialogReady(rewriteDialogValues) ||
+                rewriteActionLoading === "rewrite"
+              }
+              onClick={() => void executeRewriteAction()}
+            >
+              {rewriteActionLoading === "rewrite" ? (
+                <>
+                  <IconLoader2 className="mr-2 size-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                "Confirm Force Send"
+              )}
+            </Button>
+          </>
+        }
+        maxWidthClassName="max-w-xl"
+      >
+        {canRewriteTransaction && rewriteTargetAddress ? (
+          <div className="grid gap-4 pb-1">
+            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2">
+              <div className="min-w-0 sm:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
+                <p className="mt-1 break-all text-sm text-slate-900 mono">{rewriteTargetAddress}</p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
+                <p className="mt-1 text-sm text-slate-900">
+                  {decodedTransactionInput ? decodedTransactionInput.functionSignature : "Transfer"}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
+                <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
+              </div>
+              {decodedTransactionInput ? (
+                <div className="min-w-0 sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Artifact</p>
+                  <p className="mt-1 text-sm text-slate-900">{decodedTransactionInput.artifactName}</p>
+                </div>
+              ) : null}
+            </div>
+
+            {!activeKey ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Select a global private key first.
+              </div>
+            ) : null}
+
+            {decodedTransactionInput ? (
+              <div className="grid gap-3">
+                <p className="text-sm font-medium text-slate-700">Function Arguments</p>
+                <div className="max-h-64 overflow-y-auto pr-1">
+                  <RewriteArgumentsForm
+                    args={decodedTransactionInput.args.map((arg) => ({ name: arg.name, type: arg.type }))}
+                    values={rewriteArgumentValues}
+                    onChange={(index, value) => {
+                      const nextArgs = [...rewriteArgumentValues];
+                      nextArgs[index] = value;
+                      setRewriteArgumentValues(nextArgs);
+                      setRewriteError(null);
+                    }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                This transaction is a native transfer. No function arguments are required.
+              </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <Select
+                  value={rewriteDialogValues.transactionType}
+                  onValueChange={(value) =>
+                    setRewriteDialogValues((current) => ({
+                      ...current,
+                      transactionType: value as RewriteTransactionType,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select transaction type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EIP1559">EIP1559</SelectItem>
+                    <SelectItem value="LEGACY">LEGACY</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Value ({rewriteEnvironment?.nativeCurrency ?? "Native"})
+                </label>
+                <Input
+                  value={rewriteDialogValues.value}
+                  onChange={(event) =>
+                    setRewriteDialogValues((current) => ({
+                      ...current,
+                      value: event.target.value,
+                    }))
+                  }
+                  placeholder="0"
+                />
+              </div>
+              {rewriteDialogValues.transactionType === "LEGACY" ? (
+                <div className="grid gap-2">
+                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <Input
+                    value={rewriteDialogValues.gasPrice}
+                    onChange={(event) =>
+                      setRewriteDialogValues((current) => ({
+                        ...current,
+                        gasPrice: event.target.value,
+                      }))
+                    }
+                    placeholder="0.001"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <Input
+                      value={rewriteDialogValues.maxFeePerGas}
+                      onChange={(event) =>
+                        setRewriteDialogValues((current) => ({
+                          ...current,
+                          maxFeePerGas: event.target.value,
+                        }))
+                      }
+                      placeholder="auto"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <Input
+                      value={rewriteDialogValues.maxPriorityFeePerGas}
+                      onChange={(event) =>
+                        setRewriteDialogValues((current) => ({
+                          ...current,
+                          maxPriorityFeePerGas: event.target.value,
+                        }))
+                      }
+                      placeholder="auto"
+                    />
+                  </div>
+                </>
+              )}
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <Input
+                  value={rewriteDialogValues.gasLimit}
+                  onChange={(event) =>
+                    setRewriteDialogValues((current) => ({
+                      ...current,
+                      gasLimit: event.target.value,
+                    }))
+                  }
+                  placeholder="0"
+                />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <Input
+                  value={rewriteDialogValues.nonce}
+                  onChange={(event) =>
+                    setRewriteDialogValues((current) => ({
+                      ...current,
+                      nonce: event.target.value,
+                    }))
+                  }
+                  placeholder="auto"
+                />
+              </div>
+            </div>
+
+            {rewriteError ? (
+              <div className="max-h-32 overflow-auto rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <p className="break-all whitespace-pre-wrap">{rewriteError}</p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </ModalDialog>
+      <SecretInputDialog
+        open={rewriteUnlockDialogOpen}
+        onOpenChange={(open) => {
+          setRewriteUnlockDialogOpen(open);
+
+          if (!open) {
+            setRewriteUnlockPassword("");
+            setRewriteUnlockError(null);
+            setPendingRewriteAction(null);
+          }
+        }}
+        title="Unlock Private Key"
+        description={
+          activeKey
+            ? `Enter the password for "${activeKey.name}" to continue the rewrite flow.`
+            : "Enter the password to continue."
+        }
+        value={rewriteUnlockPassword}
+        onValueChange={setRewriteUnlockPassword}
+        placeholder="Password"
+        confirmLabel="Unlock"
+        errorMessage={rewriteUnlockError}
+        confirmDisabled={!rewriteUnlockPassword.trim()}
+        onConfirm={() => void handleConfirmRewriteUnlock()}
+      />
       <style jsx global>{`
         .json-view-wrap .w-rjv-value {
           white-space: pre-wrap;

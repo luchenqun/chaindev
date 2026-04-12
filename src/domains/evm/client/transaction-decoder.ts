@@ -14,6 +14,7 @@ export type EvmDecodedTransactionInput = {
   functionSignature: string;
   selector: string;
   artifactName: string;
+  abiJson: string;
   bindingLabel: string;
   args: Array<{
     name: string;
@@ -143,6 +144,7 @@ export function decodeBoundEvmTransactionInput(input: {
       functionSignature: matchedFunction.signature,
       selector,
       artifactName: boundArtifact.artifact.name,
+      abiJson: boundArtifact.artifact.abiJson,
       bindingLabel: boundArtifact.binding.label,
       args: matchedFunction.inputs.map((parameter, index) => ({
         name: parameter.name || `arg${index + 1}`,
@@ -157,6 +159,7 @@ export function decodeBoundEvmTransactionInput(input: {
       functionSignature: matchedFunction.signature,
       selector,
       artifactName: boundArtifact.artifact.name,
+      abiJson: boundArtifact.artifact.abiJson,
       bindingLabel: boundArtifact.binding.label,
       args: [],
     };

@@ -5,5 +5,13 @@ export function isWebSocketUrl(url: string) {
 }
 
 export function createEvmTransport(rpcUrl: string) {
-  return isWebSocketUrl(rpcUrl) ? webSocket(rpcUrl) : http(rpcUrl);
+  return isWebSocketUrl(rpcUrl)
+    ? webSocket(rpcUrl)
+    : http(rpcUrl, {
+        // Coalesce concurrent JSON-RPC calls into a single HTTP batch request.
+        batch: {
+          wait: 12,
+          batchSize: 100,
+        },
+      });
 }

@@ -4,16 +4,25 @@ import { usePathname } from "next/navigation";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   getEvmLatestFeedDirect,
+  getEvmHomeMetricsSupplementDirect,
   getEvmHomeSnapshotDirect,
   validateActiveEvmCacheDirect,
 } from "@/domains/evm/client/queries";
 
 type EvmHomeSnapshot = Awaited<ReturnType<typeof getEvmHomeSnapshotDirect>>;
 type EvmLatestFeed = Awaited<ReturnType<typeof getEvmLatestFeedDirect>>;
+type EvmHomeMetricsSupplement = Awaited<ReturnType<typeof getEvmHomeMetricsSupplementDirect>>;
 type EvmLiveStatus = Pick<
   EvmLatestFeed,
   "latestBlock" | "latestBlockNumber" | "latestBlockTime" | "latestBlockTimestamp" | "pollIntervalMs"
 >;
+type RecentHomeBlock = {
+  blockNumber: number;
+  timestampMs: number | null;
+  txCount: number;
+  block: EvmLatestFeed["block"];
+  transactions: EvmLatestFeed["transactions"];
+};
 
 type EvmHomeDataContextValue = {
   status: EvmLiveStatus | null;
@@ -25,6 +34,133 @@ type EvmHomeDataContextValue = {
 };
 
 const EvmHomeDataContext = createContext<EvmHomeDataContextValue | null>(null);
+const RECENT_HOME_BLOCK_WINDOW = 10;
+const HOME_BLOCK_LIST_LIMIT = 6;
+const HOME_TRANSACTION_LIST_LIMIT = 6;
+
+function formatMetricInteger(value: number) {
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatMetricInterval(seconds: number | null | undefined) {
+  if (seconds == null || !Number.isFinite(seconds) || seconds < 0) {
+    return "--";
+  }
+
+  if (seconds < 1) {
+    return `${seconds.toFixed(2).replace(/\.?0+$/, "")}s`;
+  }
+
+  if (seconds < 10) {
+    return `${seconds.toFixed(1).replace(/\.0$/, "")}s`;
+  }
+
+  return `${Math.round(seconds)}s`;
+}
+
+function mergeRecentHomeBlocks(current: RecentHomeBlock[], feed: EvmLatestFeed) {
+  const nextBlock: RecentHomeBlock = {
+    blockNumber: feed.latestBlockNumber,
+    timestampMs: feed.latestBlockTimestamp ? feed.latestBlockTimestamp * 1000 : null,
+    txCount: feed.blockPageItem.txCount,
+    block: feed.block,
+    transactions: feed.transactions,
+  };
+  const merged = [nextBlock, ...current.filter((item) => item.blockNumber !== nextBlock.blockNumber)];
+
+  return merged.slice(0, RECENT_HOME_BLOCK_WINDOW);
+}
+
+function buildDerivedHomeSnapshot(input: {
+  feed: EvmLatestFeed;
+  supplement: EvmHomeMetricsSupplement;
+  recentBlocks: RecentHomeBlock[];
+  chainId: string | null;
+  pollIntervalMs: number;
+}): EvmHomeSnapshot {
+  const activityBlocks = input.recentBlocks.slice(0, HOME_BLOCK_LIST_LIMIT).map((item) => item.block);
+  const activityTransactions = input.recentBlocks
+    .flatMap((item) => item.transactions)
+    .filter((transaction, index, transactions) => transactions.findIndex((candidate) => candidate.hash === transaction.hash) === index)
+    .slice(0, HOME_TRANSACTION_LIST_LIMIT);
+  const recentBlocksForMetrics = input.recentBlocks.slice(0, RECENT_HOME_BLOCK_WINDOW);
+  const timestampSamples = recentBlocksForMetrics
+    .map((item) => item.timestampMs)
+    .filter((value): value is number => value != null);
+  const intervalSamples =
+    timestampSamples.length >= 2
+      ? timestampSamples
+          .slice(0, -1)
+          .map((timestamp, index) => (timestamp - timestampSamples[index + 1]) / 1000)
+          .filter((value) => Number.isFinite(value) && value >= 0)
+      : [];
+  const averageBlockTimeSeconds = intervalSamples.length
+    ? intervalSamples.reduce((sum, value) => sum + value, 0) / intervalSamples.length
+    : null;
+  const recentTxCount =
+    recentBlocksForMetrics.length >= 2
+      ? recentBlocksForMetrics.reduce((sum, block) => sum + block.txCount, 0)
+      : null;
+
+  return {
+    header: {
+      connection: input.supplement.header.connection,
+      providerName: input.supplement.header.providerName,
+      nativeCurrency: input.supplement.header.nativeCurrency,
+      chainId: input.chainId ?? "Unavailable",
+    },
+    metrics: [
+      { label: "Latest Block", value: input.feed.latestBlock, subtext: "Current head" },
+      { label: "Latest Block Time", value: input.feed.latestBlockTime, subtext: "Local formatted time" },
+      {
+        label: "Average Block Time",
+        value: formatMetricInterval(averageBlockTimeSeconds),
+        subtext:
+          recentBlocksForMetrics.length >= 2
+            ? `Sampled from recent ${Math.min(recentBlocksForMetrics.length, RECENT_HOME_BLOCK_WINDOW)} blocks`
+            : "Waiting for at least 2 recent blocks",
+      },
+      {
+        label: "Gas Price",
+        value: input.supplement.gasPriceLabel,
+        subtext: "Quoted in gwei",
+      },
+      {
+        label: "Pending Tx Count",
+        value: input.supplement.pendingTransactionCountLabel,
+        subtext:
+          input.supplement.pendingTransactionCountLabel === "Unavailable"
+            ? "Provider does not expose pending pool"
+            : "Pending pool snapshot",
+      },
+      {
+        label: "Recent Tx Count",
+        value: recentTxCount != null ? formatMetricInteger(recentTxCount) : "--",
+        subtext:
+          recentBlocksForMetrics.length >= 2
+            ? `Last ${recentBlocksForMetrics.length} blocks`
+            : "Waiting for at least 2 recent blocks",
+      },
+      {
+        label: "Cached Transactions",
+        value: formatMetricInteger(input.supplement.cacheSummary.totalTransactions),
+        subtext: "Local IndexedDB",
+      },
+      {
+        label: "Observed Accounts",
+        value: formatMetricInteger(input.supplement.cacheSummary.totalObservedAccounts),
+        subtext: "Derived from cached transactions",
+      },
+    ],
+    activity: {
+      blocks: activityBlocks,
+      transactions: activityTransactions,
+    },
+    latestBlockNumber: input.feed.latestBlockNumber,
+    latestBlockTimestamp: input.feed.latestBlockTimestamp,
+    pollIntervalMs: input.pollIntervalMs,
+  };
+}
 
 export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -37,8 +173,9 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   const timeoutRef = useRef<number | null>(null);
   const pollIntervalRef = useRef(12_000);
   const hasResolvedPollIntervalRef = useRef(false);
-  const snapshotRef = useRef<EvmHomeSnapshot | null>(null);
   const hasValidatedCacheRef = useRef(false);
+  const recentHomeBlocksRef = useRef<RecentHomeBlock[]>([]);
+  const homeChainIdRef = useRef<string | null>(null);
 
   function resolvePollInterval(nextPollIntervalMs: number) {
     if (!hasResolvedPollIntervalRef.current) {
@@ -78,84 +215,66 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       }, delayMs);
     }
 
-    async function bootstrapHome() {
-      const next = await getEvmHomeSnapshotDirect();
-      const resolvedPollIntervalMs = resolvePollInterval(next.pollIntervalMs);
-
-      if (disposed) {
-        return;
-      }
-
-      setLatestFeed(null);
-      snapshotRef.current = next;
-      setSnapshot(next);
-      setStatus({
-        latestBlock: next.metrics.find((metric) => metric.label === "Latest Block")?.value ?? "Unavailable",
-        latestBlockNumber: next.latestBlockNumber,
-        latestBlockTime: next.metrics.find((metric) => metric.label === "Latest Block Time")?.value ?? "Unavailable",
-        latestBlockTimestamp: next.latestBlockTimestamp,
-        pollIntervalMs: resolvedPollIntervalMs,
-      });
-      setPollIntervalMs(resolvedPollIntervalMs);
-      setErrorMessage(null);
-      scheduleNextPoll(pollIntervalRef.current);
-    }
-
-    async function refreshHome() {
-      const next = await getEvmHomeSnapshotDirect();
-
-      if (disposed) {
-        return;
-      }
-
-      const resolvedPollIntervalMs = resolvePollInterval(next.pollIntervalMs);
-
-      setStatus({
-        latestBlock: next.metrics.find((metric) => metric.label === "Latest Block")?.value ?? "Unavailable",
-        latestBlockNumber: next.latestBlockNumber,
-        latestBlockTime: next.metrics.find((metric) => metric.label === "Latest Block Time")?.value ?? "Unavailable",
-        latestBlockTimestamp: next.latestBlockTimestamp,
-        pollIntervalMs: resolvedPollIntervalMs,
-      });
-      snapshotRef.current = next;
-      setSnapshot(next);
-      setPollIntervalMs(resolvedPollIntervalMs);
-      setErrorMessage(null);
-      scheduleNextPoll(pollIntervalRef.current);
-    }
-
-    async function refreshStatus() {
+    async function refreshLatestFeed() {
       const next = await getEvmLatestFeedDirect(20, !hasResolvedPollIntervalRef.current);
       const resolvedPollIntervalMs = resolvePollInterval(next.pollIntervalMs);
 
       if (disposed) {
-        return;
+        return null;
       }
 
-      setLatestFeed({
+      const nextFeed = {
         ...next,
         pollIntervalMs: resolvedPollIntervalMs,
-      });
+      };
+      recentHomeBlocksRef.current = mergeRecentHomeBlocks(recentHomeBlocksRef.current, nextFeed);
+
+      setLatestFeed(nextFeed);
       setStatus({
-        ...next,
+        ...nextFeed,
         pollIntervalMs: resolvedPollIntervalMs,
       });
       setPollIntervalMs(resolvedPollIntervalMs);
-      snapshotRef.current = null;
-      setSnapshot(null);
+      if (!isHomePage) {
+        setSnapshot(null);
+      }
       setErrorMessage(null);
-      scheduleNextPoll(pollIntervalRef.current);
+
+      return nextFeed;
+    }
+
+    async function refreshHome(feed: EvmLatestFeed) {
+      const supplement = await getEvmHomeMetricsSupplementDirect(homeChainIdRef.current == null);
+
+      if (disposed) {
+        return;
+      }
+
+      if (supplement.header.chainId) {
+        homeChainIdRef.current = supplement.header.chainId;
+      }
+
+      setSnapshot(
+        buildDerivedHomeSnapshot({
+          feed,
+          supplement,
+          recentBlocks: recentHomeBlocksRef.current,
+          chainId: homeChainIdRef.current,
+          pollIntervalMs: feed.pollIntervalMs,
+        }),
+      );
     }
 
     async function load() {
       try {
         if (!isEvmRoute) {
           setStatus(null);
-          snapshotRef.current = null;
           setSnapshot(null);
           setLatestFeed(null);
           setErrorMessage(null);
           setPollIntervalMs(12_000);
+          recentHomeBlocksRef.current = [];
+          homeChainIdRef.current = null;
           clearPoll();
           return;
         }
@@ -165,27 +284,26 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
           hasValidatedCacheRef.current = true;
         }
 
-        if (isHomePage) {
-          if (!snapshotRef.current) {
-            await bootstrapHome();
-            return;
-          }
+        const nextFeed = await refreshLatestFeed();
 
-          await refreshHome();
+        if (!nextFeed) {
           return;
         }
 
-        await refreshStatus();
+        if (isHomePage) {
+          await refreshHome(nextFeed);
+          scheduleNextPoll(pollIntervalRef.current);
+          return;
+        }
+
+        scheduleNextPoll(pollIntervalRef.current);
       } catch (error) {
         if (disposed) {
           return;
         }
 
         setStatus(null);
-        if (!isHomePage) {
-          snapshotRef.current = null;
-          setSnapshot(null);
-        }
+        setSnapshot(null);
         setErrorMessage(error instanceof Error ? error.message : "Failed to load homepage activity.");
         setPollIntervalMs(12_000);
         scheduleNextPoll(12_000);
@@ -198,7 +316,8 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       pollIntervalRef.current = 12_000;
       hasResolvedPollIntervalRef.current = false;
       setPollIntervalMs(12_000);
-      snapshotRef.current = null;
+      recentHomeBlocksRef.current = [];
+      homeChainIdRef.current = null;
       setSnapshot(null);
       setStatus(null);
       setLatestFeed(null);

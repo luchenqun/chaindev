@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { IconInfoCircle } from "@tabler/icons-react";
+import { IconFileDots, IconInfoCircle } from "@tabler/icons-react";
 import { RelativeTime } from "@/components/relative-time";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ import { AddressContractPanel } from "@/domains/evm/ui/address-contract-panel";
 import {
   getActiveEvmCurrencyNameClient,
   getEvmAddressSummaryDirect,
+  getEvmTransactionReceiptSummariesDirect,
   hydrateEvmCachedTransactionInputsByHashDirect,
 } from "@/domains/evm/client/queries";
 import { AppShell } from "@/platform/layout/app-shell";
@@ -220,6 +221,11 @@ export default function EvmAddressPage() {
   const [contractEnvironment, setContractEnvironment] = useState<ContractEnvironmentState>(null);
   const [contractBinding, setContractBinding] = useState<EvmContractBinding | null>(null);
   const [contractArtifact, setContractArtifact] = useState<EvmContractArtifact | null>(null);
+  const [receiptLookupEnabled, setReceiptLookupEnabled] = useState(false);
+  const [receiptDetailsByHash, setReceiptDetailsByHash] = useState<
+    Record<string, { status: string; statusLabel: string; feeLabel: string }>
+  >({});
+  const [receiptLoading, setReceiptLoading] = useState(false);
   const currencyName = getActiveEvmCurrencyNameClient();
 
   useEffect(() => {
@@ -377,6 +383,10 @@ export default function EvmAddressPage() {
       )],
     [visibleTransactions],
   );
+  const transactionHashesKey = useMemo(
+    () => visibleTransactions.map((transaction) => transaction.hash).join(","),
+    [visibleTransactions],
+  );
   const decodedMethodLabelByHash = useMemo(
     () => {
       void contractBinding;
@@ -408,6 +418,40 @@ export default function EvmAddressPage() {
 
     void hydrateEvmCachedTransactionInputsByHashDirect(hashesNeedingInputData);
   }, [visibleTransactions]);
+
+  useEffect(() => {
+    if (!receiptLookupEnabled || !visibleTransactions.length) {
+      setReceiptDetailsByHash({});
+      setReceiptLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadReceiptDetails() {
+      setReceiptLoading(true);
+
+      try {
+        const nextDetails = await getEvmTransactionReceiptSummariesDirect(
+          visibleTransactions.map((transaction) => transaction.hash),
+        );
+
+        if (!cancelled) {
+          setReceiptDetailsByHash(nextDetails);
+        }
+      } finally {
+        if (!cancelled) {
+          setReceiptLoading(false);
+        }
+      }
+    }
+
+    void loadReceiptDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [receiptLookupEnabled, transactionHashesKey, visibleTransactions]);
 
   useEffect(() => {
     function loadVisibleTags() {
@@ -636,13 +680,29 @@ export default function EvmAddressPage() {
 
         {resolvedActiveTab === "transactions" ? (
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <p className="text-lg font-semibold text-slate-900">
-              Latest {visibleTransactions.length} from a total of {addressCacheSnapshot.totalTransactions.toLocaleString("en-US")} cached transactions
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              Showing IndexedDB-cached transactions where the address appears in either the `from` or `to` field.
-            </p>
+          <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-lg font-semibold text-slate-900">
+                Latest {visibleTransactions.length} from a total of {addressCacheSnapshot.totalTransactions.toLocaleString("en-US")} cached transactions
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Showing IndexedDB-cached transactions where the address appears in either the `from` or `to` field.
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label={receiptLookupEnabled ? "Disable receipt lookup" : "Enable receipt lookup"}
+              aria-pressed={receiptLookupEnabled}
+              title={receiptLookupEnabled ? "Receipt lookup enabled" : "Receipt lookup disabled"}
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
+                receiptLookupEnabled
+                  ? "border-sky-200 bg-sky-50 text-sky-600"
+                  : "border-slate-200 bg-white text-slate-400 hover:text-slate-600"
+              } ${receiptLoading ? "cursor-wait" : ""}`}
+              onClick={() => setReceiptLookupEnabled((current) => !current)}
+            >
+              <IconFileDots className="size-4" stroke={1.8} />
+            </button>
           </div>
 
           <div className="overflow-x-auto">
@@ -673,15 +733,27 @@ export default function EvmAddressPage() {
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
                     Amount
                   </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Max Tx Cost
-                  </th>
+                  {receiptLookupEnabled ? (
+                    <>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Txn Fee
+                      </th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Status
+                      </th>
+                    </>
+                  ) : (
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Max Tx Cost
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {visibleTransactions.length ? (
                   visibleTransactions.map((transaction) => {
                     const direction = getDirection(transaction, normalizedAddress);
+                    const receiptDetail = receiptDetailsByHash[transaction.hash];
 
                     return (
                       <tr key={transaction.hash} className="border-t border-slate-200">
@@ -734,18 +806,39 @@ export default function EvmAddressPage() {
                             <span className="text-slate-500">Contract Creation</span>
                           )}
                         </td>
-                        <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
-                          {transaction.amountLabel}
-                        </td>
-                        <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                          {transaction.maxTxCostLabel}
-                        </td>
+                        <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.amountLabel}</td>
+                        {receiptLookupEnabled ? (
+                          <>
+                            <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
+                              {receiptDetail ? receiptDetail.feeLabel : <span className="text-slate-400">--</span>}
+                            </td>
+                            <td className="px-5 py-3 text-sm">
+                              {receiptDetail ? (
+                                <span
+                                  className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                                    receiptDetail.status === "success"
+                                      ? "bg-emerald-50 text-emerald-700"
+                                      : receiptDetail.status === "reverted"
+                                        ? "bg-rose-50 text-rose-700"
+                                        : "bg-slate-100 text-slate-500"
+                                  }`}
+                                >
+                                  {receiptDetail.statusLabel}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">--</span>
+                              )}
+                            </td>
+                          </>
+                        ) : (
+                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">{transaction.maxTxCostLabel}</td>
+                        )}
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-5 py-10 text-center text-sm text-slate-500">
+                    <td colSpan={receiptLookupEnabled ? 10 : 9} className="px-5 py-10 text-center text-sm text-slate-500">
                       No cached transactions for this address yet. Browse recent blocks or the tx list first so matching transactions can be written into IndexedDB.
                     </td>
                   </tr>
