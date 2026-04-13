@@ -3,7 +3,6 @@
 import {
   IconChevronDown,
   IconLogout,
-  IconMoonStars,
   IconUserCircle,
 } from "@tabler/icons-react";
 import Image from "next/image";
@@ -137,6 +136,7 @@ export function TopNav() {
             label: messages.navigation.settings,
             items: [
               { href: "/evm/settings/cache", label: messages.navigation.cache },
+              { href: "/evm/settings/providers", label: messages.navigation.providers },
               { href: "/evm/settings/private-keys", label: messages.navigation.privateKeys },
               { href: "/evm/settings/name-tags", label: messages.navigation.nameTags },
             ],
@@ -147,7 +147,7 @@ export function TopNav() {
 
   return (
     <header className="mb-4 border-b border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-3 px-5 py-2 text-xs text-slate-500 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+      <div className="mx-auto grid max-w-7xl gap-3 px-5 py-2 text-xs text-slate-500 lg:grid-cols-[auto_minmax(320px,1fr)_auto] lg:items-center">
         <ChainStatusStrip mode={mode} />
         <div className="flex justify-end">
           <GlobalSearch
@@ -157,15 +157,16 @@ export function TopNav() {
             placeholder="Search by Address / Txn Hash / Block"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-10 rounded-xl border border-slate-200 bg-white text-sky-600 hover:bg-slate-100"
-          >
-            <IconMoonStars className="size-4" stroke={2} />
-          </Button>
-          <RpcProviderManager mode={mode} />
+        <div className="flex min-w-0 items-center justify-end gap-2">
+          <div className="flex h-[34px] min-w-0 items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+            <RpcProviderManager mode={mode} variant="topbar-context" />
+            {mode === "evm" ? (
+              <>
+                <div className="h-3.5 w-px bg-slate-200" aria-hidden="true" />
+                <ActiveEvmKeySelector variant="topbar-context" />
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -177,9 +178,9 @@ export function TopNav() {
             </Link>
           </div>
 
-          <nav className="flex flex-wrap items-center justify-end gap-8 text-[15px] font-normal text-slate-800">
+          <nav className="flex flex-wrap items-center justify-end gap-8 text-[15px] font-[450] text-slate-950">
             <Link
-              className={pathname === "/" ? "py-2.5 text-[#1697ea]" : "py-2.5 text-slate-800 hover:text-[#1697ea]"}
+              className={pathname === "/" ? "py-2.5 font-[450] text-[#1697ea]" : "py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]"}
               href="/"
             >
               {messages.navigation.home}
@@ -198,8 +199,8 @@ export function TopNav() {
                       type="button"
                       className={
                         active || openGroup === group.id
-                          ? "inline-flex items-center gap-1 py-2.5 text-[#1697ea]"
-                          : "inline-flex items-center gap-1 py-2.5 text-slate-800 hover:text-[#1697ea]"
+                          ? "inline-flex items-center gap-1 py-2.5 font-[450] text-[#1697ea]"
+                          : "inline-flex items-center gap-1 py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]"
                       }
                     >
                       {group.label}
@@ -218,8 +219,8 @@ export function TopNav() {
                                 href={item.href}
                                 className={
                                   itemActive
-                                    ? "block rounded-lg px-6 py-2 text-[15px] font-normal text-[#1697ea]"
-                                    : "block rounded-lg px-6 py-2 text-[15px] font-normal text-slate-800 hover:bg-slate-100 hover:text-slate-900"
+                                    ? "block rounded-lg px-6 py-2 text-[15px] font-[450] text-[#1697ea]"
+                                    : "block rounded-lg px-6 py-2 text-[15px] font-[450] text-slate-950 hover:bg-slate-100 hover:text-black"
                                 }
                               >
                                 {item.label}
@@ -238,7 +239,7 @@ export function TopNav() {
                           <Link
                             key={item.href}
                             href={item.href}
-                            className={itemActive ? "py-2.5 text-[#1697ea]" : "py-2.5 text-slate-800 hover:text-[#1697ea]"}
+                            className={itemActive ? "py-2.5 font-[450] text-[#1697ea]" : "py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]"}
                           >
                             {item.label}
                           </Link>
@@ -250,11 +251,9 @@ export function TopNav() {
             })}
           </nav>
 
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            {mode === "evm" ? <ActiveEvmKeySelector /> : null}
-            <div className="h-6 w-px bg-slate-200" aria-hidden="true" />
+          <div className="relative flex flex-wrap items-center justify-end gap-3 pl-[8px] before:absolute before:left-[-8px] before:top-1/2 before:h-[14px] before:w-[1.5px] before:-translate-y-1/2 before:bg-slate-300">
             {status === "authenticated" ? (
-              <>
+              <div className="flex items-center gap-3">
                 <span className="inline-flex items-center gap-2 text-[15px] font-normal text-slate-700">
                   <IconUserCircle className="size-4" stroke={2} />
                   {(session.user as { username?: string } | undefined)?.username ??
@@ -263,16 +262,16 @@ export function TopNav() {
                 </span>
                 <Button
                   variant="ghost"
-                  className="h-8 gap-2 px-2 text-[15px] font-normal text-slate-700"
+                  className="h-8 gap-2 px-1 text-[15px] font-normal text-slate-700"
                   onClick={() => void signOut({ callbackUrl: "/" })}
                 >
                   <IconLogout className="size-4" stroke={2} />
                   Sign Out
                 </Button>
-              </>
+              </div>
             ) : (
               <Link href="/login">
-                <Button variant="ghost" className="h-8 gap-2 px-2 text-[15px] font-normal text-slate-700">
+                <Button variant="ghost" className="h-8 gap-2 px-0 text-[15px] font-normal text-slate-700">
                   <IconUserCircle className="size-4" stroke={2} />
                   {messages.navigation.signIn}
                 </Button>

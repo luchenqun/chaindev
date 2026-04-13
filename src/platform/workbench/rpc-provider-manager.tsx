@@ -1,18 +1,18 @@
 "use client";
 
 import {
-  IconChevronDown,
-  IconEdit,
-  IconListDetails,
-  IconPlugConnected,
-  IconPlus,
-  IconX,
+  IconPencil,
+  IconTrash,
 } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { PlatformMode } from "@/config/chains";
+import { ActionIconButton } from "@/components/ui/action-icon-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { ModalDialog } from "@/components/ui/modal-dialog";
 import {
   Select,
   SelectContent,
@@ -34,6 +34,7 @@ import type { RpcProfile, RpcProfileDraft, SelectedRpcProfileMap } from "@/platf
 
 type RpcProviderManagerProps = {
   mode: PlatformMode;
+  variant?: "compact" | "topbar-context" | "page";
 };
 
 type DraftState = {
@@ -75,20 +76,29 @@ function getDraftFromProfile(profile: RpcProfile): DraftState {
   };
 }
 
-export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
+function formatTimestamp(timestamp: number) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(timestamp));
+}
+
+export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderManagerProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RpcProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<RpcProfile[]>([]);
   const [selected, setSelected] = useState<SelectedRpcProfileMap>({});
   const [draft, setDraft] = useState<DraftState>(getInitialDraft(mode));
 
-  const modeProfiles = useMemo(() => profiles.filter((profile) => profile.mode === mode), [mode, profiles]);
   const activeProfile = useMemo(() => getPreferredProfile(mode, profiles, selected), [mode, profiles, selected]);
   const sortedProfiles = useMemo(
     () =>
@@ -133,7 +143,7 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
       }
     }
 
-    load();
+    void load();
 
     return () => {
       cancelled = true;
@@ -168,6 +178,26 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
       router.refresh();
     }
   }, [loading, mode, profiles, router, selected]);
+
+  const saveDisabled =
+    saving ||
+    !draft.name.trim() ||
+    !draft.rpcUrl.trim() ||
+    (draft.mode === "evm" ? !draft.nativeCurrencySymbol.trim() : !draft.restUrl.trim());
+
+  function handleOpenCreate() {
+    setDraft(getInitialDraft(mode));
+    setEditingId(null);
+    setError(null);
+    setOpen(true);
+  }
+
+  function handleOpenEdit(profile: RpcProfile) {
+    setDraft(getDraftFromProfile(profile));
+    setEditingId(profile.id);
+    setError(null);
+    setOpen(true);
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -229,8 +259,9 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
 
       setProfiles(remaining);
       setSelected(nextSelected);
+      setDeleteTarget(null);
 
-      if (profile.mode === mode && activeProfile?.id === profile.id) {
+      if (selected[profile.mode] === profile.id) {
         if (fallback) {
           writeActiveRpcProfileCookie(fallback);
           setLocalSelectedRpcProfile(profile.mode, fallback.id);
@@ -239,7 +270,9 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
           setLocalSelectedRpcProfile(profile.mode, null);
         }
 
-        router.refresh();
+        if (profile.mode === mode) {
+          router.refresh();
+        }
       }
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete RPC provider.");
@@ -270,276 +303,283 @@ export function RpcProviderManager({ mode }: RpcProviderManagerProps) {
     router.refresh();
   }
 
-  return (
-    <>
-      <div className="flex items-center gap-0 rounded-xl border border-slate-200 bg-white pr-1 shadow-sm">
-        <button
-          type="button"
-          className="inline-flex h-10 items-center gap-2 px-4 text-[13px] text-slate-600 transition hover:text-slate-900"
-          onClick={() => {
-            setError(null);
-            setListOpen(true);
-          }}
-        >
-          {activeProfile ? (
-            <>
-              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                {getModeLabel(activeProfile.mode)}
-              </span>
-              <span className="text-[13px] text-slate-900">{activeProfile.name}</span>
-              <IconChevronDown className="size-3.5 text-slate-400" stroke={2} />
-            </>
-          ) : (
-            <>
-              <span className="text-[13px] text-slate-500">No provider</span>
-              <IconChevronDown className="size-3.5 text-slate-400" stroke={2} />
-            </>
-          )}
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-6 items-center justify-center px-0.5 text-slate-500 transition hover:text-slate-900"
-          onClick={() => {
-            setDraft(getInitialDraft(mode));
-            setEditingId(null);
-            setError(null);
-            setOpen(true);
-          }}
-        >
-          <IconPlus className="size-3.5" stroke={2} />
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-6 items-center justify-center px-0.5 text-slate-500 transition hover:text-slate-900"
-          onClick={() => {
-            setError(null);
-            setListOpen(true);
-          }}
-        >
-          <IconListDetails className="size-3.5" stroke={2} />
-        </button>
+  function renderProfilesTable() {
+    return (
+      <div className="overflow-x-auto">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                Mode
+              </th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                Name
+              </th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                RPC URL
+              </th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                Details
+              </th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                Updated
+              </th>
+              <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedProfiles.length ? (
+              sortedProfiles.map((profile) => {
+                const isActive = selected[profile.mode] === profile.id;
+
+                return (
+                  <tr key={profile.id} className="border-t border-slate-200">
+                    <td className="px-5 py-3 text-sm text-slate-700">
+                      <Badge variant="secondary">{getModeLabel(profile.mode)}</Badge>
+                    </td>
+                    <td className="px-5 py-3 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-slate-900">{profile.name}</span>
+                        {isActive ? <Badge variant="secondary">Selected</Badge> : null}
+                      </div>
+                    </td>
+                    <td className="max-w-[28rem] px-5 py-3 text-sm text-slate-700">
+                      <span className="block truncate font-mono text-[13px]">{profile.rpcUrl}</span>
+                    </td>
+                    <td className="max-w-[20rem] px-5 py-3 text-sm text-slate-500">
+                      {profile.mode === "evm" ? (
+                        <span className="block truncate">Currency: {profile.nativeCurrencySymbol ?? "ETH"}</span>
+                      ) : (
+                        <span className="block truncate">REST: {profile.restUrl ?? "-"}</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(profile.updatedAt)}</td>
+                    <td className="px-5 py-3 text-sm">
+                      <div className="flex items-center justify-end gap-0">
+                        <ActionIconButton
+                          className="text-slate-400 hover:text-slate-700"
+                          tooltip="Edit provider"
+                          aria-label="Edit provider"
+                          onClick={() => handleOpenEdit(profile)}
+                        >
+                          <IconPencil className="size-4" stroke={1.8} />
+                        </ActionIconButton>
+                        <ActionIconButton
+                          className="text-slate-400 hover:text-rose-600"
+                          tooltip="Delete provider"
+                          aria-label="Delete provider"
+                          disabled={deletingId === profile.id}
+                          onClick={() => setDeleteTarget(profile)}
+                        >
+                          <IconTrash className="size-4" stroke={1.8} />
+                        </ActionIconButton>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
+                  No providers saved yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
+    );
+  }
 
-      {open ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 py-10"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="w-full max-w-3xl rounded-[28px] bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-6 flex items-start justify-between gap-4">
+  if (variant === "page") {
+    return (
+      <>
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-600">
-                  Provider Setup
-                </p>
-                <h2 className="text-3xl font-semibold text-slate-900">
-                  {editingId ? "Edit Provider" : "Add Provider"}
-                </h2>
-                <p className="mt-2 text-sm text-slate-500">
-                  Choose the chain type first, then enter the RPC endpoint used by explorer and workbench pages.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-                onClick={() => setOpen(false)}
-              >
-                <IconX className="size-4" stroke={2} />
-              </button>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="grid gap-2">
-                <span className="text-sm font-medium text-slate-700">Chain Type</span>
-                <Select
-                  value={draft.mode}
-                  disabled={Boolean(editingId)}
-                  onValueChange={(value) =>
-                    setDraft((current) => ({
-                      ...getInitialDraft(value as PlatformMode),
-                      name: current.name,
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-4/5">
-                    <SelectValue placeholder="Select chain type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="evm">EVM</SelectItem>
-                    <SelectItem value="cosmos">Cosmos</SelectItem>
-                  </SelectContent>
-                </Select>
-              </label>
-              <label className="grid gap-2">
-                <span className="text-sm font-medium text-slate-700">Provider Name</span>
-                <Input
-                  className="w-4/5"
-                  value={draft.name}
-                  onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
-                  placeholder={draft.mode === "evm" ? "Local EVM" : "Local Cosmos"}
-                />
-              </label>
-              {draft.mode === "evm" ? (
-                <label className="grid gap-2 md:col-span-2">
-                  <span className="text-sm font-medium text-slate-700">Currency Name</span>
-                  <Input
-                    className="w-4/5"
-                    value={draft.nativeCurrencySymbol}
-                    onChange={(event) =>
-                      setDraft((current) => ({ ...current, nativeCurrencySymbol: event.target.value }))
-                    }
-                    placeholder="ETH"
-                  />
-                </label>
-              ) : null}
-              <label className="grid gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">RPC URL</span>
-                <Input
-                  className="w-4/5"
-                  value={draft.rpcUrl}
-                  onChange={(event) => setDraft((current) => ({ ...current, rpcUrl: event.target.value }))}
-                  placeholder={draft.mode === "evm" ? "http://127.0.0.1:8545" : "http://127.0.0.1:26657"}
-                />
-              </label>
-              {draft.mode === "cosmos" ? (
-                <label className="grid gap-2 md:col-span-2">
-                  <span className="text-sm font-medium text-slate-700">REST URL</span>
-                  <Input
-                    className="w-4/5"
-                    value={draft.restUrl}
-                    onChange={(event) => setDraft((current) => ({ ...current, restUrl: event.target.value }))}
-                    placeholder="http://127.0.0.1:1317"
-                  />
-                </label>
-              ) : null}
-            </div>
-
-            {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
-
-            <div className="mt-6 flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button disabled={saving} onClick={handleSave}>
-                {saving ? "Saving..." : editingId ? "Save Changes" : "Save Provider"}
-              </Button>
-            </div>
-
-          </div>
-        </div>
-      ) : null}
-
-      {listOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 px-4 py-10"
-          onClick={() => setListOpen(false)}
-        >
-          <div
-            className="w-full max-w-4xl rounded-[28px] bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mb-6 flex items-start justify-between gap-4">
-              <div>
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-600">
-                  Provider List
-                </p>
-                <h2 className="text-3xl font-semibold text-slate-900">All Providers</h2>
-                <p className="mt-2 text-sm text-slate-500">
+                <p className="text-lg font-semibold text-slate-900">Saved Providers</p>
+                <p className="mt-1 text-sm text-slate-500">
                   Browse, activate, edit, or remove saved EVM and Cosmos providers from one place.
                 </p>
               </div>
-              <button
-                type="button"
-                className="inline-flex size-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
-                onClick={() => setListOpen(false)}
-              >
-                <IconX className="size-4" stroke={2} />
-              </button>
+              <Button type="button" size="sm" onClick={handleOpenCreate}>
+                Add
+              </Button>
             </div>
-
-            {error ? <p className="mb-4 text-sm text-rose-600">{error}</p> : null}
-
-            {sortedProfiles.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm text-slate-500">
-                No saved providers yet.
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {sortedProfiles.map((profile) => {
-                  const isActive = selected[profile.mode] === profile.id;
-
-                  return (
-                    <div
-                      key={profile.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-4"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          <div className="inline-flex size-8 items-center justify-center rounded-full bg-sky-50 text-sky-600">
-                            <IconPlugConnected className="size-4" stroke={2} />
-                          </div>
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                            {getModeLabel(profile.mode)}
-                          </span>
-                          <p className="truncate text-sm font-semibold text-slate-900">{profile.name}</p>
-                          {isActive ? (
-                            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
-                              Active
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="truncate text-xs text-slate-500">RPC: {profile.rpcUrl}</p>
-                        {profile.mode === "evm" && profile.nativeCurrencySymbol ? (
-                          <p className="truncate text-xs text-slate-500">Currency: {profile.nativeCurrencySymbol}</p>
-                        ) : null}
-                        {profile.restUrl ? <p className="truncate text-xs text-slate-500">REST: {profile.restUrl}</p> : null}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={isActive}
-                          onClick={() => {
-                            handleUse(profile);
-                            setListOpen(false);
-                          }}
-                        >
-                          {isActive ? "Using" : "Use"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setDraft(getDraftFromProfile(profile));
-                            setEditingId(profile.id);
-                            setError(null);
-                            setListOpen(false);
-                            setOpen(true);
-                          }}
-                        >
-                          <IconEdit className="mr-1 size-4" stroke={2} />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={deletingId === profile.id}
-                          className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700"
-                          onClick={() => handleDelete(profile)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
           </div>
-        </div>
-      ) : null}
-    </>
+          {error ? <p className="border-b border-slate-200 px-5 py-4 text-sm text-rose-600">{error}</p> : null}
+          {loading ? (
+            <div className="px-5 py-10 text-sm text-slate-500">Loading providers...</div>
+          ) : (
+            renderProfilesTable()
+          )}
+        </section>
+
+        <ModalDialog
+          open={open}
+          onOpenChange={(nextOpen) => {
+            setOpen(nextOpen);
+
+            if (!nextOpen) {
+              setError(null);
+            }
+          }}
+          title={editingId ? "Edit Provider" : "Add Provider"}
+          description="Choose the chain type first, then enter the RPC endpoint used by explorer and workbench pages."
+          footer={
+            <>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" disabled={saveDisabled} onClick={() => void handleSave()}>
+                {saving ? "Saving..." : editingId ? "Save Changes" : "Save Provider"}
+              </Button>
+            </>
+          }
+          maxWidthClassName="max-w-3xl"
+        >
+          <div className="grid gap-4 pb-1 md:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">Chain Type</span>
+              <Select
+                value={draft.mode}
+                disabled={Boolean(editingId)}
+                onValueChange={(value) =>
+                  setDraft((current) => ({
+                    ...getInitialDraft(value as PlatformMode),
+                    name: current.name,
+                  }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select chain type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="evm">EVM</SelectItem>
+                  <SelectItem value="cosmos">Cosmos</SelectItem>
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">Provider Name</span>
+              <Input
+                value={draft.name}
+                onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+                placeholder={draft.mode === "evm" ? "Local EVM" : "Local Cosmos"}
+              />
+            </label>
+            {draft.mode === "evm" ? (
+              <label className="grid gap-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">Currency Name</span>
+                <Input
+                  value={draft.nativeCurrencySymbol}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, nativeCurrencySymbol: event.target.value }))
+                  }
+                  placeholder="ETH"
+                />
+              </label>
+            ) : null}
+            <label className="grid gap-2 md:col-span-2">
+              <span className="text-sm font-medium text-slate-700">RPC URL</span>
+              <Input
+                value={draft.rpcUrl}
+                onChange={(event) => setDraft((current) => ({ ...current, rpcUrl: event.target.value }))}
+                placeholder={draft.mode === "evm" ? "http://127.0.0.1:8545" : "http://127.0.0.1:26657"}
+              />
+            </label>
+            {draft.mode === "cosmos" ? (
+              <label className="grid gap-2 md:col-span-2">
+                <span className="text-sm font-medium text-slate-700">REST URL</span>
+                <Input
+                  value={draft.restUrl}
+                  onChange={(event) => setDraft((current) => ({ ...current, restUrl: event.target.value }))}
+                  placeholder="http://127.0.0.1:1317"
+                />
+              </label>
+            ) : null}
+          </div>
+          {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
+        </ModalDialog>
+
+        <ConfirmDialog
+          open={Boolean(deleteTarget)}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setDeleteTarget(null);
+            }
+          }}
+          title="Delete Provider"
+          description={
+            deleteTarget
+              ? `Remove provider "${deleteTarget.name}" and its saved endpoint configuration?`
+              : undefined
+          }
+          confirmLabel="Delete"
+          onConfirm={() => {
+            if (deleteTarget) {
+              void handleDelete(deleteTarget);
+            }
+          }}
+        />
+      </>
+    );
+  }
+
+  if (variant === "topbar-context") {
+    return (
+      <div className="min-w-0 shrink-0">
+        <Select
+          value={activeProfile?.id}
+          disabled={loading || sortedProfiles.length === 0}
+          onValueChange={(value) => {
+            const profile = sortedProfiles.find((item) => item.id === value) ?? null;
+            handleUse(profile);
+          }}
+        >
+          <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] leading-none shadow-none focus:ring-0">
+            <SelectValue placeholder={loading ? "Loading providers..." : "No provider"}>
+              {activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : undefined}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
+            {sortedProfiles.map((profile) => (
+              <SelectItem key={profile.id} value={profile.id}>
+                {getModeLabel(profile.mode)} · {profile.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-w-0 shrink-0">
+      <Select
+        value={activeProfile?.id}
+        disabled={loading || sortedProfiles.length === 0}
+        onValueChange={(value) => {
+          const profile = sortedProfiles.find((item) => item.id === value) ?? null;
+          handleUse(profile);
+        }}
+      >
+        <SelectTrigger className="h-9 w-auto justify-start gap-1.5 rounded-xl border-slate-200 bg-white px-4 pr-2.5 text-[13px] shadow-sm">
+          <SelectValue placeholder={loading ? "Loading providers..." : "No provider"}>
+            {activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : undefined}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
+          {sortedProfiles.map((profile) => (
+            <SelectItem key={profile.id} value={profile.id}>
+              {getModeLabel(profile.mode)} · {profile.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

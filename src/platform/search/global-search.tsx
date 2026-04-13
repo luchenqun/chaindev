@@ -60,23 +60,23 @@ export function GlobalSearch({
 
   if (variant === "topbar") {
     return (
-      <form className="flex w-full max-w-[540px] flex-col gap-1" onSubmit={handleSubmit}>
+      <form className="flex w-full min-w-0 max-w-[400px] flex-col gap-1" onSubmit={handleSubmit}>
         {showLabel ? (
           <label className="text-xs font-semibold text-slate-500" htmlFor={inputId}>
             Global Search
           </label>
         ) : null}
-        <div className="flex h-10 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 shadow-sm transition focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400">
-          <IconSearch className="mr-2 size-4 shrink-0 text-slate-400" stroke={2} />
+        <div className="flex h-[34px] items-center rounded-md border border-slate-200 bg-slate-50 px-3 shadow-sm transition focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400">
+          <IconSearch className="mr-2 size-3.5 shrink-0 text-slate-400" stroke={2} />
           <Input
             id={inputId}
-            className="h-full border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+            className="h-full border-0 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder}
           />
           <button
-            className="ml-2 inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-slate-200 bg-slate-200 px-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-300"
+            className="ml-2 inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-[5px] border border-slate-200 bg-slate-200 px-1.5 text-[10px] font-semibold text-white transition hover:bg-slate-300"
             type="submit"
             aria-label="Search"
           >
