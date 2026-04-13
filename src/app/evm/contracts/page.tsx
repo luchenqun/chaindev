@@ -218,6 +218,18 @@ function areDeployConstructorArgsReady(inputs: readonly AbiParameter[], values: 
   return inputs.every((_, index) => !!values[index]?.trim());
 }
 
+function buildDeploySimulationKey(input: {
+  artifactId: string | null;
+  rawArgs: string[];
+  value: string;
+}) {
+  return JSON.stringify({
+    artifactId: input.artifactId,
+    rawArgs: input.rawArgs,
+    value: input.value.trim(),
+  });
+}
+
 export default function EvmContractsRegistryPage() {
   const [environment, setEnvironment] = useState<EnvironmentState>(null);
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
@@ -268,6 +280,10 @@ export default function EvmContractsRegistryPage() {
   const [loading, setLoading] = useState(true);
   const environmentRef = useRef<EnvironmentState>(null);
   const deployDefaultsRequestIdRef = useRef(0);
+  const deploySimulationFailureRef = useRef<{ key: string; attempts: number }>({
+    key: "",
+    attempts: 0,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -361,10 +377,28 @@ export default function EvmContractsRegistryPage() {
     () => (deployArtifact ? getContractConstructor(deployArtifact.abiJson) : null),
     [deployArtifact],
   );
+  const deploySimulationKey = useMemo(
+    () =>
+      buildDeploySimulationKey({
+        artifactId: deployArtifact?.id ?? null,
+        rawArgs: deployArgumentValues,
+        value: deployDialogValues.value,
+      }),
+    [deployArgumentValues, deployArtifact?.id, deployDialogValues.value],
+  );
   const isDeploySimulationReady = useMemo(
     () => areDeployConstructorArgsReady(deployConstructor?.inputs ?? [], deployArgumentValues),
     [deployConstructor, deployArgumentValues],
   );
+
+  useEffect(() => {
+    if (deploySimulationFailureRef.current.key !== deploySimulationKey) {
+      deploySimulationFailureRef.current = {
+        key: deploySimulationKey,
+        attempts: 0,
+      };
+    }
+  }, [deploySimulationKey]);
 
   function resetArtifactForm() {
     setArtifactForm({
@@ -399,6 +433,10 @@ export default function EvmContractsRegistryPage() {
     setDeployUnlockPassword("");
     setDeployUnlockError(null);
     setPendingDeployAction(null);
+    deploySimulationFailureRef.current = {
+      key: "",
+      attempts: 0,
+    };
   }
 
   function startArtifactEdit(artifact: EvmContractArtifact) {
@@ -453,6 +491,10 @@ export default function EvmContractsRegistryPage() {
     setDeployUnlockPassword("");
     setDeployUnlockError(null);
     setPendingDeployAction(null);
+    deploySimulationFailureRef.current = {
+      key: "",
+      attempts: 0,
+    };
   }
 
   useEffect(() => {
@@ -465,7 +507,13 @@ export default function EvmContractsRegistryPage() {
       !isDeploySimulationReady ||
       !isValidNativeValueInput(deployDialogValues.value)
     ) {
-      setDeployError(null);
+      return;
+    }
+
+    if (
+      deploySimulationFailureRef.current.key === deploySimulationKey &&
+      deploySimulationFailureRef.current.attempts >= 3
+    ) {
       return;
     }
 
@@ -479,7 +527,15 @@ export default function EvmContractsRegistryPage() {
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [activeKey, deployActionLoading, deployArtifact, deployArgumentValues, deployDialogValues.value, isDeploySimulationReady]);
+  }, [
+    activeKey,
+    deployActionLoading,
+    deployArtifact,
+    deployArgumentValues,
+    deployDialogValues.value,
+    deploySimulationKey,
+    isDeploySimulationReady,
+  ]);
 
   function handleSaveArtifact() {
     try {
@@ -599,7 +655,6 @@ export default function EvmContractsRegistryPage() {
     nextArgs[index] = value;
     setDeployArgumentValues(nextArgs);
     setDeployResult(null);
-    setDeployError(null);
   }
 
   async function fillDeployDefaults(
@@ -625,16 +680,20 @@ export default function EvmContractsRegistryPage() {
     }
 
     setDeployActionLoading("fill");
-    setDeployError(null);
     const requestId = deployDefaultsRequestIdRef.current + 1;
     deployDefaultsRequestIdRef.current = requestId;
+    const rawArgs = overrides?.rawArgs ?? deployArgumentValues;
+    const value = overrides?.value ?? deployDialogValues.value;
+    const simulationKey = buildDeploySimulationKey({
+      artifactId: deployArtifact.id,
+      rawArgs,
+      value,
+    });
 
     try {
       const privateKey = password
         ? await resolveEvmStoredPrivateKey(activeKey.id, password)
         : await peekEvmStoredPrivateKey(activeKey.id);
-      const rawArgs = overrides?.rawArgs ?? deployArgumentValues;
-      const value = overrides?.value ?? deployDialogValues.value;
       const defaults = await getEvmContractDeployManualDefaultsDirect({
         abiJson: deployArtifact.abiJson,
         bytecode: deployArtifact.bytecode,
@@ -660,7 +719,20 @@ export default function EvmContractsRegistryPage() {
       }));
 
       if (defaults.simulationError) {
+        deploySimulationFailureRef.current = {
+          key: simulationKey,
+          attempts:
+            deploySimulationFailureRef.current.key === simulationKey
+              ? deploySimulationFailureRef.current.attempts + 1
+              : 1,
+        };
         setDeployError(normalizeDeployErrorMessage(defaults.simulationError));
+      } else {
+        deploySimulationFailureRef.current = {
+          key: simulationKey,
+          attempts: 0,
+        };
+        setDeployError(null);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to simulate deployment.";
@@ -677,6 +749,13 @@ export default function EvmContractsRegistryPage() {
         return;
       }
 
+      deploySimulationFailureRef.current = {
+        key: simulationKey,
+        attempts:
+          deploySimulationFailureRef.current.key === simulationKey
+            ? deploySimulationFailureRef.current.attempts + 1
+            : 1,
+      };
       setDeployError(normalizeDeployErrorMessage(message));
     } finally {
       if (requestId === deployDefaultsRequestIdRef.current) {
@@ -1368,7 +1447,6 @@ export default function EvmContractsRegistryPage() {
                       value: nextValue,
                     }));
                     setDeployResult(null);
-                    setDeployError(null);
                   }}
                   placeholder="0"
                 />
