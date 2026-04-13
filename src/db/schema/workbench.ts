@@ -97,3 +97,15 @@ export const evmContractBindings = sqliteTable("evm_contract_bindings", {
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
+
+export const evmPrivateKeys = sqliteTable("evm_private_keys", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  addressLower: text("address_lower").notNull(),
+  privateKey: text("private_key").notNull(),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  lastUsedAt: integer("last_used_at"),
+});

@@ -3,6 +3,7 @@
 import { IconKey, IconPlus } from "@tabler/icons-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -12,10 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  getEvmKeyringSource,
   getActiveEvmStoredPrivateKey,
   listEvmStoredPrivateKeys,
   setActiveEvmStoredPrivateKey,
   subscribeEvmKeyring,
+  syncEvmKeyringFromServer,
   type EvmStoredPrivateKey,
 } from "@/domains/evm/client/keyring";
 
@@ -28,19 +31,25 @@ function formatAddressLabel(address: string) {
 }
 
 export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelectorProps) {
+  const { status } = useSession();
   const [items, setItems] = useState<EvmStoredPrivateKey[]>([]);
   const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(null);
+  const [source, setSource] = useState<"guest" | "server">("guest");
 
   useEffect(() => {
     function load() {
       setItems(listEvmStoredPrivateKeys());
       setActiveItem(getActiveEvmStoredPrivateKey());
+      setSource(getEvmKeyringSource());
     }
 
     load();
+    void syncEvmKeyringFromServer().catch(() => undefined);
 
     return subscribeEvmKeyring(load);
   }, []);
+
+  const manageHref = status === "authenticated" ? "/evm/settings/private-keys" : "/login?callbackUrl=%2Fevm%2Fsettings%2Fprivate-keys";
 
   if (!items.length) {
     if (variant === "topbar-context") {
@@ -73,6 +82,7 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
       <div className="min-w-0 shrink-0">
         <Select
           value={activeItem?.id}
+          disabled={items.length <= 1}
           onValueChange={(value) => {
             setActiveEvmStoredPrivateKey(value);
           }}
@@ -99,6 +109,7 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
     <div className="flex items-center gap-0.5">
       <Select
         value={activeItem?.id}
+        disabled={items.length <= 1}
         onValueChange={(value) => {
           setActiveEvmStoredPrivateKey(value);
         }}
@@ -118,9 +129,9 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
         </SelectContent>
       </Select>
       <Link
-        href="/evm/settings/private-keys"
+        href={manageHref}
         className="inline-flex h-6 items-center justify-center px-0.5 text-slate-500 transition hover:text-slate-900"
-        aria-label="Manage private keys"
+        aria-label={source === "server" ? "Manage private keys" : "Sign in to manage private keys"}
       >
         <IconPlus className="size-3.5" stroke={2} />
       </Link>

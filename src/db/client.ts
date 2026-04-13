@@ -184,14 +184,29 @@ function ensureWorkbenchSchema() {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS evm_private_keys (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      address TEXT NOT NULL,
+      address_lower TEXT NOT NULL,
+      private_key TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      last_used_at INTEGER
+    );
+
     CREATE INDEX IF NOT EXISTS rpc_profiles_user_id_idx ON rpc_profiles(user_id);
     CREATE INDEX IF NOT EXISTS evm_address_tags_user_id_idx ON evm_address_tags(user_id);
     CREATE INDEX IF NOT EXISTS evm_contract_artifacts_user_id_idx ON evm_contract_artifacts(user_id);
     CREATE INDEX IF NOT EXISTS evm_contract_bindings_user_id_idx ON evm_contract_bindings(user_id);
+    CREATE INDEX IF NOT EXISTS evm_private_keys_user_id_idx ON evm_private_keys(user_id);
     CREATE UNIQUE INDEX IF NOT EXISTS evm_address_tags_scope_address_unique
       ON evm_address_tags(user_id, provider_profile_id, address_lower);
     CREATE UNIQUE INDEX IF NOT EXISTS evm_contract_bindings_scope_address_unique
       ON evm_contract_bindings(user_id, provider_profile_id, chain_id, address_lower);
+    CREATE UNIQUE INDEX IF NOT EXISTS evm_private_keys_user_address_unique
+      ON evm_private_keys(user_id, address_lower);
   `);
 }
 

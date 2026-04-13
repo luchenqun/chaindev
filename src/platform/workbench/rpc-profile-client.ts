@@ -3,6 +3,7 @@
 import type { PlatformMode } from "@/config/chains";
 import {
   getActiveRpcProfileCookieName,
+  getGuestFallbackRpcProfile,
   LOCAL_RPC_PROFILES_STORAGE_KEY,
   LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY,
   parseActiveRpcProfileCookie,
@@ -10,6 +11,10 @@ import {
   type RpcProfileDraft,
   type SelectedRpcProfileMap,
 } from "@/platform/workbench/rpc-profile";
+import {
+  getDefaultGuestRpcProfiles,
+  getDefaultGuestSelectedRpcProfiles,
+} from "@/platform/workbench/defaults";
 
 type RpcProfilesResponse = {
   ok: boolean;
@@ -48,6 +53,12 @@ function notifyActiveRpcProfileChanged() {
   }
 
   window.dispatchEvent(new CustomEvent("chaindev:active-rpc-profile-changed"));
+}
+
+function createAuthRequiredError() {
+  const error = new Error("AUTH_REQUIRED");
+  error.name = "AuthRequiredError";
+  return error;
 }
 
 export function listLocalRpcProfiles() {
@@ -146,9 +157,9 @@ export async function fetchRpcProfiles() {
 
   if (response.status === 401) {
     return {
-      source: "local" as const,
-      profiles: listLocalRpcProfiles(),
-      selected: getLocalSelectedRpcProfiles(),
+      source: "guest" as const,
+      profiles: getDefaultGuestRpcProfiles(),
+      selected: getDefaultGuestSelectedRpcProfiles(),
     };
   }
 
@@ -175,10 +186,7 @@ export async function createRpcProfile(input: RpcProfileDraft) {
   });
 
   if (response.status === 401) {
-    return {
-      source: "local" as const,
-      profile: saveLocalRpcProfile(input),
-    };
+    throw createAuthRequiredError();
   }
 
   if (!response.ok) {
@@ -208,10 +216,7 @@ export async function editRpcProfile(profileId: string, input: RpcProfileDraft) 
   });
 
   if (response.status === 401) {
-    return {
-      source: "local" as const,
-      profile: updateLocalRpcProfile(profileId, input),
-    };
+    throw createAuthRequiredError();
   }
 
   if (!response.ok) {
@@ -234,10 +239,7 @@ export async function removeRpcProfile(mode: PlatformMode, profileId: string) {
   });
 
   if (response.status === 401) {
-    return {
-      source: "local" as const,
-      fallbackProfile: deleteLocalRpcProfile(mode, profileId),
-    };
+    throw createAuthRequiredError();
   }
 
   if (!response.ok) {
@@ -273,7 +275,7 @@ export function clearActiveRpcProfileCookie(mode: PlatformMode) {
 
 export function readActiveRpcProfileCookie(mode: PlatformMode) {
   if (typeof document === "undefined") {
-    return null;
+    return getGuestFallbackRpcProfile(mode);
   }
 
   const pair = document.cookie
@@ -281,8 +283,8 @@ export function readActiveRpcProfileCookie(mode: PlatformMode) {
     .find((item) => item.startsWith(`${getActiveRpcProfileCookieName(mode)}=`));
 
   if (!pair) {
-    return null;
+    return getGuestFallbackRpcProfile(mode);
   }
 
-  return parseActiveRpcProfileCookie(pair.slice(pair.indexOf("=") + 1));
+  return parseActiveRpcProfileCookie(pair.slice(pair.indexOf("=") + 1)) ?? getGuestFallbackRpcProfile(mode);
 }

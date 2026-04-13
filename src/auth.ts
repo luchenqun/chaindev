@@ -3,24 +3,24 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { db } from "@/db/client";
 import { verifyPassword } from "@/server/auth/password";
-import { findAuthUserByEmail } from "@/server/repositories/auth-users";
+import { findAuthUserByIdentifier } from "@/server/repositories/auth-users";
 
 const providers = [
   Credentials({
     name: "Credentials",
     credentials: {
-      email: { label: "Email", type: "email" },
+      identifier: { label: "Username or Email", type: "text" },
       password: { label: "Password", type: "password" },
     },
     async authorize(credentials) {
-      const email = String(credentials?.email ?? "").trim().toLowerCase();
+      const identifier = String(credentials?.identifier ?? "").trim();
       const password = String(credentials?.password ?? "");
 
-      if (!email || !password) {
+      if (!identifier || !password) {
         return null;
       }
 
-      const user = await findAuthUserByEmail(email);
+      const user = await findAuthUserByIdentifier(identifier);
 
       if (!user?.passwordHash || !user.email || !verifyPassword(password, user.passwordHash)) {
         return null;

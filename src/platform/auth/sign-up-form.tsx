@@ -17,7 +17,6 @@ export function SignUpForm() {
   const router = useRouter();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
-  const [confirmEmail, setConfirmEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -28,11 +27,6 @@ export function SignUpForm() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-
-    if (email.trim().toLowerCase() !== confirmEmail.trim().toLowerCase()) {
-      setError("两次输入的邮箱不一致。");
-      return;
-    }
 
     if (password !== confirmPassword) {
       setError("两次输入的密码不一致。");
@@ -62,7 +56,7 @@ export function SignUpForm() {
     }
 
     const signInResult = await signIn("credentials", {
-      email: email.trim(),
+      identifier: email.trim(),
       password,
       redirect: false,
       callbackUrl: "/",
@@ -110,19 +104,6 @@ export function SignUpForm() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             placeholder="A confirmation code will be sent to this address"
-            className="h-14 rounded-2xl px-4 text-lg placeholder:text-slate-400"
-            required
-          />
-        </label>
-
-        <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">Confirm Email Address</span>
-          <Input
-            type="email"
-            autoComplete="email"
-            value={confirmEmail}
-            onChange={(event) => setConfirmEmail(event.target.value)}
-            placeholder="Re-enter your email address"
             className="h-14 rounded-2xl px-4 text-lg placeholder:text-slate-400"
             required
           />

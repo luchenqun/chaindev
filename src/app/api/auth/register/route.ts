@@ -11,20 +11,28 @@ const registerSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = registerSchema.parse(await request.json());
+    const normalizedUsername = body.username.trim();
+    const normalizedUsernameLower = normalizedUsername.toLowerCase();
     const existing = await findAuthUserConflict({
       email: body.email,
-      username: body.username,
+      username: normalizedUsername,
     });
 
-    if (existing?.email === body.email) {
+    if (existing?.email?.toLowerCase() === body.email || existing?.username?.toLowerCase() === body.email) {
       return fail({ category: "validation", message: "该邮箱已注册。" }, 409);
     }
 
-    if (existing?.username === body.username) {
+    if (
+      existing?.username?.toLowerCase() === normalizedUsernameLower ||
+      existing?.email?.toLowerCase() === normalizedUsernameLower
+    ) {
       return fail({ category: "validation", message: "该用户名已存在。" }, 409);
     }
 
-    const user = await createCredentialUser(body);
+    const user = await createCredentialUser({
+      ...body,
+      username: normalizedUsername,
+    });
 
     if (!user) {
       return fail({ category: "server", message: "注册失败，请稍后重试。" }, 500);

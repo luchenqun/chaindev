@@ -13,7 +13,7 @@ export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = useMemo(() => searchParams.get("callbackUrl") ?? "/", [searchParams]);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +25,7 @@ export function SignInForm() {
     setError(null);
 
     const result = await signIn("credentials", {
-      email: email.trim(),
+      identifier: identifier.trim(),
       password,
       redirect: false,
       callbackUrl,
@@ -33,7 +33,7 @@ export function SignInForm() {
 
     if (!result || result.error) {
       setSubmitting(false);
-      setError("邮箱或密码错误。");
+      setError("用户名、邮箱或密码错误。");
       return;
     }
 
@@ -55,13 +55,13 @@ export function SignInForm() {
     >
       <form className="grid gap-7" onSubmit={handleSubmit}>
         <label className="grid gap-3">
-          <span className="text-[15px] font-semibold text-slate-900">Email Address</span>
+          <span className="text-[15px] font-semibold text-slate-900">Username or Email</span>
           <Input
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="e.g. john@company.com"
+            type="text"
+            autoComplete="username"
+            value={identifier}
+            onChange={(event) => setIdentifier(event.target.value)}
+            placeholder="Enter your username or email"
             className="h-16 rounded-2xl px-5 text-xl placeholder:text-slate-400"
             required
           />

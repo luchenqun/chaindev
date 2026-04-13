@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PlatformMode } from "@/config/chains";
 import { db } from "@/db/client";
 import { rpcProfiles } from "@/db/schema/workbench";
+import { DEFAULT_EVM_PROVIDER_ID, DEFAULT_EVM_RPC_PROFILE } from "@/platform/workbench/defaults";
 import type { ImportedRpcProfile } from "@/server/schemas/workbench-migration";
 
 type RpcProfileInput = {
@@ -53,7 +54,27 @@ export async function importRpcProfiles(userId: string, profiles: ImportedRpcPro
 }
 
 export async function listRpcProfiles(userId: string) {
-  return db.select().from(rpcProfiles).where(eq(rpcProfiles.userId, userId)).orderBy(desc(rpcProfiles.updatedAt)).all();
+  const profiles = db.select().from(rpcProfiles).where(eq(rpcProfiles.userId, userId)).orderBy(desc(rpcProfiles.updatedAt)).all();
+
+  if (profiles.length) {
+    return profiles;
+  }
+
+  const row = {
+    id: `${userId}:${DEFAULT_EVM_PROVIDER_ID}`,
+    userId,
+    mode: DEFAULT_EVM_RPC_PROFILE.mode,
+    name: DEFAULT_EVM_RPC_PROFILE.name,
+    nativeCurrencySymbol: DEFAULT_EVM_RPC_PROFILE.nativeCurrencySymbol,
+    rpcUrl: DEFAULT_EVM_RPC_PROFILE.rpcUrl,
+    restUrl: DEFAULT_EVM_RPC_PROFILE.restUrl,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  db.insert(rpcProfiles).values(row).run();
+
+  return [row];
 }
 
 export async function getLatestRpcProfileByMode(userId: string, mode: PlatformMode) {

@@ -4,6 +4,7 @@ import {
   IconPencil,
   IconTrash,
 } from "@tabler/icons-react";
+import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { PlatformMode } from "@/config/chains";
@@ -88,6 +89,7 @@ function formatTimestamp(timestamp: number) {
 
 export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderManagerProps) {
   const router = useRouter();
+  const { status } = useSession();
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -97,6 +99,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
   const [error, setError] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<RpcProfile[]>([]);
   const [selected, setSelected] = useState<SelectedRpcProfileMap>({});
+  const [source, setSource] = useState<"guest" | "server">("guest");
   const [draft, setDraft] = useState<DraftState>(getInitialDraft(mode));
 
   const activeProfile = useMemo(() => getPreferredProfile(mode, profiles, selected), [mode, profiles, selected]);
@@ -131,6 +134,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
 
         setProfiles(data.profiles);
         setSelected(data.selected);
+        setSource(data.source === "server" ? "server" : "guest");
         setError(null);
       } catch (loadError) {
         if (!cancelled) {
@@ -167,8 +171,6 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
       return;
     }
 
-    setLocalSelectedRpcProfile(mode, preferred.id);
-
     if (
       cookieProfile?.id !== preferred.id ||
       cookieProfile.rpcUrl !== preferred.rpcUrl ||
@@ -185,7 +187,17 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
     !draft.rpcUrl.trim() ||
     (draft.mode === "evm" ? !draft.nativeCurrencySymbol.trim() : !draft.restUrl.trim());
 
+  function goToLogin() {
+    const callbackUrl = encodeURIComponent(window.location.pathname);
+    router.push(`/login?callbackUrl=${callbackUrl}`);
+  }
+
   function handleOpenCreate() {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     setDraft(getInitialDraft(mode));
     setEditingId(null);
     setError(null);
@@ -193,6 +205,11 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
   }
 
   function handleOpenEdit(profile: RpcProfile) {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     setDraft(getDraftFromProfile(profile));
     setEditingId(profile.id);
     setError(null);
@@ -235,6 +252,11 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
       setOpen(false);
       router.refresh();
     } catch (saveError) {
+      if (saveError instanceof Error && saveError.name === "AuthRequiredError") {
+        goToLogin();
+        return;
+      }
+
       setError(saveError instanceof Error ? saveError.message : "Failed to save RPC provider.");
     } finally {
       setSaving(false);
@@ -275,6 +297,11 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
         }
       }
     } catch (deleteError) {
+      if (deleteError instanceof Error && deleteError.name === "AuthRequiredError") {
+        goToLogin();
+        return;
+      }
+
       setError(deleteError instanceof Error ? deleteError.message : "Failed to delete RPC provider.");
     } finally {
       setDeletingId(null);
@@ -358,23 +385,27 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
                     <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(profile.updatedAt)}</td>
                     <td className="px-5 py-3 text-sm">
                       <div className="flex items-center justify-end gap-0">
-                        <ActionIconButton
-                          className="text-slate-400 hover:text-slate-700"
-                          tooltip="Edit provider"
-                          aria-label="Edit provider"
-                          onClick={() => handleOpenEdit(profile)}
-                        >
-                          <IconPencil className="size-4" stroke={1.8} />
-                        </ActionIconButton>
-                        <ActionIconButton
-                          className="text-slate-400 hover:text-rose-600"
-                          tooltip="Delete provider"
-                          aria-label="Delete provider"
-                          disabled={deletingId === profile.id}
-                          onClick={() => setDeleteTarget(profile)}
-                        >
-                          <IconTrash className="size-4" stroke={1.8} />
-                        </ActionIconButton>
+                        {source === "server" ? (
+                          <>
+                            <ActionIconButton
+                              className="text-slate-400 hover:text-slate-700"
+                              tooltip="Edit provider"
+                              aria-label="Edit provider"
+                              onClick={() => handleOpenEdit(profile)}
+                            >
+                              <IconPencil className="size-4" stroke={1.8} />
+                            </ActionIconButton>
+                            <ActionIconButton
+                              className="text-slate-400 hover:text-rose-600"
+                              tooltip="Delete provider"
+                              aria-label="Delete provider"
+                              disabled={deletingId === profile.id}
+                              onClick={() => setDeleteTarget(profile)}
+                            >
+                              <IconTrash className="size-4" stroke={1.8} />
+                            </ActionIconButton>
+                          </>
+                        ) : null}
                       </div>
                     </td>
                   </tr>
@@ -406,7 +437,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
                 </p>
               </div>
               <Button type="button" size="sm" onClick={handleOpenCreate}>
-                Add
+                {source === "server" ? "Add" : "Sign In to Add"}
               </Button>
             </div>
           </div>
@@ -534,7 +565,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
       <div className="min-w-0 shrink-0">
         <Select
           value={activeProfile?.id}
-          disabled={loading || sortedProfiles.length === 0}
+          disabled={loading || sortedProfiles.length <= 1}
           onValueChange={(value) => {
             const profile = sortedProfiles.find((item) => item.id === value) ?? null;
             handleUse(profile);
@@ -561,7 +592,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
     <div className="min-w-0 shrink-0">
       <Select
         value={activeProfile?.id}
-        disabled={loading || sortedProfiles.length === 0}
+        disabled={loading || sortedProfiles.length <= 1}
         onValueChange={(value) => {
           const profile = sortedProfiles.find((item) => item.id === value) ?? null;
           handleUse(profile);

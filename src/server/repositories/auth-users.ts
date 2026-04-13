@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, or } from "drizzle-orm";
+import { eq, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { users } from "@/db/schema/auth";
 import { hashPassword } from "@/server/auth/password";
@@ -18,12 +18,31 @@ export async function findAuthUserByUsername(username: string) {
   });
 }
 
+export async function findAuthUserByIdentifier(identifier: string) {
+  const normalizedIdentifier = identifier.trim();
+  const normalizedEmail = normalizedIdentifier.toLowerCase();
+
+  return db.query.users.findFirst({
+    where: or(
+      eq(users.email, normalizedEmail),
+      sql`lower(${users.username}) = ${normalizedIdentifier.toLowerCase()}`,
+    ),
+  });
+}
+
 export async function findAuthUserConflict(input: { email: string; username: string }) {
   const normalizedEmail = input.email.trim().toLowerCase();
   const normalizedUsername = input.username.trim();
+  const normalizedUsernameLower = normalizedUsername.toLowerCase();
 
   return db.query.users.findFirst({
-    where: or(eq(users.email, normalizedEmail), eq(users.username, normalizedUsername)),
+    where: or(
+      eq(users.email, normalizedEmail),
+      sql`lower(${users.email}) = ${normalizedUsernameLower}`,
+      eq(users.username, normalizedUsername),
+      sql`lower(${users.username}) = ${normalizedEmail}`,
+      sql`lower(${users.username}) = ${normalizedUsernameLower}`,
+    ),
   });
 }
 

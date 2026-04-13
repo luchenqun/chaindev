@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { type PlatformMode } from "@/config/chains";
+import { DEFAULT_EVM_RPC_PROFILE } from "@/platform/workbench/defaults";
 
 export const platformModeSchema = z.enum(["evm", "cosmos"]);
 
@@ -57,6 +58,14 @@ export function parseActiveRpcProfileCookie(raw: string | undefined) {
   } catch {
     return null;
   }
+}
+
+export function getGuestFallbackRpcProfile(mode: PlatformMode) {
+  if (mode === "evm") {
+    return DEFAULT_EVM_RPC_PROFILE;
+  }
+
+  return null;
 }
 
 export function isPlatformMode(value: string): value is PlatformMode {
