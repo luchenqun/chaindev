@@ -425,13 +425,15 @@ export function decodeBoundEvmReceiptLog(input: {
   }
 
   const normalizedTopics = input.topics.map((topic) => topic.toLowerCase()) as Hex[];
+  const decodedTopics: [] | [Hex, ...Hex[]] =
+    normalizedTopics.length > 0 ? [normalizedTopics[0], ...normalizedTopics.slice(1)] : [];
   const normalizedData = (input.data ?? "0x") as Hex;
 
   try {
     const decoded = decodeEventLog({
       abi: [matchedArtifact.event],
       data: normalizedData,
-      topics: normalizedTopics,
+      topics: decodedTopics,
       strict: false,
     });
 

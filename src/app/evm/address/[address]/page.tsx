@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
-import { IconBinaryTree2, IconFileDots, IconInfoCircle, IconTag } from "@tabler/icons-react";
+import { IconBinaryTree2, IconInfoCircle, IconTag } from "@tabler/icons-react";
 import { RelativeTime } from "@/components/relative-time";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModalDialog } from "@/components/ui/modal-dialog";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
   Select,
   SelectContent,
@@ -48,10 +49,10 @@ import { AddressContractPanel } from "@/domains/evm/ui/address-contract-panel";
 import {
   getActiveEvmCurrencyNameClient,
   getEvmAddressSummaryDirect,
-  getEvmTransactionReceiptSummariesDirect,
   hydrateEvmCachedTransactionInputsByHashDirect,
 } from "@/domains/evm/client/queries";
 import { AppShell } from "@/platform/layout/app-shell";
+import { TransactionHashCell, TransactionPreviewButton } from "@/domains/evm/ui/transaction-list-cells";
 
 const VISIBLE_TRANSACTIONS = 25;
 type AddressPageTab = "transactions" | "contract";
@@ -62,6 +63,16 @@ type ContractEnvironmentState = {
   chainId: string;
   nativeCurrency: string;
 } | null;
+
+function parsePageParam(rawPage: string | null) {
+  const parsed = Number.parseInt(rawPage ?? "1", 10);
+
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return 1;
+  }
+
+  return parsed;
+}
 
 function AddressPageSkeleton() {
   return (
@@ -217,12 +228,18 @@ export default function EvmAddressPage() {
   const isValid = useMemo(() => /^0x[a-fA-F0-9]{40}$/.test(address), [address]);
   const requestedTab = searchParams.get("tab");
   const requestedContractTab = searchParams.get("contractTab");
+  const transactionPage = parsePageParam(searchParams.get("page"));
   const [summary, setSummary] = useState<Awaited<ReturnType<typeof getEvmAddressSummaryDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nameTag, setNameTag] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState("");
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [addressCacheSnapshot, setAddressCacheSnapshot] = useState<Awaited<ReturnType<typeof getEvmAddressCacheSnapshot>>>({
+    page: 1,
+    pageSize: VISIBLE_TRANSACTIONS,
+    totalPages: 1,
+    hasPreviousPage: false,
+    hasNextPage: false,
     totalTransactions: 0,
     transactions: [],
     latestSeenTransaction: null,
@@ -240,11 +257,6 @@ export default function EvmAddressPage() {
   const [bindingArtifactId, setBindingArtifactId] = useState("");
   const [bindingLabelInput, setBindingLabelInput] = useState("");
   const [bindingError, setBindingError] = useState<string | null>(null);
-  const [receiptLookupEnabled, setReceiptLookupEnabled] = useState(false);
-  const [receiptDetailsByHash, setReceiptDetailsByHash] = useState<
-    Record<string, { status: string; statusLabel: string; feeLabel: string }>
-  >({});
-  const [receiptLoading, setReceiptLoading] = useState(false);
   const currencyName = getActiveEvmCurrencyNameClient();
 
   function goToLogin() {
@@ -259,7 +271,7 @@ export default function EvmAddressPage() {
     let cancelled = false;
 
     async function loadAddressCache() {
-      const nextSnapshot = await getEvmAddressCacheSnapshot(address, VISIBLE_TRANSACTIONS);
+      const nextSnapshot = await getEvmAddressCacheSnapshot(address, transactionPage, VISIBLE_TRANSACTIONS);
 
       if (!cancelled) {
         setAddressCacheSnapshot(nextSnapshot);
@@ -276,7 +288,7 @@ export default function EvmAddressPage() {
       cancelled = true;
       unsubscribe();
     };
-  }, [address, isValid]);
+  }, [address, isValid, transactionPage]);
 
   useEffect(() => {
     if (!isValid) {
@@ -407,10 +419,6 @@ export default function EvmAddressPage() {
       )],
     [visibleTransactions],
   );
-  const transactionHashesKey = useMemo(
-    () => visibleTransactions.map((transaction) => transaction.hash).join(","),
-    [visibleTransactions],
-  );
   const decodedMethodLabelByHash = useMemo(
     () => {
       void contractBinding;
@@ -442,40 +450,6 @@ export default function EvmAddressPage() {
 
     void hydrateEvmCachedTransactionInputsByHashDirect(hashesNeedingInputData);
   }, [visibleTransactions]);
-
-  useEffect(() => {
-    if (!receiptLookupEnabled || !visibleTransactions.length) {
-      setReceiptDetailsByHash({});
-      setReceiptLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function loadReceiptDetails() {
-      setReceiptLoading(true);
-
-      try {
-        const nextDetails = await getEvmTransactionReceiptSummariesDirect(
-          visibleTransactions.map((transaction) => transaction.hash),
-        );
-
-        if (!cancelled) {
-          setReceiptDetailsByHash(nextDetails);
-        }
-      } finally {
-        if (!cancelled) {
-          setReceiptLoading(false);
-        }
-      }
-    }
-
-    void loadReceiptDetails();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [receiptLookupEnabled, transactionHashesKey, visibleTransactions]);
 
   useEffect(() => {
     function loadVisibleTags() {
@@ -611,6 +585,21 @@ export default function EvmAddressPage() {
       if (!nextParams.get("contractTab")) {
         nextParams.set("contractTab", "read");
       }
+    }
+
+    const query = nextParams.toString();
+    router.replace(query ? `/evm/address/${address}?${query}` : `/evm/address/${address}`, {
+      scroll: false,
+    });
+  }
+
+  function handleTransactionPageChange(nextPage: number) {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (nextPage <= 1) {
+      nextParams.delete("page");
+    } else {
+      nextParams.set("page", String(nextPage));
     }
 
     const query = nextParams.toString();
@@ -776,104 +765,87 @@ export default function EvmAddressPage() {
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <p className="text-lg font-semibold text-slate-900">
-                Latest {visibleTransactions.length} from a total of {addressCacheSnapshot.totalTransactions.toLocaleString("en-US")} cached transactions
+                Showing {visibleTransactions.length} from a total of {addressCacheSnapshot.totalTransactions.toLocaleString("en-US")} cached transactions
               </p>
               <p className="mt-1 text-sm text-slate-500">
                 Showing IndexedDB-cached transactions where the address appears in either the `from` or `to` field.
               </p>
             </div>
-            <button
-              type="button"
-              aria-label={receiptLookupEnabled ? "Disable receipt lookup" : "Enable receipt lookup"}
-              aria-pressed={receiptLookupEnabled}
-              title={receiptLookupEnabled ? "Receipt lookup enabled" : "Receipt lookup disabled"}
-              className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                receiptLookupEnabled
-                  ? "border-sky-200 bg-sky-50 text-sky-600"
-                  : "border-slate-200 bg-white text-slate-400 hover:text-slate-600"
-              } ${receiptLoading ? "cursor-wait" : ""}`}
-              onClick={() => setReceiptLookupEnabled((current) => !current)}
-            >
-              <IconFileDots className="size-4" stroke={1.8} />
-            </button>
+            <PaginationControls
+              page={addressCacheSnapshot.page}
+              totalPages={addressCacheSnapshot.totalPages}
+              hasPreviousPage={addressCacheSnapshot.hasPreviousPage}
+              hasNextPage={addressCacheSnapshot.hasNextPage}
+              onPageChange={handleTransactionPageChange}
+            />
           </div>
 
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                  <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">
                     Transaction Hash
                   </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                  <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
                     Method
                   </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                  <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
                     Block
                   </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                  <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
                     Age
                   </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Direction
+                  <th className="w-[44px] border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Dir
                   </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                  <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
                     From
                   </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                  <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
                     To
                   </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                  <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
                     Amount
                   </th>
-                  {receiptLookupEnabled ? (
-                    <>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                        Txn Fee
-                      </th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                        Status
-                      </th>
-                    </>
-                  ) : (
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Max Tx Cost
-                    </th>
-                  )}
+                  <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Txn Fee
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {visibleTransactions.length ? (
                   visibleTransactions.map((transaction) => {
                     const direction = getDirection(transaction, normalizedAddress);
-                    const receiptDetail = receiptDetailsByHash[transaction.hash];
+                    const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
 
                     return (
                       <tr key={transaction.hash} className="border-t border-slate-200">
-                        <td className="px-5 py-3 text-sm">
-                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
-                            {transaction.hashLabel}
-                          </Link>
+                        <td className="pl-5 pr-1 py-3 text-sm">
+                          <div className="flex items-center gap-3">
+                            <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
+                            <TransactionHashCell {...transaction} />
+                          </div>
                         </td>
-                        <td className="px-5 py-3 text-sm">
+                        <td className="px-1 py-3 text-sm">
                           <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                            {decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel}
+                            {decodedMethodLabel}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-sm tabular-nums">
+                        <td className="px-1 py-3 text-sm tabular-nums">
                           <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
                             {transaction.blockNumber}
                           </Link>
                         </td>
-                        <td className="px-5 py-3 text-sm text-slate-700">
+                        <td className="px-1 py-3 text-sm text-slate-700">
                           <RelativeTime timestampMs={transaction.timestampMs} />
                         </td>
-                        <td className="px-5 py-3 text-sm">
-                          <span className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${direction.className}`}>
+                        <td className="w-[44px] px-1 py-3 text-sm">
+                          <span className={`inline-flex min-w-[44px] justify-center rounded-md px-2 py-1 text-xs font-semibold ${direction.className}`}>
                             {direction.label}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-sm">
+                        <td className="px-1 py-3 text-sm">
                           <AddressLink
                             address={transaction.from}
                             href={`/evm/address/${transaction.from}`}
@@ -884,7 +856,7 @@ export default function EvmAddressPage() {
                             className="font-medium text-sky-600 hover:text-sky-700"
                           />
                         </td>
-                        <td className="px-5 py-3 text-sm">
+                        <td className="px-1 py-3 text-sm">
                           {transaction.to ? (
                             <AddressLink
                               address={transaction.to}
@@ -899,39 +871,16 @@ export default function EvmAddressPage() {
                             <span className="text-slate-500">Contract Creation</span>
                           )}
                         </td>
-                        <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.amountLabel}</td>
-                        {receiptLookupEnabled ? (
-                          <>
-                            <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                              {receiptDetail ? receiptDetail.feeLabel : <span className="text-slate-400">--</span>}
-                            </td>
-                            <td className="px-5 py-3 text-sm">
-                              {receiptDetail ? (
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                                    receiptDetail.status === "success"
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : receiptDetail.status === "reverted"
-                                        ? "bg-rose-50 text-rose-700"
-                                        : "bg-slate-100 text-slate-500"
-                                  }`}
-                                >
-                                  {receiptDetail.statusLabel}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400">--</span>
-                              )}
-                            </td>
-                          </>
-                        ) : (
-                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">{transaction.maxTxCostLabel}</td>
-                        )}
+                        <td className="px-1 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.amountLabel}</td>
+                        <td className="px-1 py-3 text-sm tabular-nums text-slate-500">
+                          {transaction.feeLabel ?? <span className="text-slate-400">--</span>}
+                        </td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={receiptLookupEnabled ? 10 : 9} className="px-5 py-10 text-center text-sm text-slate-500">
+                    <td colSpan={9} className="px-1 py-10 text-center text-sm text-slate-500">
                       No cached transactions for this address yet. Browse recent blocks or the tx list first so matching transactions can be written into IndexedDB.
                     </td>
                   </tr>

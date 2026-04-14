@@ -1,6 +1,6 @@
 "use client";
 
-import { IconFileDots, IconRefresh, IconSearch } from "@tabler/icons-react";
+import { IconRefresh, IconSearch } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -9,6 +9,7 @@ import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
 import { RelativeTime } from "@/components/relative-time";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { PaginationControls } from "@/components/ui/pagination-controls";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
@@ -23,10 +24,10 @@ import {
 import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transaction-decoder";
 import { AddressLink } from "@/domains/evm/ui/address-link";
 import {
-  getEvmTransactionReceiptSummariesDirect,
   syncLatestEvmTransactionsDirect,
 } from "@/domains/evm/client/queries";
 import { useEvmHomeData } from "@/domains/evm/ui/home-data-provider";
+import { TransactionHashCell, TransactionPreviewButton } from "@/domains/evm/ui/transaction-list-cells";
 import { AppShell } from "@/platform/layout/app-shell";
 
 const PAGE_SIZE = 20;
@@ -49,6 +50,7 @@ type TransactionSearchFormState = {
   from: string;
   to: string;
   method: string;
+  status: "any" | "success" | "reverted";
   startTime: string;
   endTime: string;
   startBlock: string;
@@ -62,6 +64,7 @@ type AppliedTransactionSearchFilters = {
   fromAddress: string | null;
   toAddress: string | null;
   methodQuery: string | null;
+  receiptStatus: "success" | "reverted" | null;
   startTimeMs: number | null;
   endTimeMs: number | null;
   startBlockNumber: number | null;
@@ -74,6 +77,7 @@ const EMPTY_TRANSACTION_SEARCH_FORM: TransactionSearchFormState = {
   from: "",
   to: "",
   method: "",
+  status: "any",
   startTime: "",
   endTime: "",
   startBlock: "",
@@ -87,6 +91,7 @@ const EMPTY_APPLIED_TRANSACTION_SEARCH: AppliedTransactionSearchFilters = {
   fromAddress: null,
   toAddress: null,
   methodQuery: null,
+  receiptStatus: null,
   startTimeMs: null,
   endTimeMs: null,
   startBlockNumber: null,
@@ -154,6 +159,7 @@ function buildFilteredTransactionsPageData(input: {
     filters.fromAddress ? `from ${filters.fromAddress}` : null,
     filters.toAddress ? `to ${filters.toAddress}` : null,
     filters.methodQuery ? `method ${filters.methodQuery}` : null,
+    filters.receiptStatus ? `status ${filters.receiptStatus === "reverted" ? "failed" : filters.receiptStatus}` : null,
     filters.startTimeMs != null || filters.endTimeMs != null ? "time range" : null,
     filters.startBlockNumber != null || filters.endBlockNumber != null ? "block range" : null,
     filters.minValueWei != null || filters.maxValueWei != null ? "amount range" : null,
@@ -180,6 +186,7 @@ function parseTransactionSearchForm(form: TransactionSearchFormState): {
   const from = form.from.trim();
   const to = form.to.trim();
   const method = form.method.trim().toLowerCase();
+  const status = form.status === "any" ? null : form.status;
   const hasFilters = Object.values(form).some((value) => value.trim() !== "");
 
   if (!hasFilters) {
@@ -258,6 +265,7 @@ function parseTransactionSearchForm(form: TransactionSearchFormState): {
         fromAddress: from || null,
         toAddress: to || null,
         methodQuery: method || null,
+        receiptStatus: status,
         startTimeMs,
         endTimeMs,
         startBlockNumber,
@@ -296,6 +304,7 @@ function TransactionsAutoRefreshBridge(props: {
   return null;
 }
 
+
 function EvmTransactionsPageContent() {
   const pathname = usePathname();
   const router = useRouter();
@@ -311,21 +320,13 @@ function EvmTransactionsPageContent() {
   );
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
-  const [receiptLookupEnabled, setReceiptLookupEnabled] = useState(false);
-  const [receiptDetailsByHash, setReceiptDetailsByHash] = useState<
-    Record<string, { status: string; statusLabel: string; feeLabel: string }>
-  >({});
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [decodeVersion, setDecodeVersion] = useState(0);
-  const [receiptLoading, setReceiptLoading] = useState(false);
   const [syncingLatest, setSyncingLatest] = useState(false);
   const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [cacheRefreshVersion, setCacheRefreshVersion] = useState(0);
-  const transactionHashesKey = useMemo(
-    () => data?.transactions.map((transaction) => transaction.hash).join(",") ?? "",
-    [data],
-  );
+  const hasLoadedDataRef = useRef(false);
   const visibleAddresses = useMemo(
     () =>
       [...new Set(
@@ -362,7 +363,7 @@ function EvmTransactionsPageContent() {
     let cancelled = false;
 
     async function load(showSkeleton = false) {
-      if (showSkeleton || !data) {
+      if (showSkeleton || !hasLoadedDataRef.current) {
         setLoading(true);
       }
 
@@ -375,6 +376,7 @@ function EvmTransactionsPageContent() {
                 fromAddress: activeSearchFilters.fromAddress,
                 toAddress: activeSearchFilters.toAddress,
                 methodQuery: activeSearchFilters.methodQuery,
+                receiptStatus: activeSearchFilters.receiptStatus,
                 startTimeMs: activeSearchFilters.startTimeMs,
                 endTimeMs: activeSearchFilters.endTimeMs,
                 startBlockNumber: activeSearchFilters.startBlockNumber,
@@ -399,6 +401,7 @@ function EvmTransactionsPageContent() {
               });
 
           setData(next);
+          hasLoadedDataRef.current = true;
           setErrorMessage(null);
 
           if (next.page !== currentPage) {
@@ -407,6 +410,7 @@ function EvmTransactionsPageContent() {
         }
       } catch (error) {
         if (!cancelled) {
+          hasLoadedDataRef.current = false;
           setData(null);
           setErrorMessage(error instanceof Error ? error.message : "Failed to load transactions.");
         }
@@ -417,7 +421,7 @@ function EvmTransactionsPageContent() {
       }
     }
 
-    void load(!data);
+    void load();
 
     const handleProfileChanged = () => {
       void load(true);
@@ -485,39 +489,17 @@ function EvmTransactionsPageContent() {
   }, []);
 
   function handleAutoRefreshFeed(latestFeed: NonNullable<ReturnType<typeof useEvmHomeData>["latestFeed"]>) {
-    if (currentPage !== 1 || activeSearchFilters.hasFilters) {
+    if (currentPage !== 1 || activeSearchFilters.hasFilters || !data) {
       return;
     }
 
-    setData((current) => {
-      if (!current) {
-        return current;
-      }
+    const hasNewTransactions = latestFeed.transactionsPageItems.some(
+      (transaction) => !data.transactions.some((item) => item.hash === transaction.hash),
+    );
 
-      const mergedTransactions = [
-        ...latestFeed.transactionsPageItems,
-        ...current.transactions.filter(
-          (transaction) => !latestFeed.transactionsPageItems.some((item) => item.hash === transaction.hash),
-        ),
-      ].slice(0, PAGE_SIZE);
-      const nextTotalTransactions =
-        current.totalTransactions +
-        latestFeed.transactionsPageItems.filter(
-          (transaction) => !current.transactions.some((item) => item.hash === transaction.hash),
-        ).length;
-      const totalPages = Math.max(1, Math.ceil(nextTotalTransactions / current.pageSize));
-
-      return {
-        ...current,
-        totalTransactions: nextTotalTransactions,
-        totalPages,
-        hasNextPage: totalPages > current.page,
-        latestBlockNumber: latestFeed.latestBlock,
-        title: `${nextTotalTransactions.toLocaleString("en-US")} cached recent transactions`,
-        subtitle: `Showing cached transactions up to block #${latestFeed.latestBlock}`,
-        transactions: mergedTransactions,
-      };
-    });
+    if (hasNewTransactions) {
+      setCacheRefreshVersion((version) => version + 1);
+    }
   }
 
   function handleSearchInputChange<Key extends keyof TransactionSearchFormState>(
@@ -556,41 +538,6 @@ function EvmTransactionsPageContent() {
       router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), 1));
     }
   }
-
-  useEffect(() => {
-    if (!receiptLookupEnabled || !data?.transactions.length) {
-      setReceiptDetailsByHash({});
-      setReceiptLoading(false);
-      return;
-    }
-
-    const transactions = data.transactions;
-    let cancelled = false;
-
-    async function loadReceiptDetails() {
-      setReceiptLoading(true);
-
-      try {
-        const nextDetails = await getEvmTransactionReceiptSummariesDirect(
-          transactions.map((transaction) => transaction.hash),
-        );
-
-        if (!cancelled) {
-          setReceiptDetailsByHash(nextDetails);
-        }
-      } finally {
-        if (!cancelled) {
-          setReceiptLoading(false);
-        }
-      }
-    }
-
-    void loadReceiptDetails();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [data, receiptLookupEnabled, transactionHashesKey]);
 
   useEffect(() => {
     const unsubscribe = subscribeEvmContractRegistry(() => {
@@ -719,20 +666,6 @@ function EvmTransactionsPageContent() {
               >
                 <IconRefresh className="size-4" stroke={1.8} />
               </button>
-              <button
-                type="button"
-                aria-label={receiptLookupEnabled ? "Disable receipt lookup" : "Enable receipt lookup"}
-                aria-pressed={receiptLookupEnabled}
-                title={receiptLookupEnabled ? "Receipt lookup enabled" : "Receipt lookup disabled"}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  receiptLookupEnabled
-                    ? "border-sky-200 bg-sky-50 text-sky-600"
-                    : "border-slate-200 bg-white text-slate-400 hover:text-slate-600"
-                } ${receiptLoading ? "cursor-wait" : ""}`}
-                onClick={() => setReceiptLookupEnabled((current) => !current)}
-              >
-                <IconFileDots className="size-4" stroke={1.8} />
-              </button>
             </div>
           </div>
 
@@ -761,37 +694,31 @@ function EvmTransactionsPageContent() {
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
                     Amount
                   </th>
-                  {receiptLookupEnabled ? (
-                    <>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                        Txn Fee
-                      </th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                        Status
-                      </th>
-                    </>
-                  ) : (
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Max Tx Cost
-                    </th>
-                  )}
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Txn Fee
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {data.transactions.length ? (
                   data.transactions.map((transaction) => {
-                    const receiptDetail = receiptDetailsByHash[transaction.hash];
+                    const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
 
                     return (
                       <tr key={transaction.hash} className="border-t border-slate-200">
                         <td className="px-5 py-3 text-sm">
-                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
-                            {transaction.hashLabel}
-                          </Link>
+                          <div className="flex items-center gap-3">
+                            <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
+                            <TransactionHashCell
+                              hash={transaction.hash}
+                              hashLabel={transaction.hashLabel}
+                              receiptStatus={transaction.receiptStatus}
+                            />
+                          </div>
                         </td>
                         <td className="px-5 py-3 text-sm">
                           <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                            {decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel}
+                            {decodedMethodLabel}
                           </span>
                         </td>
                         <td className="px-5 py-3 text-sm tabular-nums">
@@ -828,40 +755,15 @@ function EvmTransactionsPageContent() {
                         <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
                           {transaction.amountLabel}
                         </td>
-                        {receiptLookupEnabled ? (
-                          <>
-                            <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                              {receiptDetail ? receiptDetail.feeLabel : <span className="text-slate-400">--</span>}
-                            </td>
-                            <td className="px-5 py-3 text-sm">
-                              {receiptDetail ? (
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                                    receiptDetail.status === "success"
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : receiptDetail.status === "reverted"
-                                        ? "bg-rose-50 text-rose-700"
-                                        : "bg-slate-100 text-slate-500"
-                                  }`}
-                                >
-                                  {receiptDetail.statusLabel}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400">--</span>
-                              )}
-                            </td>
-                          </>
-                        ) : (
-                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                            {transaction.maxTxCostLabel}
-                          </td>
-                        )}
+                        <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
+                          {transaction.feeLabel ?? <span className="text-slate-400">--</span>}
+                        </td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
-                    <td colSpan={receiptLookupEnabled ? 9 : 8} className="px-5 py-10 text-center text-sm text-slate-500">
+                    <td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-500">
                       No cached transactions available yet.
                     </td>
                   </tr>
@@ -984,6 +886,24 @@ function EvmTransactionsPageContent() {
               placeholder="transfer / create / 0xa9059cbb"
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
+          </label>
+          <label className="grid gap-1.5">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status</span>
+            <Select
+              value={searchForm.status}
+              onValueChange={(value: TransactionSearchFormState["status"]) =>
+                handleSearchInputChange("status", value)
+              }
+            >
+              <SelectTrigger className="h-10 rounded-lg border-slate-200 text-sm text-slate-700">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Any</SelectItem>
+                <SelectItem value="success">Success</SelectItem>
+                <SelectItem value="reverted">Failed</SelectItem>
+              </SelectContent>
+            </Select>
           </label>
         </div>
         {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{searchErrorMessage}</p> : null}

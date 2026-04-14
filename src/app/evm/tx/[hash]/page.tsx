@@ -3,7 +3,7 @@
 import JsonView from "@uiw/react-json-view";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconArrowsExchange, IconCode, IconLoader2 } from "@tabler/icons-react";
 import { decodeErrorResult, formatEther } from "viem";
 import { Button } from "@/components/ui/button";
@@ -670,8 +670,10 @@ export default function EvmTxPage() {
     [transaction],
   );
   const decodedReceiptLogs = useMemo(
-    () =>
-      normalizedReceiptLogs.map((log, index) => ({
+    () => {
+      void decodeVersion;
+
+      return normalizedReceiptLogs.map((log, index) => ({
         key: `${log.logIndex ?? index}-${log.address}-${index}`,
         raw: log,
         decoded: decodeBoundEvmReceiptLog({
@@ -679,7 +681,8 @@ export default function EvmTxPage() {
           topics: log.topics,
           data: log.data,
         }),
-      })),
+      }));
+    },
     [normalizedReceiptLogs, decodeVersion],
   );
   const visibleAddresses = useMemo(
@@ -879,70 +882,14 @@ export default function EvmTxPage() {
     };
   }, [visibleAddresses]);
 
-  useEffect(() => {
-    if (
-      !rewriteDialogOpen ||
-      !canRewriteTransaction ||
-      !rewriteTargetAddress ||
-      !activeKey ||
-      rewriteActionLoading === "rewrite" ||
-      (activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
-      !isValidNativeValueInput(rewriteDialogValues.value)
-    ) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      void fillRewriteDefaults(undefined, {
-        rawArgs: rewriteArgumentValues,
-        value: rewriteDialogValues.value,
-      });
-    }, 240);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [
-    activeKey,
-    canRewriteTransaction,
-    decodedTransactionInput,
-    rewriteDialogOpen,
-    rewriteTargetAddress,
-    rewriteArgumentValues,
-    rewriteActionLoading,
-    rewriteDialogValues.value,
-  ]);
-
-  function openRewriteDialog() {
-    if (!canRewriteTransaction || !rewriteTargetAddress) {
-      return;
-    }
-
-    setRewriteArgumentValues(decodedTransactionInput?.args.map((arg) => arg.value) ?? []);
-    setRewriteDialogValues(
-      createInitialRewriteDialogState({
-        transactionType: resolveRewriteTransactionType(transaction.rawJson),
-        value: extractTransactionValueInput(transaction.rawJson),
-        gasLimit: extractTransactionGasLimit(transaction.rawJson),
-      }),
-    );
-    setRewriteError(null);
-    setRewriteActionLoading(null);
-    setRewriteUnlockDialogOpen(false);
-    setRewriteUnlockPassword("");
-    setRewriteUnlockError(null);
-    setPendingRewriteAction(null);
-    setRewriteDialogOpen(true);
-  }
-
-  async function fillRewriteDefaults(
+  const fillRewriteDefaults = useCallback(async (
     password?: string,
     overrides?: {
       rawArgs?: string[];
       value?: string;
     },
-  ) {
-    if (!rewriteTargetAddress || !activeKey || !canRewriteTransaction) {
+  ) => {
+    if (!transaction || !rewriteTargetAddress || !activeKey || !canRewriteTransaction) {
       return;
     }
 
@@ -1018,10 +965,75 @@ export default function EvmTxPage() {
         setRewriteActionLoading(null);
       }
     }
+  }, [
+    activeKey,
+    canRewriteTransaction,
+    decodedTransactionInput,
+    rewriteArgumentValues,
+    rewriteDialogValues.value,
+    rewriteTargetAddress,
+    transaction,
+  ]);
+
+  useEffect(() => {
+    if (
+      !rewriteDialogOpen ||
+      !canRewriteTransaction ||
+      !rewriteTargetAddress ||
+      !activeKey ||
+      rewriteActionLoading === "rewrite" ||
+      (activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
+      !isValidNativeValueInput(rewriteDialogValues.value)
+    ) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      void fillRewriteDefaults(undefined, {
+        rawArgs: rewriteArgumentValues,
+        value: rewriteDialogValues.value,
+      });
+    }, 240);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [
+    activeKey,
+    canRewriteTransaction,
+    decodedTransactionInput,
+    fillRewriteDefaults,
+    rewriteDialogOpen,
+    rewriteTargetAddress,
+    rewriteArgumentValues,
+    rewriteActionLoading,
+    rewriteDialogValues.value,
+  ]);
+
+  function openRewriteDialog() {
+    if (!transaction || !canRewriteTransaction || !rewriteTargetAddress) {
+      return;
+    }
+
+    setRewriteArgumentValues(decodedTransactionInput?.args.map((arg) => arg.value) ?? []);
+    setRewriteDialogValues(
+      createInitialRewriteDialogState({
+        transactionType: resolveRewriteTransactionType(transaction.rawJson),
+        value: extractTransactionValueInput(transaction.rawJson),
+        gasLimit: extractTransactionGasLimit(transaction.rawJson),
+      }),
+    );
+    setRewriteError(null);
+    setRewriteActionLoading(null);
+    setRewriteUnlockDialogOpen(false);
+    setRewriteUnlockPassword("");
+    setRewriteUnlockError(null);
+    setPendingRewriteAction(null);
+    setRewriteDialogOpen(true);
   }
 
   async function executeRewriteAction(password?: string) {
-    if (!rewriteTargetAddress || !activeKey || !canRewriteTransaction) {
+    if (!transaction || !rewriteTargetAddress || !activeKey || !canRewriteTransaction) {
       return;
     }
 

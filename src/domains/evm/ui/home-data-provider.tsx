@@ -19,6 +19,7 @@ type EvmLiveStatus = Pick<
   "latestBlock" | "latestBlockNumber" | "latestBlockTime" | "latestBlockTimestamp" | "pollIntervalMs"
 >;
 type RecentHomeBlock = EvmHomeBootstrap["recentBlocks"][number];
+type RecentHomeTransaction = EvmHomeBootstrap["transactions"][number];
 
 type EvmHomeDataContextValue = {
   status: EvmLiveStatus | null;
@@ -65,6 +66,19 @@ function mergeRecentHomeBlocks(current: RecentHomeBlock[], feed: EvmLatestFeed) 
   const merged = [nextBlock, ...current.filter((item) => item.blockNumber !== nextBlock.blockNumber)];
 
   return merged.slice(0, RECENT_HOME_BLOCK_WINDOW);
+}
+
+function mergeRecentHomeTransactions(current: RecentHomeTransaction[], feed: EvmLatestFeed) {
+  if (!feed.transactions.length) {
+    return current;
+  }
+
+  return [...feed.transactions, ...current]
+    .filter(
+      (transaction, index, transactions) =>
+        transactions.findIndex((candidate) => candidate.hash === transaction.hash) === index,
+    )
+    .slice(0, HOME_TRANSACTION_LIST_LIMIT);
 }
 
 function buildDerivedHomeSnapshot(input: {
@@ -177,6 +191,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   const hasResolvedPollIntervalRef = useRef(false);
   const hasValidatedCacheRef = useRef(false);
   const recentHomeBlocksRef = useRef<RecentHomeBlock[]>([]);
+  const recentHomeTransactionsRef = useRef<RecentHomeTransaction[]>([]);
   const homeChainIdRef = useRef<string | null>(null);
 
   function resolvePollInterval(nextPollIntervalMs: number) {
@@ -230,6 +245,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         pollIntervalMs: resolvedPollIntervalMs,
       };
       recentHomeBlocksRef.current = mergeRecentHomeBlocks(recentHomeBlocksRef.current, nextFeed);
+      recentHomeTransactionsRef.current = mergeRecentHomeTransactions(recentHomeTransactionsRef.current, nextFeed);
 
       setLatestFeed(nextFeed);
       setStatus({
@@ -263,6 +279,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
           recentBlocks: recentHomeBlocksRef.current,
           chainId: homeChainIdRef.current,
           pollIntervalMs: feed.pollIntervalMs,
+          activityTransactions: recentHomeTransactionsRef.current,
         }),
       );
     }
@@ -278,6 +295,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       }
 
       recentHomeBlocksRef.current = bootstrap.recentBlocks;
+      recentHomeTransactionsRef.current = bootstrap.transactions;
 
       if (supplement.header.chainId) {
         homeChainIdRef.current = supplement.header.chainId;
@@ -305,6 +323,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
           setErrorMessage(null);
           setPollIntervalMs(12_000);
           recentHomeBlocksRef.current = [];
+          recentHomeTransactionsRef.current = [];
           homeChainIdRef.current = null;
           clearPoll();
           return;
@@ -361,6 +380,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       hasResolvedPollIntervalRef.current = false;
       setPollIntervalMs(12_000);
       recentHomeBlocksRef.current = [];
+      recentHomeTransactionsRef.current = [];
       homeChainIdRef.current = null;
       setSnapshot(null);
       setStatus(null);

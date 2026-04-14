@@ -1,6 +1,6 @@
 "use client";
 
-import { IconBox, IconFileText } from "@tabler/icons-react";
+import { IconAlertCircle, IconBox, IconFileText } from "@tabler/icons-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -171,9 +171,17 @@ export function EvmHomeActivity() {
                     <IconFileText className="size-5" stroke={1.8} />
                   </div>
                   <div className="min-w-0">
-                    <Link className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
-                      {transaction.hashLabel}
-                    </Link>
+                    <div className="flex min-w-0 items-center gap-0.5">
+                      {transaction.receiptStatus === "reverted" ? (
+                        <IconAlertCircle className="size-4 shrink-0 text-rose-500" stroke={2} />
+                      ) : null}
+                      <Link
+                        className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700"
+                        href={`/evm/tx/${transaction.hash}`}
+                      >
+                        {transaction.hashLabel}
+                      </Link>
+                    </div>
                     <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(transaction.timestampMs, nowMs)}</p>
                   </div>
                   <div className="min-w-0">

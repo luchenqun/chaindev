@@ -7,7 +7,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   IconChevronLeft,
   IconChevronRight,
-  IconFileDots,
   IconLanguage,
   IconMinus,
   IconPlus,
@@ -24,9 +23,9 @@ import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transacti
 import { AddressLink } from "@/domains/evm/ui/address-link";
 import {
   getEvmBlockByNumberDirect,
-  getEvmTransactionReceiptSummariesDirect,
 } from "@/domains/evm/client/queries";
 import { AppShell } from "@/platform/layout/app-shell";
+import { TransactionHashCell, TransactionPreviewButton } from "@/domains/evm/ui/transaction-list-cells";
 
 function DetailRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
@@ -139,15 +138,10 @@ export default function EvmBlockDetailPage() {
   const number = params.number;
   const isValid = useMemo(() => /^\d+$/.test(number), [number]);
   const [block, setBlock] = useState<Awaited<ReturnType<typeof getEvmBlockByNumberDirect>> | null>(null);
-  const [receiptDetailsByHash, setReceiptDetailsByHash] = useState<
-    Record<string, { status: string; statusLabel: string; feeLabel: string }>
-  >({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "json">("overview");
   const [extraDataView, setExtraDataView] = useState<"hex" | "ascii">("hex");
-  const [isReceiptDetailsLoading, setIsReceiptDetailsLoading] = useState(false);
-  const [hasLoadedReceiptDetails, setHasLoadedReceiptDetails] = useState(false);
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [decodeVersion, setDecodeVersion] = useState(0);
   const visibleAddresses = useMemo(
@@ -198,9 +192,6 @@ export default function EvmBlockDetailPage() {
       }
     }
 
-    setReceiptDetailsByHash({});
-    setIsReceiptDetailsLoading(false);
-    setHasLoadedReceiptDetails(false);
     void load();
     window.addEventListener("chaindev:active-rpc-profile-changed", load);
 
@@ -286,25 +277,7 @@ export default function EvmBlockDetailPage() {
   const hasTransactions = block.transactions.length > 0;
   const currentBlock = block;
   const resolvedActiveTab = activeTab === "transactions" && !hasTransactions ? "overview" : activeTab;
-  const showReceiptDetailsColumns = isReceiptDetailsLoading || hasLoadedReceiptDetails;
-
-  async function loadReceiptDetails() {
-    if (!hasTransactions || isReceiptDetailsLoading) {
-      return;
-    }
-
-    setIsReceiptDetailsLoading(true);
-
-    try {
-      const nextDetails = await getEvmTransactionReceiptSummariesDirect(
-        currentBlock.transactions.map((transaction) => transaction.hash),
-      );
-      setReceiptDetailsByHash(nextDetails);
-      setHasLoadedReceiptDetails(true);
-    } finally {
-      setIsReceiptDetailsLoading(false);
-    }
-  }
+  void currentBlock;
 
   return (
     <AppShell>
@@ -343,7 +316,7 @@ export default function EvmBlockDetailPage() {
             disabled={!hasTransactions}
             aria-disabled={!hasTransactions}
           >
-            Transactions
+            {hasTransactions ? `Transactions (${block.transactions.length})` : "Transactions"}
           </button>
           <button
             type="button"
@@ -518,19 +491,6 @@ export default function EvmBlockDetailPage() {
             <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
                 <p className="text-base font-semibold text-slate-900">A total of {block.transactions.length} transactions found</p>
-                {!showReceiptDetailsColumns ? (
-                  <button
-                    type="button"
-                    className="inline-flex size-5 items-center justify-center text-slate-400 transition hover:text-slate-700"
-                    onClick={() => {
-                      void loadReceiptDetails();
-                    }}
-                    aria-label="Load receipt details"
-                    title="Load receipt details"
-                  >
-                    <IconFileDots className="size-4.5" stroke={1.9} />
-                  </button>
-                ) : null}
               </div>
               <div className="overflow-x-auto">
                 <table className="data-table">
@@ -543,28 +503,24 @@ export default function EvmBlockDetailPage() {
                       <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
                       <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">To</th>
                       <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                        {showReceiptDetailsColumns ? "Txn Fee" : "Max Tx Cost"}
-                      </th>
-                      {showReceiptDetailsColumns ? (
-                        <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Status</th>
-                      ) : null}
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Fee</th>
                     </tr>
                   </thead>
                   <tbody>
                     {block.transactions.map((transaction) => {
-                      const receiptDetail = receiptDetailsByHash[transaction.hash];
+                      const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
 
                       return (
                         <tr key={transaction.hash} className="border-t border-slate-200">
                           <td className="px-5 py-3 text-sm">
-                            <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
-                              {transaction.hashLabel}
-                            </Link>
+                            <div className="flex items-center gap-3">
+                              <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
+                              <TransactionHashCell {...transaction} />
+                            </div>
                           </td>
                           <td className="px-5 py-3 text-sm">
                             <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                              {decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel}
+                              {decodedMethodLabel}
                             </span>
                           </td>
                           <td className="px-5 py-3 text-sm tabular-nums">
@@ -600,31 +556,8 @@ export default function EvmBlockDetailPage() {
                           </td>
                           <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.valueLabel}</td>
                           <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                            {showReceiptDetailsColumns
-                              ? receiptDetail
-                                ? receiptDetail.feeLabel
-                                : "--"
-                              : transaction.maxTxCostLabel}
+                            {transaction.feeLabel ?? <span className="text-slate-400">--</span>}
                           </td>
-                          {showReceiptDetailsColumns ? (
-                            <td className="px-5 py-3 text-sm">
-                              {receiptDetail ? (
-                                <span
-                                  className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                                    receiptDetail.status === "success"
-                                      ? "bg-emerald-50 text-emerald-700"
-                                      : receiptDetail.status === "reverted"
-                                        ? "bg-rose-50 text-rose-700"
-                                        : "bg-slate-100 text-slate-500"
-                                  }`}
-                                >
-                                  {receiptDetail.statusLabel}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400">--</span>
-                              )}
-                            </td>
-                          ) : null}
                         </tr>
                       );
                     })}

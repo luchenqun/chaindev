@@ -10,6 +10,7 @@ type AddressLinkProps = {
   href: string;
   label: string;
   className?: string;
+  tooltipClassName?: string;
   showCopyButton?: boolean;
 };
 
@@ -18,8 +19,10 @@ export function AddressLink({
   href,
   label,
   className,
+  tooltipClassName,
   showCopyButton = true,
 }: AddressLinkProps) {
+  void tooltipClassName;
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<number | null>(null);
 
