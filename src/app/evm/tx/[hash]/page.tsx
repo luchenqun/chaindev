@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconArrowsExchange, IconCode, IconLoader2 } from "@tabler/icons-react";
 import { decodeErrorResult, formatEther } from "viem";
 import { Button } from "@/components/ui/button";
-import { FlashMessage } from "@/components/ui/flash-message";
 import { Input } from "@/components/ui/input";
 import { DetailPageSkeleton } from "@/components/ui/loading-placeholders";
 import { ModalDialog } from "@/components/ui/modal-dialog";
@@ -21,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
@@ -635,6 +635,7 @@ function RewriteArgumentsForm({
 
 export default function EvmTxPage() {
   const params = useParams<{ hash: string }>();
+  const { showToast } = useToast();
   const hash = params.hash;
   const { status } = useEvmHomeData();
   const isValid = useMemo(() => /^0x[a-fA-F0-9]{64}$/.test(hash), [hash]);
@@ -659,11 +660,6 @@ export default function EvmTxPage() {
   const [rewriteUnlockPassword, setRewriteUnlockPassword] = useState("");
   const [rewriteUnlockError, setRewriteUnlockError] = useState<string | null>(null);
   const [pendingRewriteAction, setPendingRewriteAction] = useState<"fill" | "rewrite" | null>(null);
-  const [flashMessage, setFlashMessage] = useState<{
-    title: string;
-    description?: string;
-    tone?: "success" | "info";
-  } | null>(null);
   const rewriteDefaultsRequestIdRef = useRef(0);
   const normalizedReceiptLogs = useMemo(
     () => normalizeReceiptLogs(transaction?.logs),
@@ -827,20 +823,6 @@ export default function EvmTxPage() {
       window.removeEventListener("chaindev:active-rpc-profile-changed", loadEnvironment);
     };
   }, []);
-
-  useEffect(() => {
-    if (!flashMessage) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setFlashMessage(null);
-    }, 2600);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [flashMessage]);
 
   useEffect(() => {
     const unsubscribe = subscribeEvmContractRegistry(() => {
@@ -1127,7 +1109,7 @@ export default function EvmTxPage() {
 
       setRewriteDialogOpen(false);
       rewriteSucceeded = true;
-      setFlashMessage(
+      showToast(
         result.receipt.status === "success"
           ? {
               title: "Rewrite submitted",
@@ -1252,13 +1234,6 @@ export default function EvmTxPage() {
 
   return (
     <AppShell>
-      {flashMessage ? (
-        <FlashMessage
-          title={flashMessage.title}
-          description={flashMessage.description}
-          tone={flashMessage.tone}
-        />
-      ) : null}
       <main className="section-block">
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">

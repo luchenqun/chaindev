@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createCredentialUser, findAuthUserConflict } from "@/server/repositories/auth-users";
+import { seedDefaultWorkbenchForUser } from "@/server/repositories/workbench-bootstrap";
 import { fail, ok } from "@/server/utils/api-response";
 
 const registerSchema = z.object({
@@ -37,6 +38,8 @@ export async function POST(request: Request) {
     if (!user) {
       return fail({ category: "server", message: "注册失败，请稍后重试。" }, 500);
     }
+
+    await seedDefaultWorkbenchForUser(user.id);
 
     return ok({ userId: user.id });
   } catch (error) {

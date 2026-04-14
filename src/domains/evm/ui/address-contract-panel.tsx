@@ -23,7 +23,6 @@ import Link from "next/link";
 import { toFunctionSelector } from "viem";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
-import { FlashMessage } from "@/components/ui/flash-message";
 import { Input } from "@/components/ui/input";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
@@ -34,6 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/components/ui/toast";
 import {
   getReadContractFunctions,
   getWriteContractFunctions,
@@ -528,6 +528,7 @@ export function AddressContractPanel({
   environment: EnvironmentState;
   initialTab?: ContractSubview;
 }) {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<ContractSubview>(initialTab);
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
   const [expandedReadSignatures, setExpandedReadSignatures] = useState<string[]>([]);
@@ -548,11 +549,6 @@ export function AddressContractPanel({
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [unlockPassword, setUnlockPassword] = useState("");
   const [unlockError, setUnlockError] = useState<string | null>(null);
-  const [flashMessage, setFlashMessage] = useState<{
-    title: string;
-    description?: string;
-    tone?: "success" | "info";
-  } | null>(null);
   const [pendingWriteAction, setPendingWriteAction] = useState<{
     signature: string;
     type: "write" | "manual-open" | "manual-confirm";
@@ -605,20 +601,6 @@ export function AddressContractPanel({
     setManualWriteDialogError(null);
     setManualWriteDialogValues(createInitialManualWriteDialogState());
   }, [writeFunctions]);
-
-  useEffect(() => {
-    if (!flashMessage) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setFlashMessage(null);
-    }, 2200);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [flashMessage]);
 
   function updateReadArgumentValue(signature: string, index: number, value: string) {
     setReadArgumentValues((current) => ({
@@ -778,7 +760,7 @@ export function AddressContractPanel({
         delete next[signature];
         return next;
       });
-      setFlashMessage(
+      showToast(
         result.receipt.status === "success"
           ? {
               title: "Transaction submitted",
@@ -982,7 +964,7 @@ export function AddressContractPanel({
       });
       setManualWriteTarget(null);
       setManualWriteDialogError(null);
-      setFlashMessage(
+      showToast(
         result.receipt.status === "success"
           ? {
               title: "Force-send submitted",
@@ -1084,7 +1066,7 @@ export function AddressContractPanel({
 
   function copyFunctionSignature(fn: EvmContractFunctionDescriptor) {
     void copyText(fn.signature);
-    setFlashMessage({
+    showToast({
       title: "Signature copied",
       description: `${fn.signature} was copied successfully.`,
     });
@@ -1122,13 +1104,6 @@ export function AddressContractPanel({
 
   return (
     <>
-      {flashMessage ? (
-        <FlashMessage
-          title={flashMessage.title}
-          description={flashMessage.description}
-          tone={flashMessage.tone}
-        />
-      ) : null}
       <div className="inline-flex flex-wrap rounded-[14px] bg-slate-100 p-1">
         {[
           { value: "code" as const, label: "Code" },
@@ -1187,7 +1162,7 @@ export function AddressContractPanel({
                     aria-label="Copy ABI"
                     onClick={() => {
                       void navigator.clipboard.writeText(artifact.abiJson);
-                      setFlashMessage({
+                      showToast({
                         title: "ABI copied",
                         description: "Contract ABI was copied successfully.",
                       });

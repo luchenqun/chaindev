@@ -32,6 +32,7 @@ import {
   writeActiveRpcProfileCookie,
 } from "@/platform/workbench/rpc-profile-client";
 import type { RpcProfile, RpcProfileDraft, SelectedRpcProfileMap } from "@/platform/workbench/rpc-profile";
+import { getDefaultGuestRpcProfiles, getDefaultGuestSelectedRpcProfiles } from "@/platform/workbench/defaults";
 
 type RpcProviderManagerProps = {
   mode: PlatformMode;
@@ -101,8 +102,24 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
   const [selected, setSelected] = useState<SelectedRpcProfileMap>({});
   const [source, setSource] = useState<"guest" | "server">("guest");
   const [draft, setDraft] = useState<DraftState>(getInitialDraft(mode));
+  const hasPersistedProfiles = profiles.length > 0;
+  const topbarProfiles = useMemo(
+    () => (profiles.length ? profiles : getDefaultGuestRpcProfiles()),
+    [profiles],
+  );
+  const topbarSelected = useMemo(
+    () => (profiles.length ? selected : getDefaultGuestSelectedRpcProfiles()),
+    [profiles.length, selected],
+  );
 
-  const activeProfile = useMemo(() => getPreferredProfile(mode, profiles, selected), [mode, profiles, selected]);
+  const activeProfile = useMemo(
+    () => getPreferredProfile(mode, profiles, selected),
+    [mode, profiles, selected],
+  );
+  const topbarActiveProfile = useMemo(
+    () => getPreferredProfile(mode, topbarProfiles, topbarSelected),
+    [mode, topbarProfiles, topbarSelected],
+  );
   const sortedProfiles = useMemo(
     () =>
       [...profiles].sort((left, right) => {
@@ -113,6 +130,17 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
         return right.updatedAt - left.updatedAt;
       }),
     [profiles],
+  );
+  const topbarSortedProfiles = useMemo(
+    () =>
+      [...topbarProfiles].sort((left, right) => {
+        if (left.mode !== right.mode) {
+          return left.mode.localeCompare(right.mode);
+        }
+
+        return right.updatedAt - left.updatedAt;
+      }),
+    [topbarProfiles],
   );
 
   useEffect(() => {
@@ -186,6 +214,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
     !draft.name.trim() ||
     !draft.rpcUrl.trim() ||
     (draft.mode === "evm" ? !draft.nativeCurrencySymbol.trim() : !draft.restUrl.trim());
+  const isAuthenticated = status === "authenticated";
 
   function goToLogin() {
     const callbackUrl = encodeURIComponent(window.location.pathname);
@@ -437,7 +466,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
                 </p>
               </div>
               <Button type="button" size="sm" onClick={handleOpenCreate}>
-                {source === "server" ? "Add" : "Sign In to Add"}
+                {isAuthenticated ? "Add" : "Sign In to Add"}
               </Button>
             </div>
           </div>
@@ -564,20 +593,24 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
     return (
       <div className="min-w-0 shrink-0">
         <Select
-          value={activeProfile?.id}
-          disabled={loading || sortedProfiles.length <= 1}
+          value={topbarActiveProfile?.id}
+          disabled={loading || !hasPersistedProfiles}
           onValueChange={(value) => {
-            const profile = sortedProfiles.find((item) => item.id === value) ?? null;
+            const profile = topbarSortedProfiles.find((item) => item.id === value) ?? null;
             handleUse(profile);
           }}
         >
           <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] leading-none shadow-none focus:ring-0">
             <span className="truncate">
-              {activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : loading ? "Loading providers..." : "No provider"}
+              {topbarActiveProfile
+                ? `${getModeLabel(topbarActiveProfile.mode)} · ${topbarActiveProfile.name}`
+                : loading
+                  ? "Loading providers..."
+                  : "No provider"}
             </span>
           </SelectTrigger>
           <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
-            {sortedProfiles.map((profile) => (
+            {topbarSortedProfiles.map((profile) => (
               <SelectItem key={profile.id} value={profile.id}>
                 {getModeLabel(profile.mode)} · {profile.name}
               </SelectItem>

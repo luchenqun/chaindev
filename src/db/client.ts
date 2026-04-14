@@ -190,7 +190,12 @@ function ensureWorkbenchSchema() {
       name TEXT NOT NULL,
       address TEXT NOT NULL,
       address_lower TEXT NOT NULL,
-      private_key TEXT NOT NULL,
+      security_mode TEXT NOT NULL,
+      private_key TEXT,
+      encrypted_private_key TEXT,
+      iv TEXT,
+      salt TEXT,
+      auth_tag TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       last_used_at INTEGER

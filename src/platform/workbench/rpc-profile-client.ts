@@ -169,6 +169,14 @@ export async function fetchRpcProfiles() {
 
   const body = (await response.json()) as RpcProfilesResponse;
 
+  if (!body.data.length) {
+    return {
+      source: "server" as const,
+      profiles: [],
+      selected: getLocalSelectedRpcProfiles(),
+    };
+  }
+
   return {
     source: "server" as const,
     profiles: body.data,

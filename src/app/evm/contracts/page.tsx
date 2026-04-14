@@ -17,7 +17,6 @@ import { type AbiParameter } from "viem";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { FlashMessage } from "@/components/ui/flash-message";
 import { Input } from "@/components/ui/input";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
@@ -29,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import { getContractConstructor } from "@/domains/evm/client/abi-utils";
 import {
   createEvmContractArtifact,
@@ -235,6 +235,7 @@ function buildDeploySimulationKey(input: {
 export default function EvmContractsRegistryPage() {
   const router = useRouter();
   const { status } = useSession();
+  const { showToast } = useToast();
   const [environment, setEnvironment] = useState<EnvironmentState>(null);
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
   const [bindings, setBindings] = useState<EvmContractBinding[]>([]);
@@ -274,10 +275,6 @@ export default function EvmContractsRegistryPage() {
   function goToLogin() {
     router.push("/login?callbackUrl=%2Fevm%2Fcontracts");
   }
-  const [flashMessage, setFlashMessage] = useState<{
-    title: string;
-    description?: string;
-  } | null>(null);
   const [artifactError, setArtifactError] = useState<string | null>(null);
   const [bindingError, setBindingError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<
@@ -358,20 +355,6 @@ export default function EvmContractsRegistryPage() {
 
     return subscribeEvmKeyring(loadActiveKey);
   }, []);
-
-  useEffect(() => {
-    if (!flashMessage) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setFlashMessage(null);
-    }, 2600);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [flashMessage]);
 
   const artifactsById = useMemo(
     () => Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifact])),
@@ -572,13 +555,13 @@ export default function EvmContractsRegistryPage() {
     try {
       if (artifactForm.id) {
         await updateEvmContractArtifact(artifactForm.id, artifactForm);
-        setFlashMessage({
+        showToast({
           title: "Artifact updated",
           description: `"${artifactForm.name.trim()}" was saved successfully.`,
         });
       } else {
         await createEvmContractArtifact(artifactForm);
-        setFlashMessage({
+        showToast({
           title: "Artifact created",
           description: `"${artifactForm.name.trim()}" was added successfully.`,
         });
@@ -657,7 +640,7 @@ export default function EvmContractsRegistryPage() {
           providerProfileId: environment.providerProfileId,
           providerName: environment.providerName,
         });
-        setFlashMessage({
+        showToast({
           title: "Binding updated",
           description: `"${bindingForm.label.trim() || bindingForm.address}" was updated successfully.`,
         });
@@ -668,7 +651,7 @@ export default function EvmContractsRegistryPage() {
           providerProfileId: environment.providerProfileId,
           providerName: environment.providerName,
         });
-        setFlashMessage({
+        showToast({
           title: "Binding created",
           description: `"${bindingForm.label.trim() || bindingForm.address}" was added successfully.`,
         });
@@ -899,7 +882,7 @@ export default function EvmContractsRegistryPage() {
         }
       }
 
-      setFlashMessage({
+      showToast({
         title: "Contract deployed",
         description: deployBindingError
           ? `Deployed to ${result.contractAddress}. Binding was not created.`
@@ -1002,12 +985,6 @@ export default function EvmContractsRegistryPage() {
 
   return (
     <AppShell>
-      {flashMessage ? (
-        <FlashMessage
-          title={flashMessage.title}
-          description={flashMessage.description}
-        />
-      ) : null}
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-4">

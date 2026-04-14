@@ -10,10 +10,8 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import {
-  getEvmKeyringSource,
   getActiveEvmStoredPrivateKey,
   listEvmStoredPrivateKeys,
   setActiveEvmStoredPrivateKey,
@@ -21,6 +19,11 @@ import {
   syncEvmKeyringFromServer,
   type EvmStoredPrivateKey,
 } from "@/domains/evm/client/keyring";
+import {
+  DEFAULT_EVM_PRIVATE_KEY_ID,
+  DEFAULT_EVM_PRIVATE_KEY_VALUE,
+  getDefaultAliceAddress,
+} from "@/platform/workbench/defaults";
 
 type ActiveEvmKeySelectorProps = {
   variant?: "default" | "topbar-context";
@@ -30,17 +33,38 @@ function formatAddressLabel(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-4)}`;
 }
 
+function getTopbarFallbackKey(): EvmStoredPrivateKey {
+  const address = getDefaultAliceAddress();
+
+  return {
+    id: DEFAULT_EVM_PRIVATE_KEY_ID,
+    name: "Alice",
+    address,
+    addressLower: address.toLowerCase(),
+    securityMode: "plain",
+    encryptedPrivateKey: null,
+    privateKey: DEFAULT_EVM_PRIVATE_KEY_VALUE,
+    iv: null,
+    salt: null,
+    authTag: null,
+    createdAt: 1,
+    updatedAt: 1,
+    lastUsedAt: null,
+  };
+}
+
 export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelectorProps) {
   const { status } = useSession();
   const [items, setItems] = useState<EvmStoredPrivateKey[]>([]);
   const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(null);
-  const [source, setSource] = useState<"guest" | "server">("guest");
+  const hasPersistedItems = items.length > 0;
+  const topbarItems = items.length ? items : [getTopbarFallbackKey()];
+  const topbarActiveItem = activeItem ?? topbarItems[0] ?? null;
 
   useEffect(() => {
     function load() {
       setItems(listEvmStoredPrivateKeys());
       setActiveItem(getActiveEvmStoredPrivateKey());
-      setSource(getEvmKeyringSource());
     }
 
     load();
@@ -49,19 +73,27 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
     return subscribeEvmKeyring(load);
   }, []);
 
+  const isAuthenticated = status === "authenticated";
   const manageHref = status === "authenticated" ? "/evm/settings/private-keys" : "/login?callbackUrl=%2Fevm%2Fsettings%2Fprivate-keys";
 
   if (!items.length) {
     if (variant === "topbar-context") {
       return (
         <div className="min-w-0 shrink-0">
-          <Select disabled>
-            <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] font-normal leading-none text-slate-500 shadow-none focus:ring-0">
+          <Select value={topbarActiveItem?.id} disabled>
+            <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] font-normal leading-none shadow-none focus:ring-0">
               <div className="flex min-w-0 items-center gap-1.5">
                 <IconKey className="size-3.5 shrink-0 text-slate-500" stroke={2} />
-                <SelectValue placeholder="No Key" />
+                <span className="truncate">{topbarActiveItem?.name ?? "Alice"}</span>
               </div>
             </SelectTrigger>
+            <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
+              {topbarItems.map((item) => (
+                <SelectItem key={item.id} value={item.id}>
+                  {`${item.name} · ${formatAddressLabel(item.address)}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
           </Select>
         </div>
       );
@@ -81,8 +113,8 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
     return (
       <div className="min-w-0 shrink-0">
         <Select
-          value={activeItem?.id}
-          disabled={items.length <= 1}
+          value={topbarActiveItem?.id}
+          disabled={!hasPersistedItems}
           onValueChange={(value) => {
             setActiveEvmStoredPrivateKey(value);
           }}
@@ -90,11 +122,11 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
           <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] font-normal leading-none shadow-none focus:ring-0">
             <div className="flex min-w-0 items-center gap-1.5">
               <IconKey className="size-3.5 shrink-0 text-slate-500" stroke={2} />
-              <span className="truncate">{activeItem?.name ?? "Select Key"}</span>
+              <span className="truncate">{topbarActiveItem?.name ?? "Alice"}</span>
             </div>
           </SelectTrigger>
           <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
-            {items.map((item) => (
+            {topbarItems.map((item) => (
               <SelectItem key={item.id} value={item.id}>
                 {`${item.name} · ${formatAddressLabel(item.address)}`}
               </SelectItem>
@@ -131,7 +163,7 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
       <Link
         href={manageHref}
         className="inline-flex h-6 items-center justify-center px-0.5 text-slate-500 transition hover:text-slate-900"
-        aria-label={source === "server" ? "Manage private keys" : "Sign in to manage private keys"}
+        aria-label={isAuthenticated ? "Manage private keys" : "Sign in to manage private keys"}
       >
         <IconPlus className="size-3.5" stroke={2} />
       </Link>
