@@ -36,53 +36,82 @@ const registryStoreSchema = z.object({
 export type EvmContractArtifact = z.infer<typeof artifactSchema>;
 export type EvmContractBinding = z.infer<typeof bindingSchema>;
 
-const STORAGE_KEY = "chaindev-evm-contract-registry-v1";
 const listeners = new Set<() => void>();
+let cache: z.infer<typeof registryStoreSchema> = {
+  artifacts: [],
+  bindings: [],
+};
+let loaded = false;
+let loadingPromise: Promise<void> | null = null;
 
 function emitChange() {
   listeners.forEach((listener) => listener());
 }
 
+function createAuthRequiredError() {
+  const error = new Error("AUTH_REQUIRED");
+  error.name = "AuthRequiredError";
+  return error;
+}
+
 function readRegistryStore() {
-  if (typeof window === "undefined") {
-    return {
-      artifacts: [],
-      bindings: [],
-    } satisfies z.infer<typeof registryStoreSchema>;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!raw) {
-      return {
-        artifacts: [],
-        bindings: [],
-      } satisfies z.infer<typeof registryStoreSchema>;
-    }
-
-    return registryStoreSchema.parse(JSON.parse(raw));
-  } catch {
-    return {
-      artifacts: [],
-      bindings: [],
-    } satisfies z.infer<typeof registryStoreSchema>;
-  }
+  return cache;
 }
 
 function writeRegistryStore(value: z.infer<typeof registryStoreSchema>) {
-  if (typeof window === "undefined") {
+  cache = registryStoreSchema.parse(value);
+  loaded = true;
+}
+
+async function parseError(response: Response, fallback: string) {
+  const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return body?.error?.message ?? fallback;
+}
+
+function ensureLoaded() {
+  if (loaded || loadingPromise) {
     return;
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+  loadingPromise = syncEvmContractRegistryFromServer().finally(() => {
+    loadingPromise = null;
+  });
 }
 
 export function replaceEvmContractRegistryStore(value: {
   artifacts: EvmContractArtifact[];
   bindings: EvmContractBinding[];
 }) {
-  writeRegistryStore(registryStoreSchema.parse(value));
+  writeRegistryStore(value);
+  emitChange();
+}
+
+export async function syncEvmContractRegistryFromServer() {
+  const response = await fetch("/api/workbench/evm/contract-registry", {
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    writeRegistryStore({
+      artifacts: [],
+      bindings: [],
+    });
+    emitChange();
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to load contract registry."));
+  }
+
+  const body = (await response.json()) as {
+    ok: boolean;
+    data: {
+      artifacts: EvmContractArtifact[];
+      bindings: EvmContractBinding[];
+    };
+  };
+  writeRegistryStore(body.data);
   emitChange();
 }
 
@@ -232,21 +261,22 @@ export function parseEvmContractArtifactImportPayload(raw: string) {
 }
 
 export function listEvmContractArtifacts() {
+  ensureLoaded();
   return readRegistryStore().artifacts.sort(
     (left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name),
   );
 }
 
 export function getEvmContractArtifact(artifactId: string) {
+  ensureLoaded();
   return readRegistryStore().artifacts.find((artifact) => artifact.id === artifactId) ?? null;
 }
 
-export function createEvmContractArtifact(input: {
+export async function createEvmContractArtifact(input: {
   name: string;
   abiJson: string;
   bytecode: string;
 }) {
-  const now = Date.now();
   const store = readRegistryStore();
   const name = input.name.trim();
 
@@ -267,26 +297,41 @@ export function createEvmContractArtifact(input: {
     throw new Error("An identical contract artifact already exists.");
   }
 
-  const artifact: EvmContractArtifact = {
-    id: crypto.randomUUID(),
-    name,
-    abiJson,
-    bytecode,
-    functionCount,
-    eventCount,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const response = await fetch("/api/workbench/evm/contract-registry", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      kind: "artifact",
+      name,
+      abiJson,
+      bytecode,
+      functionCount,
+      eventCount,
+    }),
+  });
+
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to save contract artifact."));
+  }
+
+  const body = (await response.json()) as { ok: boolean; data: EvmContractArtifact };
+  const artifact = body.data;
 
   writeRegistryStore({
     ...store,
-    artifacts: [artifact, ...store.artifacts],
+    artifacts: [artifact, ...store.artifacts.filter((item) => item.id !== artifact.id)],
   });
   emitChange();
   return artifact;
 }
 
-export function updateEvmContractArtifact(
+export async function updateEvmContractArtifact(
   artifactId: string,
   input: {
     name: string;
@@ -324,15 +369,34 @@ export function updateEvmContractArtifact(
     throw new Error("An identical contract artifact already exists.");
   }
 
-  const updated: EvmContractArtifact = {
-    ...previous,
-    name,
-    abiJson,
-    bytecode,
-    functionCount,
-    eventCount,
-    updatedAt: Date.now(),
-  };
+  const response = await fetch("/api/workbench/evm/contract-registry", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: artifactId,
+      payload: {
+        kind: "artifact",
+        name,
+        abiJson,
+        bytecode,
+        functionCount,
+        eventCount,
+      },
+    }),
+  });
+
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to update contract artifact."));
+  }
+
+  const body = (await response.json()) as { ok: boolean; data: EvmContractArtifact };
+  const updated = body.data;
 
   writeRegistryStore({
     ...store,
@@ -342,11 +406,26 @@ export function updateEvmContractArtifact(
   return updated;
 }
 
-export function deleteEvmContractArtifact(artifactId: string) {
+export async function deleteEvmContractArtifact(artifactId: string) {
   const store = readRegistryStore();
 
   if (store.bindings.some((binding) => binding.artifactId === artifactId)) {
     throw new Error("Remove deployed bindings for this artifact before deleting it.");
+  }
+
+  const response = await fetch(
+    `/api/workbench/evm/contract-registry?id=${encodeURIComponent(artifactId)}&kind=artifact`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to delete contract artifact."));
   }
 
   writeRegistryStore({
@@ -357,6 +436,7 @@ export function deleteEvmContractArtifact(artifactId: string) {
 }
 
 export function listEvmContractBindings() {
+  ensureLoaded();
   return readRegistryStore().bindings.sort(
     (left, right) => right.updatedAt - left.updatedAt || left.label.localeCompare(right.label),
   );
@@ -369,10 +449,11 @@ export function listEvmContractBindingsByScope(chainId: string, providerProfileI
 }
 
 export function getEvmContractBinding(bindingId: string) {
+  ensureLoaded();
   return readRegistryStore().bindings.find((binding) => binding.id === bindingId) ?? null;
 }
 
-export function createEvmContractBinding(input: {
+export async function createEvmContractBinding(input: {
   artifactId: string;
   address: string;
   label: string;
@@ -407,29 +488,37 @@ export function createEvmContractBinding(input: {
     throw new Error("This contract address is already bound under the current provider scope.");
   }
 
-  const now = Date.now();
-  const binding: EvmContractBinding = {
-    id: crypto.randomUUID(),
-    artifactId: input.artifactId,
-    address: input.address,
-    addressLower,
-    label: input.label.trim() || input.address,
-    chainId: input.chainId,
-    providerProfileId: input.providerProfileId,
-    providerName: input.providerName,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const response = await fetch("/api/workbench/evm/contract-registry", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      kind: "binding",
+      ...input,
+    }),
+  });
+
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to save bound contract."));
+  }
+
+  const body = (await response.json()) as { ok: boolean; data: EvmContractBinding };
+  const binding = body.data;
 
   writeRegistryStore({
     ...store,
-    bindings: [binding, ...store.bindings],
+    bindings: [binding, ...store.bindings.filter((item) => item.id !== binding.id)],
   });
   emitChange();
   return binding;
 }
 
-export function updateEvmContractBinding(
+export async function updateEvmContractBinding(
   bindingId: string,
   input: {
     artifactId: string;
@@ -473,17 +562,30 @@ export function updateEvmContractBinding(
     throw new Error("This contract address is already bound under the current provider scope.");
   }
 
-  const updated: EvmContractBinding = {
-    ...previous,
-    artifactId: input.artifactId,
-    address: input.address,
-    addressLower,
-    label: input.label.trim() || input.address,
-    chainId: input.chainId,
-    providerProfileId: input.providerProfileId,
-    providerName: input.providerName,
-    updatedAt: Date.now(),
-  };
+  const response = await fetch("/api/workbench/evm/contract-registry", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      id: bindingId,
+      payload: {
+        kind: "binding",
+        ...input,
+      },
+    }),
+  });
+
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to update bound contract."));
+  }
+
+  const body = (await response.json()) as { ok: boolean; data: EvmContractBinding };
+  const updated = body.data;
 
   writeRegistryStore({
     ...store,
@@ -493,8 +595,23 @@ export function updateEvmContractBinding(
   return updated;
 }
 
-export function deleteEvmContractBinding(bindingId: string) {
+export async function deleteEvmContractBinding(bindingId: string) {
   const store = readRegistryStore();
+
+  const response = await fetch(
+    `/api/workbench/evm/contract-registry?id=${encodeURIComponent(bindingId)}&kind=binding`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to delete bound contract."));
+  }
 
   writeRegistryStore({
     ...store,

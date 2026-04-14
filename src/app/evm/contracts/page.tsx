@@ -10,6 +10,8 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type AbiParameter } from "viem";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
@@ -231,6 +233,8 @@ function buildDeploySimulationKey(input: {
 }
 
 export default function EvmContractsRegistryPage() {
+  const router = useRouter();
+  const { status } = useSession();
   const [environment, setEnvironment] = useState<EnvironmentState>(null);
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
   const [bindings, setBindings] = useState<EvmContractBinding[]>([]);
@@ -266,6 +270,10 @@ export default function EvmContractsRegistryPage() {
   const [deployUnlockPassword, setDeployUnlockPassword] = useState("");
   const [deployUnlockError, setDeployUnlockError] = useState<string | null>(null);
   const [pendingDeployAction, setPendingDeployAction] = useState<"fill" | "deploy" | null>(null);
+
+  function goToLogin() {
+    router.push("/login?callbackUrl=%2Fevm%2Fcontracts");
+  }
   const [flashMessage, setFlashMessage] = useState<{
     title: string;
     description?: string;
@@ -440,6 +448,11 @@ export default function EvmContractsRegistryPage() {
   }
 
   function startArtifactEdit(artifact: EvmContractArtifact) {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     setArtifactForm({
       id: artifact.id,
       name: artifact.name,
@@ -452,11 +465,21 @@ export default function EvmContractsRegistryPage() {
   }
 
   function startArtifactCreate() {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     resetArtifactForm();
     setArtifactDialogOpen(true);
   }
 
   function startBindingEdit(binding: EvmContractBinding) {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     setBindingForm({
       id: binding.id,
       artifactId: binding.artifactId,
@@ -468,6 +491,11 @@ export default function EvmContractsRegistryPage() {
   }
 
   function startBindingCreate(artifact?: EvmContractArtifact) {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     setBindingForm({
       id: null,
       artifactId: artifact?.id ?? "",
@@ -527,6 +555,9 @@ export default function EvmContractsRegistryPage() {
     return () => {
       window.clearTimeout(timeout);
     };
+  // fillDeployDefaults is intentionally omitted here so the debounce effect only reacts
+  // to simulation inputs, not to the recreated function identity on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeKey,
     deployActionLoading,
@@ -537,16 +568,16 @@ export default function EvmContractsRegistryPage() {
     isDeploySimulationReady,
   ]);
 
-  function handleSaveArtifact() {
+  async function handleSaveArtifact() {
     try {
       if (artifactForm.id) {
-        updateEvmContractArtifact(artifactForm.id, artifactForm);
+        await updateEvmContractArtifact(artifactForm.id, artifactForm);
         setFlashMessage({
           title: "Artifact updated",
           description: `"${artifactForm.name.trim()}" was saved successfully.`,
         });
       } else {
-        createEvmContractArtifact(artifactForm);
+        await createEvmContractArtifact(artifactForm);
         setFlashMessage({
           title: "Artifact created",
           description: `"${artifactForm.name.trim()}" was added successfully.`,
@@ -556,6 +587,11 @@ export default function EvmContractsRegistryPage() {
       resetArtifactForm();
       setArtifactDialogOpen(false);
     } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+        return;
+      }
+
       setArtifactError(
         normalizeWorkbenchErrorMessage(
           error instanceof Error ? error.message : "Failed to save contract artifact.",
@@ -607,7 +643,7 @@ export default function EvmContractsRegistryPage() {
     applyImportedArtifact(trimmedValue);
   }
 
-  function handleSaveBinding() {
+  async function handleSaveBinding() {
     if (!environment) {
       setBindingError("No active EVM provider selected.");
       return;
@@ -615,7 +651,7 @@ export default function EvmContractsRegistryPage() {
 
     try {
       if (bindingForm.id) {
-        updateEvmContractBinding(bindingForm.id, {
+        await updateEvmContractBinding(bindingForm.id, {
           ...bindingForm,
           chainId: environment.chainId,
           providerProfileId: environment.providerProfileId,
@@ -626,7 +662,7 @@ export default function EvmContractsRegistryPage() {
           description: `"${bindingForm.label.trim() || bindingForm.address}" was updated successfully.`,
         });
       } else {
-        createEvmContractBinding({
+        await createEvmContractBinding({
           ...bindingForm,
           chainId: environment.chainId,
           providerProfileId: environment.providerProfileId,
@@ -641,6 +677,11 @@ export default function EvmContractsRegistryPage() {
       resetBindingForm();
       setBindingDialogOpen(false);
     } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+        return;
+      }
+
       setBindingError(
         normalizeWorkbenchErrorMessage(
           error instanceof Error ? error.message : "Failed to save contract binding.",
@@ -841,7 +882,7 @@ export default function EvmContractsRegistryPage() {
 
       if (deployBindingLabel.trim() && environment) {
         try {
-          const binding = createEvmContractBinding({
+          const binding = await createEvmContractBinding({
             artifactId: deployArtifact.id,
             address: result.contractAddress,
             label: deployBindingLabel.trim(),
@@ -914,20 +955,20 @@ export default function EvmContractsRegistryPage() {
     }
   }
 
-  function handleConfirmDelete() {
+  async function handleConfirmDelete() {
     if (!deleteTarget) {
       return;
     }
 
     try {
       if (deleteTarget.type === "artifact") {
-        deleteEvmContractArtifact(deleteTarget.id);
+        await deleteEvmContractArtifact(deleteTarget.id);
 
         if (artifactForm.id === deleteTarget.id) {
           resetArtifactForm();
         }
       } else {
-        deleteEvmContractBinding(deleteTarget.id);
+        await deleteEvmContractBinding(deleteTarget.id);
 
         if (bindingForm.id === deleteTarget.id) {
           resetBindingForm();
@@ -936,6 +977,11 @@ export default function EvmContractsRegistryPage() {
 
       setDeleteTarget(null);
     } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+        return;
+      }
+
       if (deleteTarget.type === "artifact") {
         setArtifactError(
           normalizeWorkbenchErrorMessage(
@@ -1171,7 +1217,9 @@ export default function EvmContractsRegistryPage() {
           title={deleteTarget?.title ?? "Delete"}
           description={deleteTarget?.description}
           confirmLabel="Delete"
-          onConfirm={handleConfirmDelete}
+          onConfirm={() => {
+            void handleConfirmDelete();
+          }}
         />
 
         <ModalDialog
@@ -1197,7 +1245,7 @@ export default function EvmContractsRegistryPage() {
               >
                 Cancel
               </Button>
-              <Button type="button" onClick={handleSaveArtifact}>
+              <Button type="button" onClick={() => void handleSaveArtifact()}>
                 {artifactForm.id ? "Update Artifact" : "Save Artifact"}
               </Button>
             </>
@@ -1277,7 +1325,7 @@ export default function EvmContractsRegistryPage() {
               >
                 Cancel
               </Button>
-              <Button type="button" onClick={handleSaveBinding} disabled={!artifacts.length}>
+              <Button type="button" onClick={() => void handleSaveBinding()} disabled={!artifacts.length}>
                 {bindingForm.id ? "Update Binding" : "Save Binding"}
               </Button>
             </>

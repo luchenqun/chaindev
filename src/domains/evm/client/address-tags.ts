@@ -3,17 +3,6 @@
 import { isAddress } from "viem";
 import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
 
-type EvmAddressTagRecord = {
-  address: string;
-  addressLower: string;
-  nameTag: string;
-  tagType: "manual";
-  source: "user";
-  updatedAt: number;
-};
-
-type EvmAddressTagScopeMap = Record<string, Record<string, EvmAddressTagRecord>>;
-
 export type EvmAddressTagItem = {
   address: string;
   addressLower: string;
@@ -21,67 +10,21 @@ export type EvmAddressTagItem = {
   updatedAt: number;
 };
 
-export type EvmAddressTagMigrationItem = EvmAddressTagItem & {
+type ServerAddressTagItem = EvmAddressTagItem & {
   providerProfileId: string;
+  providerName: string | null;
 };
 
-const STORAGE_KEY = "chaindev-evm-address-tags-v1";
+type AddressTagCache = Record<string, EvmAddressTagItem[]>;
+
 const listeners = new Set<() => void>();
+
+let cache: AddressTagCache = {};
+let loadingPromise: Promise<void> | null = null;
+let loaded = false;
 
 function emitChange() {
   listeners.forEach((listener) => listener());
-}
-
-function getActiveTagScope() {
-  const profile = readActiveRpcProfileCookie("evm");
-  return profile?.id ?? "default";
-}
-
-function readTagStore() {
-  if (typeof window === "undefined") {
-    return {} satisfies EvmAddressTagScopeMap;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!raw) {
-      return {} satisfies EvmAddressTagScopeMap;
-    }
-
-    return JSON.parse(raw) as EvmAddressTagScopeMap;
-  } catch {
-    return {} satisfies EvmAddressTagScopeMap;
-  }
-}
-
-function writeTagStore(value: EvmAddressTagScopeMap) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-}
-
-export function replaceAllEvmAddressTagsForMigration(items: EvmAddressTagMigrationItem[]) {
-  const nextStore = items.reduce<EvmAddressTagScopeMap>((accumulator, item) => {
-    const scopeEntries = accumulator[item.providerProfileId] ?? {};
-
-    scopeEntries[item.addressLower] = {
-      address: item.address,
-      addressLower: item.addressLower,
-      nameTag: item.nameTag,
-      tagType: "manual",
-      source: "user",
-      updatedAt: item.updatedAt,
-    };
-
-    accumulator[item.providerProfileId] = scopeEntries;
-    return accumulator;
-  }, {});
-
-  writeTagStore(nextStore);
-  emitChange();
 }
 
 function normalizeAddress(address: string) {
@@ -92,116 +35,218 @@ function normalizeAddress(address: string) {
   return address.toLowerCase();
 }
 
+function getActiveTagScope() {
+  return readActiveRpcProfileCookie("evm")?.id ?? "default";
+}
+
+function sortItems(items: EvmAddressTagItem[]) {
+  return [...items].sort(
+    (left, right) => right.updatedAt - left.updatedAt || left.address.localeCompare(right.address),
+  );
+}
+
+function getScopedItems(scope = getActiveTagScope()) {
+  return cache[scope] ?? [];
+}
+
+function mapServerData(items: ServerAddressTagItem[]) {
+  return items.reduce<AddressTagCache>((accumulator, item) => {
+    const scopeItems = accumulator[item.providerProfileId] ?? [];
+
+    scopeItems.push({
+      address: item.address,
+      addressLower: item.addressLower,
+      nameTag: item.nameTag,
+      updatedAt: item.updatedAt,
+    });
+
+    accumulator[item.providerProfileId] = scopeItems;
+    return accumulator;
+  }, {});
+}
+
+async function parseError(response: Response, fallback: string) {
+  const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return body?.error?.message ?? fallback;
+}
+
+function createAuthRequiredError() {
+  const error = new Error("AUTH_REQUIRED");
+  error.name = "AuthRequiredError";
+  return error;
+}
+
+function ensureLoaded() {
+  if (loaded || loadingPromise) {
+    return;
+  }
+
+  loadingPromise = syncEvmAddressTagsFromServer().finally(() => {
+    loadingPromise = null;
+  });
+}
+
+export async function syncEvmAddressTagsFromServer() {
+  const response = await fetch("/api/workbench/evm/address-tags", {
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    cache = {};
+    loaded = true;
+    emitChange();
+    return;
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to load address tags."));
+  }
+
+  const body = (await response.json()) as { ok: boolean; data: ServerAddressTagItem[] };
+  cache = mapServerData(body.data);
+  loaded = true;
+  emitChange();
+}
+
 export function getEvmAddressTag(address: string) {
+  ensureLoaded();
+
   const addressLower = normalizeAddress(address);
-  const store = readTagStore();
-  const scope = getActiveTagScope();
-  return store[scope]?.[addressLower]?.nameTag ?? null;
+  return getScopedItems().find((item) => item.addressLower === addressLower)?.nameTag ?? null;
 }
 
 export function getEvmAddressTags(addresses: string[]) {
-  const scope = getActiveTagScope();
-  const store = readTagStore();
-  const scopeEntries = store[scope] ?? {};
+  ensureLoaded();
+
+  const scopedItems = getScopedItems();
 
   return Object.fromEntries(
     addresses
       .filter((address) => isAddress(address))
-      .map((address) => [address, scopeEntries[address.toLowerCase()]?.nameTag ?? null]),
+      .map((address) => [
+        address,
+        scopedItems.find((item) => item.addressLower === address.toLowerCase())?.nameTag ?? null,
+      ]),
   ) as Record<string, string | null>;
 }
 
 export function listEvmAddressTags(): EvmAddressTagItem[] {
-  const scope = getActiveTagScope();
-  const store = readTagStore();
-  const scopeEntries = Object.values(store[scope] ?? {});
-
-  return scopeEntries
-    .map((entry) => ({
-      address: entry.address,
-      addressLower: entry.addressLower,
-      nameTag: entry.nameTag,
-      updatedAt: entry.updatedAt,
-    }))
-    .sort((left, right) => right.updatedAt - left.updatedAt || left.address.localeCompare(right.address));
+  ensureLoaded();
+  return sortItems(getScopedItems());
 }
 
-export function listAllEvmAddressTagsForMigration(): EvmAddressTagMigrationItem[] {
-  const store = readTagStore();
-
-  return Object.entries(store)
-    .flatMap(([providerProfileId, scopeEntries]) =>
-      Object.values(scopeEntries).map((entry) => ({
-        providerProfileId,
-        address: entry.address,
-        addressLower: entry.addressLower,
-        nameTag: entry.nameTag,
-        updatedAt: entry.updatedAt,
-      })),
-    )
-    .sort((left, right) => right.updatedAt - left.updatedAt || left.address.localeCompare(right.address));
-}
-
-export function upsertEvmAddressTag(address: string, nameTag: string) {
+export async function upsertEvmAddressTag(address: string, nameTag: string) {
   const normalizedNameTag = nameTag.trim();
 
   if (!normalizedNameTag) {
-    deleteEvmAddressTag(address);
-    return;
+    return deleteEvmAddressTag(address);
   }
 
-  const addressLower = normalizeAddress(address);
-  const scope = getActiveTagScope();
-  const store = readTagStore();
-  const nextScopeEntries = {
-    ...(store[scope] ?? {}),
-    [addressLower]: {
+  const activeProfile = readActiveRpcProfileCookie("evm");
+
+  if (!activeProfile) {
+    throw new Error("No active EVM provider selected.");
+  }
+
+  const response = await fetch("/api/workbench/evm/address-tags", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      providerProfileId: activeProfile.id,
+      providerName: activeProfile.name,
       address,
-      addressLower,
       nameTag: normalizedNameTag,
-      tagType: "manual",
-      source: "user",
-      updatedAt: Date.now(),
-    } satisfies EvmAddressTagRecord,
+    }),
+  });
+
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to save name tag."));
+  }
+
+  const body = (await response.json()) as { ok: boolean; data: ServerAddressTagItem };
+  const scope = body.data.providerProfileId;
+  const nextItem: EvmAddressTagItem = {
+    address: body.data.address,
+    addressLower: body.data.addressLower,
+    nameTag: body.data.nameTag,
+    updatedAt: body.data.updatedAt,
   };
 
-  writeTagStore({
-    ...store,
-    [scope]: nextScopeEntries,
-  });
+  cache = {
+    ...cache,
+    [scope]: sortItems([
+      nextItem,
+      ...getScopedItems(scope).filter((item) => item.addressLower !== nextItem.addressLower),
+    ]),
+  };
+  loaded = true;
   emitChange();
 }
 
-export function deleteEvmAddressTag(address: string) {
-  const addressLower = normalizeAddress(address);
-  const scope = getActiveTagScope();
-  const store = readTagStore();
-  const scopeEntries = { ...(store[scope] ?? {}) };
+export async function deleteEvmAddressTag(address: string) {
+  const activeProfile = readActiveRpcProfileCookie("evm");
 
-  if (!(addressLower in scopeEntries)) {
-    return;
+  if (!activeProfile) {
+    throw new Error("No active EVM provider selected.");
   }
 
-  delete scopeEntries[addressLower];
+  const response = await fetch(
+    `/api/workbench/evm/address-tags?providerProfileId=${encodeURIComponent(activeProfile.id)}&address=${encodeURIComponent(address)}`,
+    {
+      method: "DELETE",
+    },
+  );
 
-  writeTagStore({
-    ...store,
-    [scope]: scopeEntries,
-  });
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to delete name tag."));
+  }
+
+  const normalizedAddressLower = normalizeAddress(address);
+  cache = {
+    ...cache,
+    [activeProfile.id]: getScopedItems(activeProfile.id).filter((item) => item.addressLower !== normalizedAddressLower),
+  };
+  loaded = true;
   emitChange();
 }
 
-export function clearEvmAddressTags() {
-  const scope = getActiveTagScope();
-  const store = readTagStore();
+export async function clearEvmAddressTags() {
+  const activeProfile = readActiveRpcProfileCookie("evm");
 
-  if (!(scope in store)) {
-    return;
+  if (!activeProfile) {
+    throw new Error("No active EVM provider selected.");
   }
 
-  const nextStore = { ...store };
-  delete nextStore[scope];
-  writeTagStore(nextStore);
+  const response = await fetch(
+    `/api/workbench/evm/address-tags?providerProfileId=${encodeURIComponent(activeProfile.id)}&clear=1`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  if (response.status === 401) {
+    throw createAuthRequiredError();
+  }
+
+  if (!response.ok) {
+    throw new Error(await parseError(response, "Failed to clear name tags."));
+  }
+
+  cache = {
+    ...cache,
+    [activeProfile.id]: [],
+  };
+  loaded = true;
   emitChange();
 }
 

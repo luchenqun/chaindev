@@ -2,6 +2,8 @@
 
 import { IconPencil, IconTrash } from "@tabler/icons-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +37,8 @@ function formatUpdatedAt(timestamp: number) {
 }
 
 export default function EvmNameTagsPage() {
+  const router = useRouter();
+  const { status } = useSession();
   const [items, setItems] = useState<EvmAddressTagItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState("");
@@ -46,6 +50,10 @@ export default function EvmNameTagsPage() {
   const [deleteTarget, setDeleteTarget] = useState<EvmAddressTagItem | null>(null);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [providerName, setProviderName] = useState("Current Provider");
+
+  function goToLogin() {
+    router.push("/login?callbackUrl=%2Fevm%2Fsettings%2Fname-tags");
+  }
 
   useEffect(() => {
     function load() {
@@ -93,35 +101,57 @@ export default function EvmNameTagsPage() {
     );
   }, [items, searchText]);
 
-  function handleCreate() {
+  async function handleCreate() {
     try {
-      upsertEvmAddressTag(newAddress, newNameTag);
+      await upsertEvmAddressTag(newAddress, newNameTag);
       setNewAddress("");
       setNewNameTag("");
       setCreateError(null);
     } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+        return;
+      }
+
       setCreateError(error instanceof Error ? error.message : "Failed to save name tag.");
     }
   }
 
   function handleStartEdit(item: EvmAddressTagItem) {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     setEditingAddress(item.address);
     setEditingValue(item.nameTag);
     setDeleteTarget(null);
   }
 
-  function handleSaveEdit(address: string) {
+  async function handleSaveEdit(address: string) {
     try {
-      upsertEvmAddressTag(address, editingValue);
+      await upsertEvmAddressTag(address, editingValue);
       setEditingAddress(null);
       setEditingValue("");
-    } catch {
+    } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+      }
+
       // Ignore invalid save attempts and let the current input remain editable.
     }
   }
 
-  function handleDelete(address: string) {
-    deleteEvmAddressTag(address);
+  async function handleDelete(address: string) {
+    try {
+      await deleteEvmAddressTag(address);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+      }
+
+      return;
+    }
 
     if (editingAddress === address) {
       setEditingAddress(null);
@@ -129,8 +159,17 @@ export default function EvmNameTagsPage() {
     }
   }
 
-  function handleClearAll() {
-    clearEvmAddressTags();
+  async function handleClearAll() {
+    try {
+      await clearEvmAddressTags();
+    } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+      }
+
+      return;
+    }
+
     setEditingAddress(null);
     setEditingValue("");
     setDeleteTarget(null);
@@ -179,9 +218,16 @@ export default function EvmNameTagsPage() {
             <Button
               type="button"
               disabled={!newAddress.trim() || !newNameTag.trim()}
-              onClick={handleCreate}
+              onClick={() => {
+                if (status !== "authenticated") {
+                  goToLogin();
+                  return;
+                }
+
+                void handleCreate();
+              }}
             >
-              Save Tag
+              {status === "authenticated" ? "Save Tag" : "Sign In to Save"}
             </Button>
           </div>
           {createError ? <p className="px-5 pb-4 text-sm text-rose-600">{createError}</p> : null}
@@ -209,7 +255,14 @@ export default function EvmNameTagsPage() {
                 type="button"
                 variant="outline"
                 disabled={!items.length}
-                onClick={() => setClearDialogOpen(true)}
+                onClick={() => {
+                  if (status !== "authenticated") {
+                    goToLogin();
+                    return;
+                  }
+
+                  setClearDialogOpen(true);
+                }}
               >
                 Clear All
               </Button>
@@ -265,7 +318,7 @@ export default function EvmNameTagsPage() {
                         <div className="flex justify-end gap-0">
                           {editingAddress === item.address ? (
                             <>
-                              <Button size="sm" type="button" onClick={() => handleSaveEdit(item.address)}>
+                              <Button size="sm" type="button" onClick={() => void handleSaveEdit(item.address)}>
                                 Save
                               </Button>
                               <Button
@@ -295,7 +348,14 @@ export default function EvmNameTagsPage() {
                                 className="text-slate-400 hover:text-rose-600"
                                 tooltip="Delete name tag"
                                 aria-label="Delete name tag"
-                                onClick={() => setDeleteTarget(item)}
+                                onClick={() => {
+                                  if (status !== "authenticated") {
+                                    goToLogin();
+                                    return;
+                                  }
+
+                                  setDeleteTarget(item);
+                                }}
                               >
                                 <IconTrash className="size-4" stroke={1.8} />
                               </ActionIconButton>
@@ -332,7 +392,7 @@ export default function EvmNameTagsPage() {
           confirmLabel="Delete"
           onConfirm={() => {
             if (deleteTarget) {
-              handleDelete(deleteTarget.address);
+              void handleDelete(deleteTarget.address);
             }
           }}
         />
@@ -342,7 +402,9 @@ export default function EvmNameTagsPage() {
           title="Clear All Name Tags"
           description={`Clear all ${items.length.toLocaleString("en-US")} name tags under the current provider scope?`}
           confirmLabel="Clear All"
-          onConfirm={handleClearAll}
+          onConfirm={() => {
+            void handleClearAll();
+          }}
         />
       </main>
     </AppShell>

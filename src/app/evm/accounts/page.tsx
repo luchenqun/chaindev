@@ -2,6 +2,7 @@
 
 import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
@@ -49,6 +50,7 @@ function buildPageHref(pathname: string, searchParams: URLSearchParams, page: nu
 function EvmAccountsPageContent() {
   const pathname = usePathname();
   const router = useRouter();
+  const { status } = useSession();
   const searchParams = useSearchParams();
   const searchParamsText = searchParams.toString();
   const currentPage = parsePageParam(searchParams.get("page"));
@@ -62,6 +64,10 @@ function EvmAccountsPageContent() {
   const [tagInputValue, setTagInputValue] = useState("");
   const [tagErrorMessage, setTagErrorMessage] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ address: string; nameTag: string } | null>(null);
+
+  function goToLogin() {
+    router.push("/login?callbackUrl=%2Fevm%2Faccounts");
+  }
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -159,6 +165,11 @@ function EvmAccountsPageContent() {
   }
 
   function handleStartTagEdit(address: string) {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     setEditingTagAddress(address);
     setTagInputValue(nameTagsByAddress[address] ?? "");
     setTagErrorMessage(null);
@@ -171,19 +182,32 @@ function EvmAccountsPageContent() {
     setTagErrorMessage(null);
   }
 
-  function handleSaveTag(address: string) {
+  async function handleSaveTag(address: string) {
     try {
-      upsertEvmAddressTag(address, tagInputValue);
+      await upsertEvmAddressTag(address, tagInputValue);
       setEditingTagAddress(null);
       setTagInputValue("");
       setTagErrorMessage(null);
     } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+        return;
+      }
+
       setTagErrorMessage(error instanceof Error ? error.message : "Failed to save name tag.");
     }
   }
 
-  function handleDeleteTag(address: string) {
-    deleteEvmAddressTag(address);
+  async function handleDeleteTag(address: string) {
+    try {
+      await deleteEvmAddressTag(address);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+      }
+
+      return;
+    }
 
     if (editingTagAddress === address) {
       setEditingTagAddress(null);
@@ -303,7 +327,18 @@ function EvmAccountsPageContent() {
                               placeholder="Name tag"
                             />
                             <div className="flex gap-2">
-                              <Button size="sm" type="button" onClick={() => handleSaveTag(account.address)}>
+                              <Button
+                                size="sm"
+                                type="button"
+                                onClick={() => {
+                                  if (status !== "authenticated") {
+                                    goToLogin();
+                                    return;
+                                  }
+
+                                  void handleSaveTag(account.address);
+                                }}
+                              >
                                 Save
                               </Button>
                               <Button size="sm" type="button" variant="ghost" onClick={handleCancelTagEdit}>
@@ -349,12 +384,17 @@ function EvmAccountsPageContent() {
                                   className="text-slate-400 hover:text-rose-600"
                                   tooltip="Delete name tag"
                                   aria-label="Delete name tag"
-                                  onClick={() =>
+                                  onClick={() => {
+                                    if (status !== "authenticated") {
+                                      goToLogin();
+                                      return;
+                                    }
+
                                     setDeleteTarget({
                                       address: account.address,
                                       nameTag: nameTagsByAddress[account.address] ?? "",
-                                    })
-                                  }
+                                    });
+                                  }}
                                 >
                                   <IconTrash className="size-4" stroke={1.8} />
                                 </ActionIconButton>
@@ -401,7 +441,7 @@ function EvmAccountsPageContent() {
           confirmLabel="Delete"
           onConfirm={() => {
             if (deleteTarget) {
-              handleDeleteTag(deleteTarget.address);
+              void handleDeleteTag(deleteTarget.address);
             }
           }}
         />

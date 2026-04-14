@@ -1,4 +1,5 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { isAddress } from "viem";
 import { db } from "@/db/client";
 import { evmContractArtifacts, evmContractBindings } from "@/db/schema/workbench";
@@ -33,6 +34,182 @@ export async function listServerEvmContractBindings(userId: string) {
     .from(evmContractBindings)
     .where(eq(evmContractBindings.userId, userId))
     .orderBy(desc(evmContractBindings.updatedAt));
+}
+
+export async function createServerEvmContractArtifact(input: {
+  userId: string;
+  name: string;
+  abiJson: string;
+  bytecode: string | null;
+  functionCount: number;
+  eventCount: number;
+}) {
+  const now = Date.now();
+  const row = {
+    id: randomUUID(),
+    userId: input.userId,
+    name: input.name.trim(),
+    abiJson: input.abiJson,
+    bytecode: input.bytecode,
+    functionCount: input.functionCount,
+    eventCount: input.eventCount,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  db.insert(evmContractArtifacts).values(row).run();
+  return row;
+}
+
+export async function updateServerEvmContractArtifact(input: {
+  userId: string;
+  id: string;
+  name: string;
+  abiJson: string;
+  bytecode: string | null;
+  functionCount: number;
+  eventCount: number;
+}) {
+  db
+    .update(evmContractArtifacts)
+    .set({
+      name: input.name.trim(),
+      abiJson: input.abiJson,
+      bytecode: input.bytecode,
+      functionCount: input.functionCount,
+      eventCount: input.eventCount,
+      updatedAt: Date.now(),
+    })
+    .where(and(eq(evmContractArtifacts.userId, input.userId), eq(evmContractArtifacts.id, input.id)))
+    .run();
+
+  return (
+    (await db.query.evmContractArtifacts.findFirst({
+      where: and(eq(evmContractArtifacts.userId, input.userId), eq(evmContractArtifacts.id, input.id)),
+    })) ?? null
+  );
+}
+
+export async function deleteServerEvmContractArtifact(userId: string, id: string) {
+  const binding = await db.query.evmContractBindings.findFirst({
+    where: and(eq(evmContractBindings.userId, userId), eq(evmContractBindings.artifactId, id)),
+  });
+
+  if (binding) {
+    throw new Error("Remove deployed bindings for this artifact before deleting it.");
+  }
+
+  db.delete(evmContractArtifacts).where(and(eq(evmContractArtifacts.userId, userId), eq(evmContractArtifacts.id, id))).run();
+  return { id };
+}
+
+export async function createServerEvmContractBinding(input: {
+  userId: string;
+  artifactId: string;
+  address: string;
+  label: string;
+  chainId: string;
+  providerProfileId: string;
+  providerName: string;
+}) {
+  const artifact = await db.query.evmContractArtifacts.findFirst({
+    where: and(eq(evmContractArtifacts.userId, input.userId), eq(evmContractArtifacts.id, input.artifactId)),
+  });
+
+  if (!artifact) {
+    throw new Error("Select a saved artifact first.");
+  }
+
+  const addressLower = normalizeBindingAddress(input.address);
+  const duplicate = await db.query.evmContractBindings.findFirst({
+    where: and(
+      eq(evmContractBindings.userId, input.userId),
+      eq(evmContractBindings.providerProfileId, input.providerProfileId),
+      eq(evmContractBindings.chainId, input.chainId),
+      eq(evmContractBindings.addressLower, addressLower),
+    ),
+  });
+
+  if (duplicate) {
+    throw new Error("This contract address is already bound under the current provider scope.");
+  }
+
+  const now = Date.now();
+  const row = {
+    id: randomUUID(),
+    userId: input.userId,
+    artifactId: input.artifactId,
+    address: input.address,
+    addressLower,
+    label: input.label.trim() || input.address,
+    chainId: input.chainId,
+    providerProfileId: input.providerProfileId,
+    providerName: input.providerName,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  db.insert(evmContractBindings).values(row).run();
+  return row;
+}
+
+export async function updateServerEvmContractBinding(input: {
+  userId: string;
+  id: string;
+  artifactId: string;
+  address: string;
+  label: string;
+  chainId: string;
+  providerProfileId: string;
+  providerName: string;
+}) {
+  const artifact = await db.query.evmContractArtifacts.findFirst({
+    where: and(eq(evmContractArtifacts.userId, input.userId), eq(evmContractArtifacts.id, input.artifactId)),
+  });
+
+  if (!artifact) {
+    throw new Error("Select a saved artifact first.");
+  }
+
+  const addressLower = normalizeBindingAddress(input.address);
+  const duplicate = await db.query.evmContractBindings.findFirst({
+    where: and(
+      eq(evmContractBindings.userId, input.userId),
+      eq(evmContractBindings.providerProfileId, input.providerProfileId),
+      eq(evmContractBindings.chainId, input.chainId),
+      eq(evmContractBindings.addressLower, addressLower),
+    ),
+  });
+
+  if (duplicate && duplicate.id !== input.id) {
+    throw new Error("This contract address is already bound under the current provider scope.");
+  }
+
+  db
+    .update(evmContractBindings)
+    .set({
+      artifactId: input.artifactId,
+      address: input.address,
+      addressLower,
+      label: input.label.trim() || input.address,
+      chainId: input.chainId,
+      providerProfileId: input.providerProfileId,
+      providerName: input.providerName,
+      updatedAt: Date.now(),
+    })
+    .where(and(eq(evmContractBindings.userId, input.userId), eq(evmContractBindings.id, input.id)))
+    .run();
+
+  return (
+    (await db.query.evmContractBindings.findFirst({
+      where: and(eq(evmContractBindings.userId, input.userId), eq(evmContractBindings.id, input.id)),
+    })) ?? null
+  );
+}
+
+export async function deleteServerEvmContractBinding(userId: string, id: string) {
+  db.delete(evmContractBindings).where(and(eq(evmContractBindings.userId, userId), eq(evmContractBindings.id, id))).run();
+  return { id };
 }
 
 export async function importServerEvmContractRegistry(

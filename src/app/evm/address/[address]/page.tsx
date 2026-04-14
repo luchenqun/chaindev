@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 import { IconBinaryTree2, IconFileDots, IconInfoCircle, IconTag } from "@tabler/icons-react";
 import { RelativeTime } from "@/components/relative-time";
@@ -210,6 +211,7 @@ function AddressMetric({
 export default function EvmAddressPage() {
   const params = useParams<{ address: string }>();
   const router = useRouter();
+  const { status } = useSession();
   const searchParams = useSearchParams();
   const address = params.address;
   const isValid = useMemo(() => /^0x[a-fA-F0-9]{40}$/.test(address), [address]);
@@ -244,6 +246,10 @@ export default function EvmAddressPage() {
   >({});
   const [receiptLoading, setReceiptLoading] = useState(false);
   const currencyName = getActiveEvmCurrencyNameClient();
+
+  function goToLogin() {
+    router.push(`/login?callbackUrl=${encodeURIComponent(`/evm/address/${address}`)}`);
+  }
 
   useEffect(() => {
     if (!isValid) {
@@ -494,28 +500,50 @@ export default function EvmAddressPage() {
     };
   }, [visibleAddresses]);
 
-  function handleSaveTag() {
-    if (tagInput.trim()) {
-      upsertEvmAddressTag(address, tagInput);
-    } else {
-      deleteEvmAddressTag(address);
-    }
+  async function handleSaveTag() {
+    try {
+      if (tagInput.trim()) {
+        await upsertEvmAddressTag(address, tagInput);
+      } else {
+        await deleteEvmAddressTag(address);
+      }
 
-    setTagDialogOpen(false);
+      setTagDialogOpen(false);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+      }
+    }
   }
 
-  function handleRemoveTag() {
-    deleteEvmAddressTag(address);
-    setTagInput("");
-    setTagDialogOpen(false);
+  async function handleRemoveTag() {
+    try {
+      await deleteEvmAddressTag(address);
+      setTagInput("");
+      setTagDialogOpen(false);
+    } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+      }
+    }
   }
 
   function openTagDialog() {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     setTagInput(nameTag ?? "");
     setTagDialogOpen(true);
   }
 
   function openBindingDialog() {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
     const defaultArtifact =
       (contractBinding ? getEvmContractArtifact(contractBinding.artifactId) : contractArtifact) ?? artifacts[0] ?? null;
 
@@ -530,7 +558,7 @@ export default function EvmAddressPage() {
     setBindingLabelInput(artifacts.find((artifact) => artifact.id === nextArtifactId)?.name ?? "");
   }
 
-  function handleSaveBinding() {
+  async function handleSaveBinding() {
     if (!contractEnvironment) {
       setBindingError("Current provider environment is unavailable.");
       return;
@@ -554,14 +582,19 @@ export default function EvmAddressPage() {
       };
 
       if (contractBinding) {
-        updateEvmContractBinding(contractBinding.id, payload);
+        await updateEvmContractBinding(contractBinding.id, payload);
       } else {
-        createEvmContractBinding(payload);
+        await createEvmContractBinding(payload);
       }
 
       setBindingDialogOpen(false);
       setBindingError(null);
     } catch (error) {
+      if (error instanceof Error && error.name === "AuthRequiredError") {
+        goToLogin();
+        return;
+      }
+
       setBindingError(error instanceof Error ? error.message : "Failed to bind artifact.");
     }
   }
@@ -967,7 +1000,7 @@ export default function EvmAddressPage() {
               <Button type="button" variant="outline" onClick={() => setBindingDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="button" onClick={handleSaveBinding} disabled={!artifacts.length}>
+              <Button type="button" onClick={() => void handleSaveBinding()} disabled={!artifacts.length}>
                 Save
               </Button>
             </>
