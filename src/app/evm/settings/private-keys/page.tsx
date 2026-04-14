@@ -40,6 +40,7 @@ import {
   type EvmStoredPrivateKeySecurityMode,
 } from "@/domains/evm/client/keyring";
 import { AppShell } from "@/platform/layout/app-shell";
+import { AccountWorkbenchShell } from "@/platform/layout/account-workbench-shell";
 
 function formatAddressLabel(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
@@ -291,18 +292,18 @@ export default function EvmPrivateKeysPage() {
   if (loading) {
     return (
       <AppShell>
-        <main className="section-block">
+        <AccountWorkbenchShell mode="evm">
           <div className="rounded-3xl border border-slate-200 bg-white px-5 py-10 text-sm text-slate-500">
             Loading private keys...
           </div>
-        </main>
+        </AccountWorkbenchShell>
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-      <main className="section-block">
+      <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
           <h1 className="text-[1.171875rem] font-semibold text-slate-900">Private Keys</h1>
           <p className="mt-2 text-sm text-slate-500">
@@ -764,7 +765,7 @@ export default function EvmPrivateKeysPage() {
             void handleDeleteConfirm();
           }}
         />
-      </main>
+      </AccountWorkbenchShell>
     </AppShell>
   );
 }

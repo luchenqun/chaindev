@@ -13,6 +13,7 @@ import { signOut, useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { type PlatformMode } from "@/config/chains";
 import { getMessages } from "@/i18n";
+import { getAccountMenuSections } from "@/platform/layout/account-menu-config";
 import { ChainStatusStrip } from "@/platform/layout/chain-status-strip";
 import { ActiveEvmKeySelector } from "@/platform/layout/active-evm-key-selector";
 import { GlobalSearch } from "@/platform/search/global-search";
@@ -97,6 +98,11 @@ export function TopNav() {
   const mode = inferMode(pathname);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { data: session, status } = useSession();
+  const username =
+    (session?.user as { username?: string } | undefined)?.username ??
+    session?.user?.name ??
+    session?.user?.email ??
+    "Account";
   const blockchainItems: NavItem[] =
     mode === "cosmos"
       ? [
@@ -110,7 +116,13 @@ export function TopNav() {
           { href: "/evm/txs", label: "Transactions" },
           { href: "/evm/pending-txs", label: messages.navigation.pendingTransactions },
         ];
-  const directNavItems: NavItem[] = mode === "evm" ? [{ href: "/evm/contracts", label: messages.navigation.contracts }] : [];
+  const directNavItems: NavItem[] =
+    mode === "evm"
+      ? [
+          { href: "/evm/contracts", label: messages.navigation.contracts },
+          { href: "/evm/settings/cache", label: messages.navigation.cache },
+        ]
+      : [];
   const activeNavGroups: NavGroup[] = [
     {
       id: "browser",
@@ -129,21 +141,11 @@ export function TopNav() {
         { href: "/cosmos/tools/encode-decode", label: "Cosmos Encode / Decode" },
       ],
     },
-    ...(mode === "evm"
-      ? [
-          {
-            id: "settings",
-            label: messages.navigation.settings,
-            items: [
-              { href: "/evm/settings/cache", label: messages.navigation.cache },
-              { href: "/evm/settings/providers", label: messages.navigation.providers },
-              { href: "/evm/settings/private-keys", label: messages.navigation.privateKeys },
-              { href: "/evm/settings/name-tags", label: messages.navigation.nameTags },
-            ],
-          } satisfies NavGroup,
-        ]
-      : []),
   ];
+  const userMenuSections = getAccountMenuSections(mode);
+  const userMenuActive = userMenuSections.some((section) =>
+    section.items.some((item) => matchesNavItem(pathname, item.href)),
+  );
 
   return (
     <header className="mb-4 border-b border-slate-200 bg-white">
@@ -253,21 +255,67 @@ export function TopNav() {
 
           <div className="relative flex flex-wrap items-center justify-end gap-3 pl-[8px] before:absolute before:left-[-8px] before:top-1/2 before:h-[14px] before:w-[1.5px] before:-translate-y-1/2 before:bg-slate-300">
             {status === "authenticated" ? (
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center gap-2 text-[15px] font-normal text-slate-700">
-                  <IconUserCircle className="size-4" stroke={2} />
-                  {(session.user as { username?: string } | undefined)?.username ??
-                    session.user?.name ??
-                    session.user?.email}
-                </span>
-                <Button
-                  variant="ghost"
-                  className="h-8 gap-2 px-1 text-[15px] font-normal text-slate-700"
-                  onClick={() => void signOut({ callbackUrl: "/" })}
+              <div
+                className="relative"
+                onMouseEnter={() => setOpenGroup("user-menu")}
+                onMouseLeave={() => setOpenGroup((current) => (current === "user-menu" ? null : current))}
+              >
+                <button
+                  type="button"
+                  className={
+                    userMenuActive || openGroup === "user-menu"
+                      ? "inline-flex items-center gap-2 py-2.5 text-[15px] font-[450] text-[#1697ea]"
+                      : "inline-flex items-center gap-2 py-2.5 text-[15px] font-[450] text-slate-700 hover:text-[#1697ea]"
+                  }
+                  aria-expanded={openGroup === "user-menu"}
                 >
-                  <IconLogout className="size-4" stroke={2} />
-                  Sign Out
-                </Button>
+                  <IconUserCircle className="size-4" stroke={2} />
+                  <span>{username}</span>
+                  <IconChevronDown className="size-3.5" stroke={2.2} />
+                </button>
+                {openGroup === "user-menu" ? (
+                  <div className="absolute right-0 top-full z-20 min-w-[248px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                    <div className="border-t-[3px] border-[#19a7f2]" />
+                    <div className="px-3 pt-2 pb-0">
+                      {userMenuSections.map((section, sectionIndex) => (
+                        <div
+                          key={section.id}
+                          className={sectionIndex === 0 ? "" : "border-t border-slate-200"}
+                        >
+                          {section.items.map((item) => {
+                            const itemActive = matchesNavItem(pathname, item.href);
+
+                            return (
+                              <Link
+                                key={item.href}
+                                href={item.href}
+                                className={
+                                  itemActive
+                                    ? "block rounded-lg px-3 py-2.5 text-[15px] font-[450] text-[#1697ea]"
+                                    : "block rounded-lg px-3 py-2.5 text-[15px] font-[450] text-slate-950 hover:bg-slate-100 hover:text-black"
+                                }
+                              >
+                                {item.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-3 pb-3">
+                      <div className="border-t border-slate-200 pt-3">
+                        <Button
+                          variant="outline"
+                          className="h-11 w-full gap-2 rounded-xl border-sky-300 text-[15px] font-semibold text-[#1697ea] hover:border-sky-400 hover:bg-sky-50 hover:text-[#1697ea]"
+                          onClick={() => void signOut({ callbackUrl: "/" })}
+                        >
+                          <IconLogout className="size-4" stroke={2} />
+                          Sign Out
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <Link href="/login">

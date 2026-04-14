@@ -58,6 +58,7 @@ import {
   type EvmStoredPrivateKey,
 } from "@/domains/evm/client/keyring";
 import { AppShell } from "@/platform/layout/app-shell";
+import { AccountWorkbenchShell } from "@/platform/layout/account-workbench-shell";
 
 const textareaClassName =
   "min-h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
@@ -985,7 +986,7 @@ export default function EvmContractsRegistryPage() {
 
   return (
     <AppShell>
-      <main className="section-block">
+      <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -1623,7 +1624,7 @@ export default function EvmContractsRegistryPage() {
             void handleConfirmDeployUnlock();
           }}
         />
-      </main>
+      </AccountWorkbenchShell>
     </AppShell>
   );
 }

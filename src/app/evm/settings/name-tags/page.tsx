@@ -21,6 +21,7 @@ import {
 } from "@/domains/evm/client/address-tags";
 import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
 import { AppShell } from "@/platform/layout/app-shell";
+import { AccountWorkbenchShell } from "@/platform/layout/account-workbench-shell";
 
 function formatAddressLabel(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
@@ -179,14 +180,16 @@ export default function EvmNameTagsPage() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-36" rows={8} columns={4} showToolbar={false} />
+        <AccountWorkbenchShell mode="evm">
+          <ListPageSkeleton titleWidth="w-36" rows={8} columns={4} showToolbar={false} />
+        </AccountWorkbenchShell>
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-      <main className="section-block">
+      <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[1.171875rem] font-semibold text-slate-900">Name Tags</h1>
@@ -406,7 +409,7 @@ export default function EvmNameTagsPage() {
             void handleClearAll();
           }}
         />
-      </main>
+      </AccountWorkbenchShell>
     </AppShell>
   );
 }
