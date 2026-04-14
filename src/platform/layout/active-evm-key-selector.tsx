@@ -90,7 +90,7 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
           <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] font-normal leading-none shadow-none focus:ring-0">
             <div className="flex min-w-0 items-center gap-1.5">
               <IconKey className="size-3.5 shrink-0 text-slate-500" stroke={2} />
-              <SelectValue placeholder="Select Key">{activeItem?.name ?? "Select Key"}</SelectValue>
+              <span className="truncate">{activeItem?.name ?? "Select Key"}</span>
             </div>
           </SelectTrigger>
           <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
@@ -117,7 +117,7 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
         <SelectTrigger className="h-8 w-auto justify-start gap-1 rounded-lg border-transparent bg-transparent px-2 pr-1.5 text-[13px] font-normal shadow-none hover:bg-slate-100 focus:ring-0">
           <div className="flex min-w-0 items-center gap-1.5">
             <IconKey className="size-4 shrink-0 text-slate-500" stroke={2} />
-            <SelectValue placeholder="Select Key">{activeItem?.name ?? "Select Key"}</SelectValue>
+            <span className="truncate">{activeItem?.name ?? "Select Key"}</span>
           </div>
         </SelectTrigger>
         <SelectContent className="min-w-[var(--radix-select-trigger-width)]">

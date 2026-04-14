@@ -572,9 +572,9 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
           }}
         >
           <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] leading-none shadow-none focus:ring-0">
-            <SelectValue placeholder={loading ? "Loading providers..." : "No provider"}>
-              {activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : undefined}
-            </SelectValue>
+            <span className="truncate">
+              {activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : loading ? "Loading providers..." : "No provider"}
+            </span>
           </SelectTrigger>
           <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
             {sortedProfiles.map((profile) => (
@@ -599,9 +599,9 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
         }}
       >
         <SelectTrigger className="h-9 w-auto justify-start gap-1.5 rounded-xl border-slate-200 bg-white px-4 pr-2.5 text-[13px] shadow-sm">
-          <SelectValue placeholder={loading ? "Loading providers..." : "No provider"}>
-            {activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : undefined}
-          </SelectValue>
+          <span className="truncate">
+            {activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : loading ? "Loading providers..." : "No provider"}
+          </span>
         </SelectTrigger>
         <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
           {sortedProfiles.map((profile) => (
