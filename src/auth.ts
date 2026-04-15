@@ -29,6 +29,7 @@ const providers = [
       return {
         id: user.id,
         email: user.email,
+        isAdmin: user.isAdmin,
         username: user.username ?? user.name ?? user.email,
         name: user.username ?? user.name ?? user.email,
       };
@@ -49,6 +50,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     jwt({ token, user }) {
       if (user) {
         token.sub = user.id;
+        token.isAdmin = Boolean((user as { isAdmin?: boolean }).isAdmin);
         token.username = (user as { username?: string }).username ?? user.name ?? undefined;
       }
 
@@ -56,9 +58,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     session({ session, token }) {
       if (session.user) {
-        (session.user as { id?: string; username?: string }).id = token.sub;
-        (session.user as { id?: string; username?: string }).username =
+        (session.user as { id?: string; username?: string; isAdmin?: boolean }).id = token.sub;
+        (session.user as { id?: string; username?: string; isAdmin?: boolean }).username =
           (token as { username?: string }).username ?? session.user.name ?? undefined;
+        (session.user as { id?: string; username?: string; isAdmin?: boolean }).isAdmin = Boolean(
+          (token as { isAdmin?: boolean }).isAdmin,
+        );
         session.user.name = (token as { username?: string }).username ?? session.user.name;
       }
 

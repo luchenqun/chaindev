@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { fail, ok } from "@/server/utils/api-response";
 import { normalizeApiError } from "@/server/utils/error-normalizer";
-import { requireSessionUserId } from "@/server/utils/auth-user";
+import { requireSessionUser } from "@/server/utils/auth-user";
 import {
   createServerEvmContractArtifact,
   createServerEvmContractBinding,
@@ -15,11 +15,10 @@ import {
 
 const artifactPayloadSchema = z.object({
   kind: z.literal("artifact"),
+  scope: z.enum(["system", "user"]).default("user"),
   name: z.string().trim().min(1, "Contract name is required."),
   abiJson: z.string().trim().min(1, "ABI is required."),
   bytecode: z.string().trim().nullable(),
-  functionCount: z.number().int().nonnegative(),
-  eventCount: z.number().int().nonnegative(),
 });
 
 const bindingPayloadSchema = z.object({
@@ -34,15 +33,15 @@ const bindingPayloadSchema = z.object({
 
 export async function GET() {
   try {
-    const userId = await requireSessionUserId();
+    const sessionUser = await requireSessionUser();
 
-    if (!userId) {
+    if (!sessionUser) {
       return fail({ category: "auth", message: "Unauthorized" }, 401);
     }
 
     return ok({
-      artifacts: await listServerEvmContractArtifacts(userId),
-      bindings: await listServerEvmContractBindings(userId),
+      artifacts: await listServerEvmContractArtifacts(sessionUser.id),
+      bindings: await listServerEvmContractBindings(sessionUser.id),
     });
   } catch (error) {
     return fail(normalizeApiError(error));
@@ -51,9 +50,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const userId = await requireSessionUserId();
+    const sessionUser = await requireSessionUser();
 
-    if (!userId) {
+    if (!sessionUser) {
       return fail({ category: "auth", message: "Unauthorized" }, 401);
     }
 
@@ -61,11 +60,11 @@ export async function POST(request: Request) {
     const artifactPayload = artifactPayloadSchema.safeParse(body);
 
     if (artifactPayload.success) {
-      return ok(await createServerEvmContractArtifact({ userId, ...artifactPayload.data }));
+      return ok(await createServerEvmContractArtifact({ userId: sessionUser.id, isAdmin: sessionUser.isAdmin, ...artifactPayload.data }));
     }
 
     const bindingPayload = bindingPayloadSchema.parse(body);
-    return ok(await createServerEvmContractBinding({ userId, ...bindingPayload }));
+    return ok(await createServerEvmContractBinding({ userId: sessionUser.id, ...bindingPayload }));
   } catch (error) {
     return fail(normalizeApiError(error));
   }
@@ -73,9 +72,9 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const userId = await requireSessionUserId();
+    const sessionUser = await requireSessionUser();
 
-    if (!userId) {
+    if (!sessionUser) {
       return fail({ category: "auth", message: "Unauthorized" }, 401);
     }
 
@@ -89,7 +88,8 @@ export async function PATCH(request: Request) {
 
     if (artifactPayload.success) {
       const item = await updateServerEvmContractArtifact({
-        userId,
+        userId: sessionUser.id,
+        isAdmin: sessionUser.isAdmin,
         id: body.id,
         ...artifactPayload.data,
       });
@@ -103,7 +103,7 @@ export async function PATCH(request: Request) {
 
     const bindingPayload = bindingPayloadSchema.parse(body.payload);
     const item = await updateServerEvmContractBinding({
-      userId,
+      userId: sessionUser.id,
       id: body.id,
       ...bindingPayload,
     });
@@ -120,9 +120,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const userId = await requireSessionUserId();
+    const sessionUser = await requireSessionUser();
 
-    if (!userId) {
+    if (!sessionUser) {
       return fail({ category: "auth", message: "Unauthorized" }, 401);
     }
 
@@ -135,11 +135,11 @@ export async function DELETE(request: Request) {
     }
 
     if (kind === "artifact") {
-      return ok(await deleteServerEvmContractArtifact(userId, id));
+      return ok(await deleteServerEvmContractArtifact(sessionUser.id, id, sessionUser.isAdmin));
     }
 
     if (kind === "binding") {
-      return ok(await deleteServerEvmContractBinding(userId, id));
+      return ok(await deleteServerEvmContractBinding(sessionUser.id, id));
     }
 
     return fail({ category: "validation", message: "Unsupported kind" }, 400);

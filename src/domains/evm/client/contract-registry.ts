@@ -6,6 +6,7 @@ import { analyzeContractArtifactAbi, parseContractAbiJson } from "@/domains/evm/
 
 const artifactSchema = z.object({
   id: z.string().min(1),
+  scope: z.enum(["system", "user"]),
   name: z.string().trim().min(1),
   abiJson: z.string().trim().min(1),
   bytecode: z.string().trim().nullable(),
@@ -273,6 +274,7 @@ export function getEvmContractArtifact(artifactId: string) {
 }
 
 export async function createEvmContractArtifact(input: {
+  scope?: "system" | "user";
   name: string;
   abiJson: string;
   bytecode: string;
@@ -284,7 +286,7 @@ export async function createEvmContractArtifact(input: {
     throw new Error("Contract name is required.");
   }
 
-  const { abi, functionCount, eventCount } = analyzeContractArtifactAbi(input.abiJson);
+  const { abi } = analyzeContractArtifactAbi(input.abiJson);
   const abiJson = JSON.stringify(abi, null, 2);
   const bytecode = normalizeBytecode(input.bytecode);
 
@@ -304,11 +306,10 @@ export async function createEvmContractArtifact(input: {
     },
     body: JSON.stringify({
       kind: "artifact",
+      scope: input.scope ?? "user",
       name,
       abiJson,
       bytecode,
-      functionCount,
-      eventCount,
     }),
   });
 
@@ -334,6 +335,7 @@ export async function createEvmContractArtifact(input: {
 export async function updateEvmContractArtifact(
   artifactId: string,
   input: {
+    scope?: "system" | "user";
     name: string;
     abiJson: string;
     bytecode: string;
@@ -352,7 +354,7 @@ export async function updateEvmContractArtifact(
     throw new Error("Contract name is required.");
   }
 
-  const { abi, functionCount, eventCount } = analyzeContractArtifactAbi(input.abiJson);
+  const { abi } = analyzeContractArtifactAbi(input.abiJson);
   const abiJson = JSON.stringify(abi, null, 2);
   const bytecode = normalizeBytecode(input.bytecode);
 
@@ -378,11 +380,10 @@ export async function updateEvmContractArtifact(
       id: artifactId,
       payload: {
         kind: "artifact",
+        scope: input.scope ?? previous.scope,
         name,
         abiJson,
         bytecode,
-        functionCount,
-        eventCount,
       },
     }),
   });

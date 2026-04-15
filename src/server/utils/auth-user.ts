@@ -6,3 +6,17 @@ export async function requireSessionUserId() {
 
   return userId;
 }
+
+export async function requireSessionUser() {
+  const session = await auth();
+  const user = (session?.user as { id?: string; isAdmin?: boolean } | undefined) ?? null;
+
+  if (!user?.id) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    isAdmin: Boolean(user.isAdmin),
+  };
+}

@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  IconListDetails,
   IconEdit,
+  IconLink,
   IconLinkPlus,
   IconLoader2,
   IconPlugConnected,
@@ -13,7 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { type AbiParameter } from "viem";
+import { isAddress, type AbiParameter } from "viem";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -27,9 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
-import { getContractConstructor } from "@/domains/evm/client/abi-utils";
+import { getContractConstructor, getContractFunctions } from "@/domains/evm/client/abi-utils";
 import {
   createEvmContractArtifact,
   createEvmContractBinding,
@@ -49,6 +50,7 @@ import {
   getActiveEvmContractEnvironmentDirect,
   getEvmContractDeployManualDefaultsDirect,
 } from "@/domains/evm/client/contract-executor";
+import { getArtifactDefaultAddressByName } from "@/domains/evm/lib/precompile-artifact-default-addresses";
 import {
   getActiveEvmStoredPrivateKey,
   isEvmStoredPrivateKeyUnlocked,
@@ -57,6 +59,7 @@ import {
   subscribeEvmKeyring,
   type EvmStoredPrivateKey,
 } from "@/domains/evm/client/keyring";
+import { AddressLink } from "@/domains/evm/ui/address-link";
 import { AppShell } from "@/platform/layout/app-shell";
 import { AccountWorkbenchShell } from "@/platform/layout/account-workbench-shell";
 
@@ -174,6 +177,18 @@ function normalizeWorkbenchErrorMessage(message: string, fallback: string) {
   return message;
 }
 
+function formatAddressLabel(address: string) {
+  return `${address.slice(0, 8)}...${address.slice(-6)}`;
+}
+
+function getDefaultBindingAddressForArtifact(artifact?: Pick<EvmContractArtifact, "name"> | null) {
+  if (!artifact) {
+    return "";
+  }
+
+  return getArtifactDefaultAddressByName(artifact.name) ?? "";
+}
+
 function createInitialDeployDialogState(): DeployDialogState {
   return {
     transactionType: "EIP1559",
@@ -235,7 +250,7 @@ function buildDeploySimulationKey(input: {
 
 export default function EvmContractsRegistryPage() {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const { showToast } = useToast();
   const [environment, setEnvironment] = useState<EnvironmentState>(null);
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
@@ -244,9 +259,11 @@ export default function EvmContractsRegistryPage() {
   const [artifactDialogOpen, setArtifactDialogOpen] = useState(false);
   const [artifactForm, setArtifactForm] = useState({
     id: null as string | null,
+    scope: "user" as "system" | "user",
     name: "",
     abiJson: "",
     bytecode: "",
+    contractAddress: "",
   });
   const [artifactImportText, setArtifactImportText] = useState("");
   const [bindingForm, setBindingForm] = useState({
@@ -255,6 +272,10 @@ export default function EvmContractsRegistryPage() {
     address: "",
     label: "",
   });
+  const [artifactDetailsTarget, setArtifactDetailsTarget] = useState<EvmContractArtifact | null>(null);
+  const [defaultBindingDialogOpen, setDefaultBindingDialogOpen] = useState(false);
+  const [selectedDefaultBindingArtifactIds, setSelectedDefaultBindingArtifactIds] = useState<string[]>([]);
+  const [importSystemBindingsLoading, setImportSystemBindingsLoading] = useState(false);
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false);
   const [deployArtifactId, setDeployArtifactId] = useState<string | null>(null);
   const [deployArgumentValues, setDeployArgumentValues] = useState<string[]>([]);
@@ -283,7 +304,6 @@ export default function EvmContractsRegistryPage() {
     | { type: "binding"; id: string; title: string; description: string }
     | null
   >(null);
-  const [loading, setLoading] = useState(true);
   const environmentRef = useRef<EnvironmentState>(null);
   const deployDefaultsRequestIdRef = useRef(0);
   const deploySimulationFailureRef = useRef<{ key: string; attempts: number }>({
@@ -305,7 +325,6 @@ export default function EvmContractsRegistryPage() {
       setEnvironment(nextEnvironment);
       setArtifacts(listEvmContractArtifacts());
       setBindings(listEvmContractBindingsByScope(nextEnvironment.chainId, nextEnvironment.providerProfileId));
-      setLoading(false);
     }
 
     void load();
@@ -361,9 +380,26 @@ export default function EvmContractsRegistryPage() {
     () => Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifact])),
     [artifacts],
   );
+  const isAdmin = Boolean((session?.user as { isAdmin?: boolean } | undefined)?.isAdmin);
+  const myArtifacts = useMemo(
+    () => artifacts.filter((artifact) => artifact.scope === "user"),
+    [artifacts],
+  );
+  const systemArtifacts = useMemo(
+    () => artifacts.filter((artifact) => artifact.scope === "system"),
+    [artifacts],
+  );
+  const importableSystemArtifacts = useMemo(
+    () => systemArtifacts.filter((artifact) => getArtifactDefaultAddressByName(artifact.name) !== null),
+    [systemArtifacts],
+  );
   const deployArtifact = useMemo(
     () => (deployArtifactId ? artifacts.find((artifact) => artifact.id === deployArtifactId) ?? null : null),
     [artifacts, deployArtifactId],
+  );
+  const artifactDetailsFunctions = useMemo(
+    () => (artifactDetailsTarget ? getContractFunctions(artifactDetailsTarget.abiJson) : []),
+    [artifactDetailsTarget],
   );
   const deployConstructor = useMemo(
     () => (deployArtifact ? getContractConstructor(deployArtifact.abiJson) : null),
@@ -395,9 +431,11 @@ export default function EvmContractsRegistryPage() {
   function resetArtifactForm() {
     setArtifactForm({
       id: null,
+      scope: "user",
       name: "",
       abiJson: "",
       bytecode: "",
+      contractAddress: "",
     });
     setArtifactImportText("");
     setArtifactError(null);
@@ -439,23 +477,33 @@ export default function EvmContractsRegistryPage() {
 
     setArtifactForm({
       id: artifact.id,
+      scope: artifact.scope,
       name: artifact.name,
       abiJson: artifact.abiJson,
       bytecode: artifact.bytecode ?? "",
+      contractAddress: "",
     });
     setArtifactImportText("");
     setArtifactError(null);
     setArtifactDialogOpen(true);
   }
 
-  function startArtifactCreate() {
+  function startArtifactCreate(scope: "system" | "user" = "user") {
     if (status !== "authenticated") {
       goToLogin();
       return;
     }
 
     resetArtifactForm();
+    setArtifactForm((current) => ({
+      ...current,
+      scope,
+    }));
     setArtifactDialogOpen(true);
+  }
+
+  function canManageArtifact(artifact: EvmContractArtifact) {
+    return artifact.scope === "user" || isAdmin;
   }
 
   function startBindingEdit(binding: EvmContractBinding) {
@@ -483,11 +531,111 @@ export default function EvmContractsRegistryPage() {
     setBindingForm({
       id: null,
       artifactId: artifact?.id ?? "",
-      address: "",
+      address: getDefaultBindingAddressForArtifact(artifact),
       label: artifact?.name ?? "",
     });
     setBindingError(null);
     setBindingDialogOpen(true);
+  }
+
+  function openDefaultBindingDialog() {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
+    if (!environment) {
+      showToast({
+        title: "Import failed",
+        description: "No active EVM provider selected.",
+      });
+      return;
+    }
+
+    if (!importableSystemArtifacts.length) {
+      showToast({
+        title: "No default contracts",
+        description: "No system artifacts with default contract addresses were found.",
+      });
+      return;
+    }
+
+    setSelectedDefaultBindingArtifactIds(importableSystemArtifacts.map((artifact) => artifact.id));
+    setDefaultBindingDialogOpen(true);
+  }
+
+  async function handleImportSystemBindings() {
+    if (status !== "authenticated") {
+      goToLogin();
+      return;
+    }
+
+    if (!environment) {
+      showToast({
+        title: "Import failed",
+        description: "No active EVM provider selected.",
+      });
+      return;
+    }
+
+    setImportSystemBindingsLoading(true);
+
+    try {
+      const importableArtifacts = importableSystemArtifacts.filter((artifact) =>
+        selectedDefaultBindingArtifactIds.includes(artifact.id),
+      );
+      const boundAddressSet = new Set(bindings.map((binding) => binding.addressLower));
+
+      let createdCount = 0;
+      let skippedCount = 0;
+      let failedCount = 0;
+
+      for (const artifact of importableArtifacts) {
+        const defaultAddress = getArtifactDefaultAddressByName(artifact.name);
+
+        if (!defaultAddress) {
+          continue;
+        }
+
+        const addressLower = defaultAddress.toLowerCase();
+
+        if (boundAddressSet.has(addressLower)) {
+          skippedCount += 1;
+          continue;
+        }
+
+        try {
+          await createEvmContractBinding({
+            artifactId: artifact.id,
+            address: defaultAddress,
+            label: artifact.name,
+            chainId: environment.chainId,
+            providerProfileId: environment.providerProfileId,
+            providerName: environment.providerName,
+          });
+          boundAddressSet.add(addressLower);
+          createdCount += 1;
+        } catch (error) {
+          if (error instanceof Error && error.name === "AuthRequiredError") {
+            goToLogin();
+            return;
+          }
+
+          failedCount += 1;
+        }
+      }
+
+      showToast({
+        title: "System bindings imported",
+        description:
+          createdCount || skippedCount || failedCount
+            ? `${createdCount} added, ${skippedCount} skipped, ${failedCount} failed.`
+            : "No importable system artifacts were found.",
+      });
+      setDefaultBindingDialogOpen(false);
+    } finally {
+      setImportSystemBindingsLoading(false);
+    }
   }
 
   function startDeployArtifact(artifact: EvmContractArtifact) {
@@ -561,10 +709,36 @@ export default function EvmContractsRegistryPage() {
           description: `"${artifactForm.name.trim()}" was saved successfully.`,
         });
       } else {
-        await createEvmContractArtifact(artifactForm);
+        const contractAddress = artifactForm.contractAddress.trim();
+
+        if (contractAddress) {
+          if (!environment) {
+            throw new Error("No active EVM provider selected.");
+          }
+
+          if (!isAddress(contractAddress)) {
+            throw new Error("Contract address must be a valid EVM address.");
+          }
+        }
+
+        const createdArtifact = await createEvmContractArtifact(artifactForm);
+
+        if (contractAddress && environment) {
+          await createEvmContractBinding({
+            artifactId: createdArtifact.id,
+            address: contractAddress,
+            label: artifactForm.name.trim() || contractAddress,
+            chainId: environment.chainId,
+            providerProfileId: environment.providerProfileId,
+            providerName: environment.providerName,
+          });
+        }
+
         showToast({
           title: "Artifact created",
-          description: `"${artifactForm.name.trim()}" was added successfully.`,
+          description: contractAddress
+            ? `"${artifactForm.name.trim()}" was added and bound successfully.`
+            : `"${artifactForm.name.trim()}" was added successfully.`,
         });
       }
 
@@ -988,116 +1162,11 @@ export default function EvmContractsRegistryPage() {
     <AppShell>
       <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-[1.171875rem] font-semibold text-slate-900">Contract Registry</h1>
-              <p className="mt-2 text-sm text-slate-500">
-                Store contract artifacts and bind deployed contracts to the active EVM environment.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Provider</p>
-                {loading ? <Skeleton className="mt-2 h-4 w-24" /> : <p className="mt-1 text-sm font-semibold text-slate-900">{environment?.providerName ?? "Unavailable"}</p>}
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Chain ID</p>
-                {loading ? <Skeleton className="mt-2 h-4 w-16" /> : <p className="mt-1 text-sm font-semibold text-slate-900">{environment?.chainId ?? "Unavailable"}</p>}
-              </div>
-            </div>
-          </div>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Contract Registry</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Store contract artifacts and bind deployed contracts to the active EVM environment.
+          </p>
         </div>
-
-        <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-          <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
-            <div>
-              <p className="text-lg font-semibold text-slate-900">Saved Artifacts</p>
-              <p className="mt-1 text-sm text-slate-500">Reusable ABI and bytecode definitions shared across EVM environments.</p>
-            </div>
-            <div className="flex justify-end">
-              <Button type="button" size="sm" onClick={startArtifactCreate}>
-                Add
-              </Button>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Functions</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Events</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Bytecode</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Updated</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {artifacts.length ? (
-                  artifacts.map((artifact) => (
-                    <tr key={artifact.id} className="border-t border-slate-200">
-                      <td className="px-5 py-3 text-sm font-medium text-slate-900">{artifact.name}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{artifact.functionCount}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{artifact.eventCount}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{artifact.bytecode ? "Available" : "Missing"}</td>
-                      <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(artifact.updatedAt)}</td>
-                      <td className="px-5 py-3 text-sm">
-                        <div className="flex items-center justify-end gap-0">
-                          <ActionIconButton
-                            disabled={!artifact.bytecode}
-                            className={artifact.bytecode ? "text-slate-400 hover:text-sky-600" : "text-slate-300"}
-                            tooltip="Deploy contract artifact"
-                            aria-label="Deploy contract artifact"
-                            onClick={() => startDeployArtifact(artifact)}
-                          >
-                            <IconRocket className="size-4" stroke={1.8} />
-                          </ActionIconButton>
-                          <ActionIconButton
-                            className="text-slate-400 hover:text-sky-600"
-                            tooltip="Bind contract address"
-                            aria-label="Bind contract address"
-                            onClick={() => startBindingCreate(artifact)}
-                          >
-                            <IconPlugConnected className="size-4" stroke={1.8} />
-                          </ActionIconButton>
-                          <ActionIconButton
-                            className="text-slate-400 hover:text-slate-700"
-                            tooltip="Edit artifact"
-                            aria-label="Edit artifact"
-                            onClick={() => startArtifactEdit(artifact)}
-                          >
-                            <IconEdit className="size-4" stroke={1.8} />
-                          </ActionIconButton>
-                          <ActionIconButton
-                            className="text-slate-400 hover:text-rose-600"
-                            tooltip="Delete artifact"
-                            aria-label="Delete artifact"
-                            onClick={() =>
-                              setDeleteTarget({
-                                type: "artifact",
-                                id: artifact.id,
-                                title: "Delete Contract Artifact",
-                                description: `Delete the artifact "${artifact.name}"?`,
-                              })
-                            }
-                          >
-                            <IconTrash className="size-4" stroke={1.8} />
-                          </ActionIconButton>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
-                      No saved artifacts yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
 
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="border-b border-slate-200 px-5 py-4">
@@ -1122,12 +1191,12 @@ export default function EvmContractsRegistryPage() {
                     <tr key={binding.id} className="border-t border-slate-200">
                       <td className="px-5 py-3 text-sm font-medium text-slate-900">{binding.label}</td>
                       <td className="px-5 py-3 text-sm">
-                        <Link
+                        <AddressLink
+                          address={binding.address}
                           href={`/evm/address/${binding.address}`}
+                          label={formatAddressLabel(binding.address)}
                           className="font-medium text-sky-600 hover:text-sky-700 mono"
-                        >
-                          {binding.address}
-                        </Link>
+                        />
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">{artifactsById[binding.artifactId]?.name ?? "Missing Artifact"}</td>
                       <td className="px-5 py-3 text-sm text-slate-700">{binding.chainId}</td>
@@ -1185,6 +1254,170 @@ export default function EvmContractsRegistryPage() {
           </div>
         </section>
 
+        {[
+          {
+            title: "System Artifacts",
+            description: "Shared ABI and bytecode definitions published by administrators for all users.",
+            items: systemArtifacts,
+            showAdd: isAdmin,
+            showImport: true,
+            showDefaultContract: true,
+            addScope: "system" as const,
+            emptyText: "No system artifacts yet.",
+          },
+          {
+            title: "My Artifacts",
+            description: "Your reusable ABI and bytecode definitions for the current account.",
+            items: myArtifacts,
+            showAdd: true,
+            showImport: false,
+            showDefaultContract: false,
+            addScope: "user" as const,
+            emptyText: "No personal artifacts yet.",
+          },
+        ].map((group) => (
+          <section
+            key={group.title}
+            className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]"
+          >
+            <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
+              <div>
+                <p className="text-lg font-semibold text-slate-900">{group.title}</p>
+                <p className="mt-1 text-sm text-slate-500">{group.description}</p>
+              </div>
+              {group.showAdd || group.showImport ? (
+                <div className="flex justify-end gap-2">
+                  {group.showImport ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openDefaultBindingDialog()}
+                      disabled={importSystemBindingsLoading}
+                    >
+                      <IconLink className="mr-1.5 size-4" stroke={1.8} />
+                      Bind Defaults
+                    </Button>
+                  ) : null}
+                  {group.showAdd ? (
+                    <Button type="button" size="sm" onClick={() => startArtifactCreate(group.addScope)}>
+                      Add
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
+                    {group.showDefaultContract ? (
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Default Contract</th>
+                    ) : null}
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Functions</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Events</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Bytecode</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Updated</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.items.length ? (
+                    group.items.map((artifact) => (
+                      <tr key={artifact.id} className="border-t border-slate-200">
+                        <td className="px-5 py-3 text-sm font-medium text-slate-900">{artifact.name}</td>
+                        {group.showDefaultContract ? (
+                          <td className="px-5 py-3 text-sm">
+                            {getArtifactDefaultAddressByName(artifact.name) ? (
+                              <AddressLink
+                                address={getArtifactDefaultAddressByName(artifact.name) ?? ""}
+                                href={`/evm/address/${getArtifactDefaultAddressByName(artifact.name)}`}
+                                label={formatAddressLabel(getArtifactDefaultAddressByName(artifact.name) ?? "")}
+                                className="font-medium text-sky-600 hover:text-sky-700 mono"
+                              />
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                        ) : null}
+                        <td className="px-5 py-3 text-sm text-slate-700">{artifact.functionCount}</td>
+                        <td className="px-5 py-3 text-sm text-slate-700">{artifact.eventCount}</td>
+                        <td className={`px-5 py-3 text-sm ${artifact.bytecode ? "text-emerald-600" : "text-slate-700"}`}>
+                          {artifact.bytecode ? "Available" : "Missing"}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(artifact.updatedAt)}</td>
+                        <td className="px-5 py-3 text-sm">
+                          <div className="flex items-center justify-end gap-0">
+                            <ActionIconButton
+                              className="text-slate-400 hover:text-slate-700"
+                              tooltip="View artifact methods"
+                              aria-label="View artifact methods"
+                              onClick={() => setArtifactDetailsTarget(artifact)}
+                            >
+                              <IconListDetails className="size-4" stroke={1.8} />
+                            </ActionIconButton>
+                            <ActionIconButton
+                              disabled={!artifact.bytecode}
+                              className={artifact.bytecode ? "text-slate-400 hover:text-sky-600" : "text-slate-300"}
+                              tooltip="Deploy contract artifact"
+                              aria-label="Deploy contract artifact"
+                              onClick={() => startDeployArtifact(artifact)}
+                            >
+                              <IconRocket className="size-4" stroke={1.8} />
+                            </ActionIconButton>
+                            <ActionIconButton
+                              className="text-slate-400 hover:text-sky-600"
+                              tooltip="Bind contract address"
+                              aria-label="Bind contract address"
+                              onClick={() => startBindingCreate(artifact)}
+                            >
+                              <IconPlugConnected className="size-4" stroke={1.8} />
+                            </ActionIconButton>
+                            {canManageArtifact(artifact) ? (
+                              <>
+                                <ActionIconButton
+                                  className="text-slate-400 hover:text-slate-700"
+                                  tooltip="Edit artifact"
+                                  aria-label="Edit artifact"
+                                  onClick={() => startArtifactEdit(artifact)}
+                                >
+                                  <IconEdit className="size-4" stroke={1.8} />
+                                </ActionIconButton>
+                                <ActionIconButton
+                                  className="text-slate-400 hover:text-rose-600"
+                                  tooltip="Delete artifact"
+                                  aria-label="Delete artifact"
+                                  onClick={() =>
+                                    setDeleteTarget({
+                                      type: "artifact",
+                                      id: artifact.id,
+                                      title: "Delete Contract Artifact",
+                                      description: `Delete the artifact "${artifact.name}"?`,
+                                    })
+                                  }
+                                >
+                                  <IconTrash className="size-4" stroke={1.8} />
+                                </ActionIconButton>
+                              </>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={group.showDefaultContract ? 7 : 6}>
+                        {group.emptyText}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ))}
+
         <ConfirmDialog
           open={deleteTarget !== null}
           onOpenChange={(open) => {
@@ -1199,6 +1432,124 @@ export default function EvmContractsRegistryPage() {
             void handleConfirmDelete();
           }}
         />
+
+        <ModalDialog
+          open={defaultBindingDialogOpen}
+          onOpenChange={(open) => {
+            setDefaultBindingDialogOpen(open);
+
+            if (!open) {
+              setSelectedDefaultBindingArtifactIds([]);
+            }
+          }}
+          title="Bind Default Contracts"
+          description="Choose which system artifacts should be bound to their default contract addresses for the active provider and chain."
+          footer={
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setDefaultBindingDialogOpen(false);
+                  setSelectedDefaultBindingArtifactIds([]);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleImportSystemBindings()}
+                disabled={!selectedDefaultBindingArtifactIds.length || importSystemBindingsLoading}
+              >
+                {importSystemBindingsLoading ? (
+                  <IconLoader2 className="mr-1.5 size-4 animate-spin" />
+                ) : null}
+                Bind Selected
+              </Button>
+            </>
+          }
+          maxWidthClassName="max-w-2xl"
+        >
+          <div className="grid gap-3">
+            {importableSystemArtifacts.length ? (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <ul className="divide-y divide-slate-200">
+                  {importableSystemArtifacts.map((artifact) => {
+                    const defaultAddress = getArtifactDefaultAddressByName(artifact.name) ?? "";
+                    const checked = selectedDefaultBindingArtifactIds.includes(artifact.id);
+
+                    return (
+                      <li key={artifact.id} className="px-4 py-3">
+                        <label className="flex cursor-pointer items-start gap-3">
+                          <input
+                            type="checkbox"
+                            className="mt-1 size-4 rounded border-slate-300 text-sky-600 focus-visible:ring-2 focus-visible:ring-sky-400"
+                            checked={checked}
+                            onChange={(event) => {
+                              setSelectedDefaultBindingArtifactIds((current) =>
+                                event.target.checked
+                                  ? [...current, artifact.id]
+                                  : current.filter((id) => id !== artifact.id),
+                              );
+                            }}
+                          />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-900">{artifact.name}</span>
+                              <span className="font-mono text-xs text-slate-500">{defaultAddress}</span>
+                            </div>
+                          </div>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                No system artifacts with default contract addresses were found.
+              </div>
+            )}
+          </div>
+        </ModalDialog>
+
+        <ModalDialog
+          open={artifactDetailsTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setArtifactDetailsTarget(null);
+            }
+          }}
+          title={artifactDetailsTarget ? `${artifactDetailsTarget.name} Methods` : "Artifact Methods"}
+          description="List of contract methods parsed from the saved ABI."
+          footer={
+            <Button type="button" variant="ghost" onClick={() => setArtifactDetailsTarget(null)}>
+              Close
+            </Button>
+          }
+          maxWidthClassName="max-w-3xl"
+        >
+          <div className="grid gap-3">
+            {artifactDetailsFunctions.length ? (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <ul className="divide-y divide-slate-200">
+                  {artifactDetailsFunctions.map((fn) => (
+                    <li key={fn.signature} className="flex items-center justify-between gap-4 px-4 py-3">
+                      <span className="min-w-0 truncate font-mono text-sm text-slate-900">{fn.signature}</span>
+                      <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-600">
+                        {fn.stateMutability}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                No contract methods were found in this ABI.
+              </div>
+            )}
+          </div>
+        </ModalDialog>
 
         <ModalDialog
           open={artifactDialogOpen}
@@ -1259,6 +1610,22 @@ export default function EvmContractsRegistryPage() {
                 placeholder='{"contractName":"Simple","abi":[...],"bytecode":"0x..."}'
               />
             </div>
+            {isAdmin ? (
+              <Select
+                value={artifactForm.scope}
+                onValueChange={(value) =>
+                  setArtifactForm((current) => ({ ...current, scope: value as "system" | "user" }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select artifact scope" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">My Artifact</SelectItem>
+                  <SelectItem value="system">System Artifact</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : null}
             <Input
               value={artifactForm.name}
               onChange={(event) => setArtifactForm((current) => ({ ...current, name: event.target.value }))}
@@ -1276,6 +1643,13 @@ export default function EvmContractsRegistryPage() {
               onChange={(event) => setArtifactForm((current) => ({ ...current, bytecode: event.target.value }))}
               placeholder="Optional bytecode (0x...)"
             />
+            {!artifactForm.id ? (
+              <Input
+                value={artifactForm.contractAddress}
+                onChange={(event) => setArtifactForm((current) => ({ ...current, contractAddress: event.target.value }))}
+                placeholder="Optional contract address (auto-bind after create)"
+              />
+            ) : null}
             {artifactError ? <p className="text-sm text-rose-600">{artifactError}</p> : null}
           </div>
         </ModalDialog>
@@ -1313,7 +1687,21 @@ export default function EvmContractsRegistryPage() {
           <div className="grid gap-3">
             <Select
               value={bindingForm.artifactId || undefined}
-              onValueChange={(value) => setBindingForm((current) => ({ ...current, artifactId: value }))}
+              onValueChange={(value) =>
+                setBindingForm((current) => {
+                  const previousArtifact = current.artifactId ? artifactsById[current.artifactId] ?? null : null;
+                  const nextArtifact = artifactsById[value] ?? null;
+                  const previousDefaultAddress = getDefaultBindingAddressForArtifact(previousArtifact);
+                  const nextDefaultAddress = getDefaultBindingAddressForArtifact(nextArtifact);
+                  const shouldReplaceAddress = !current.address || current.address === previousDefaultAddress;
+
+                  return {
+                    ...current,
+                    artifactId: value,
+                    address: shouldReplaceAddress ? nextDefaultAddress : current.address,
+                  };
+                })
+              }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select a contract artifact" />
@@ -1321,7 +1709,7 @@ export default function EvmContractsRegistryPage() {
               <SelectContent>
                 {artifacts.map((artifact) => (
                   <SelectItem key={artifact.id} value={artifact.id}>
-                    {artifact.name}
+                    {artifact.scope === "system" ? `[System] ${artifact.name}` : artifact.name}
                   </SelectItem>
                 ))}
               </SelectContent>

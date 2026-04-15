@@ -75,6 +75,7 @@ export const evmAddressTags = sqliteTable("evm_address_tags", {
 export const evmContractArtifacts = sqliteTable("evm_contract_artifacts", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),
+  scope: text("scope").notNull(),
   name: text("name").notNull(),
   abiJson: text("abi_json").notNull(),
   bytecode: text("bytecode"),

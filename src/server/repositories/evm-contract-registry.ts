@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { isAddress } from "viem";
 import { db } from "@/db/client";
@@ -20,12 +20,69 @@ function normalizeBindingAddress(address: string) {
   return address.toLowerCase();
 }
 
+function normalizeArtifactAbi(input: unknown) {
+  const parsed =
+    typeof input === "string"
+      ? (() => {
+          try {
+            return JSON.parse(input) as unknown;
+          } catch {
+            throw new Error("ABI must be valid JSON.");
+          }
+        })()
+      : input;
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("ABI must be a JSON array.");
+  }
+
+  let functionCount = 0;
+  let eventCount = 0;
+
+  for (const item of parsed) {
+    if (!item || typeof item !== "object" || !("type" in item)) {
+      continue;
+    }
+
+    if (item.type === "function") {
+      functionCount += 1;
+    }
+
+    if (item.type === "event") {
+      eventCount += 1;
+    }
+  }
+
+  return {
+    abiJson: JSON.stringify(parsed),
+    functionCount,
+    eventCount,
+  };
+}
+
+async function findAccessibleArtifact(input: { userId: string; id: string }) {
+  return (
+    (await db.query.evmContractArtifacts.findFirst({
+      where: or(
+        and(eq(evmContractArtifacts.id, input.id), eq(evmContractArtifacts.scope, "system")),
+        and(eq(evmContractArtifacts.id, input.id), eq(evmContractArtifacts.userId, input.userId)),
+      ),
+    })) ?? null
+  );
+}
+
 export async function listServerEvmContractArtifacts(userId: string) {
   return db
     .select()
     .from(evmContractArtifacts)
-    .where(eq(evmContractArtifacts.userId, userId))
-    .orderBy(desc(evmContractArtifacts.updatedAt));
+    .where(
+      or(
+        eq(evmContractArtifacts.scope, "system"),
+        and(eq(evmContractArtifacts.scope, "user"), eq(evmContractArtifacts.userId, userId)),
+      ),
+    )
+    .orderBy(desc(evmContractArtifacts.updatedAt))
+    .all();
 }
 
 export async function listServerEvmContractBindings(userId: string) {
@@ -38,21 +95,27 @@ export async function listServerEvmContractBindings(userId: string) {
 
 export async function createServerEvmContractArtifact(input: {
   userId: string;
+  isAdmin: boolean;
+  scope: "system" | "user";
   name: string;
-  abiJson: string;
+  abiJson: unknown;
   bytecode: string | null;
-  functionCount: number;
-  eventCount: number;
 }) {
+  if (input.scope === "system" && !input.isAdmin) {
+    throw new Error("Only administrators can create system artifacts.");
+  }
+
+  const normalizedAbi = normalizeArtifactAbi(input.abiJson);
   const now = Date.now();
   const row = {
     id: randomUUID(),
     userId: input.userId,
+    scope: input.scope,
     name: input.name.trim(),
-    abiJson: input.abiJson,
+    abiJson: normalizedAbi.abiJson,
     bytecode: input.bytecode,
-    functionCount: input.functionCount,
-    eventCount: input.eventCount,
+    functionCount: normalizedAbi.functionCount,
+    eventCount: normalizedAbi.eventCount,
     createdAt: now,
     updatedAt: now,
   };
@@ -63,43 +126,69 @@ export async function createServerEvmContractArtifact(input: {
 
 export async function updateServerEvmContractArtifact(input: {
   userId: string;
+  isAdmin: boolean;
   id: string;
+  scope: "system" | "user";
   name: string;
-  abiJson: string;
+  abiJson: unknown;
   bytecode: string | null;
-  functionCount: number;
-  eventCount: number;
 }) {
+  const existing = await findAccessibleArtifact({ userId: input.userId, id: input.id });
+
+  if (!existing) {
+    return null;
+  }
+
+  if (existing.scope === "system" && !input.isAdmin) {
+    throw new Error("Only administrators can modify system artifacts.");
+  }
+
+  if (input.scope === "system" && !input.isAdmin) {
+    throw new Error("Only administrators can save system artifacts.");
+  }
+
+  const normalizedAbi = normalizeArtifactAbi(input.abiJson);
   db
     .update(evmContractArtifacts)
     .set({
+      scope: input.scope,
       name: input.name.trim(),
-      abiJson: input.abiJson,
+      abiJson: normalizedAbi.abiJson,
       bytecode: input.bytecode,
-      functionCount: input.functionCount,
-      eventCount: input.eventCount,
+      functionCount: normalizedAbi.functionCount,
+      eventCount: normalizedAbi.eventCount,
       updatedAt: Date.now(),
     })
-    .where(and(eq(evmContractArtifacts.userId, input.userId), eq(evmContractArtifacts.id, input.id)))
+    .where(eq(evmContractArtifacts.id, input.id))
     .run();
 
   return (
     (await db.query.evmContractArtifacts.findFirst({
-      where: and(eq(evmContractArtifacts.userId, input.userId), eq(evmContractArtifacts.id, input.id)),
+      where: eq(evmContractArtifacts.id, input.id),
     })) ?? null
   );
 }
 
-export async function deleteServerEvmContractArtifact(userId: string, id: string) {
+export async function deleteServerEvmContractArtifact(userId: string, id: string, isAdmin: boolean) {
+  const artifact = await findAccessibleArtifact({ userId, id });
+
+  if (!artifact) {
+    return { id };
+  }
+
+  if (artifact.scope === "system" && !isAdmin) {
+    throw new Error("Only administrators can delete system artifacts.");
+  }
+
   const binding = await db.query.evmContractBindings.findFirst({
-    where: and(eq(evmContractBindings.userId, userId), eq(evmContractBindings.artifactId, id)),
+    where: eq(evmContractBindings.artifactId, id),
   });
 
   if (binding) {
     throw new Error("Remove deployed bindings for this artifact before deleting it.");
   }
 
-  db.delete(evmContractArtifacts).where(and(eq(evmContractArtifacts.userId, userId), eq(evmContractArtifacts.id, id))).run();
+  db.delete(evmContractArtifacts).where(eq(evmContractArtifacts.id, id)).run();
   return { id };
 }
 
@@ -112,8 +201,9 @@ export async function createServerEvmContractBinding(input: {
   providerProfileId: string;
   providerName: string;
 }) {
-  const artifact = await db.query.evmContractArtifacts.findFirst({
-    where: and(eq(evmContractArtifacts.userId, input.userId), eq(evmContractArtifacts.id, input.artifactId)),
+  const artifact = await findAccessibleArtifact({
+    userId: input.userId,
+    id: input.artifactId,
   });
 
   if (!artifact) {
@@ -163,8 +253,9 @@ export async function updateServerEvmContractBinding(input: {
   providerProfileId: string;
   providerName: string;
 }) {
-  const artifact = await db.query.evmContractArtifacts.findFirst({
-    where: and(eq(evmContractArtifacts.userId, input.userId), eq(evmContractArtifacts.id, input.artifactId)),
+  const artifact = await findAccessibleArtifact({
+    userId: input.userId,
+    id: input.artifactId,
   });
 
   if (!artifact) {
@@ -230,6 +321,7 @@ export async function importServerEvmContractRegistry(
       .values({
         id: scopedArtifactId,
         userId,
+        scope: "user",
         name: artifact.name.trim(),
         abiJson: artifact.abiJson,
         bytecode: artifact.bytecode ?? null,

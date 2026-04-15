@@ -30,6 +30,7 @@ function ensureAuthSchema() {
       username TEXT,
       email TEXT,
       password_hash TEXT,
+      is_admin INTEGER NOT NULL DEFAULT 0,
       email_verified INTEGER,
       image TEXT
     );
@@ -75,6 +76,26 @@ function ensureAuthSchema() {
   if (!userColumns.has("password_hash")) {
     sqlite.exec("ALTER TABLE user ADD COLUMN password_hash TEXT");
   }
+
+  if (!userColumns.has("is_admin")) {
+    sqlite.exec("ALTER TABLE user ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0");
+  }
+
+  sqlite.exec(`
+    UPDATE user
+    SET is_admin = 1
+    WHERE id = (
+      SELECT id
+      FROM user
+      ORDER BY rowid ASC
+      LIMIT 1
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM user
+      WHERE is_admin = 1
+    );
+  `);
 
   sqlite.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS user_email_unique ON user(email);
@@ -161,6 +182,7 @@ function ensureWorkbenchSchema() {
     CREATE TABLE IF NOT EXISTS evm_contract_artifacts (
       id TEXT PRIMARY KEY NOT NULL,
       user_id TEXT NOT NULL,
+      scope TEXT NOT NULL DEFAULT 'user',
       name TEXT NOT NULL,
       abi_json TEXT NOT NULL,
       bytecode TEXT,
@@ -213,6 +235,12 @@ function ensureWorkbenchSchema() {
     CREATE UNIQUE INDEX IF NOT EXISTS evm_private_keys_user_address_unique
       ON evm_private_keys(user_id, address_lower);
   `);
+
+  const contractArtifactColumns = new Set(getTableColumns("evm_contract_artifacts").map((column) => column.name));
+
+  if (!contractArtifactColumns.has("scope")) {
+    sqlite.exec("ALTER TABLE evm_contract_artifacts ADD COLUMN scope TEXT NOT NULL DEFAULT 'user'");
+  }
 }
 
 ensureWorkbenchSchema();
@@ -223,3 +251,15 @@ export const db = drizzle(sqlite, {
     ...workbenchSchema,
   },
 });
+
+declare global {
+  var __chaindevDevSeedPromise: Promise<void> | undefined;
+}
+
+if (process.env.NODE_ENV !== "production") {
+  globalThis.__chaindevDevSeedPromise ??= import("@/server/dev/ensure-dev-seed")
+    .then(({ ensureDevSeed }) => ensureDevSeed())
+    .catch((error) => {
+      console.error("Failed to initialize development seed data.", error);
+    });
+}

@@ -388,18 +388,13 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
           <tbody>
             {sortedProfiles.length ? (
               sortedProfiles.map((profile) => {
-                const isActive = selected[profile.mode] === profile.id;
-
                 return (
                   <tr key={profile.id} className="border-t border-slate-200">
                     <td className="px-5 py-3 text-sm text-slate-700">
                       <Badge variant="secondary">{getModeLabel(profile.mode)}</Badge>
                     </td>
                     <td className="px-5 py-3 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-900">{profile.name}</span>
-                        {isActive ? <Badge variant="secondary">Selected</Badge> : null}
-                      </div>
+                      <span className="font-medium text-slate-900">{profile.name}</span>
                     </td>
                     <td className="max-w-[28rem] px-5 py-3 text-sm text-slate-700">
                       <span className="block truncate font-mono text-[13px]">{profile.rpcUrl}</span>
@@ -460,8 +455,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
           <div className="border-b border-slate-200 px-5 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-lg font-semibold text-slate-900">Saved Providers</p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="text-sm text-slate-500">
                   Browse, activate, edit, or remove saved EVM and Cosmos providers from one place.
                 </p>
               </div>

@@ -9,6 +9,7 @@ import {
   IconPlayerPlay,
   IconRefresh,
   IconSparkles,
+  IconX,
 } from "@tabler/icons-react";
 import {
   type CSSProperties,
@@ -90,6 +91,8 @@ type ManualWriteDialogState = {
   nonce: string;
 };
 
+const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
+
 function stringifyResult(value: unknown) {
   return JSON.stringify(
     value,
@@ -102,23 +105,55 @@ function FunctionArgumentsForm({
   fn,
   values,
   onChange,
+  selfAddress,
 }: {
   fn: EvmContractFunctionDescriptor;
   values: string[];
   onChange: (index: number, value: string) => void;
+  selfAddress?: string | null;
 }) {
+  const [scaleSelectResetVersion, setScaleSelectResetVersion] = useState<Record<string, number>>({});
+
   if (!fn.inputs.length) {
     return null;
+  }
+
+  function resetScaleSelect(fieldKey: string) {
+    setScaleSelectResetVersion((current) => ({
+      ...current,
+      [fieldKey]: (current[fieldKey] ?? 0) + 1,
+    }));
   }
 
   return (
     <div className="grid gap-3">
       {fn.inputs.map((input, index) => {
         const isComplex = input.type.includes("[") || input.type === "tuple";
+        const isAddressInput = input.type === "address";
+        const isIntegerInput = /^u?int\d*$/.test(input.type);
+        const isUnsignedIntegerInput = /^uint\d*$/.test(input.type);
+        const hasValue = Boolean(values[index]?.trim());
         const label = input.name || `arg${index + 1}`;
+        const fieldKey = `${fn.signature}-${label}-${index}`;
+
+        function applyIntegerScale(exponent: number) {
+          const rawValue = values[index]?.trim() ?? "";
+          const baseValue = rawValue || "1";
+
+          if (isUnsignedIntegerInput && baseValue.startsWith("-")) {
+            return;
+          }
+
+          if (!/^-?\d+$/.test(baseValue)) {
+            return;
+          }
+
+          const scaledValue = (BigInt(baseValue) * 10n ** BigInt(exponent)).toString();
+          onChange(index, scaledValue);
+        }
 
         return (
-          <div key={`${fn.signature}-${label}-${index}`} className="grid gap-2">
+          <div key={fieldKey} className="grid gap-2">
             <label className="text-sm font-medium text-slate-700">
               {label} <span className="text-slate-400">({input.type})</span>
             </label>
@@ -130,11 +165,68 @@ function FunctionArgumentsForm({
                 placeholder={input.type === "tuple" ? '{"value":"..."}' : '["value"]'}
               />
             ) : (
-              <Input
-                value={values[index] ?? ""}
-                onChange={(event) => onChange(index, event.target.value)}
-                placeholder={input.type === "bool" ? "true or false" : input.type}
-              />
+              <div className="relative">
+                <Input
+                  value={values[index] ?? ""}
+                  onChange={(event) => onChange(index, event.target.value)}
+                  placeholder={input.type === "bool" ? "true or false" : input.type}
+                  className={
+                    isAddressInput ? "pr-28" : isIntegerInput ? "pr-40" : hasValue ? "pr-10" : undefined
+                  }
+                />
+                {hasValue ? (
+                  <button
+                    type="button"
+                    className={
+                      isAddressInput
+                        ? "absolute right-[61px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
+                        : isIntegerInput
+                          ? "absolute right-[73px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
+                          : "absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
+                    }
+                    onClick={() => onChange(index, "")}
+                    aria-label="Clear input"
+                  >
+                    <IconX className="size-4" stroke={1.8} />
+                  </button>
+                ) : null}
+                {isAddressInput ? (
+                  <button
+                    type="button"
+                    className="absolute right-1.5 top-1/2 inline-flex h-[30px] -translate-y-1/2 items-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 disabled:cursor-not-allowed disabled:border-slate-100 disabled:bg-slate-50 disabled:text-slate-300"
+                    onClick={() => {
+                      if (selfAddress) {
+                        onChange(index, selfAddress);
+                      }
+                    }}
+                    disabled={!selfAddress}
+                  >
+                    Self
+                  </button>
+                ) : null}
+                {isIntegerInput ? (
+                  <>
+                    <Select
+                      key={`scale-${fieldKey}-${scaleSelectResetVersion[fieldKey] ?? 0}`}
+                      onValueChange={(value) => {
+                        applyIntegerScale(Number(value));
+                        resetScaleSelect(fieldKey);
+                      }}
+                    >
+                      <SelectTrigger className="absolute right-1.5 top-1/2 h-[30px] w-[66px] -translate-y-1/2 rounded-xl border-slate-200 bg-slate-50 px-2.5 text-sm font-medium text-slate-700 shadow-none">
+                        <SelectValue placeholder="Scale" />
+                      </SelectTrigger>
+                      <SelectContent align="end">
+                        {INTEGER_SCALE_OPTIONS.map((option) => (
+                          <SelectItem key={option} value={String(option)}>
+                            {`x10^${option}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                ) : null}
+              </div>
             )}
           </div>
         );
@@ -1261,6 +1353,7 @@ export function AddressContractPanel({
                   fn={fn}
                   values={readArgumentValues[fn.signature] ?? fn.inputs.map(() => "")}
                   onChange={(index, value) => updateReadArgumentValue(fn.signature, index, value)}
+                  selfAddress={activeKey?.address ?? null}
                 />
                 {readResults[fn.signature] ? (
                   <ValuePreview value={readResults[fn.signature]} />
@@ -1368,6 +1461,7 @@ export function AddressContractPanel({
                   fn={fn}
                   values={writeArgumentValues[fn.signature] ?? fn.inputs.map(() => "")}
                   onChange={(index, value) => updateWriteArgumentValue(fn.signature, index, value)}
+                  selfAddress={activeKey?.address ?? null}
                 />
                 {fn.stateMutability === "payable" && !manualWriteMode ? (
                   <div className="grid gap-2">
