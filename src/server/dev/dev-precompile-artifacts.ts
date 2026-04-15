@@ -6,7 +6,7 @@ export type DevPrecompileArtifact = {
 
 export const QUARIX_SYSTEM_ARTIFACTS = [
   {
-    contractName: 'bank',
+    contractName: 'QuarixBank',
     abi: [
       {
         inputs: [
@@ -87,7 +87,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     bytecode: null,
   },
   {
-    contractName: 'blacklist',
+    contractName: 'QuarixBlacklist',
     abi: [
       {
         anonymous: false,
@@ -251,7 +251,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     bytecode: null,
   },
   {
-    contractName: 'distribution',
+    contractName: 'QuarixDistribution',
     abi: [
       {
         anonymous: false,
@@ -1345,7 +1345,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     bytecode: null,
   },
   {
-    contractName: 'gaswaiver',
+    contractName: 'QuarixGaswaiver',
     abi: [
       {
         anonymous: false,
@@ -2624,7 +2624,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     bytecode: null,
   },
   {
-    contractName: 'gov',
+    contractName: 'QuarixGov',
     abi: [
       {
         anonymous: false,
@@ -4043,7 +4043,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     bytecode: null,
   },
   {
-    contractName: 'nativebank',
+    contractName: 'QuarixNativebank',
     abi: [
       {
         inputs: [
@@ -4410,7 +4410,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     bytecode: null,
   },
   {
-    contractName: 'qrx',
+    contractName: 'QuarixQrx',
     abi: [
       {
         anonymous: false,
@@ -4555,7 +4555,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     bytecode: null,
   },
   {
-    contractName: 'slashing',
+    contractName: 'QuarixSlashing',
     abi: [
       {
         anonymous: false,
@@ -4815,7 +4815,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     bytecode: null,
   },
   {
-    contractName: 'staking',
+    contractName: 'QuarixStaking',
     abi: [
       {
         anonymous: false,
@@ -6603,7 +6603,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
         type: 'function',
       },
     ],
-    contractName: 'ServiceProvider',
+    contractName: 'QuarixServiceProvider',
     bytecode: null,
   },
   {
@@ -6872,7 +6872,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
         type: 'function',
       },
     ],
-    contractName: 'Role',
+    contractName: 'QuarixRole',
     bytecode: null,
   },
   {
@@ -7199,7 +7199,7 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
       { inputs: [{ internalType: 'address', name: 'newOwner', type: 'address' }], name: 'transferOwnership', outputs: [], stateMutability: 'nonpayable', type: 'function' },
       { inputs: [{ internalType: 'address', name: 'newQOE', type: 'address' }], name: 'transferQOE', outputs: [], stateMutability: 'nonpayable', type: 'function' },
     ],
-    contractName: 'ServiceWrapper',
+    contractName: 'QuarixServiceWrapper',
     bytecode: null,
   },
 ] satisfies ReadonlyArray<DevPrecompileArtifact>;

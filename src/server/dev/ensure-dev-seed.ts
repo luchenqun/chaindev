@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { db } from '@/db/client';
 import { users } from '@/db/schema/auth';
+import { MOCA_SYSTEM_ARTIFACTS } from '@/server/dev/dev-moca-artifacts';
 import { createCredentialUser } from '@/server/repositories/auth-users';
 import { QUARIX_SYSTEM_ARTIFACTS } from '@/server/dev/dev-precompile-artifacts';
 import { createServerEvmContractArtifact } from '@/server/repositories/evm-contract-registry';
@@ -204,6 +205,7 @@ const DEV_SYSTEM_ARTIFACTS = [
     contractName: 'ERC20Token',
   },
   ...QUARIX_SYSTEM_ARTIFACTS,
+  ...MOCA_SYSTEM_ARTIFACTS,
 ];
 
 export async function ensureDevSeed() {
