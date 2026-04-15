@@ -93,6 +93,7 @@ type ManualWriteDialogState = {
 };
 
 const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
+const CONTRACT_ARGUMENT_CACHE_KEY = "evm-contract-arguments:v1";
 const jsonViewStyle = {
   "--w-rjv-background-color": "transparent",
   "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
@@ -318,6 +319,70 @@ function getInitialValues(functions: EvmContractFunctionDescriptor[]) {
   return Object.fromEntries(
     functions.map((fn) => [fn.signature, fn.inputs.map((input) => getInitialArgumentValue(input))]),
   );
+}
+
+function readContractArgumentCache() {
+  if (typeof window === "undefined") {
+    return {} as Record<string, string[]>;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(CONTRACT_ARGUMENT_CACHE_KEY);
+
+    if (!rawValue) {
+      return {} as Record<string, string[]>;
+    }
+
+    const parsedValue = JSON.parse(rawValue) as unknown;
+
+    if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) {
+      return {} as Record<string, string[]>;
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsedValue).filter(
+        (entry): entry is [string, string[]] =>
+          Array.isArray(entry[1]) && entry[1].every((item) => typeof item === "string"),
+      ),
+    );
+  } catch {
+    return {} as Record<string, string[]>;
+  }
+}
+
+function writeContractArgumentCache(cache: Record<string, string[]>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(CONTRACT_ARGUMENT_CACHE_KEY, JSON.stringify(cache));
+}
+
+function getCachedArgumentValues(fn: EvmContractFunctionDescriptor) {
+  const cachedValues = readContractArgumentCache()[fn.signature];
+
+  if (!cachedValues || cachedValues.length !== fn.inputs.length) {
+    return null;
+  }
+
+  return cachedValues;
+}
+
+function getInitialValuesWithCache(functions: EvmContractFunctionDescriptor[]) {
+  return Object.fromEntries(
+    functions.map((fn) => [
+      fn.signature,
+      getCachedArgumentValues(fn) ?? fn.inputs.map((input) => getInitialArgumentValue(input)),
+    ]),
+  );
+}
+
+function persistArgumentValues(signature: string, values: string[]) {
+  const currentCache = readContractArgumentCache();
+  writeContractArgumentCache({
+    ...currentCache,
+    [signature]: values,
+  });
 }
 
 function copyText(value: string) {
@@ -796,14 +861,14 @@ export function AddressContractPanel({
 
   useEffect(() => {
     setExpandedReadSignatures([]);
-    setReadArgumentValues(getInitialValues(readFunctions));
+    setReadArgumentValues(getInitialValuesWithCache(readFunctions));
     setReadResults({});
     setReadErrors({});
   }, [readFunctions]);
 
   useEffect(() => {
     setExpandedWriteSignatures([]);
-    setWriteArgumentValues(getInitialValues(writeFunctions));
+    setWriteArgumentValues(getInitialValuesWithCache(writeFunctions));
     setWritePreviews({});
     setWriteResults({});
     setWriteErrors({});
@@ -814,10 +879,21 @@ export function AddressContractPanel({
   }, [writeFunctions]);
 
   function updateReadArgumentValue(signature: string, index: number, value: string) {
-    setReadArgumentValues((current) => ({
-      ...current,
-      [signature]: current[signature]?.map((item, itemIndex) => (itemIndex === index ? value : item)) ?? [],
-    }));
+    const fallbackValues =
+      readFunctions.find((item) => item.signature === signature)?.inputs.map((input) => getInitialArgumentValue(input)) ??
+      [];
+
+    setReadArgumentValues((current) => {
+      const nextValues = (current[signature] ?? fallbackValues).map((item, itemIndex) =>
+        itemIndex === index ? value : item,
+      );
+      persistArgumentValues(signature, nextValues);
+
+      return {
+        ...current,
+        [signature]: nextValues,
+      };
+    });
     setReadResults((current) => {
       const next = { ...current };
       delete next[signature];
@@ -831,10 +907,21 @@ export function AddressContractPanel({
   }
 
   function updateWriteArgumentValue(signature: string, index: number, value: string) {
-    setWriteArgumentValues((current) => ({
-      ...current,
-      [signature]: current[signature]?.map((item, itemIndex) => (itemIndex === index ? value : item)) ?? [],
-    }));
+    const fallbackValues =
+      writeFunctions.find((item) => item.signature === signature)?.inputs.map((input) => getInitialArgumentValue(input)) ??
+      [];
+
+    setWriteArgumentValues((current) => {
+      const nextValues = (current[signature] ?? fallbackValues).map((item, itemIndex) =>
+        itemIndex === index ? value : item,
+      );
+      persistArgumentValues(signature, nextValues);
+
+      return {
+        ...current,
+        [signature]: nextValues,
+      };
+    });
     setWritePreviews((current) => {
       const next = { ...current };
       delete next[signature];
@@ -1257,14 +1344,14 @@ export function AddressContractPanel({
 
   function resetReadView() {
     setExpandedReadSignatures([]);
-    setReadArgumentValues(getInitialValues(readFunctions));
+    setReadArgumentValues(getInitialValuesWithCache(readFunctions));
     setReadResults({});
     setReadErrors({});
   }
 
   function resetWriteView() {
     setExpandedWriteSignatures([]);
-    setWriteArgumentValues(getInitialValues(writeFunctions));
+    setWriteArgumentValues(getInitialValuesWithCache(writeFunctions));
     setWritePreviews({});
     setWriteResults({});
     setWriteErrors({});
@@ -1286,6 +1373,17 @@ export function AddressContractPanel({
   function handleToggleReadSignature(signature: string) {
     const fn = readFunctions.find((item) => item.signature === signature);
 
+    if (fn) {
+      const cachedValues = getCachedArgumentValues(fn);
+
+      if (cachedValues) {
+        setReadArgumentValues((current) => ({
+          ...current,
+          [signature]: cachedValues,
+        }));
+      }
+    }
+
     setExpandedReadSignatures((current) => {
       const isExpanded = current.includes(signature);
 
@@ -1305,6 +1403,14 @@ export function AddressContractPanel({
     const isExpanded = expandedReadSignatures.includes(fn.signature);
 
     if (!isExpanded) {
+      const cachedValues = getCachedArgumentValues(fn);
+
+      if (cachedValues) {
+        setReadArgumentValues((current) => ({
+          ...current,
+          [fn.signature]: cachedValues,
+        }));
+      }
       setExpandedReadSignatures((current) => [...current, fn.signature]);
     }
 
