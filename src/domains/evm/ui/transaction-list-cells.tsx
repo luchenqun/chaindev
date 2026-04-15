@@ -107,6 +107,7 @@ export function TransactionPreviewButton(props: {
   const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -141,7 +142,14 @@ export function TransactionPreviewButton(props: {
     }
 
     function handlePointerDown(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        panelRef.current &&
+        !panelRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -182,6 +190,7 @@ export function TransactionPreviewButton(props: {
       {open && panelPosition && typeof document !== "undefined"
         ? createPortal(
             <div
+              ref={panelRef}
               className="fixed z-[70] w-[340px] rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
               style={{
                 top: panelPosition.top,
