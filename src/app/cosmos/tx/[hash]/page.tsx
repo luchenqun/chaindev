@@ -1,17 +1,19 @@
-"use client";
+'use client';
 
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { DetailPageSkeleton } from "@/components/ui/loading-placeholders";
-import { getCosmosTxByHashDirect } from "@/domains/cosmos/client/queries";
-import { CosmosTxSummary } from "@/domains/cosmos/ui/tx-summary";
-import { AppShell } from "@/platform/layout/app-shell";
+import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
+import { getCosmosTxByHashDirect } from '@/domains/cosmos/client/queries';
+import { CosmosTxSummary } from '@/domains/cosmos/ui/tx-summary';
+import { AppShell } from '@/platform/layout/app-shell';
 
 export default function CosmosTxPage() {
   const params = useParams<{ hash: string }>();
   const hash = params.hash;
   const isValid = useMemo(() => /^[A-Fa-f0-9]{64}$/.test(hash), [hash]);
-  const [transaction, setTransaction] = useState<Awaited<ReturnType<typeof getCosmosTxByHashDirect>> | null>(null);
+  const [transaction, setTransaction] = useState<Awaited<
+    ReturnType<typeof getCosmosTxByHashDirect>
+  > | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -32,17 +34,21 @@ export default function CosmosTxPage() {
       } catch (error) {
         if (!cancelled) {
           setTransaction(null);
-          setErrorMessage(error instanceof Error ? error.message : "Failed to load Cosmos transaction.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load Cosmos transaction.',
+          );
         }
       }
     }
 
     void load();
-    window.addEventListener("chaindev:active-rpc-profile-changed", load);
+    window.addEventListener('chaindev:active-rpc-profile-changed', load);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("chaindev:active-rpc-profile-changed", load);
+      window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
   }, [hash, isValid]);
 
@@ -61,7 +67,12 @@ export default function CosmosTxPage() {
     if (!errorMessage) {
       return (
         <AppShell>
-          <DetailPageSkeleton titleWidth="w-52" groups={2} rowsPerGroup={4} secondaryCard={false} />
+          <DetailPageSkeleton
+            titleWidth="w-52"
+            groups={2}
+            rowsPerGroup={4}
+            secondaryCard={false}
+          />
         </AppShell>
       );
     }
@@ -84,7 +95,9 @@ export default function CosmosTxPage() {
             <span className="kicker">Cosmos Transaction</span>
             <h1>Transaction Detail</h1>
           </div>
-          <p className="eyebrow">The first version shows summary fields and the raw log.</p>
+          <p className="eyebrow">
+            The first version shows summary fields and the raw log.
+          </p>
         </div>
         <CosmosTxSummary transaction={transaction} />
       </main>

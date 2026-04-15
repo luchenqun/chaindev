@@ -21,7 +21,7 @@ export function EvmTxSummary({ transaction, currencyName }: TxSummaryProps) {
         </div>
         <div>
           <dt>Block</dt>
-          <dd>{transaction.blockNumber ?? "Pending"}</dd>
+          <dd>{transaction.blockNumber ?? 'Pending'}</dd>
         </div>
         <div>
           <dt>From</dt>
@@ -29,19 +29,21 @@ export function EvmTxSummary({ transaction, currencyName }: TxSummaryProps) {
         </div>
         <div>
           <dt>To</dt>
-          <dd className="mono">{transaction.to ?? "Contract Creation"}</dd>
+          <dd className="mono">{transaction.to ?? 'Contract Creation'}</dd>
         </div>
         <div>
           <dt>Value</dt>
-          <dd>{transaction.value} {currencyName}</dd>
+          <dd>
+            {transaction.value} {currencyName}
+          </dd>
         </div>
         <div>
           <dt>Nonce</dt>
-          <dd>{transaction.nonce ?? "N/A"}</dd>
+          <dd>{transaction.nonce ?? 'N/A'}</dd>
         </div>
         <div>
           <dt>Gas</dt>
-          <dd>{transaction.gas ?? "N/A"}</dd>
+          <dd>{transaction.gas ?? 'N/A'}</dd>
         </div>
       </dl>
     </div>

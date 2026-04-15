@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   Pagination,
@@ -8,7 +8,7 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination";
+} from '@/components/ui/pagination';
 
 type PaginationControlsProps = {
   page: number;
@@ -41,7 +41,7 @@ export function PaginationControls({
             />
           </PaginationItem>
           {visiblePages.map((item, index) =>
-            item === "ellipsis" ? (
+            item === 'ellipsis' ? (
               <PaginationItem key={`ellipsis-${index}`}>
                 <PaginationEllipsis />
               </PaginationItem>
@@ -77,12 +77,20 @@ function getVisiblePages(page: number, totalPages: number) {
   }
 
   if (page <= 3) {
-    return [1, 2, 3, "ellipsis", totalPages] as const;
+    return [1, 2, 3, 'ellipsis', totalPages] as const;
   }
 
   if (page >= totalPages - 2) {
-    return [1, "ellipsis", totalPages - 2, totalPages - 1, totalPages] as const;
+    return [1, 'ellipsis', totalPages - 2, totalPages - 1, totalPages] as const;
   }
 
-  return [1, "ellipsis", page - 1, page, page + 1, "ellipsis", totalPages] as const;
+  return [
+    1,
+    'ellipsis',
+    page - 1,
+    page,
+    page + 1,
+    'ellipsis',
+    totalPages,
+  ] as const;
 }

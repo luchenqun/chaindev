@@ -1,13 +1,13 @@
-import { redirect } from "next/navigation";
-import { auth } from "@/auth";
-import { AppShell } from "@/platform/layout/app-shell";
-import { SignUpForm } from "@/platform/auth/sign-up-form";
+import { redirect } from 'next/navigation';
+import { auth } from '@/auth';
+import { AppShell } from '@/platform/layout/app-shell';
+import { SignUpForm } from '@/platform/auth/sign-up-form';
 
 export default async function SignUpPage() {
   const session = await auth();
 
   if (session?.user) {
-    redirect("/");
+    redirect('/');
   }
 
   return (

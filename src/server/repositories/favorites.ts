@@ -1,7 +1,7 @@
-import { desc, eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
-import { db } from "@/db/client";
-import { favorites } from "@/db/schema/workbench";
+import { desc, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { db } from '@/db/client';
+import { favorites } from '@/db/schema/workbench';
 
 type FavoriteInput = {
   userId: string;
@@ -25,5 +25,10 @@ export async function addFavorite(input: FavoriteInput) {
 }
 
 export async function listFavorites(userId: string) {
-  return db.select().from(favorites).where(eq(favorites.userId, userId)).orderBy(desc(favorites.createdAt)).all();
+  return db
+    .select()
+    .from(favorites)
+    .where(eq(favorites.userId, userId))
+    .orderBy(desc(favorites.createdAt))
+    .all();
 }

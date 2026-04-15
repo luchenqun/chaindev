@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { type ButtonHTMLAttributes, type ReactNode } from "react";
-import { cn } from "@/lib/utils";
+import { type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
 type ActionIconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   tooltip: string;
@@ -17,11 +17,14 @@ export function ActionIconButton({
   ...props
 }: ActionIconButtonProps) {
   return (
-    <span className={cn("group relative inline-flex", wrapperClassName)}>
+    <span className={cn('group relative inline-flex', wrapperClassName)}>
       <button
         type="button"
-        aria-label={props["aria-label"] ?? tooltip}
-        className={cn("inline-flex items-center justify-center p-[3px] transition", className)}
+        aria-label={props['aria-label'] ?? tooltip}
+        className={cn(
+          'inline-flex items-center justify-center p-[3px] transition',
+          className,
+        )}
         {...props}
       >
         {children}

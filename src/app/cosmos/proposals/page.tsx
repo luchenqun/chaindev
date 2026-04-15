@@ -1,12 +1,14 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
-import { getCosmosProposalsDirect } from "@/domains/cosmos/client/queries";
-import { AppShell } from "@/platform/layout/app-shell";
+import { useEffect, useState } from 'react';
+import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
+import { getCosmosProposalsDirect } from '@/domains/cosmos/client/queries';
+import { AppShell } from '@/platform/layout/app-shell';
 
 export default function CosmosProposalsPage() {
-  const [proposals, setProposals] = useState<Awaited<ReturnType<typeof getCosmosProposalsDirect>> | null>(null);
+  const [proposals, setProposals] = useState<Awaited<
+    ReturnType<typeof getCosmosProposalsDirect>
+  > | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,17 +25,21 @@ export default function CosmosProposalsPage() {
       } catch (error) {
         if (!cancelled) {
           setProposals(null);
-          setErrorMessage(error instanceof Error ? error.message : "Failed to load proposals.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load proposals.',
+          );
         }
       }
     }
 
     void load();
-    window.addEventListener("chaindev:active-rpc-profile-changed", load);
+    window.addEventListener('chaindev:active-rpc-profile-changed', load);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("chaindev:active-rpc-profile-changed", load);
+      window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
   }, []);
 
@@ -41,7 +47,12 @@ export default function CosmosProposalsPage() {
     if (!errorMessage) {
       return (
         <AppShell>
-          <ListPageSkeleton titleWidth="w-24" rows={8} columns={3} showToolbar={false} />
+          <ListPageSkeleton
+            titleWidth="w-24"
+            rows={8}
+            columns={3}
+            showToolbar={false}
+          />
         </AppShell>
       );
     }
@@ -64,7 +75,10 @@ export default function CosmosProposalsPage() {
             <span className="kicker">Cosmos Governance</span>
             <h1>Proposals</h1>
           </div>
-          <p className="eyebrow">The current phase focuses on the proposal list and basic status fields.</p>
+          <p className="eyebrow">
+            The current phase focuses on the proposal list and basic status
+            fields.
+          </p>
         </div>
         <div className="table-card">
           <table className="table-shell">
@@ -79,8 +93,8 @@ export default function CosmosProposalsPage() {
               {proposals.map((proposal) => (
                 <tr key={proposal.id}>
                   <td>{proposal.id}</td>
-                  <td>{proposal.title ?? "Untitled Proposal"}</td>
-                  <td>{proposal.status ?? "Unknown"}</td>
+                  <td>{proposal.title ?? 'Untitled Proposal'}</td>
+                  <td>{proposal.status ?? 'Unknown'}</td>
                 </tr>
               ))}
             </tbody>

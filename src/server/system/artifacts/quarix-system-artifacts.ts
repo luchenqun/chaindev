@@ -6229,9 +6229,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'owner', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'approved', type: 'address' },
-          { indexed: true, internalType: 'uint256', name: 'tokenId', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'owner',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'approved',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
         ],
         name: 'Approval',
         type: 'event',
@@ -6239,9 +6254,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'owner', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'operator', type: 'address' },
-          { indexed: false, internalType: 'bool', name: 'approved', type: 'bool' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'owner',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'operator',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'bool',
+            name: 'approved',
+            type: 'bool',
+          },
         ],
         name: 'ApprovalForAll',
         type: 'event',
@@ -6249,31 +6279,114 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: false, internalType: 'uint256', name: '_fromTokenId', type: 'uint256' },
-          { indexed: false, internalType: 'uint256', name: '_toTokenId', type: 'uint256' },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: '_fromTokenId',
+            type: 'uint256',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: '_toTokenId',
+            type: 'uint256',
+          },
         ],
         name: 'BatchMetadataUpdate',
         type: 'event',
       },
-      { anonymous: false, inputs: [{ indexed: false, internalType: 'uint256', name: 'tokenId', type: 'uint256' }], name: 'Disabled', type: 'event' },
-      { anonymous: false, inputs: [{ indexed: false, internalType: 'uint256', name: 'tokenId', type: 'uint256' }], name: 'Enabled', type: 'event' },
-      { anonymous: false, inputs: [{ indexed: false, internalType: 'uint8', name: 'version', type: 'uint8' }], name: 'Initialized', type: 'event' },
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'from', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'to', type: 'address' },
-          { indexed: true, internalType: 'uint256', name: 'tokenId', type: 'uint256' },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
+        ],
+        name: 'Disabled',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
+        ],
+        name: 'Enabled',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: false,
+            internalType: 'uint8',
+            name: 'version',
+            type: 'uint8',
+          },
+        ],
+        name: 'Initialized',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'from',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'to',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
         ],
         name: 'Issued',
         type: 'event',
       },
-      { anonymous: false, inputs: [{ indexed: false, internalType: 'uint256', name: '_tokenId', type: 'uint256' }], name: 'MetadataUpdate', type: 'event' },
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'to', type: 'address' },
-          { indexed: true, internalType: 'uint256', name: 'expiryDate', type: 'uint256' },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: '_tokenId',
+            type: 'uint256',
+          },
+        ],
+        name: 'MetadataUpdate',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'to',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'uint256',
+            name: 'expiryDate',
+            type: 'uint256',
+          },
         ],
         name: 'Renew',
         type: 'event',
@@ -6281,9 +6394,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'bytes32', name: 'role', type: 'bytes32' },
-          { indexed: true, internalType: 'bytes32', name: 'previousAdminRole', type: 'bytes32' },
-          { indexed: true, internalType: 'bytes32', name: 'newAdminRole', type: 'bytes32' },
+          {
+            indexed: true,
+            internalType: 'bytes32',
+            name: 'role',
+            type: 'bytes32',
+          },
+          {
+            indexed: true,
+            internalType: 'bytes32',
+            name: 'previousAdminRole',
+            type: 'bytes32',
+          },
+          {
+            indexed: true,
+            internalType: 'bytes32',
+            name: 'newAdminRole',
+            type: 'bytes32',
+          },
         ],
         name: 'RoleAdminChanged',
         type: 'event',
@@ -6291,9 +6419,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'bytes32', name: 'role', type: 'bytes32' },
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'sender', type: 'address' },
+          {
+            indexed: true,
+            internalType: 'bytes32',
+            name: 'role',
+            type: 'bytes32',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'sender',
+            type: 'address',
+          },
         ],
         name: 'RoleGranted',
         type: 'event',
@@ -6301,9 +6444,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'bytes32', name: 'role', type: 'bytes32' },
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'sender', type: 'address' },
+          {
+            indexed: true,
+            internalType: 'bytes32',
+            name: 'role',
+            type: 'bytes32',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'sender',
+            type: 'address',
+          },
         ],
         name: 'RoleRevoked',
         type: 'event',
@@ -6311,18 +6469,50 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: false, internalType: 'string', name: 'oldBaseURI', type: 'string' },
-          { indexed: false, internalType: 'string', name: 'currentBaseURI', type: 'string' },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'oldBaseURI',
+            type: 'string',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'currentBaseURI',
+            type: 'string',
+          },
         ],
         name: 'SetBaseURI',
         type: 'event',
       },
-      { anonymous: false, inputs: [{ indexed: false, internalType: 'uint256', name: 'newBatchSize', type: 'uint256' }], name: 'SetBatchSize', type: 'event' },
       {
         anonymous: false,
         inputs: [
-          { indexed: false, internalType: 'uint256', name: 'tokenId', type: 'uint256' },
-          { indexed: false, internalType: 'uint256', name: 'timestamp', type: 'uint256' },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'newBatchSize',
+            type: 'uint256',
+          },
+        ],
+        name: 'SetBatchSize',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'timestamp',
+            type: 'uint256',
+          },
         ],
         name: 'SetTokenExpireTime',
         type: 'event',
@@ -6330,16 +6520,49 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'from', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'to', type: 'address' },
-          { indexed: true, internalType: 'uint256', name: 'tokenId', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'from',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'to',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
         ],
         name: 'Transfer',
         type: 'event',
       },
-      { inputs: [], name: 'DEFAULT_ADMIN_ROLE', outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'ISSUER_ROLE', outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'MANAGER_ROLE', outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }], stateMutability: 'view', type: 'function' },
+      {
+        inputs: [],
+        name: 'DEFAULT_ADMIN_ROLE',
+        outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'ISSUER_ROLE',
+        outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'MANAGER_ROLE',
+        outputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'address', name: '', type: 'address' },
@@ -6357,11 +6580,41 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [], name: 'baseTokenURI', outputs: [{ internalType: 'string', name: '', type: 'string' }], stateMutability: 'view', type: 'function' },
-      { inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }], name: 'burn', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'address', name: 'account', type: 'address' }], name: 'burnFor', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }], name: 'disableToken', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }], name: 'enableToken', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+      {
+        inputs: [],
+        name: 'baseTokenURI',
+        outputs: [{ internalType: 'string', name: '', type: 'string' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }],
+        name: 'burn',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+        name: 'burnFor',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }],
+        name: 'disableToken',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }],
+        name: 'enableToken',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
       {
         inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }],
         name: 'exists',
@@ -6370,7 +6623,9 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
       {
-        inputs: [{ internalType: 'address', name: 'ownerAddress', type: 'address' }],
+        inputs: [
+          { internalType: 'address', name: 'ownerAddress', type: 'address' },
+        ],
         name: 'expiryDateOf',
         outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
         stateMutability: 'view',
@@ -6477,7 +6732,13 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'nonpayable',
         type: 'function',
       },
-      { inputs: [], name: 'name', outputs: [{ internalType: 'string', name: '', type: 'string' }], stateMutability: 'view', type: 'function' },
+      {
+        inputs: [],
+        name: 'name',
+        outputs: [{ internalType: 'string', name: '', type: 'string' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
       {
         inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }],
         name: 'ownerOf',
@@ -6558,7 +6819,15 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'pure',
         type: 'function',
       },
-      { inputs: [{ internalType: 'string', name: '_baseTokenURI', type: 'string' }], name: 'setBaseURI', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+      {
+        inputs: [
+          { internalType: 'string', name: '_baseTokenURI', type: 'string' },
+        ],
+        name: 'setBaseURI',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'uint256', name: 'tokenId', type: 'uint256' },
@@ -6570,15 +6839,25 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
       {
-        inputs: [{ internalType: 'bytes4', name: 'interfaceId', type: 'bytes4' }],
+        inputs: [
+          { internalType: 'bytes4', name: 'interfaceId', type: 'bytes4' },
+        ],
         name: 'supportsInterface',
         outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [], name: 'symbol', outputs: [{ internalType: 'string', name: '', type: 'string' }], stateMutability: 'view', type: 'function' },
       {
-        inputs: [{ internalType: 'address', name: 'ownerAddress', type: 'address' }],
+        inputs: [],
+        name: 'symbol',
+        outputs: [{ internalType: 'string', name: '', type: 'string' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          { internalType: 'address', name: 'ownerAddress', type: 'address' },
+        ],
         name: 'tokenIdOf',
         outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
         stateMutability: 'view',
@@ -6611,9 +6890,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'qoe', type: 'address' },
-          { indexed: false, internalType: 'string', name: 'role', type: 'string' },
-          { indexed: false, internalType: 'string', name: 'desc', type: 'string' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoe',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'role',
+            type: 'string',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'desc',
+            type: 'string',
+          },
         ],
         name: 'AddRole',
         type: 'event',
@@ -6621,8 +6915,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: false, internalType: 'address', name: 'issuer', type: 'address' },
-          { indexed: false, internalType: 'string', name: 'roleName', type: 'string' },
+          {
+            indexed: false,
+            internalType: 'address',
+            name: 'issuer',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'roleName',
+            type: 'string',
+          },
         ],
         name: 'AddRoleIssuer',
         type: 'event',
@@ -6630,8 +6934,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'to', type: 'address' },
-          { indexed: true, internalType: 'uint256', name: 'tokenId', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'to',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
         ],
         name: 'Attest',
         type: 'event',
@@ -6639,8 +6953,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'from', type: 'address' },
-          { indexed: true, internalType: 'uint256', name: 'tokenId', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'from',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
         ],
         name: 'Burn',
         type: 'event',
@@ -6648,8 +6972,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'qoe', type: 'address' },
-          { indexed: false, internalType: 'string', name: 'name', type: 'string' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoe',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'name',
+            type: 'string',
+          },
         ],
         name: 'RemoveRole',
         type: 'event',
@@ -6657,8 +6991,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: false, internalType: 'address', name: 'issuer', type: 'address' },
-          { indexed: false, internalType: 'string', name: 'roleName', type: 'string' },
+          {
+            indexed: false,
+            internalType: 'address',
+            name: 'issuer',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'roleName',
+            type: 'string',
+          },
         ],
         name: 'RemoveRoleIssuer',
         type: 'event',
@@ -6666,8 +7010,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'to', type: 'address' },
-          { indexed: false, internalType: 'uint256', name: 'deadline', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'to',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'deadline',
+            type: 'uint256',
+          },
         ],
         name: 'ResetTime',
         type: 'event',
@@ -6675,8 +7029,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'from', type: 'address' },
-          { indexed: true, internalType: 'uint256', name: 'tokenId', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'from',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
         ],
         name: 'Revoke',
         type: 'event',
@@ -6684,9 +7048,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'from', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'to', type: 'address' },
-          { indexed: true, internalType: 'uint256', name: 'tokenId', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'from',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'to',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'uint256',
+            name: 'tokenId',
+            type: 'uint256',
+          },
         ],
         name: 'Transfer',
         type: 'event',
@@ -6694,9 +7073,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'qoe', type: 'address' },
-          { indexed: false, internalType: 'string', name: 'name', type: 'string' },
-          { indexed: false, internalType: 'string', name: 'desc', type: 'string' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoe',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'name',
+            type: 'string',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'desc',
+            type: 'string',
+          },
         ],
         name: 'UpdateRoleDesc',
         type: 'event',
@@ -6752,8 +7146,20 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [], name: 'burn', outputs: [], stateMutability: 'pure', type: 'function' },
-      { inputs: [], name: 'expire', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
+      {
+        inputs: [],
+        name: 'burn',
+        outputs: [],
+        stateMutability: 'pure',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'expire',
+        outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
       {
         inputs: [{ internalType: 'address', name: 'addr', type: 'address' }],
         name: 'getAddressRole',
@@ -6778,7 +7184,13 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [], name: 'getRoleList', outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }], stateMutability: 'view', type: 'function' },
+      {
+        inputs: [],
+        name: 'getRoleList',
+        outputs: [{ internalType: 'string[]', name: '', type: 'string[]' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'string', name: 'name_', type: 'string' },
@@ -6798,7 +7210,13 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [], name: 'name', outputs: [{ internalType: 'string', name: '', type: 'string' }], stateMutability: 'view', type: 'function' },
+      {
+        inputs: [],
+        name: 'name',
+        outputs: [{ internalType: 'string', name: '', type: 'string' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
       {
         inputs: [{ internalType: 'uint256', name: 'tokenId', type: 'uint256' }],
         name: 'ownerOf',
@@ -6813,7 +7231,13 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [{ internalType: 'string', name: 'roleName', type: 'string' }], name: 'removeRole', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+      {
+        inputs: [{ internalType: 'string', name: 'roleName', type: 'string' }],
+        name: 'removeRole',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'address', name: 'issuer', type: 'address' },
@@ -6824,8 +7248,20 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'nonpayable',
         type: 'function',
       },
-      { inputs: [{ internalType: 'address', name: 'to', type: 'address' }], name: 'resetTime', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'address', name: 'from', type: 'address' }], name: 'revoke', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+      {
+        inputs: [{ internalType: 'address', name: 'to', type: 'address' }],
+        name: 'resetTime',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'address', name: 'from', type: 'address' }],
+        name: 'revoke',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'address', name: 'from', type: 'address' },
@@ -6836,16 +7272,36 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'nonpayable',
         type: 'function',
       },
-      { inputs: [{ internalType: 'string', name: 'uri', type: 'string' }], name: 'setBaseTokenURI', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'uint128', name: 'segment', type: 'uint128' }], name: 'setExpire', outputs: [], stateMutability: 'nonpayable', type: 'function' },
       {
-        inputs: [{ internalType: 'bytes4', name: 'interfaceId', type: 'bytes4' }],
+        inputs: [{ internalType: 'string', name: 'uri', type: 'string' }],
+        name: 'setBaseTokenURI',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'uint128', name: 'segment', type: 'uint128' }],
+        name: 'setExpire',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [
+          { internalType: 'bytes4', name: 'interfaceId', type: 'bytes4' },
+        ],
         name: 'supportsInterface',
         outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [], name: 'symbol', outputs: [{ internalType: 'string', name: '', type: 'string' }], stateMutability: 'view', type: 'function' },
+      {
+        inputs: [],
+        name: 'symbol',
+        outputs: [{ internalType: 'string', name: '', type: 'string' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
       {
         inputs: [{ internalType: 'address', name: 'from', type: 'address' }],
         name: 'tokenIdOf',
@@ -6860,7 +7316,13 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [], name: 'totalSupply', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
+      {
+        inputs: [],
+        name: 'totalSupply',
+        outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'string', name: 'roleName', type: 'string' },
@@ -6880,8 +7342,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'issuer', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'serviceProvider', type: 'address' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'issuer',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'serviceProvider',
+            type: 'address',
+          },
         ],
         name: 'Approve',
         type: 'event',
@@ -6889,20 +7361,69 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: false, internalType: 'enumRole', name: 'role', type: 'uint8' },
-          { indexed: false, internalType: 'uint256', name: 'expiryDate', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'enumRole',
+            name: 'role',
+            type: 'uint8',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'expiryDate',
+            type: 'uint256',
+          },
         ],
         name: 'Assign',
         type: 'event',
       },
-      { anonymous: false, inputs: [{ indexed: true, internalType: 'address', name: 'account', type: 'address' }], name: 'EditDetail', type: 'event' },
-      { anonymous: false, inputs: [{ indexed: false, internalType: 'uint8', name: 'version', type: 'uint8' }], name: 'Initialized', type: 'event' },
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'previousOwner', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'newOwner', type: 'address' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+        ],
+        name: 'EditDetail',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: false,
+            internalType: 'uint8',
+            name: 'version',
+            type: 'uint8',
+          },
+        ],
+        name: 'Initialized',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'previousOwner',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'newOwner',
+            type: 'address',
+          },
         ],
         name: 'OwnershipTransferStarted',
         type: 'event',
@@ -6910,8 +7431,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'previousOwner', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'newOwner', type: 'address' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'previousOwner',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'newOwner',
+            type: 'address',
+          },
         ],
         name: 'OwnershipTransferred',
         type: 'event',
@@ -6919,8 +7450,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'previousQOE', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'newQOE', type: 'address' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'previousQOE',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'newQOE',
+            type: 'address',
+          },
         ],
         name: 'QOETransferStarted',
         type: 'event',
@@ -6928,18 +7469,50 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: false, internalType: 'uint256', name: 'expiryDate', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'expiryDate',
+            type: 'uint256',
+          },
         ],
         name: 'Renew',
         type: 'event',
       },
-      { anonymous: false, inputs: [{ indexed: true, internalType: 'address', name: 'account', type: 'address' }], name: 'Revoke', type: 'event' },
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: false, internalType: 'bool', name: 'status', type: 'bool' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+        ],
+        name: 'Revoke',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'bool',
+            name: 'status',
+            type: 'bool',
+          },
         ],
         name: 'SetEnableKYB',
         type: 'event',
@@ -6947,8 +7520,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: false, internalType: 'bool', name: 'status', type: 'bool' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'bool',
+            name: 'status',
+            type: 'bool',
+          },
         ],
         name: 'SetEnableKYC',
         type: 'event',
@@ -6956,8 +7539,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: false, internalType: 'uint256', name: 'gasLimit', type: 'uint256' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'gasLimit',
+            type: 'uint256',
+          },
         ],
         name: 'SetGasLimit',
         type: 'event',
@@ -6965,8 +7558,18 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: false, internalType: 'bool', name: 'manageDirectly', type: 'bool' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'bool',
+            name: 'manageDirectly',
+            type: 'bool',
+          },
         ],
         name: 'SetManageDirectly',
         type: 'event',
@@ -6974,9 +7577,24 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'account', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'serviceProvider', type: 'address' },
-          { indexed: false, internalType: 'uint64', name: 'permissions', type: 'uint64' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'serviceProvider',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint64',
+            name: 'permissions',
+            type: 'uint64',
+          },
         ],
         name: 'SetServiceProviderPermissions',
         type: 'event',
@@ -6984,30 +7602,94 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         anonymous: false,
         inputs: [
-          { indexed: true, internalType: 'address', name: 'oldQOE', type: 'address' },
-          { indexed: true, internalType: 'address', name: 'newQOE', type: 'address' },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'oldQOE',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'newQOE',
+            type: 'address',
+          },
         ],
         name: 'TransferQOE',
         type: 'event',
       },
-      { inputs: [], name: 'KYC_PERMISSION_RECEIVE_OTHER_NATIVE_TOKEN', outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'KYC_PERMISSION_RECEIVE_QARE_TOKEN', outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'KYC_PERMISSION_RECEIVE_QRX_TOKEN', outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'KYC_PERMISSION_RECEIVE_QVOUCHER_TOKEN', outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'KYC_PERMISSION_USE_GASWAIVER', outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'acceptOwnership', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [], name: 'acceptQOE', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+      {
+        inputs: [],
+        name: 'KYC_PERMISSION_RECEIVE_OTHER_NATIVE_TOKEN',
+        outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'KYC_PERMISSION_RECEIVE_QARE_TOKEN',
+        outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'KYC_PERMISSION_RECEIVE_QRX_TOKEN',
+        outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'KYC_PERMISSION_RECEIVE_QVOUCHER_TOKEN',
+        outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'KYC_PERMISSION_USE_GASWAIVER',
+        outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'acceptOwnership',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'acceptQOE',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'address', name: 'serviceProvider', type: 'address' },
-          { internalType: 'enumProviderMetaMap.Kind', name: 'kind', type: 'uint8' },
+          {
+            internalType: 'enumProviderMetaMap.Kind',
+            name: 'kind',
+            type: 'uint8',
+          },
         ],
         name: 'applyFor',
         outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
         stateMutability: 'nonpayable',
         type: 'function',
       },
-      { inputs: [{ internalType: 'address', name: 'serviceProvider', type: 'address' }], name: 'approve', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+      {
+        inputs: [
+          { internalType: 'address', name: 'serviceProvider', type: 'address' },
+        ],
+        name: 'approve',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'address', name: 'account', type: 'address' },
@@ -7024,7 +7706,9 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
       {
-        inputs: [{ internalType: 'address', name: 'serviceProvider', type: 'address' }],
+        inputs: [
+          { internalType: 'address', name: 'serviceProvider', type: 'address' },
+        ],
         name: 'contractDetailOf',
         outputs: [
           {
@@ -7033,7 +7717,11 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
               { internalType: 'string', name: 'name', type: 'string' },
               { internalType: 'string', name: 'symbol', type: 'string' },
               { internalType: 'bool', name: 'valid', type: 'bool' },
-              { internalType: 'enumProviderMetaMap.Kind', name: 'kind', type: 'uint8' },
+              {
+                internalType: 'enumProviderMetaMap.Kind',
+                name: 'kind',
+                type: 'uint8',
+              },
             ],
             internalType: 'structIServiceWrapper.contractDetail',
             name: '',
@@ -7066,9 +7754,21 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
               { internalType: 'bool', name: 'valid', type: 'bool' },
               { internalType: 'enumRole', name: 'role', type: 'uint8' },
               { internalType: 'uint256', name: 'expiryDate', type: 'uint256' },
-              { internalType: 'address[]', name: 'superior', type: 'address[]' },
-              { internalType: 'address[]', name: 'subordinate', type: 'address[]' },
-              { internalType: 'address', name: 'serviceProvider', type: 'address' },
+              {
+                internalType: 'address[]',
+                name: 'superior',
+                type: 'address[]',
+              },
+              {
+                internalType: 'address[]',
+                name: 'subordinate',
+                type: 'address[]',
+              },
+              {
+                internalType: 'address',
+                name: 'serviceProvider',
+                type: 'address',
+              },
             ],
             internalType: 'structdetail',
             name: '',
@@ -7091,13 +7791,45 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'nonpayable',
         type: 'function',
       },
-      { inputs: [], name: 'getEnableKYB', outputs: [{ internalType: 'bool', name: '', type: 'bool' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'getEnableKYC', outputs: [{ internalType: 'bool', name: '', type: 'bool' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'getGasLimit', outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'getManageDirectly', outputs: [{ internalType: 'bool', name: '', type: 'bool' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'getQOE', outputs: [{ internalType: 'address', name: '', type: 'address' }], stateMutability: 'view', type: 'function' },
       {
-        inputs: [{ internalType: 'address', name: 'serviceProvider', type: 'address' }],
+        inputs: [],
+        name: 'getEnableKYB',
+        outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'getEnableKYC',
+        outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'getGasLimit',
+        outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'getManageDirectly',
+        outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'getQOE',
+        outputs: [{ internalType: 'address', name: '', type: 'address' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          { internalType: 'address', name: 'serviceProvider', type: 'address' },
+        ],
         name: 'getServiceProviderPermissions',
         outputs: [{ internalType: 'uint64', name: '', type: 'uint64' }],
         stateMutability: 'view',
@@ -7120,7 +7852,11 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           { internalType: 'address', name: 'account', type: 'address' },
-          { internalType: 'enumProviderMetaMap.Kind', name: 'kind', type: 'uint8' },
+          {
+            internalType: 'enumProviderMetaMap.Kind',
+            name: 'kind',
+            type: 'uint8',
+          },
         ],
         name: 'kybkycStatus',
         outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
@@ -7131,7 +7867,11 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         inputs: [
           { internalType: 'address', name: 'role', type: 'address' },
           { internalType: 'address', name: 'account', type: 'address' },
-          { internalType: 'enumProviderMetaMap.Kind', name: 'kind', type: 'uint8' },
+          {
+            internalType: 'enumProviderMetaMap.Kind',
+            name: 'kind',
+            type: 'uint8',
+          },
         ],
         name: 'kybkycStatusUnder',
         outputs: [
@@ -7145,7 +7885,11 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         inputs: [
           { internalType: 'address', name: 'role', type: 'address' },
           { internalType: 'address', name: 'account', type: 'address' },
-          { internalType: 'enumProviderMetaMap.Kind', name: 'kind', type: 'uint8' },
+          {
+            internalType: 'enumProviderMetaMap.Kind',
+            name: 'kind',
+            type: 'uint8',
+          },
           { internalType: 'uint64', name: 'permissions', type: 'uint64' },
         ],
         name: 'kybkycStatusUnderV2',
@@ -7159,7 +7903,11 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           { internalType: 'address', name: 'account', type: 'address' },
-          { internalType: 'enumProviderMetaMap.Kind', name: 'kind', type: 'uint8' },
+          {
+            internalType: 'enumProviderMetaMap.Kind',
+            name: 'kind',
+            type: 'uint8',
+          },
           { internalType: 'uint64', name: 'permissions', type: 'uint64' },
         ],
         name: 'kybkycStatusV2',
@@ -7167,9 +7915,27 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'view',
         type: 'function',
       },
-      { inputs: [], name: 'owner', outputs: [{ internalType: 'address', name: '', type: 'address' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'pendingOwner', outputs: [{ internalType: 'address', name: '', type: 'address' }], stateMutability: 'view', type: 'function' },
-      { inputs: [], name: 'pendingQOE', outputs: [{ internalType: 'address', name: '', type: 'address' }], stateMutability: 'view', type: 'function' },
+      {
+        inputs: [],
+        name: 'owner',
+        outputs: [{ internalType: 'address', name: '', type: 'address' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'pendingOwner',
+        outputs: [{ internalType: 'address', name: '', type: 'address' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'pendingQOE',
+        outputs: [{ internalType: 'address', name: '', type: 'address' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'address', name: 'account', type: 'address' },
@@ -7180,12 +7946,52 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'nonpayable',
         type: 'function',
       },
-      { inputs: [], name: 'renounceOwnership', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'address', name: 'account', type: 'address' }], name: 'revoke', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'bool', name: 'status', type: 'bool' }], name: 'setEnableKYB', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'bool', name: 'status', type: 'bool' }], name: 'setEnableKYC', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'uint256', name: 'gasLimit', type: 'uint256' }], name: 'setGasLimit', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'bool', name: 'manageDirectly', type: 'bool' }], name: 'setManageDirectly', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+      {
+        inputs: [],
+        name: 'renounceOwnership',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+        name: 'revoke',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'bool', name: 'status', type: 'bool' }],
+        name: 'setEnableKYB',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'bool', name: 'status', type: 'bool' }],
+        name: 'setEnableKYC',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [
+          { internalType: 'uint256', name: 'gasLimit', type: 'uint256' },
+        ],
+        name: 'setGasLimit',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [
+          { internalType: 'bool', name: 'manageDirectly', type: 'bool' },
+        ],
+        name: 'setManageDirectly',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
       {
         inputs: [
           { internalType: 'address', name: 'serviceProvider', type: 'address' },
@@ -7196,8 +8002,22 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'nonpayable',
         type: 'function',
       },
-      { inputs: [{ internalType: 'address', name: 'newOwner', type: 'address' }], name: 'transferOwnership', outputs: [], stateMutability: 'nonpayable', type: 'function' },
-      { inputs: [{ internalType: 'address', name: 'newQOE', type: 'address' }], name: 'transferQOE', outputs: [], stateMutability: 'nonpayable', type: 'function' },
+      {
+        inputs: [
+          { internalType: 'address', name: 'newOwner', type: 'address' },
+        ],
+        name: 'transferOwnership',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'address', name: 'newQOE', type: 'address' }],
+        name: 'transferQOE',
+        outputs: [],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
     ],
     contractName: 'QuarixServiceWrapper',
     bytecode: null,

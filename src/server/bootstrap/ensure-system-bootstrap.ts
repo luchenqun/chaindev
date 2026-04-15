@@ -1,12 +1,12 @@
-import { eq, or, sql } from "drizzle-orm";
-import { db } from "@/db/client";
-import { users } from "@/db/schema/auth";
-import { evmContractArtifacts } from "@/db/schema/workbench";
-import { hashPassword } from "@/server/auth/password";
-import { createCredentialUser } from "@/server/repositories/auth-users";
-import { createServerEvmContractArtifact } from "@/server/repositories/evm-contract-registry";
-import { seedDefaultWorkbenchForUser } from "@/server/repositories/workbench-bootstrap";
-import { SYSTEM_CONTRACT_ARTIFACTS } from "@/server/system/artifacts/system-contract-artifacts";
+import { eq, or, sql } from 'drizzle-orm';
+import { db } from '@/db/client';
+import { users } from '@/db/schema/auth';
+import { evmContractArtifacts } from '@/db/schema/workbench';
+import { hashPassword } from '@/server/auth/password';
+import { createCredentialUser } from '@/server/repositories/auth-users';
+import { createServerEvmContractArtifact } from '@/server/repositories/evm-contract-registry';
+import { seedDefaultWorkbenchForUser } from '@/server/repositories/workbench-bootstrap';
+import { SYSTEM_CONTRACT_ARTIFACTS } from '@/server/system/artifacts/system-contract-artifacts';
 
 type BootstrapAdminConfig = {
   email: string;
@@ -27,7 +27,7 @@ function getBootstrapAdminConfig(): BootstrapAdminConfig | null {
 
   if (!email || !username || !password) {
     throw new Error(
-      "BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_USERNAME, and BOOTSTRAP_ADMIN_PASSWORD must be set together.",
+      'BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_USERNAME, and BOOTSTRAP_ADMIN_PASSWORD must be set together.',
     );
   }
 
@@ -56,22 +56,28 @@ async function ensureBootstrapAdminUser(config: BootstrapAdminConfig) {
 
   if (distinctUserIds.length > 1) {
     throw new Error(
-      "Bootstrap admin identity matches multiple users. Resolve the email/username conflict first.",
+      'Bootstrap admin identity matches multiple users. Resolve the email/username conflict first.',
     );
   }
 
   if (matchedUsers[0]) {
     const existingUser = matchedUsers[0];
     const emailMatches = existingUser.email?.toLowerCase() === config.email;
-    const usernameMatches = existingUser.username?.toLowerCase() === normalizedUsernameLower;
-    const nameMatches = (existingUser.name ?? existingUser.username ?? "").trim() === config.name;
+    const usernameMatches =
+      existingUser.username?.toLowerCase() === normalizedUsernameLower;
+    const nameMatches =
+      (existingUser.name ?? existingUser.username ?? '').trim() === config.name;
 
-    if (existingUser.isAdmin && emailMatches && usernameMatches && nameMatches) {
+    if (
+      existingUser.isAdmin &&
+      emailMatches &&
+      usernameMatches &&
+      nameMatches
+    ) {
       return existingUser;
     }
 
-    db
-      .update(users)
+    db.update(users)
       .set({
         email: config.email,
         username: config.username,
@@ -84,11 +90,7 @@ async function ensureBootstrapAdminUser(config: BootstrapAdminConfig) {
       .run();
 
     return (
-      db
-        .select()
-        .from(users)
-        .where(eq(users.id, existingUser.id))
-        .get() ?? null
+      db.select().from(users).where(eq(users.id, existingUser.id)).get() ?? null
     );
   }
 
@@ -108,7 +110,7 @@ async function ensureSystemArtifacts(adminUserId: string) {
         name: evmContractArtifacts.name,
       })
       .from(evmContractArtifacts)
-      .where(eq(evmContractArtifacts.scope, "system"))
+      .where(eq(evmContractArtifacts.scope, 'system'))
       .all()
       .map((artifact) => artifact.name),
   );
@@ -121,7 +123,7 @@ async function ensureSystemArtifacts(adminUserId: string) {
     await createServerEvmContractArtifact({
       userId: adminUserId,
       isAdmin: true,
-      scope: "system",
+      scope: 'system',
       name: artifact.contractName,
       abiJson: artifact.abi,
       bytecode: artifact.bytecode,
@@ -139,7 +141,7 @@ export async function ensureSystemBootstrap() {
   const adminUser = await ensureBootstrapAdminUser(config);
 
   if (!adminUser) {
-    throw new Error("Failed to create or load the bootstrap admin user.");
+    throw new Error('Failed to create or load the bootstrap admin user.');
   }
 
   await seedDefaultWorkbenchForUser(adminUser.id);

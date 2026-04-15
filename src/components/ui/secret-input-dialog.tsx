@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 type SecretInputDialogProps = {
   open: boolean;
@@ -28,8 +28,8 @@ export function SecretInputDialog({
   value,
   onValueChange,
   placeholder,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   confirmDisabled = false,
   errorMessage,
   onConfirm,
@@ -40,23 +40,23 @@ export function SecretInputDialog({
     }
 
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         onOpenChange(false);
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [open, onOpenChange]);
 
-  if (!open || typeof document === "undefined") {
+  if (!open || typeof document === 'undefined') {
     return null;
   }
 
@@ -71,7 +71,11 @@ export function SecretInputDialog({
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.24)]">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          {description ? <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p> : null}
+          {description ? (
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {description}
+            </p>
+          ) : null}
         </div>
         <div className="mt-5">
           <Input
@@ -81,10 +85,16 @@ export function SecretInputDialog({
             onChange={(event) => onValueChange(event.target.value)}
             placeholder={placeholder}
           />
-          {errorMessage ? <p className="mt-2 text-sm text-rose-600">{errorMessage}</p> : null}
+          {errorMessage ? (
+            <p className="mt-2 text-sm text-rose-600">{errorMessage}</p>
+          ) : null}
         </div>
         <div className="mt-6 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             {cancelLabel}
           </Button>
           <Button type="button" onClick={onConfirm} disabled={confirmDisabled}>

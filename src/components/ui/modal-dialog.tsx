@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { type ReactNode, useEffect } from "react";
-import { createPortal } from "react-dom";
+import { type ReactNode, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 type ModalDialogProps = {
   open: boolean;
@@ -20,7 +20,7 @@ export function ModalDialog({
   description,
   children,
   footer,
-  maxWidthClassName = "max-w-2xl",
+  maxWidthClassName = 'max-w-2xl',
 }: ModalDialogProps) {
   useEffect(() => {
     if (!open) {
@@ -28,23 +28,23 @@ export function ModalDialog({
     }
 
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         onOpenChange(false);
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [open, onOpenChange]);
 
-  if (!open || typeof document === "undefined") {
+  if (!open || typeof document === 'undefined') {
     return null;
   }
 
@@ -61,7 +61,11 @@ export function ModalDialog({
       >
         <div className="shrink-0 px-6 pt-6">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          {description ? <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p> : null}
+          {description ? (
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {description}
+            </p>
+          ) : null}
         </div>
         <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-6">
           {children}

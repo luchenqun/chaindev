@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { AppShell } from "@/platform/layout/app-shell";
+import { AppShell } from '@/platform/layout/app-shell';
 
 export default function CosmosEncodeDecodePage() {
   return (
@@ -9,7 +9,10 @@ export default function CosmosEncodeDecodePage() {
         <section className="tool-card">
           <span className="kicker">Cosmos Workbench</span>
           <h1>Encode / Decode Tool</h1>
-          <p>Provide entry points for Bech32, message encoding, and raw byte decoding with room for a protobuf registry later.</p>
+          <p>
+            Provide entry points for Bech32, message encoding, and raw byte
+            decoding with room for a protobuf registry later.
+          </p>
           <form className="tool-form">
             <select defaultValue="bech32">
               <option value="bech32">Bech32</option>
@@ -25,7 +28,10 @@ export default function CosmosEncodeDecodePage() {
         <section className="tool-card">
           <span className="kicker">Output</span>
           <h2>Result Preview</h2>
-          <div className="empty-state">Encoding, decoding, and detailed error output can be shown here later.</div>
+          <div className="empty-state">
+            Encoding, decoding, and detailed error output can be shown here
+            later.
+          </div>
         </section>
       </main>
     </AppShell>

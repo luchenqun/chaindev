@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import JsonView from "@uiw/react-json-view";
+import JsonView from '@uiw/react-json-view';
 import {
   IconBrandTelegram,
   IconChevronDown,
@@ -10,7 +10,7 @@ import {
   IconRefresh,
   IconSparkles,
   IconX,
-} from "@tabler/icons-react";
+} from '@tabler/icons-react';
 import {
   type CSSProperties,
   type Dispatch,
@@ -19,49 +19,49 @@ import {
   useEffect,
   useMemo,
   useState,
-} from "react";
-import Link from "next/link";
-import { toFunctionSelector, type AbiParameter } from "viem";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { JsonInput } from "@/components/ui/json-input";
-import { ModalDialog } from "@/components/ui/modal-dialog";
-import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
+} from 'react';
+import Link from 'next/link';
+import { toFunctionSelector, type AbiParameter } from 'viem';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { JsonInput } from '@/components/ui/json-input';
+import { ModalDialog } from '@/components/ui/modal-dialog';
+import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast";
+} from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import {
   getReadContractFunctions,
   getWriteContractFunctions,
   type EvmContractFunctionDescriptor,
-} from "@/domains/evm/client/abi-utils";
+} from '@/domains/evm/client/abi-utils';
 import {
   forceWriteEvmContractMethodDirect,
   getEvmContractWriteManualDefaultsDirect,
   prepareEvmContractWriteDirect,
   readEvmContractMethodDirect,
   writeEvmContractMethodDirect,
-} from "@/domains/evm/client/contract-executor";
+} from '@/domains/evm/client/contract-executor';
 import {
   getActiveEvmStoredPrivateKey,
   isEvmStoredPrivateKeyUnlocked,
   resolveEvmStoredPrivateKey,
   subscribeEvmKeyring,
   type EvmStoredPrivateKey,
-} from "@/domains/evm/client/keyring";
+} from '@/domains/evm/client/keyring';
 import {
   type EvmContractArtifact,
   type EvmContractBinding,
-} from "@/domains/evm/client/contract-registry";
+} from '@/domains/evm/client/contract-registry';
 
 const textareaClassName =
-  "min-h-32 w-full resize-none overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
+  'min-h-32 w-full resize-none overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400';
 
 type EnvironmentState = {
   providerProfileId: string;
@@ -70,7 +70,7 @@ type EnvironmentState = {
   nativeCurrency: string;
 };
 
-type ContractSubview = "code" | "read" | "write";
+type ContractSubview = 'code' | 'read' | 'write';
 
 type WritePreviewState = {
   accountAddress: string;
@@ -80,7 +80,7 @@ type WritePreviewState = {
   valueLabel: string;
 };
 
-type ManualWriteTransactionType = "LEGACY" | "EIP1559";
+type ManualWriteTransactionType = 'LEGACY' | 'EIP1559';
 
 type ManualWriteDialogState = {
   transactionType: ManualWriteTransactionType;
@@ -93,38 +93,38 @@ type ManualWriteDialogState = {
 };
 
 const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
-const CONTRACT_ARGUMENT_CACHE_KEY = "evm-contract-arguments:v1";
+const CONTRACT_ARGUMENT_CACHE_KEY = 'evm-contract-arguments:v1';
 const jsonViewStyle = {
-  "--w-rjv-background-color": "transparent",
-  "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
-  "--w-rjv-font-family":
+  '--w-rjv-background-color': 'transparent',
+  '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
+  '--w-rjv-font-family':
     '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-  "--w-rjv-color": "#0f172a",
-  "--w-rjv-arrow-color": "#64748b",
-  "--w-rjv-line-color": "rgba(148, 163, 184, 0.24)",
-  "--w-rjv-curlybraces-color": "#475569",
-  "--w-rjv-brackets-color": "#475569",
-  "--w-rjv-colon-color": "#94a3b8",
-  "--w-rjv-key-string": "#0369a1",
-  "--w-rjv-key-number": "#0369a1",
-  "--w-rjv-type-string-color": "#b45309",
-  "--w-rjv-type-int-color": "#7c3aed",
-  "--w-rjv-type-float-color": "#7c3aed",
-  "--w-rjv-type-bigint-color": "#7c3aed",
-  "--w-rjv-type-boolean-color": "#15803d",
-  "--w-rjv-type-null-color": "#b91c1c",
-  "--w-rjv-type-undefined-color": "#b91c1c",
+  '--w-rjv-color': '#0f172a',
+  '--w-rjv-arrow-color': '#64748b',
+  '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
+  '--w-rjv-curlybraces-color': '#475569',
+  '--w-rjv-brackets-color': '#475569',
+  '--w-rjv-colon-color': '#94a3b8',
+  '--w-rjv-key-string': '#0369a1',
+  '--w-rjv-key-number': '#0369a1',
+  '--w-rjv-type-string-color': '#b45309',
+  '--w-rjv-type-int-color': '#7c3aed',
+  '--w-rjv-type-float-color': '#7c3aed',
+  '--w-rjv-type-bigint-color': '#7c3aed',
+  '--w-rjv-type-boolean-color': '#15803d',
+  '--w-rjv-type-null-color': '#b91c1c',
+  '--w-rjv-type-undefined-color': '#b91c1c',
 } as CSSProperties;
 
 function hasTupleComponents(
   parameter: AbiParameter,
 ): parameter is AbiParameter & { components: readonly AbiParameter[] } {
-  return "components" in parameter && Array.isArray(parameter.components);
+  return 'components' in parameter && Array.isArray(parameter.components);
 }
 
 function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
-  if (parameter.type.endsWith("]")) {
-    const baseType = parameter.type.slice(0, parameter.type.lastIndexOf("["));
+  if (parameter.type.endsWith(']')) {
+    const baseType = parameter.type.slice(0, parameter.type.lastIndexOf('['));
     const baseParameter = {
       ...parameter,
       type: baseType,
@@ -133,8 +133,10 @@ function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
     return [createComplexParameterTemplateValue(baseParameter)];
   }
 
-  if (parameter.type === "tuple") {
-    const components = hasTupleComponents(parameter) ? parameter.components : [];
+  if (parameter.type === 'tuple') {
+    const components = hasTupleComponents(parameter)
+      ? parameter.components
+      : [];
 
     return Object.fromEntries(
       components.map((component, index) => [
@@ -144,39 +146,44 @@ function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
     );
   }
 
-  if (parameter.type === "bool") {
-    return "false";
+  if (parameter.type === 'bool') {
+    return 'false';
   }
 
   if (/^u?int\d*$/.test(parameter.type)) {
-    return "0";
+    return '0';
   }
 
-  if (parameter.type === "address") {
-    return "0x0000000000000000000000000000000000000000";
+  if (parameter.type === 'address') {
+    return '0x0000000000000000000000000000000000000000';
   }
 
-  if (parameter.type === "bytes" || /^bytes\d+$/.test(parameter.type)) {
-    return "0x";
+  if (parameter.type === 'bytes' || /^bytes\d+$/.test(parameter.type)) {
+    return '0x';
   }
 
-  return "";
+  return '';
 }
 
 function getComplexParameterTemplate(parameter: AbiParameter) {
-  return JSON.stringify(createComplexParameterTemplateValue(parameter), null, 2);
+  return JSON.stringify(
+    createComplexParameterTemplateValue(parameter),
+    null,
+    2,
+  );
 }
 
 function getInitialArgumentValue(parameter: AbiParameter) {
-  return parameter.type.includes("[") || parameter.type === "tuple"
+  return parameter.type.includes('[') || parameter.type === 'tuple'
     ? getComplexParameterTemplate(parameter)
-    : "";
+    : '';
 }
 
 function stringifyResult(value: unknown) {
   return JSON.stringify(
     value,
-    (_, currentValue) => (typeof currentValue === "bigint" ? currentValue.toString() : currentValue),
+    (_, currentValue) =>
+      typeof currentValue === 'bigint' ? currentValue.toString() : currentValue,
     2,
   );
 }
@@ -192,7 +199,9 @@ function FunctionArgumentsForm({
   onChange: (index: number, value: string) => void;
   selfAddress?: string | null;
 }) {
-  const [scaleSelectResetVersion, setScaleSelectResetVersion] = useState<Record<string, number>>({});
+  const [scaleSelectResetVersion, setScaleSelectResetVersion] = useState<
+    Record<string, number>
+  >({});
 
   if (!fn.inputs.length) {
     return null;
@@ -208,8 +217,8 @@ function FunctionArgumentsForm({
   return (
     <div className="grid gap-3">
       {fn.inputs.map((input, index) => {
-        const isComplex = input.type.includes("[") || input.type === "tuple";
-        const isAddressInput = input.type === "address";
+        const isComplex = input.type.includes('[') || input.type === 'tuple';
+        const isAddressInput = input.type === 'address';
         const isIntegerInput = /^u?int\d*$/.test(input.type);
         const isUnsignedIntegerInput = /^uint\d*$/.test(input.type);
         const hasValue = Boolean(values[index]?.trim());
@@ -217,10 +226,10 @@ function FunctionArgumentsForm({
         const fieldKey = `${fn.signature}-${label}-${index}`;
 
         function applyIntegerScale(exponent: number) {
-          const rawValue = values[index]?.trim() ?? "";
-          const baseValue = rawValue || "1";
+          const rawValue = values[index]?.trim() ?? '';
+          const baseValue = rawValue || '1';
 
-          if (isUnsignedIntegerInput && baseValue.startsWith("-")) {
+          if (isUnsignedIntegerInput && baseValue.startsWith('-')) {
             return;
           }
 
@@ -228,7 +237,10 @@ function FunctionArgumentsForm({
             return;
           }
 
-          const scaledValue = (BigInt(baseValue) * 10n ** BigInt(exponent)).toString();
+          const scaledValue = (
+            BigInt(baseValue) *
+            10n ** BigInt(exponent)
+          ).toString();
           onChange(index, scaledValue);
         }
 
@@ -239,7 +251,7 @@ function FunctionArgumentsForm({
             </label>
             {isComplex ? (
               <JsonInput
-                value={values[index] ?? ""}
+                value={values[index] ?? ''}
                 onChange={(value) => onChange(index, value)}
                 placeholder={getComplexParameterTemplate(input)}
                 textareaClassName={textareaClassName}
@@ -247,11 +259,19 @@ function FunctionArgumentsForm({
             ) : (
               <div className="relative">
                 <Input
-                  value={values[index] ?? ""}
+                  value={values[index] ?? ''}
                   onChange={(event) => onChange(index, event.target.value)}
-                  placeholder={input.type === "bool" ? "true or false" : input.type}
+                  placeholder={
+                    input.type === 'bool' ? 'true or false' : input.type
+                  }
                   className={
-                    isAddressInput ? "pr-28" : isIntegerInput ? "pr-40" : hasValue ? "pr-10" : undefined
+                    isAddressInput
+                      ? 'pr-28'
+                      : isIntegerInput
+                        ? 'pr-40'
+                        : hasValue
+                          ? 'pr-10'
+                          : undefined
                   }
                 />
                 {hasValue ? (
@@ -259,12 +279,12 @@ function FunctionArgumentsForm({
                     type="button"
                     className={
                       isAddressInput
-                        ? "absolute right-[61px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
+                        ? 'absolute right-[61px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700'
                         : isIntegerInput
-                          ? "absolute right-[73px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
-                          : "absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
+                          ? 'absolute right-[73px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700'
+                          : 'absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700'
                     }
-                    onClick={() => onChange(index, "")}
+                    onClick={() => onChange(index, '')}
                     aria-label="Clear input"
                   >
                     <IconX className="size-4" stroke={1.8} />
@@ -315,14 +335,8 @@ function FunctionArgumentsForm({
   );
 }
 
-function getInitialValues(functions: EvmContractFunctionDescriptor[]) {
-  return Object.fromEntries(
-    functions.map((fn) => [fn.signature, fn.inputs.map((input) => getInitialArgumentValue(input))]),
-  );
-}
-
 function readContractArgumentCache() {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return {} as Record<string, string[]>;
   }
 
@@ -335,14 +349,19 @@ function readContractArgumentCache() {
 
     const parsedValue = JSON.parse(rawValue) as unknown;
 
-    if (!parsedValue || typeof parsedValue !== "object" || Array.isArray(parsedValue)) {
+    if (
+      !parsedValue ||
+      typeof parsedValue !== 'object' ||
+      Array.isArray(parsedValue)
+    ) {
       return {} as Record<string, string[]>;
     }
 
     return Object.fromEntries(
       Object.entries(parsedValue).filter(
         (entry): entry is [string, string[]] =>
-          Array.isArray(entry[1]) && entry[1].every((item) => typeof item === "string"),
+          Array.isArray(entry[1]) &&
+          entry[1].every((item) => typeof item === 'string'),
       ),
     );
   } catch {
@@ -351,11 +370,14 @@ function readContractArgumentCache() {
 }
 
 function writeContractArgumentCache(cache: Record<string, string[]>) {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return;
   }
 
-  window.localStorage.setItem(CONTRACT_ARGUMENT_CACHE_KEY, JSON.stringify(cache));
+  window.localStorage.setItem(
+    CONTRACT_ARGUMENT_CACHE_KEY,
+    JSON.stringify(cache),
+  );
 }
 
 function getCachedArgumentValues(fn: EvmContractFunctionDescriptor) {
@@ -372,7 +394,8 @@ function getInitialValuesWithCache(functions: EvmContractFunctionDescriptor[]) {
   return Object.fromEntries(
     functions.map((fn) => [
       fn.signature,
-      getCachedArgumentValues(fn) ?? fn.inputs.map((input) => getInitialArgumentValue(input)),
+      getCachedArgumentValues(fn) ??
+        fn.inputs.map((input) => getInitialArgumentValue(input)),
     ]),
   );
 }
@@ -408,15 +431,15 @@ function ValuePreview({ value }: { value: string }) {
   async function handleCopy() {
     await copyText(value);
     showToast({
-      title: "Result copied",
-      description: "Call result was copied successfully.",
+      title: 'Result copied',
+      description: 'Call result was copied successfully.',
     });
   }
 
   if (
-    typeof parsedValue === "string" ||
-    typeof parsedValue === "number" ||
-    typeof parsedValue === "boolean" ||
+    typeof parsedValue === 'string' ||
+    typeof parsedValue === 'number' ||
+    typeof parsedValue === 'boolean' ||
     parsedValue === null
   ) {
     return (
@@ -471,25 +494,30 @@ function formatMiddleEllipsis(value: string, leading = 10, trailing = 8) {
 }
 
 function formatChainTimestamp(timestamp: number) {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   }).format(new Date(timestamp * 1000));
 }
 
-function normalizeContractActionErrorMessage(message: string, fallback: string) {
+function normalizeContractActionErrorMessage(
+  message: string,
+  fallback: string,
+) {
   const roleMissingMatch = message.match(/missing role\s+(0x[a-fA-F0-9]+)/i);
 
   if (roleMissingMatch) {
     return `Transaction rejected. The current account is missing required role ${roleMissingMatch[1]}.`;
   }
 
-  const revertReasonMatch = message.match(/execution reverted:\s*(.+?)(?:\s+Version:|$)/i);
+  const revertReasonMatch = message.match(
+    /execution reverted:\s*(.+?)(?:\s+Version:|$)/i,
+  );
 
   if (revertReasonMatch?.[1]) {
     return `Transaction reverted: ${revertReasonMatch[1].trim()}.`;
@@ -505,15 +533,15 @@ function normalizeContractActionErrorMessage(message: string, fallback: string) 
 }
 
 function getReceiptStatusClasses(status: string) {
-  if (status === "success") {
-    return "bg-emerald-50 text-emerald-700";
+  if (status === 'success') {
+    return 'bg-emerald-50 text-emerald-700';
   }
 
-  if (status === "reverted") {
-    return "bg-rose-50 text-rose-700";
+  if (status === 'reverted') {
+    return 'bg-rose-50 text-rose-700';
   }
 
-  return "bg-amber-50 text-amber-700";
+  return 'bg-amber-50 text-amber-700';
 }
 
 function toWritePreviewState(input: {
@@ -534,19 +562,19 @@ function toWritePreviewState(input: {
 
 function createInitialManualWriteDialogState(): ManualWriteDialogState {
   return {
-    transactionType: "EIP1559",
-    value: "0",
-    gasPrice: "",
-    maxFeePerGas: "auto",
-    maxPriorityFeePerGas: "auto",
-    gasLimit: "",
-    nonce: "auto",
+    transactionType: 'EIP1559',
+    value: '0',
+    gasPrice: '',
+    maxFeePerGas: 'auto',
+    maxPriorityFeePerGas: 'auto',
+    gasLimit: '',
+    nonce: 'auto',
   };
 }
 
 function isAutoFieldValue(value: string) {
   const normalizedValue = value.trim().toLowerCase();
-  return !normalizedValue || normalizedValue === "auto";
+  return !normalizedValue || normalizedValue === 'auto';
 }
 
 function isManualWriteDialogReady(state: ManualWriteDialogState) {
@@ -554,14 +582,15 @@ function isManualWriteDialogReady(state: ManualWriteDialogState) {
     return false;
   }
 
-  if (state.transactionType === "LEGACY") {
+  if (state.transactionType === 'LEGACY') {
     return !!state.gasPrice.trim();
   }
 
   return (
     (isAutoFieldValue(state.nonce) || !!state.nonce.trim()) &&
     (isAutoFieldValue(state.maxFeePerGas) || !!state.maxFeePerGas.trim()) &&
-    (isAutoFieldValue(state.maxPriorityFeePerGas) || !!state.maxPriorityFeePerGas.trim())
+    (isAutoFieldValue(state.maxPriorityFeePerGas) ||
+      !!state.maxPriorityFeePerGas.trim())
   );
 }
 
@@ -591,29 +620,51 @@ function WriteExecutionPreview({
           </p>
           <dl className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
             <div className="min-w-0">
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">From</dt>
-              <dd className="mt-1 break-all text-sm text-slate-900 mono">{preview.accountAddress}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                From
+              </dt>
+              <dd className="mt-1 break-all text-sm text-slate-900 mono">
+                {preview.accountAddress}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</dt>
-              <dd className="mt-1 text-sm text-slate-900">{preview.functionSignature}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Method
+              </dt>
+              <dd className="mt-1 text-sm text-slate-900">
+                {preview.functionSignature}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Estimated Gas</dt>
-              <dd className="mt-1 text-sm text-slate-900">{preview.estimatedGas || "Unavailable"}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Estimated Gas
+              </dt>
+              <dd className="mt-1 text-sm text-slate-900">
+                {preview.estimatedGas || 'Unavailable'}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Price</dt>
-              <dd className="mt-1 text-sm text-slate-900">{preview.gasPriceLabel}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Gas Price
+              </dt>
+              <dd className="mt-1 text-sm text-slate-900">
+                {preview.gasPriceLabel}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Value</dt>
-              <dd className="mt-1 text-sm text-slate-900">{preview.valueLabel}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Value
+              </dt>
+              <dd className="mt-1 text-sm text-slate-900">
+                {preview.valueLabel}
+              </dd>
             </div>
           </dl>
         </div>
       ) : null}
-      {preview && (result || error) ? <div className="border-t border-slate-200" /> : null}
+      {preview && (result || error) ? (
+        <div className="border-t border-slate-200" />
+      ) : null}
       {result ? (
         <div className="px-4 py-4">
           <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -621,15 +672,22 @@ function WriteExecutionPreview({
           </p>
           <dl className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
             <div className="min-w-0">
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Transaction Hash</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Transaction Hash
+              </dt>
               <dd className="mt-1 text-sm font-medium text-slate-900">
-                <Link href={`/evm/tx/${result.hash}`} className="mono text-sky-600 hover:text-sky-700">
+                <Link
+                  href={`/evm/tx/${result.hash}`}
+                  className="mono text-sky-600 hover:text-sky-700"
+                >
                   {formatMiddleEllipsis(result.hash)}
                 </Link>
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Status</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Status
+              </dt>
               <dd className="mt-1">
                 <span
                   className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getReceiptStatusClasses(result.receipt.status)}`}
@@ -639,24 +697,41 @@ function WriteExecutionPreview({
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Block Number</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Block Number
+              </dt>
               <dd className="mt-1 text-sm font-medium text-slate-900">
-                <Link href={`/evm/block/${result.receipt.blockNumber}`} className="text-sky-600 hover:text-sky-700">
+                <Link
+                  href={`/evm/block/${result.receipt.blockNumber}`}
+                  className="text-sky-600 hover:text-sky-700"
+                >
                   {result.receipt.blockNumber}
                 </Link>
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Included At</dt>
-              <dd className="mt-1 text-sm text-slate-900">{formatChainTimestamp(result.receipt.blockTimestamp)}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Included At
+              </dt>
+              <dd className="mt-1 text-sm text-slate-900">
+                {formatChainTimestamp(result.receipt.blockTimestamp)}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Used</dt>
-              <dd className="mt-1 text-sm text-slate-900">{result.receipt.gasUsed}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Gas Used
+              </dt>
+              <dd className="mt-1 text-sm text-slate-900">
+                {result.receipt.gasUsed}
+              </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Effective Gas Price</dt>
-              <dd className="mt-1 text-sm text-slate-900">{result.receipt.effectiveGasPrice}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Effective Gas Price
+              </dt>
+              <dd className="mt-1 text-sm text-slate-900">
+                {result.receipt.effectiveGasPrice}
+              </dd>
             </div>
           </dl>
         </div>
@@ -711,20 +786,29 @@ function FunctionListSection({
     );
   }
 
-  const allExpanded = functions.length > 0 && expandedSignatures.length === functions.length;
+  const allExpanded =
+    functions.length > 0 && expandedSignatures.length === functions.length;
 
   return (
     <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
       <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
         <p className="text-lg font-semibold text-slate-900">{title}</p>
         <div className="flex items-center gap-2">
-          <Button type="button" size="sm" variant="outline" onClick={allExpanded ? onCollapseAll : onExpandAll}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={allExpanded ? onCollapseAll : onExpandAll}
+          >
             {allExpanded ? (
-              <IconChevronDown className="mr-1.5 size-3.5 rotate-180" stroke={1.8} />
+              <IconChevronDown
+                className="mr-1.5 size-3.5 rotate-180"
+                stroke={1.8}
+              />
             ) : (
               <IconSparkles className="mr-1.5 size-3.5" stroke={1.8} />
             )}
-            {allExpanded ? "Collapse All" : "Expand All"}
+            {allExpanded ? 'Collapse All' : 'Expand All'}
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={onReset}>
             <IconRefresh className="mr-1.5 size-3.5" stroke={1.8} />
@@ -747,7 +831,10 @@ function FunctionListSection({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-semibold text-slate-900">
-                      {index + 1}. {fn.name} <span className="font-medium text-slate-400">({selector})</span>
+                      {index + 1}. {fn.name}{' '}
+                      <span className="font-medium text-slate-400">
+                        ({selector})
+                      </span>
                     </p>
                     {inputBadgeLabel && fn.inputs.length ? (
                       <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
@@ -772,19 +859,23 @@ function FunctionListSection({
                   </ActionIconButton>
                   <ActionIconButton
                     className="text-slate-400 hover:text-slate-700"
-                    tooltip={isExpanded ? "Collapse" : "Expand"}
-                    aria-label={isExpanded ? "Collapse" : "Expand"}
+                    tooltip={isExpanded ? 'Collapse' : 'Expand'}
+                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
                     onClick={() => onToggle(fn.signature)}
                   >
                     <IconChevronDown
-                      className={`size-4 transition ${isExpanded ? "rotate-180" : ""}`}
+                      className={`size-4 transition ${isExpanded ? 'rotate-180' : ''}`}
                       stroke={1.8}
                     />
                   </ActionIconButton>
                   {renderHeaderActions ? renderHeaderActions(fn) : null}
                 </div>
               </div>
-              {isExpanded ? <div className="border-t border-slate-200 bg-slate-50/70 px-4 py-4">{renderExpanded(fn)}</div> : null}
+              {isExpanded ? (
+                <div className="border-t border-slate-200 bg-slate-50/70 px-4 py-4">
+                  {renderExpanded(fn)}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -797,7 +888,7 @@ export function AddressContractPanel({
   binding,
   artifact,
   environment,
-  initialTab = "read",
+  initialTab = 'read',
 }: {
   binding: EvmContractBinding;
   artifact: EvmContractArtifact;
@@ -807,15 +898,27 @@ export function AddressContractPanel({
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<ContractSubview>(initialTab);
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
-  const [expandedReadSignatures, setExpandedReadSignatures] = useState<string[]>([]);
-  const [expandedWriteSignatures, setExpandedWriteSignatures] = useState<string[]>([]);
-  const [readArgumentValues, setReadArgumentValues] = useState<Record<string, string[]>>({});
-  const [writeArgumentValues, setWriteArgumentValues] = useState<Record<string, string[]>>({});
+  const [expandedReadSignatures, setExpandedReadSignatures] = useState<
+    string[]
+  >([]);
+  const [expandedWriteSignatures, setExpandedWriteSignatures] = useState<
+    string[]
+  >([]);
+  const [readArgumentValues, setReadArgumentValues] = useState<
+    Record<string, string[]>
+  >({});
+  const [writeArgumentValues, setWriteArgumentValues] = useState<
+    Record<string, string[]>
+  >({});
   const [manualWriteMode, setManualWriteMode] = useState(false);
-  const [writeValueBySignature, setWriteValueBySignature] = useState<Record<string, string>>({});
+  const [writeValueBySignature, setWriteValueBySignature] = useState<
+    Record<string, string>
+  >({});
   const [readResults, setReadResults] = useState<Record<string, string>>({});
   const [readErrors, setReadErrors] = useState<Record<string, string>>({});
-  const [writePreviews, setWritePreviews] = useState<Record<string, WritePreviewState>>({});
+  const [writePreviews, setWritePreviews] = useState<
+    Record<string, WritePreviewState>
+  >({});
   const [writeResults, setWriteResults] = useState<
     Record<string, Awaited<ReturnType<typeof writeEvmContractMethodDirect>>>
   >({});
@@ -823,23 +926,29 @@ export function AddressContractPanel({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
-  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
   const [pendingWriteAction, setPendingWriteAction] = useState<{
     signature: string;
-    type: "write" | "manual-open" | "manual-confirm";
+    type: 'write' | 'manual-open' | 'manual-confirm';
   } | null>(null);
-  const [manualWriteTarget, setManualWriteTarget] = useState<string | null>(null);
-  const [manualWriteDialogValues, setManualWriteDialogValues] = useState<ManualWriteDialogState>(
-    createInitialManualWriteDialogState(),
+  const [manualWriteTarget, setManualWriteTarget] = useState<string | null>(
+    null,
   );
-  const [manualWriteDialogError, setManualWriteDialogError] = useState<string | null>(null);
+  const [manualWriteDialogValues, setManualWriteDialogValues] =
+    useState<ManualWriteDialogState>(createInitialManualWriteDialogState());
+  const [manualWriteDialogError, setManualWriteDialogError] = useState<
+    string | null
+  >(null);
 
   const readFunctions = useMemo(
     () => getReadContractFunctions(artifact.abiJson),
     [artifact.abiJson],
   );
-  const abiJsonValue = useMemo(() => JSON.parse(artifact.abiJson) as object, [artifact.abiJson]);
+  const abiJsonValue = useMemo(
+    () => JSON.parse(artifact.abiJson) as object,
+    [artifact.abiJson],
+  );
   const writeFunctions = useMemo(
     () => getWriteContractFunctions(artifact.abiJson),
     [artifact.abiJson],
@@ -878,14 +987,19 @@ export function AddressContractPanel({
     setManualWriteDialogValues(createInitialManualWriteDialogState());
   }, [writeFunctions]);
 
-  function updateReadArgumentValue(signature: string, index: number, value: string) {
+  function updateReadArgumentValue(
+    signature: string,
+    index: number,
+    value: string,
+  ) {
     const fallbackValues =
-      readFunctions.find((item) => item.signature === signature)?.inputs.map((input) => getInitialArgumentValue(input)) ??
-      [];
+      readFunctions
+        .find((item) => item.signature === signature)
+        ?.inputs.map((input) => getInitialArgumentValue(input)) ?? [];
 
     setReadArgumentValues((current) => {
-      const nextValues = (current[signature] ?? fallbackValues).map((item, itemIndex) =>
-        itemIndex === index ? value : item,
+      const nextValues = (current[signature] ?? fallbackValues).map(
+        (item, itemIndex) => (itemIndex === index ? value : item),
       );
       persistArgumentValues(signature, nextValues);
 
@@ -906,14 +1020,19 @@ export function AddressContractPanel({
     });
   }
 
-  function updateWriteArgumentValue(signature: string, index: number, value: string) {
+  function updateWriteArgumentValue(
+    signature: string,
+    index: number,
+    value: string,
+  ) {
     const fallbackValues =
-      writeFunctions.find((item) => item.signature === signature)?.inputs.map((input) => getInitialArgumentValue(input)) ??
-      [];
+      writeFunctions
+        .find((item) => item.signature === signature)
+        ?.inputs.map((input) => getInitialArgumentValue(input)) ?? [];
 
     setWriteArgumentValues((current) => {
-      const nextValues = (current[signature] ?? fallbackValues).map((item, itemIndex) =>
-        itemIndex === index ? value : item,
+      const nextValues = (current[signature] ?? fallbackValues).map(
+        (item, itemIndex) => (itemIndex === index ? value : item),
       );
       persistArgumentValues(signature, nextValues);
 
@@ -982,7 +1101,9 @@ export function AddressContractPanel({
         address: binding.address,
         abiJson: artifact.abiJson,
         functionSignature: signature,
-        rawArgs: readArgumentValues[signature] ?? fn.inputs.map((input) => getInitialArgumentValue(input)),
+        rawArgs:
+          readArgumentValues[signature] ??
+          fn.inputs.map((input) => getInitialArgumentValue(input)),
       });
 
       setReadResults((current) => ({
@@ -997,7 +1118,10 @@ export function AddressContractPanel({
       });
       setReadErrors((current) => ({
         ...current,
-        [signature]: error instanceof Error ? error.message : "Failed to read contract method.",
+        [signature]:
+          error instanceof Error
+            ? error.message
+            : 'Failed to read contract method.',
       }));
     } finally {
       setActionLoadingKey(null);
@@ -1012,7 +1136,7 @@ export function AddressContractPanel({
     }
 
     if (!activeKey) {
-      setErrorMessage("Select a global private key first.");
+      setErrorMessage('Select a global private key first.');
       return;
     }
 
@@ -1024,9 +1148,14 @@ export function AddressContractPanel({
     });
 
     try {
-      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
-      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map((input) => getInitialArgumentValue(input));
-      const value = writeValueBySignature[signature] ?? "";
+      const privateKey = await resolveEvmStoredPrivateKey(
+        activeKey.id,
+        password,
+      );
+      const rawArgs =
+        writeArgumentValues[signature] ??
+        fn.inputs.map((input) => getInitialArgumentValue(input));
+      const value = writeValueBySignature[signature] ?? '';
       const preview = await prepareEvmContractWriteDirect({
         address: binding.address,
         abiJson: artifact.abiJson,
@@ -1059,24 +1188,27 @@ export function AddressContractPanel({
         return next;
       });
       showToast(
-        result.receipt.status === "success"
+        result.receipt.status === 'success'
           ? {
-              title: "Transaction submitted",
+              title: 'Transaction submitted',
               description: `${fn.name} was sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
-              tone: "success",
+              tone: 'success',
             }
           : {
-              title: "Transaction reverted",
+              title: 'Transaction reverted',
               description: `${fn.name} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
-              tone: "info",
+              tone: 'info',
             },
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to submit contract transaction.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to submit contract transaction.';
 
-      if (message === "Password is required.") {
-        setPendingWriteAction({ signature, type: "write" });
-        setUnlockPassword("");
+      if (message === 'Password is required.') {
+        setPendingWriteAction({ signature, type: 'write' });
+        setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
         return;
@@ -1084,7 +1216,10 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: normalizeContractActionErrorMessage(message, "Failed to submit contract transaction."),
+        [signature]: normalizeContractActionErrorMessage(
+          message,
+          'Failed to submit contract transaction.',
+        ),
       }));
     } finally {
       setActionLoadingKey(null);
@@ -1099,7 +1234,7 @@ export function AddressContractPanel({
     }
 
     if (!activeKey) {
-      setErrorMessage("Select a global private key first.");
+      setErrorMessage('Select a global private key first.');
       return;
     }
 
@@ -1118,9 +1253,17 @@ export function AddressContractPanel({
     setErrorMessage(null);
 
     try {
-      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
-      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map((input) => getInitialArgumentValue(input));
-      const value = fn.stateMutability === "payable" ? (writeValueBySignature[signature] ?? "0") : "0";
+      const privateKey = await resolveEvmStoredPrivateKey(
+        activeKey.id,
+        password,
+      );
+      const rawArgs =
+        writeArgumentValues[signature] ??
+        fn.inputs.map((input) => getInitialArgumentValue(input));
+      const value =
+        fn.stateMutability === 'payable'
+          ? (writeValueBySignature[signature] ?? '0')
+          : '0';
       const defaults = await getEvmContractWriteManualDefaultsDirect({
         address: binding.address,
         abiJson: artifact.abiJson,
@@ -1138,26 +1281,29 @@ export function AddressContractPanel({
         transactionType: defaults.transactionType,
         value: defaults.value,
         gasPrice: defaults.gasPrice,
-        maxFeePerGas: "auto",
-        maxPriorityFeePerGas: "auto",
+        maxFeePerGas: 'auto',
+        maxPriorityFeePerGas: 'auto',
         gasLimit: defaults.estimatedGas,
-        nonce: "auto",
+        nonce: 'auto',
       });
       setManualWriteDialogError(
         defaults.simulationError
           ? normalizeContractActionErrorMessage(
               defaults.simulationError,
-              "Failed to prepare manual contract transaction.",
+              'Failed to prepare manual contract transaction.',
             )
           : null,
       );
       setManualWriteTarget(signature);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to prepare manual contract transaction.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to prepare manual contract transaction.';
 
-      if (message === "Password is required.") {
-        setPendingWriteAction({ signature, type: "manual-open" });
-        setUnlockPassword("");
+      if (message === 'Password is required.') {
+        setPendingWriteAction({ signature, type: 'manual-open' });
+        setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
         return;
@@ -1165,14 +1311,20 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: normalizeContractActionErrorMessage(message, "Failed to prepare manual contract transaction."),
+        [signature]: normalizeContractActionErrorMessage(
+          message,
+          'Failed to prepare manual contract transaction.',
+        ),
       }));
     } finally {
       setActionLoadingKey(null);
     }
   }
 
-  async function executeManualWriteAction(signature: string, password?: string) {
+  async function executeManualWriteAction(
+    signature: string,
+    password?: string,
+  ) {
     const fn = writeFunctions.find((item) => item.signature === signature);
 
     if (!fn) {
@@ -1180,7 +1332,7 @@ export function AddressContractPanel({
     }
 
     if (!activeKey) {
-      setErrorMessage("Select a global private key first.");
+      setErrorMessage('Select a global private key first.');
       return;
     }
 
@@ -1192,11 +1344,16 @@ export function AddressContractPanel({
     });
 
     try {
-      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
-      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map((input) => getInitialArgumentValue(input));
+      const privateKey = await resolveEvmStoredPrivateKey(
+        activeKey.id,
+        password,
+      );
+      const rawArgs =
+        writeArgumentValues[signature] ??
+        fn.inputs.map((input) => getInitialArgumentValue(input));
       const value = manualWriteDialogValues.value;
       const latestDefaults =
-        manualWriteDialogValues.transactionType === "EIP1559" &&
+        manualWriteDialogValues.transactionType === 'EIP1559' &&
         (isAutoFieldValue(manualWriteDialogValues.maxFeePerGas) ||
           isAutoFieldValue(manualWriteDialogValues.maxPriorityFeePerGas) ||
           isAutoFieldValue(manualWriteDialogValues.nonce))
@@ -1222,10 +1379,14 @@ export function AddressContractPanel({
         ...manualWriteDialogValues,
         value,
         maxFeePerGas: isAutoFieldValue(manualWriteDialogValues.maxFeePerGas)
-          ? (latestDefaults?.maxFeePerGas ?? manualWriteDialogValues.maxFeePerGas)
+          ? (latestDefaults?.maxFeePerGas ??
+            manualWriteDialogValues.maxFeePerGas)
           : manualWriteDialogValues.maxFeePerGas,
-        maxPriorityFeePerGas: isAutoFieldValue(manualWriteDialogValues.maxPriorityFeePerGas)
-          ? (latestDefaults?.maxPriorityFeePerGas ?? manualWriteDialogValues.maxPriorityFeePerGas)
+        maxPriorityFeePerGas: isAutoFieldValue(
+          manualWriteDialogValues.maxPriorityFeePerGas,
+        )
+          ? (latestDefaults?.maxPriorityFeePerGas ??
+            manualWriteDialogValues.maxPriorityFeePerGas)
           : manualWriteDialogValues.maxPriorityFeePerGas,
         nonce: isAutoFieldValue(manualWriteDialogValues.nonce)
           ? (latestDefaults?.nonce ?? manualWriteDialogValues.nonce)
@@ -1263,24 +1424,27 @@ export function AddressContractPanel({
       setManualWriteTarget(null);
       setManualWriteDialogError(null);
       showToast(
-        result.receipt.status === "success"
+        result.receipt.status === 'success'
           ? {
-              title: "Force-send submitted",
+              title: 'Force-send submitted',
               description: `${fn.name} was force-sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
-              tone: "success",
+              tone: 'success',
             }
           : {
-              title: "Force-send reverted",
+              title: 'Force-send reverted',
               description: `${fn.name} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
-              tone: "info",
+              tone: 'info',
             },
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to force-send contract transaction.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to force-send contract transaction.';
 
-      if (message === "Password is required.") {
-        setPendingWriteAction({ signature, type: "manual-confirm" });
-        setUnlockPassword("");
+      if (message === 'Password is required.') {
+        setPendingWriteAction({ signature, type: 'manual-confirm' });
+        setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
         return;
@@ -1288,10 +1452,16 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: normalizeContractActionErrorMessage(message, "Failed to force-send contract transaction."),
+        [signature]: normalizeContractActionErrorMessage(
+          message,
+          'Failed to force-send contract transaction.',
+        ),
       }));
       setManualWriteDialogError(
-        normalizeContractActionErrorMessage(message, "Failed to force-send contract transaction."),
+        normalizeContractActionErrorMessage(
+          message,
+          'Failed to force-send contract transaction.',
+        ),
       );
     } finally {
       setActionLoadingKey(null);
@@ -1305,29 +1475,37 @@ export function AddressContractPanel({
 
     try {
       setUnlockError(null);
-      if (pendingWriteAction.type === "manual-open") {
-        await openManualWriteDialog(pendingWriteAction.signature, unlockPassword);
-      } else if (pendingWriteAction.type === "manual-confirm") {
-        await executeManualWriteAction(pendingWriteAction.signature, unlockPassword);
+      if (pendingWriteAction.type === 'manual-open') {
+        await openManualWriteDialog(
+          pendingWriteAction.signature,
+          unlockPassword,
+        );
+      } else if (pendingWriteAction.type === 'manual-confirm') {
+        await executeManualWriteAction(
+          pendingWriteAction.signature,
+          unlockPassword,
+        );
       } else {
         await executeWriteAction(pendingWriteAction.signature, unlockPassword);
       }
       setUnlockDialogOpen(false);
-      setUnlockPassword("");
+      setUnlockPassword('');
       setPendingWriteAction(null);
     } catch (error) {
       setUnlockError(
         normalizeContractActionErrorMessage(
-          error instanceof Error ? error.message : "Failed to unlock private key.",
-          "Failed to unlock private key.",
+          error instanceof Error
+            ? error.message
+            : 'Failed to unlock private key.',
+          'Failed to unlock private key.',
         ),
       );
     }
   }
 
   const activeKeyStateLabel = !activeKey
-    ? "No Key Selected"
-    : activeKey.securityMode === "plain"
+    ? 'No Key Selected'
+    : activeKey.securityMode === 'plain'
       ? activeKey.name
       : isEvmStoredPrivateKeyUnlocked(activeKey.id)
         ? `${activeKey.name} (Unlocked)`
@@ -1338,7 +1516,9 @@ export function AddressContractPanel({
     setExpanded: Dispatch<SetStateAction<string[]>>,
   ) {
     setExpanded((current) =>
-      current.includes(signature) ? current.filter((item) => item !== signature) : [...current, signature],
+      current.includes(signature)
+        ? current.filter((item) => item !== signature)
+        : [...current, signature],
     );
   }
 
@@ -1365,7 +1545,7 @@ export function AddressContractPanel({
   function copyFunctionSignature(fn: EvmContractFunctionDescriptor) {
     void copyText(fn.signature);
     showToast({
-      title: "Signature copied",
+      title: 'Signature copied',
       description: `${fn.signature} was copied successfully.`,
     });
   }
@@ -1423,17 +1603,17 @@ export function AddressContractPanel({
     <>
       <div className="inline-flex flex-wrap rounded-[14px] bg-slate-100 p-1">
         {[
-          { value: "code" as const, label: "Code" },
-          { value: "read" as const, label: "Read Contract" },
-          { value: "write" as const, label: "Write Contract" },
+          { value: 'code' as const, label: 'Code' },
+          { value: 'read' as const, label: 'Read Contract' },
+          { value: 'write' as const, label: 'Write Contract' },
         ].map((tab) => (
           <button
             key={tab.value}
             type="button"
             className={`inline-flex h-8 items-center rounded-[10px] px-4 text-xs font-semibold transition ${
               activeTab === tab.value
-                ? "bg-white text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.08)]"
-                : "text-slate-900 hover:text-slate-700"
+                ? 'bg-white text-slate-900 shadow-[0_1px_3px_rgba(15,23,42,0.08)]'
+                : 'text-slate-900 hover:text-slate-700'
             }`}
             onClick={() => {
               setActiveTab(tab.value);
@@ -1445,24 +1625,38 @@ export function AddressContractPanel({
         ))}
       </div>
 
-      {activeTab === "code" ? (
+      {activeTab === 'code' ? (
         <section className="mt-4 grid gap-4">
           <article className="rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="grid gap-4 border-b border-slate-200 px-5 py-4 md:grid-cols-2 xl:grid-cols-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Binding</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{binding.label}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Binding
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {binding.label}
+                </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Artifact</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{artifact.name}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Artifact
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {artifact.name}
+                </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Address</p>
-                <p className="mt-1 break-all text-sm text-slate-700 mono">{binding.address}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Address
+                </p>
+                <p className="mt-1 break-all text-sm text-slate-700 mono">
+                  {binding.address}
+                </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Environment</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Environment
+                </p>
                 <p className="mt-1 text-sm text-slate-700">
                   {environment.providerName} / Chain {environment.chainId}
                 </p>
@@ -1472,7 +1666,9 @@ export function AddressContractPanel({
             <div className="grid gap-4 px-5 py-5">
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-900">Contract ABI</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Contract ABI
+                  </p>
                   <ActionIconButton
                     className="text-slate-400 hover:text-slate-700"
                     tooltip="Copy ABI"
@@ -1480,8 +1676,8 @@ export function AddressContractPanel({
                     onClick={() => {
                       void navigator.clipboard.writeText(artifact.abiJson);
                       showToast({
-                        title: "ABI copied",
-                        description: "Contract ABI was copied successfully.",
+                        title: 'ABI copied',
+                        description: 'Contract ABI was copied successfully.',
                       });
                     }}
                   >
@@ -1502,9 +1698,11 @@ export function AddressContractPanel({
                 </div>
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-900">Artifact Bytecode</p>
+                <p className="text-sm font-semibold text-slate-900">
+                  Artifact Bytecode
+                </p>
                 <pre className="mt-3 max-h-[260px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-800">
-                  {artifact.bytecode ?? "No bytecode saved for this artifact."}
+                  {artifact.bytecode ?? 'No bytecode saved for this artifact.'}
                 </pre>
               </div>
             </div>
@@ -1512,20 +1710,24 @@ export function AddressContractPanel({
         </section>
       ) : null}
 
-      {activeTab === "read" ? (
+      {activeTab === 'read' ? (
         <div className="mt-4 grid gap-4">
           <FunctionListSection
             title="Read Contract"
             functions={readFunctions}
             expandedSignatures={expandedReadSignatures}
             onToggle={handleToggleReadSignature}
-            onExpandAll={() => setExpandedReadSignatures(readFunctions.map((fn) => fn.signature))}
+            onExpandAll={() =>
+              setExpandedReadSignatures(readFunctions.map((fn) => fn.signature))
+            }
             onCollapseAll={() => setExpandedReadSignatures([])}
             onReset={resetReadView}
             onCopySignature={copyFunctionSignature}
-            renderHeaderActions={(fn) => (
+            renderHeaderActions={(fn) =>
               (() => {
-                const isExpanded = expandedReadSignatures.includes(fn.signature);
+                const isExpanded = expandedReadSignatures.includes(
+                  fn.signature,
+                );
                 const canQuery = fn.inputs.length === 0 || isExpanded;
                 const isLoading = actionLoadingKey === `read:${fn.signature}`;
 
@@ -1533,11 +1735,11 @@ export function AddressContractPanel({
                   <ActionIconButton
                     className={
                       canQuery
-                        ? "text-slate-400 hover:text-slate-700"
-                        : "text-slate-300 hover:text-slate-300"
+                        ? 'text-slate-400 hover:text-slate-700'
+                        : 'text-slate-300 hover:text-slate-300'
                     }
-                    tooltip={isLoading ? "Querying..." : "Query"}
-                    aria-label={isLoading ? "Querying..." : "Query"}
+                    tooltip={isLoading ? 'Querying...' : 'Query'}
+                    aria-label={isLoading ? 'Querying...' : 'Query'}
                     onClick={() => handleQueryAction(fn)}
                     disabled={!canQuery || actionLoadingKey !== null}
                   >
@@ -1549,7 +1751,7 @@ export function AddressContractPanel({
                   </ActionIconButton>
                 );
               })()
-            )}
+            }
             inputBadgeLabel="Input"
             emptyText="No read methods are available for this contract."
             renderExpanded={(fn) => (
@@ -1560,7 +1762,9 @@ export function AddressContractPanel({
                     readArgumentValues[fn.signature] ??
                     fn.inputs.map((input) => getInitialArgumentValue(input))
                   }
-                  onChange={(index, value) => updateReadArgumentValue(fn.signature, index, value)}
+                  onChange={(index, value) =>
+                    updateReadArgumentValue(fn.signature, index, value)
+                  }
                   selfAddress={activeKey?.address ?? null}
                 />
                 {readResults[fn.signature] ? (
@@ -1580,26 +1784,39 @@ export function AddressContractPanel({
         </div>
       ) : null}
 
-      {activeTab === "write" ? (
+      {activeTab === 'write' ? (
         <div className="mt-4 grid gap-4">
           <article className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Selected Key</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{activeKeyStateLabel}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Selected Key
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {activeKeyStateLabel}
+                </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Binding</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{binding.label}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Binding
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {binding.label}
+                </p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contract</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">{artifact.name}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Contract
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {artifact.name}
+                </p>
               </div>
             </div>
             {!activeKey ? (
               <p className="mt-4 text-sm text-amber-600">
-                Select a global private key first before preparing or sending contract writes.
+                Select a global private key first before preparing or sending
+                contract writes.
               </p>
             ) : null}
           </article>
@@ -1614,8 +1831,14 @@ export function AddressContractPanel({
             title="Write Contract"
             functions={writeFunctions}
             expandedSignatures={expandedWriteSignatures}
-            onToggle={(signature) => toggleExpandedSignature(signature, setExpandedWriteSignatures)}
-            onExpandAll={() => setExpandedWriteSignatures(writeFunctions.map((fn) => fn.signature))}
+            onToggle={(signature) =>
+              toggleExpandedSignature(signature, setExpandedWriteSignatures)
+            }
+            onExpandAll={() =>
+              setExpandedWriteSignatures(
+                writeFunctions.map((fn) => fn.signature),
+              )
+            }
             onCollapseAll={() => setExpandedWriteSignatures([])}
             onReset={resetWriteView}
             onCopySignature={copyFunctionSignature}
@@ -1630,9 +1853,11 @@ export function AddressContractPanel({
                 Manual Send
               </label>
             }
-            renderHeaderActions={(fn) => (
+            renderHeaderActions={(fn) =>
               (() => {
-                const canWrite = fn.inputs.length === 0 || expandedWriteSignatures.includes(fn.signature);
+                const canWrite =
+                  fn.inputs.length === 0 ||
+                  expandedWriteSignatures.includes(fn.signature);
                 const isLoading =
                   actionLoadingKey === `write:${fn.signature}` ||
                   actionLoadingKey === `manual:${fn.signature}` ||
@@ -1642,15 +1867,31 @@ export function AddressContractPanel({
                   <ActionIconButton
                     className={
                       canWrite
-                        ? "text-slate-400 hover:text-slate-700"
-                        : "text-slate-300 hover:text-slate-300"
+                        ? 'text-slate-400 hover:text-slate-700'
+                        : 'text-slate-300 hover:text-slate-300'
                     }
-                    tooltip={isLoading ? "Writing..." : manualWriteMode ? "Manual Write" : "Write"}
-                    aria-label={isLoading ? "Writing..." : manualWriteMode ? "Manual Write" : "Write"}
+                    tooltip={
+                      isLoading
+                        ? 'Writing...'
+                        : manualWriteMode
+                          ? 'Manual Write'
+                          : 'Write'
+                    }
+                    aria-label={
+                      isLoading
+                        ? 'Writing...'
+                        : manualWriteMode
+                          ? 'Manual Write'
+                          : 'Write'
+                    }
                     onClick={() =>
-                      void (manualWriteMode ? openManualWriteDialog(fn.signature) : executeWriteAction(fn.signature))
+                      void (manualWriteMode
+                        ? openManualWriteDialog(fn.signature)
+                        : executeWriteAction(fn.signature))
                     }
-                    disabled={!activeKey || !canWrite || actionLoadingKey !== null}
+                    disabled={
+                      !activeKey || !canWrite || actionLoadingKey !== null
+                    }
                   >
                     {isLoading ? (
                       <IconLoader2 className="size-4 animate-spin" />
@@ -1660,7 +1901,7 @@ export function AddressContractPanel({
                   </ActionIconButton>
                 );
               })()
-            )}
+            }
             inputBadgeLabel="Input"
             emptyText="No write methods are available for this contract."
             renderExpanded={(fn) => (
@@ -1671,17 +1912,21 @@ export function AddressContractPanel({
                     writeArgumentValues[fn.signature] ??
                     fn.inputs.map((input) => getInitialArgumentValue(input))
                   }
-                  onChange={(index, value) => updateWriteArgumentValue(fn.signature, index, value)}
+                  onChange={(index, value) =>
+                    updateWriteArgumentValue(fn.signature, index, value)
+                  }
                   selfAddress={activeKey?.address ?? null}
                 />
-                {fn.stateMutability === "payable" && !manualWriteMode ? (
+                {fn.stateMutability === 'payable' && !manualWriteMode ? (
                   <div className="grid gap-2">
                     <label className="text-sm font-medium text-slate-700">
                       Native Value ({environment.nativeCurrency})
                     </label>
                     <Input
-                      value={writeValueBySignature[fn.signature] ?? ""}
-                      onChange={(event) => updateWriteValue(fn.signature, event.target.value)}
+                      value={writeValueBySignature[fn.signature] ?? ''}
+                      onChange={(event) =>
+                        updateWriteValue(fn.signature, event.target.value)
+                      }
                       placeholder="0"
                     />
                   </div>
@@ -1703,7 +1948,7 @@ export function AddressContractPanel({
           setUnlockDialogOpen(open);
 
           if (!open) {
-            setUnlockPassword("");
+            setUnlockPassword('');
             setUnlockError(null);
             setPendingWriteAction(null);
           }
@@ -1712,7 +1957,7 @@ export function AddressContractPanel({
         description={
           activeKey
             ? `Enter the password for "${activeKey.name}" to continue the contract write flow.`
-            : "Enter the password to continue."
+            : 'Enter the password to continue.'
         }
         value={unlockPassword}
         onValueChange={setUnlockPassword}
@@ -1758,13 +2003,14 @@ export function AddressContractPanel({
                 actionLoadingKey === `manual-confirm:${manualWriteTarget}`
               }
             >
-              {manualWriteTarget && actionLoadingKey === `manual-confirm:${manualWriteTarget}` ? (
+              {manualWriteTarget &&
+              actionLoadingKey === `manual-confirm:${manualWriteTarget}` ? (
                 <>
                   <IconLoader2 className="mr-2 size-4 animate-spin" />
                   Sending...
                 </>
               ) : (
-                "Confirm Force Send"
+                'Confirm Force Send'
               )}
             </Button>
           </>
@@ -1775,25 +2021,43 @@ export function AddressContractPanel({
           <div className="grid gap-4 pb-1">
             <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
-                <p className="mt-1 break-all text-sm text-slate-900 mono">{binding.address}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Contract
+                </p>
+                <p className="mt-1 break-all text-sm text-slate-900 mono">
+                  {binding.address}
+                </p>
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
-                <p className="mt-1 text-sm text-slate-900">{manualWriteTarget}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Method
+                </p>
+                <p className="mt-1 text-sm text-slate-900">
+                  {manualWriteTarget}
+                </p>
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
-                <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Selected Key
+                </p>
+                <p className="mt-1 text-sm text-slate-900">
+                  {activeKey?.name ?? 'No Key Selected'}
+                </p>
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Chain ID</p>
-                <p className="mt-1 text-sm text-slate-900">{environment.chainId}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Chain ID
+                </p>
+                <p className="mt-1 text-sm text-slate-900">
+                  {environment.chainId}
+                </p>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Txn Type
+                </label>
                 <Select
                   value={manualWriteDialogValues.transactionType}
                   onValueChange={(value) =>
@@ -1813,7 +2077,9 @@ export function AddressContractPanel({
                 </Select>
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Value ({environment.nativeCurrency})</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Value ({environment.nativeCurrency})
+                </label>
                 <Input
                   value={manualWriteDialogValues.value}
                   onChange={(event) =>
@@ -1825,9 +2091,11 @@ export function AddressContractPanel({
                   placeholder="0"
                 />
               </div>
-              {manualWriteDialogValues.transactionType === "LEGACY" ? (
+              {manualWriteDialogValues.transactionType === 'LEGACY' ? (
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Gas Price (Gwei)
+                  </label>
                   <Input
                     value={manualWriteDialogValues.gasPrice}
                     onChange={(event) =>
@@ -1842,7 +2110,9 @@ export function AddressContractPanel({
               ) : (
                 <>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">
+                      Max Fee Per Gas (Gwei)
+                    </label>
                     <Input
                       value={manualWriteDialogValues.maxFeePerGas}
                       onChange={(event) =>
@@ -1855,7 +2125,9 @@ export function AddressContractPanel({
                     />
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">
+                      Max Priority Fee Per Gas (Gwei)
+                    </label>
                     <Input
                       value={manualWriteDialogValues.maxPriorityFeePerGas}
                       onChange={(event) =>
@@ -1870,7 +2142,9 @@ export function AddressContractPanel({
                 </>
               )}
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Gas Limit
+                </label>
                 <Input
                   value={manualWriteDialogValues.gasLimit}
                   onChange={(event) =>
@@ -1883,7 +2157,9 @@ export function AddressContractPanel({
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Nonce
+                </label>
                 <Input
                   value={manualWriteDialogValues.nonce}
                   onChange={(event) =>

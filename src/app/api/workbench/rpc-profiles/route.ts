@@ -1,14 +1,19 @@
-import { rpcProfileDraftSchema } from "@/platform/workbench/rpc-profile";
-import { addRpcProfile, deleteRpcProfile, listRpcProfiles, updateRpcProfile } from "@/server/repositories/rpc-profiles";
-import { fail, ok } from "@/server/utils/api-response";
-import { normalizeApiError } from "@/server/utils/error-normalizer";
-import { requireSessionUserId } from "@/server/utils/auth-user";
+import { rpcProfileDraftSchema } from '@/platform/workbench/rpc-profile';
+import {
+  addRpcProfile,
+  deleteRpcProfile,
+  listRpcProfiles,
+  updateRpcProfile,
+} from '@/server/repositories/rpc-profiles';
+import { fail, ok } from '@/server/utils/api-response';
+import { normalizeApiError } from '@/server/utils/error-normalizer';
+import { requireSessionUserId } from '@/server/utils/auth-user';
 
 export async function GET() {
   const userId = await requireSessionUserId();
 
   if (!userId) {
-    return fail({ category: "auth", message: "Unauthorized" }, 401);
+    return fail({ category: 'auth', message: 'Unauthorized' }, 401);
   }
 
   return ok(await listRpcProfiles(userId));
@@ -19,7 +24,7 @@ export async function POST(request: Request) {
     const userId = await requireSessionUserId();
 
     if (!userId) {
-      return fail({ category: "auth", message: "Unauthorized" }, 401);
+      return fail({ category: 'auth', message: 'Unauthorized' }, 401);
     }
 
     const body = rpcProfileDraftSchema.parse(await request.json());
@@ -35,14 +40,14 @@ export async function DELETE(request: Request) {
     const userId = await requireSessionUserId();
 
     if (!userId) {
-      return fail({ category: "auth", message: "Unauthorized" }, 401);
+      return fail({ category: 'auth', message: 'Unauthorized' }, 401);
     }
 
     const url = new URL(request.url);
-    const id = url.searchParams.get("id");
+    const id = url.searchParams.get('id');
 
     if (!id) {
-      return fail({ category: "validation", message: "id is required" }, 400);
+      return fail({ category: 'validation', message: 'id is required' }, 400);
     }
 
     return ok(await deleteRpcProfile(userId, id));
@@ -56,7 +61,7 @@ export async function PATCH(request: Request) {
     const userId = await requireSessionUserId();
 
     if (!userId) {
-      return fail({ category: "auth", message: "Unauthorized" }, 401);
+      return fail({ category: 'auth', message: 'Unauthorized' }, 401);
     }
 
     const body = (await request.json()) as {
@@ -65,7 +70,7 @@ export async function PATCH(request: Request) {
     };
 
     if (!body.id) {
-      return fail({ category: "validation", message: "id is required" }, 400);
+      return fail({ category: 'validation', message: 'id is required' }, 400);
     }
 
     const profile = rpcProfileDraftSchema.parse(body.profile);

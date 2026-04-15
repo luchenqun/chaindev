@@ -1,31 +1,31 @@
-"use client";
+'use client';
 
-import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { RelativeTime } from "@/components/relative-time";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
-import { PaginationControls } from "@/components/ui/pagination-controls";
+import { IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
+import { RelativeTime } from '@/components/relative-time';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Input } from '@/components/ui/input';
+import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
+import { PaginationControls } from '@/components/ui/pagination-controls';
 import {
   deleteEvmAddressTag,
   getEvmAddressTags,
   subscribeEvmAddressTags,
   upsertEvmAddressTag,
-} from "@/domains/evm/client/address-tags";
-import { getEvmObservedAccountsPage } from "@/domains/evm/client/transaction-cache";
-import { getEvmAddressBalancesDirect } from "@/domains/evm/client/queries";
-import { AddressLink } from "@/domains/evm/ui/address-link";
-import { AppShell } from "@/platform/layout/app-shell";
+} from '@/domains/evm/client/address-tags';
+import { getEvmObservedAccountsPage } from '@/domains/evm/client/transaction-cache';
+import { getEvmAddressBalancesDirect } from '@/domains/evm/client/queries';
+import { AddressLink } from '@/domains/evm/ui/address-link';
+import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 25;
 
 function parsePageParam(rawPage: string | null) {
-  const parsed = Number.parseInt(rawPage ?? "1", 10);
+  const parsed = Number.parseInt(rawPage ?? '1', 10);
 
   if (!Number.isFinite(parsed) || parsed < 1) {
     return 1;
@@ -34,13 +34,17 @@ function parsePageParam(rawPage: string | null) {
   return parsed;
 }
 
-function buildPageHref(pathname: string, searchParams: URLSearchParams, page: number) {
+function buildPageHref(
+  pathname: string,
+  searchParams: URLSearchParams,
+  page: number,
+) {
   const params = new URLSearchParams(searchParams.toString());
 
   if (page <= 1) {
-    params.delete("page");
+    params.delete('page');
   } else {
-    params.set("page", String(page));
+    params.set('page', String(page));
   }
 
   const nextQuery = params.toString();
@@ -53,24 +57,37 @@ function EvmAccountsPageContent() {
   const { status } = useSession();
   const searchParams = useSearchParams();
   const searchParamsText = searchParams.toString();
-  const currentPage = parsePageParam(searchParams.get("page"));
-  const [data, setData] = useState<Awaited<ReturnType<typeof getEvmObservedAccountsPage>> | null>(null);
+  const currentPage = parsePageParam(searchParams.get('page'));
+  const [data, setData] = useState<Awaited<
+    ReturnType<typeof getEvmObservedAccountsPage>
+  > | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [balanceLoading, setBalanceLoading] = useState(false);
-  const [balancesByAddress, setBalancesByAddress] = useState<Record<string, string>>({});
-  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
-  const [editingTagAddress, setEditingTagAddress] = useState<string | null>(null);
-  const [tagInputValue, setTagInputValue] = useState("");
+  const [balancesByAddress, setBalancesByAddress] = useState<
+    Record<string, string>
+  >({});
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<
+    Record<string, string | null>
+  >({});
+  const [editingTagAddress, setEditingTagAddress] = useState<string | null>(
+    null,
+  );
+  const [tagInputValue, setTagInputValue] = useState('');
   const [tagErrorMessage, setTagErrorMessage] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ address: string; nameTag: string } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    address: string;
+    nameTag: string;
+  } | null>(null);
 
   function goToLogin() {
-    router.push("/login?callbackUrl=%2Fevm%2Faccounts");
+    router.push('/login?callbackUrl=%2Fevm%2Faccounts');
   }
 
   function handlePageChange(page: number) {
-    router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
+    router.push(
+      buildPageHref(pathname, new URLSearchParams(searchParamsText), page),
+    );
   }
 
   useEffect(() => {
@@ -88,13 +105,23 @@ function EvmAccountsPageContent() {
           setBalancesByAddress({});
 
           if (next.page !== currentPage) {
-            router.replace(buildPageHref(pathname, new URLSearchParams(searchParamsText), next.page));
+            router.replace(
+              buildPageHref(
+                pathname,
+                new URLSearchParams(searchParamsText),
+                next.page,
+              ),
+            );
           }
         }
       } catch (error) {
         if (!cancelled) {
           setData(null);
-          setErrorMessage(error instanceof Error ? error.message : "Failed to load observed accounts.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load observed accounts.',
+          );
         }
       } finally {
         if (!cancelled) {
@@ -107,17 +134,23 @@ function EvmAccountsPageContent() {
 
     const handleProfileChanged = () => {
       setEditingTagAddress(null);
-      setTagInputValue("");
+      setTagInputValue('');
       setTagErrorMessage(null);
       setDeleteTarget(null);
       void load();
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       cancelled = true;
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, [currentPage, pathname, router, searchParamsText]);
 
@@ -141,11 +174,17 @@ function EvmAccountsPageContent() {
       loadVisibleTags();
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, [visibleAddresses]);
 
@@ -165,20 +204,20 @@ function EvmAccountsPageContent() {
   }
 
   function handleStartTagEdit(address: string) {
-    if (status !== "authenticated") {
+    if (status !== 'authenticated') {
       goToLogin();
       return;
     }
 
     setEditingTagAddress(address);
-    setTagInputValue(nameTagsByAddress[address] ?? "");
+    setTagInputValue(nameTagsByAddress[address] ?? '');
     setTagErrorMessage(null);
     setDeleteTarget(null);
   }
 
   function handleCancelTagEdit() {
     setEditingTagAddress(null);
-    setTagInputValue("");
+    setTagInputValue('');
     setTagErrorMessage(null);
   }
 
@@ -186,15 +225,17 @@ function EvmAccountsPageContent() {
     try {
       await upsertEvmAddressTag(address, tagInputValue);
       setEditingTagAddress(null);
-      setTagInputValue("");
+      setTagInputValue('');
       setTagErrorMessage(null);
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
-      setTagErrorMessage(error instanceof Error ? error.message : "Failed to save name tag.");
+      setTagErrorMessage(
+        error instanceof Error ? error.message : 'Failed to save name tag.',
+      );
     }
   }
 
@@ -202,7 +243,7 @@ function EvmAccountsPageContent() {
     try {
       await deleteEvmAddressTag(address);
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
       }
 
@@ -211,7 +252,7 @@ function EvmAccountsPageContent() {
 
     if (editingTagAddress === address) {
       setEditingTagAddress(null);
-      setTagInputValue("");
+      setTagInputValue('');
       setTagErrorMessage(null);
     }
   }
@@ -239,17 +280,21 @@ function EvmAccountsPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Accounts</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">
+            Accounts
+          </h1>
         </div>
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <p className="text-lg font-semibold text-slate-900">
-                Observed {data.totalAccounts.toLocaleString("en-US")} accounts from cached transactions
+                Observed {data.totalAccounts.toLocaleString('en-US')} accounts
+                from cached transactions
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Showing locally indexed addresses discovered from recent block scans only.
+                Showing locally indexed addresses discovered from recent block
+                scans only.
               </p>
             </div>
             <div className="flex items-center gap-2 lg:justify-end">
@@ -257,13 +302,13 @@ function EvmAccountsPageContent() {
                 type="button"
                 className={`inline-flex h-8 items-center justify-center rounded-md border px-3 text-sm font-medium transition ${
                   balanceLoading
-                    ? "cursor-wait border-sky-200 bg-sky-50 text-sky-600"
-                    : "border-slate-200 bg-white text-slate-600 hover:text-slate-900"
+                    ? 'cursor-wait border-sky-200 bg-sky-50 text-sky-600'
+                    : 'border-slate-200 bg-white text-slate-600 hover:text-slate-900'
                 }`}
                 disabled={!data.accounts.length || balanceLoading}
                 onClick={() => void handleLoadBalances()}
               >
-                {balanceLoading ? "Loading Balances..." : "Load Balances"}
+                {balanceLoading ? 'Loading Balances...' : 'Load Balances'}
               </button>
               <PaginationControls
                 page={data.page}
@@ -306,7 +351,10 @@ function EvmAccountsPageContent() {
               <tbody>
                 {data.accounts.length ? (
                   data.accounts.map((account, index) => (
-                    <tr key={account.address} className="border-t border-slate-200">
+                    <tr
+                      key={account.address}
+                      className="border-t border-slate-200"
+                    >
                       <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-700">
                         {(data.page - 1) * data.pageSize + index + 1}
                       </td>
@@ -323,7 +371,9 @@ function EvmAccountsPageContent() {
                           <div className="flex min-w-[220px] flex-col gap-2">
                             <Input
                               value={tagInputValue}
-                              onChange={(event) => setTagInputValue(event.target.value)}
+                              onChange={(event) =>
+                                setTagInputValue(event.target.value)
+                              }
                               placeholder="Name tag"
                             />
                             <div className="flex gap-2">
@@ -331,7 +381,7 @@ function EvmAccountsPageContent() {
                                 size="sm"
                                 type="button"
                                 onClick={() => {
-                                  if (status !== "authenticated") {
+                                  if (status !== 'authenticated') {
                                     goToLogin();
                                     return;
                                   }
@@ -341,31 +391,50 @@ function EvmAccountsPageContent() {
                               >
                                 Save
                               </Button>
-                              <Button size="sm" type="button" variant="ghost" onClick={handleCancelTagEdit}>
+                              <Button
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                                onClick={handleCancelTagEdit}
+                              >
                                 Cancel
                               </Button>
                             </div>
-                            {tagErrorMessage ? <span className="text-xs text-rose-600">{tagErrorMessage}</span> : null}
+                            {tagErrorMessage ? (
+                              <span className="text-xs text-rose-600">
+                                {tagErrorMessage}
+                              </span>
+                            ) : null}
                           </div>
                         ) : (
-                          <span className={nameTagsByAddress[account.address] ? "font-medium text-slate-900" : ""}>
-                            {nameTagsByAddress[account.address] ?? "-"}
+                          <span
+                            className={
+                              nameTagsByAddress[account.address]
+                                ? 'font-medium text-slate-900'
+                                : ''
+                            }
+                          >
+                            {nameTagsByAddress[account.address] ?? '-'}
                           </span>
                         )}
                       </td>
                       <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
-                        {balancesByAddress[account.address] ?? "Not loaded"}
+                        {balancesByAddress[account.address] ?? 'Not loaded'}
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">
                         <div className="flex flex-col gap-0.5">
                           <span>
-                            <RelativeTime timestampMs={account.lastSeenTimestampMs} />
+                            <RelativeTime
+                              timestampMs={account.lastSeenTimestampMs}
+                            />
                           </span>
-                          <span className="text-xs text-slate-400">Block #{account.lastSeenBlockNumber}</span>
+                          <span className="text-xs text-slate-400">
+                            Block #{account.lastSeenBlockNumber}
+                          </span>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
-                        {account.totalTxCount.toLocaleString("en-US")}
+                        {account.totalTxCount.toLocaleString('en-US')}
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-500">
                         {editingTagAddress === account.address ? null : (
@@ -376,7 +445,9 @@ function EvmAccountsPageContent() {
                                   className="text-slate-400 hover:text-slate-700"
                                   tooltip="Edit name tag"
                                   aria-label="Edit name tag"
-                                  onClick={() => handleStartTagEdit(account.address)}
+                                  onClick={() =>
+                                    handleStartTagEdit(account.address)
+                                  }
                                 >
                                   <IconPencil className="size-4" stroke={1.8} />
                                 </ActionIconButton>
@@ -385,14 +456,16 @@ function EvmAccountsPageContent() {
                                   tooltip="Delete name tag"
                                   aria-label="Delete name tag"
                                   onClick={() => {
-                                    if (status !== "authenticated") {
+                                    if (status !== 'authenticated') {
                                       goToLogin();
                                       return;
                                     }
 
                                     setDeleteTarget({
                                       address: account.address,
-                                      nameTag: nameTagsByAddress[account.address] ?? "",
+                                      nameTag:
+                                        nameTagsByAddress[account.address] ??
+                                        '',
                                     });
                                   }}
                                 >
@@ -404,7 +477,9 @@ function EvmAccountsPageContent() {
                                 className="text-slate-400 hover:text-slate-700"
                                 tooltip="Add name tag"
                                 aria-label="Add name tag"
-                                onClick={() => handleStartTagEdit(account.address)}
+                                onClick={() =>
+                                  handleStartTagEdit(account.address)
+                                }
                               >
                                 <IconPlus className="size-4" stroke={1.8} />
                               </ActionIconButton>
@@ -416,8 +491,13 @@ function EvmAccountsPageContent() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">
-                      No observed accounts yet. Browse recent blocks or transactions first so addresses can be indexed into IndexedDB.
+                    <td
+                      colSpan={7}
+                      className="px-5 py-10 text-center text-sm text-slate-500"
+                    >
+                      No observed accounts yet. Browse recent blocks or
+                      transactions first so addresses can be indexed into
+                      IndexedDB.
                     </td>
                   </tr>
                 )}

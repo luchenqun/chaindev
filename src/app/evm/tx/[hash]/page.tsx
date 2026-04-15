@@ -1,39 +1,39 @@
-"use client";
+'use client';
 
-import JsonView from "@uiw/react-json-view";
-import Link from "next/link";
-import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IconArrowsExchange, IconCode, IconLoader2 } from "@tabler/icons-react";
-import { decodeErrorResult, formatEther } from "viem";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { DetailPageSkeleton } from "@/components/ui/loading-placeholders";
-import { ModalDialog } from "@/components/ui/modal-dialog";
-import { RelativeTime } from "@/components/relative-time";
-import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
+import JsonView from '@uiw/react-json-view';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { IconArrowsExchange, IconCode, IconLoader2 } from '@tabler/icons-react';
+import { decodeErrorResult, formatEther } from 'viem';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
+import { ModalDialog } from '@/components/ui/modal-dialog';
+import { RelativeTime } from '@/components/relative-time';
+import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/toast";
+} from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
 import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
-} from "@/domains/evm/client/address-tags";
-import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
-import { subscribeEvmContractRegistry } from "@/domains/evm/client/contract-registry";
+} from '@/domains/evm/client/address-tags';
+import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
+import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
 import {
   forceSendEvmTransactionDirect,
   forceWriteEvmContractMethodDirect,
   getActiveEvmContractEnvironmentDirect,
   getEvmTransactionManualDefaultsDirect,
   getEvmContractWriteManualDefaultsDirect,
-} from "@/domains/evm/client/contract-executor";
+} from '@/domains/evm/client/contract-executor';
 import {
   getActiveEvmStoredPrivateKey,
   isEvmStoredPrivateKeyUnlocked,
@@ -41,20 +41,20 @@ import {
   resolveEvmStoredPrivateKey,
   subscribeEvmKeyring,
   type EvmStoredPrivateKey,
-} from "@/domains/evm/client/keyring";
+} from '@/domains/evm/client/keyring';
 import {
   decodeBoundEvmReceiptLog,
   decodeBoundEvmTransactionInput,
   decodeHexToUtf8,
   resolveEvmTransactionMethodLabel,
-} from "@/domains/evm/client/transaction-decoder";
+} from '@/domains/evm/client/transaction-decoder';
 import {
   getEvmTransactionByHashDirect,
   getEvmTransactionDebugTraceDirect,
-} from "@/domains/evm/client/queries";
-import { AddressLink } from "@/domains/evm/ui/address-link";
-import { useEvmHomeData } from "@/domains/evm/ui/home-data-provider";
-import { AppShell } from "@/platform/layout/app-shell";
+} from '@/domains/evm/client/queries';
+import { AddressLink } from '@/domains/evm/ui/address-link';
+import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { AppShell } from '@/platform/layout/app-shell';
 
 function DetailRow({
   label,
@@ -68,38 +68,60 @@ function DetailRow({
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
       <dt className="text-sm font-medium text-slate-500">{label}</dt>
-      <dd className={mono ? "self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono" : "self-start text-sm text-slate-900"}>
+      <dd
+        className={
+          mono
+            ? 'self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono'
+            : 'self-start text-sm text-slate-900'
+        }
+      >
         {value}
       </dd>
     </div>
   );
 }
 
-function DetailGroup({ children, separated = false }: { children: React.ReactNode; separated?: boolean }) {
-  return <div className={separated ? "border-t border-slate-200 pt-2.5 pb-2.5 last:pb-0" : "pb-2.5 last:pb-0"}>{children}</div>;
+function DetailGroup({
+  children,
+  separated = false,
+}: {
+  children: React.ReactNode;
+  separated?: boolean;
+}) {
+  return (
+    <div
+      className={
+        separated
+          ? 'border-t border-slate-200 pt-2.5 pb-2.5 last:pb-0'
+          : 'pb-2.5 last:pb-0'
+      }
+    >
+      {children}
+    </div>
+  );
 }
 
 function extractTraceReturnValue(traceData: unknown) {
-  if (!traceData || typeof traceData !== "object") {
+  if (!traceData || typeof traceData !== 'object') {
     return null;
   }
 
   const candidate =
-    "returnValue" in traceData
+    'returnValue' in traceData
       ? traceData.returnValue
-      : "output" in traceData
+      : 'output' in traceData
         ? traceData.output
         : null;
 
-  if (typeof candidate !== "string" || candidate.length === 0) {
+  if (typeof candidate !== 'string' || candidate.length === 0) {
     return null;
   }
 
-  return candidate.startsWith("0x") ? candidate : `0x${candidate}`;
+  return candidate.startsWith('0x') ? candidate : `0x${candidate}`;
 }
 
 function decodeTraceReturnValue(returnValue: string | null) {
-  if (!returnValue || returnValue === "0x") {
+  if (!returnValue || returnValue === '0x') {
     return null;
   }
 
@@ -110,14 +132,14 @@ function decodeTraceReturnValue(returnValue: string | null) {
       return decoded.errorName;
     }
 
-    return `${decoded.errorName}: ${decoded.args.map((value) => String(value)).join(", ")}`;
+    return `${decoded.errorName}: ${decoded.args.map((value) => String(value)).join(', ')}`;
   } catch {
     return null;
   }
 }
 
 function splitInputDataWords(inputData: string) {
-  if (!inputData.startsWith("0x") || inputData.length <= 10) {
+  if (!inputData.startsWith('0x') || inputData.length <= 10) {
     return [];
   }
 
@@ -135,12 +157,16 @@ function splitInputDataWords(inputData: string) {
   return words;
 }
 
-function buildDefaultInputDataView(inputData: string, functionSignature?: string, selector?: string) {
+function buildDefaultInputDataView(
+  inputData: string,
+  functionSignature?: string,
+  selector?: string,
+) {
   const lines: string[] = [];
 
   if (functionSignature) {
     lines.push(`Function: ${functionSignature}`);
-    lines.push("");
+    lines.push('');
   }
 
   lines.push(`MethodID: ${selector ?? inputData.slice(0, 10)}`);
@@ -149,10 +175,10 @@ function buildDefaultInputDataView(inputData: string, functionSignature?: string
     lines.push(`[${index}]:  ${word}`);
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
-type RewriteTransactionType = "LEGACY" | "EIP1559";
+type RewriteTransactionType = 'LEGACY' | 'EIP1559';
 
 type RewriteDialogState = {
   transactionType: RewriteTransactionType;
@@ -175,19 +201,19 @@ function createInitialRewriteDialogState(input?: {
   gasLimit?: string;
 }): RewriteDialogState {
   return {
-    transactionType: input?.transactionType ?? "EIP1559",
-    value: input?.value ?? "0",
-    gasPrice: "",
-    maxFeePerGas: "auto",
-    maxPriorityFeePerGas: "auto",
-    gasLimit: input?.gasLimit ?? "",
-    nonce: "auto",
+    transactionType: input?.transactionType ?? 'EIP1559',
+    value: input?.value ?? '0',
+    gasPrice: '',
+    maxFeePerGas: 'auto',
+    maxPriorityFeePerGas: 'auto',
+    gasLimit: input?.gasLimit ?? '',
+    nonce: 'auto',
   };
 }
 
 function isAutoFieldValue(value: string) {
   const normalizedValue = value.trim().toLowerCase();
-  return !normalizedValue || normalizedValue === "auto";
+  return !normalizedValue || normalizedValue === 'auto';
 }
 
 function isValidNativeValueInput(value: string) {
@@ -205,25 +231,31 @@ function isRewriteDialogReady(state: RewriteDialogState) {
     return false;
   }
 
-  if (state.transactionType === "LEGACY") {
+  if (state.transactionType === 'LEGACY') {
     return !!state.gasPrice.trim();
   }
 
   return (
     (isAutoFieldValue(state.nonce) || !!state.nonce.trim()) &&
     (isAutoFieldValue(state.maxFeePerGas) || !!state.maxFeePerGas.trim()) &&
-    (isAutoFieldValue(state.maxPriorityFeePerGas) || !!state.maxPriorityFeePerGas.trim())
+    (isAutoFieldValue(state.maxPriorityFeePerGas) ||
+      !!state.maxPriorityFeePerGas.trim())
   );
 }
 
-function normalizeContractActionErrorMessage(message: string, fallback: string) {
+function normalizeContractActionErrorMessage(
+  message: string,
+  fallback: string,
+) {
   const roleMissingMatch = message.match(/missing role\s+(0x[a-fA-F0-9]+)/i);
 
   if (roleMissingMatch) {
     return `Transaction rejected. The current account is missing required role ${roleMissingMatch[1]}.`;
   }
 
-  const revertReasonMatch = message.match(/execution reverted:\s*(.+?)(?:\s+Version:|$)/i);
+  const revertReasonMatch = message.match(
+    /execution reverted:\s*(.+?)(?:\s+Version:|$)/i,
+  );
 
   if (revertReasonMatch?.[1]) {
     return `Transaction reverted: ${revertReasonMatch[1].trim()}.`;
@@ -239,13 +271,13 @@ function normalizeContractActionErrorMessage(message: string, fallback: string) 
 }
 
 function formatChainTimestamp(timestamp: number) {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   }).format(new Date(timestamp * 1000));
 }
@@ -265,7 +297,7 @@ type ReceiptLogRecord = {
   logIndex: number | null;
 };
 
-type DecodedLogViewMode = "dec" | "hex";
+type DecodedLogViewMode = 'dec' | 'hex';
 
 function isAddressValue(value: string) {
   return /^0x[a-fA-F0-9]{40}$/.test(value);
@@ -273,15 +305,15 @@ function isAddressValue(value: string) {
 
 function isReceiptLogRecord(value: unknown): value is ReceiptLogRecord {
   return (
-    typeof value === "object" &&
+    typeof value === 'object' &&
     value !== null &&
-    "address" in value &&
-    "data" in value &&
-    "topics" in value &&
-    typeof value.address === "string" &&
-    typeof value.data === "string" &&
+    'address' in value &&
+    'data' in value &&
+    'topics' in value &&
+    typeof value.address === 'string' &&
+    typeof value.data === 'string' &&
     Array.isArray(value.topics) &&
-    value.topics.every((topic) => typeof topic === "string")
+    value.topics.every((topic) => typeof topic === 'string')
   );
 }
 
@@ -296,7 +328,8 @@ function normalizeReceiptLogs(logs: unknown): ReceiptLogRecord[] {
     }
 
     const logIndex =
-      "logIndex" in item && (typeof item.logIndex === "number" || typeof item.logIndex === "string")
+      'logIndex' in item &&
+      (typeof item.logIndex === 'number' || typeof item.logIndex === 'string')
         ? Number(item.logIndex)
         : index;
 
@@ -312,8 +345,8 @@ function normalizeReceiptLogs(logs: unknown): ReceiptLogRecord[] {
 }
 
 function formatEventArgumentDisplayValue(value: string) {
-  if (value === "undefined") {
-    return "Unavailable";
+  if (value === 'undefined') {
+    return 'Unavailable';
   }
 
   return value;
@@ -347,8 +380,12 @@ function DecodedReceiptLogsSection({
   }>;
   nameTagsByAddress: Record<string, string | null>;
 }) {
-  const [topicViews, setTopicViews] = useState<Record<string, DecodedLogViewMode>>({});
-  const [dataViews, setDataViews] = useState<Record<string, DecodedLogViewMode>>({});
+  const [topicViews, setTopicViews] = useState<
+    Record<string, DecodedLogViewMode>
+  >({});
+  const [dataViews, setDataViews] = useState<
+    Record<string, DecodedLogViewMode>
+  >({});
 
   if (!logs.length) {
     return null;
@@ -356,242 +393,298 @@ function DecodedReceiptLogsSection({
 
   return (
     <div className="mb-1">
-      <h3 className="mb-4 text-sm font-semibold text-slate-900">Transaction Receipt Event Logs</h3>
+      <h3 className="mb-4 text-sm font-semibold text-slate-900">
+        Transaction Receipt Event Logs
+      </h3>
       <div className="divide-y divide-slate-200">
-      {logs.map((log, index) => {
-        const decoded = log.decoded;
+        {logs.map((log, index) => {
+          const decoded = log.decoded;
 
-        if (!decoded) {
-          return null;
-        }
+          if (!decoded) {
+            return null;
+          }
 
-        const indexedArgs = decoded.args.filter((arg) => arg.indexed);
-        const nonIndexedArgs = decoded.args.filter((arg) => !arg.indexed);
-        const dataView = dataViews[log.key] ?? "dec";
+          const indexedArgs = decoded.args.filter((arg) => arg.indexed);
+          const nonIndexedArgs = decoded.args.filter((arg) => !arg.indexed);
+          const dataView = dataViews[log.key] ?? 'dec';
 
-        return (
-          <section key={log.key} className={index === 0 ? "pb-3" : "pt-3 pb-3"}>
-            <dl className="space-y-2">
-              <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                <dt className="text-xs font-semibold text-slate-600">Address</dt>
-                <dd className="min-w-0 text-xs text-slate-900">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <DecodedLogAddress address={log.raw.address} nameTagsByAddress={nameTagsByAddress} />
-                  </div>
-                </dd>
-              </div>
+          return (
+            <section
+              key={log.key}
+              className={index === 0 ? 'pb-3' : 'pt-3 pb-3'}
+            >
+              <dl className="space-y-2">
+                <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                  <dt className="text-xs font-semibold text-slate-600">
+                    Address
+                  </dt>
+                  <dd className="min-w-0 text-xs text-slate-900">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <DecodedLogAddress
+                        address={log.raw.address}
+                        nameTagsByAddress={nameTagsByAddress}
+                      />
+                    </div>
+                  </dd>
+                </div>
 
-              <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                <dt className="text-xs font-semibold text-slate-600">Name</dt>
-                <dd className="min-w-0 text-xs text-slate-900">
-                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                    <span className="font-semibold text-slate-800">{decoded.eventName}</span>
-                    <span className="text-slate-500">({decoded.eventSignature.slice(decoded.eventName.length + 1, -1)})</span>
-                  </div>
-                </dd>
-              </div>
-
-              <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                <dt className="text-xs font-semibold text-slate-600">Topics</dt>
-                <dd className="min-w-0 space-y-2 text-xs text-slate-900">
-                  {decoded.topic0 ? (
-                    <div className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 mono text-xs text-slate-700">
-                      <span className="mr-2 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                        0
+                <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                  <dt className="text-xs font-semibold text-slate-600">Name</dt>
+                  <dd className="min-w-0 text-xs text-slate-900">
+                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                      <span className="font-semibold text-slate-800">
+                        {decoded.eventName}
                       </span>
-                      {decoded.topic0}
+                      <span className="text-slate-500">
+                        (
+                        {decoded.eventSignature.slice(
+                          decoded.eventName.length + 1,
+                          -1,
+                        )}
+                        )
+                      </span>
                     </div>
-                  ) : null}
+                  </dd>
+                </div>
 
-                  {indexedArgs.map((arg, argIndex) => {
-                    const viewKey = `${log.key}-topic-${argIndex}`;
-                    const view = topicViews[viewKey] ?? "dec";
-                    const displayValue = view === "hex" ? (arg.rawHex ?? "Unavailable") : formatEventArgumentDisplayValue(arg.value);
-
-                    return (
-                      <div key={viewKey} className="flex flex-wrap items-center gap-1.5">
-                        <span className="inline-flex h-[30px] items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
-                          {argIndex + 1}: {arg.name}
+                <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                  <dt className="text-xs font-semibold text-slate-600">
+                    Topics
+                  </dt>
+                  <dd className="min-w-0 space-y-2 text-xs text-slate-900">
+                    {decoded.topic0 ? (
+                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 mono text-xs text-slate-700">
+                        <span className="mr-2 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                          0
                         </span>
-                        <div className="relative min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-[132px] text-xs text-slate-700">
-                          <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
-                            <button
-                              type="button"
-                              className={
-                                view === "dec"
-                                  ? "h-full px-3 text-xs font-semibold text-slate-900"
-                                  : "h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
-                              }
-                              onClick={() =>
-                                setTopicViews((current) => ({
-                                  ...current,
-                                  [viewKey]: "dec",
-                                }))
-                              }
-                            >
-                              Dec
-                            </button>
-                            <button
-                              type="button"
-                              className={
-                                view === "hex"
-                                  ? "h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900"
-                                  : "h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
-                              }
-                              onClick={() =>
-                                setTopicViews((current) => ({
-                                  ...current,
-                                  [viewKey]: "hex",
-                                }))
-                              }
-                            >
-                              Hex
-                            </button>
-                          </div>
-                          {view === "dec" && isAddressValue(arg.value) ? (
-                            <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
-                          ) : (
-                            <span className="break-all mono">{displayValue}</span>
-                          )}
-                        </div>
+                        {decoded.topic0}
                       </div>
-                    );
-                  })}
-                </dd>
-              </div>
+                    ) : null}
 
-              <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                <dt className="text-xs font-semibold text-slate-600">Data</dt>
-                <dd className="min-w-0 text-xs text-slate-900">
-                  <div className="relative min-h-[30px] rounded-lg border border-slate-200 bg-white px-3 pr-[132px]">
-                    <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
-                      <button
-                        type="button"
-                        className={
-                          dataView === "dec"
-                            ? "h-full px-3 text-xs font-semibold text-slate-900"
-                            : "h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
-                        }
-                        onClick={() =>
-                          setDataViews((current) => ({
-                            ...current,
-                            [log.key]: "dec",
-                          }))
-                        }
-                      >
-                        Dec
-                      </button>
-                      <button
-                        type="button"
-                        className={
-                          dataView === "hex"
-                            ? "h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900"
-                            : "h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700"
-                        }
-                        onClick={() =>
-                          setDataViews((current) => ({
-                            ...current,
-                            [log.key]: "hex",
-                          }))
-                        }
-                      >
-                        Hex
-                      </button>
-                    </div>
-                    {dataView === "hex" ? (
-                      <p className="flex min-h-[30px] items-center break-all py-1.5 pr-2 mono text-xs text-slate-700">
-                        {log.raw.data || "0x"}
-                      </p>
-                    ) : nonIndexedArgs.length > 1 ? (
-                      <div className="space-y-1 py-2 pr-2">
-                        {nonIndexedArgs.map((arg, argIndex) => (
-                          <div key={`${log.key}-data-${argIndex}`} className="flex flex-wrap items-center gap-1.5 text-xs text-slate-700">
-                            <span className="font-medium text-slate-500">
-                              {arg.name} ({arg.type}) :
-                            </span>
-                            {isAddressValue(arg.value) ? (
-                              <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
+                    {indexedArgs.map((arg, argIndex) => {
+                      const viewKey = `${log.key}-topic-${argIndex}`;
+                      const view = topicViews[viewKey] ?? 'dec';
+                      const displayValue =
+                        view === 'hex'
+                          ? (arg.rawHex ?? 'Unavailable')
+                          : formatEventArgumentDisplayValue(arg.value);
+
+                      return (
+                        <div
+                          key={viewKey}
+                          className="flex flex-wrap items-center gap-1.5"
+                        >
+                          <span className="inline-flex h-[30px] items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                            {argIndex + 1}: {arg.name}
+                          </span>
+                          <div className="relative min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-[132px] text-xs text-slate-700">
+                            <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
+                              <button
+                                type="button"
+                                className={
+                                  view === 'dec'
+                                    ? 'h-full px-3 text-xs font-semibold text-slate-900'
+                                    : 'h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
+                                }
+                                onClick={() =>
+                                  setTopicViews((current) => ({
+                                    ...current,
+                                    [viewKey]: 'dec',
+                                  }))
+                                }
+                              >
+                                Dec
+                              </button>
+                              <button
+                                type="button"
+                                className={
+                                  view === 'hex'
+                                    ? 'h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900'
+                                    : 'h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
+                                }
+                                onClick={() =>
+                                  setTopicViews((current) => ({
+                                    ...current,
+                                    [viewKey]: 'hex',
+                                  }))
+                                }
+                              >
+                                Hex
+                              </button>
+                            </div>
+                            {view === 'dec' && isAddressValue(arg.value) ? (
+                              <DecodedLogAddress
+                                address={arg.value}
+                                nameTagsByAddress={nameTagsByAddress}
+                              />
                             ) : (
-                              <span className="break-all mono">{formatEventArgumentDisplayValue(arg.value)}</span>
+                              <span className="break-all mono">
+                                {displayValue}
+                              </span>
                             )}
                           </div>
-                        ))}
+                        </div>
+                      );
+                    })}
+                  </dd>
+                </div>
+
+                <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                  <dt className="text-xs font-semibold text-slate-600">Data</dt>
+                  <dd className="min-w-0 text-xs text-slate-900">
+                    <div className="relative min-h-[30px] rounded-lg border border-slate-200 bg-white px-3 pr-[132px]">
+                      <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
+                        <button
+                          type="button"
+                          className={
+                            dataView === 'dec'
+                              ? 'h-full px-3 text-xs font-semibold text-slate-900'
+                              : 'h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
+                          }
+                          onClick={() =>
+                            setDataViews((current) => ({
+                              ...current,
+                              [log.key]: 'dec',
+                            }))
+                          }
+                        >
+                          Dec
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            dataView === 'hex'
+                              ? 'h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900'
+                              : 'h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
+                          }
+                          onClick={() =>
+                            setDataViews((current) => ({
+                              ...current,
+                              [log.key]: 'hex',
+                            }))
+                          }
+                        >
+                          Hex
+                        </button>
                       </div>
-                    ) : nonIndexedArgs.length === 1 ? (
-                      <div className="flex min-h-[30px] items-center py-1.5 pr-2 text-xs text-slate-700">
-                        {isAddressValue(nonIndexedArgs[0].value) ? (
-                          <>
-                            <span className="mr-1.5 font-medium text-slate-500">
-                              {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) :
+                      {dataView === 'hex' ? (
+                        <p className="flex min-h-[30px] items-center break-all py-1.5 pr-2 mono text-xs text-slate-700">
+                          {log.raw.data || '0x'}
+                        </p>
+                      ) : nonIndexedArgs.length > 1 ? (
+                        <div className="space-y-1 py-2 pr-2">
+                          {nonIndexedArgs.map((arg, argIndex) => (
+                            <div
+                              key={`${log.key}-data-${argIndex}`}
+                              className="flex flex-wrap items-center gap-1.5 text-xs text-slate-700"
+                            >
+                              <span className="font-medium text-slate-500">
+                                {arg.name} ({arg.type}) :
+                              </span>
+                              {isAddressValue(arg.value) ? (
+                                <DecodedLogAddress
+                                  address={arg.value}
+                                  nameTagsByAddress={nameTagsByAddress}
+                                />
+                              ) : (
+                                <span className="break-all mono">
+                                  {formatEventArgumentDisplayValue(arg.value)}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : nonIndexedArgs.length === 1 ? (
+                        <div className="flex min-h-[30px] items-center py-1.5 pr-2 text-xs text-slate-700">
+                          {isAddressValue(nonIndexedArgs[0].value) ? (
+                            <>
+                              <span className="mr-1.5 font-medium text-slate-500">
+                                {nonIndexedArgs[0].name} (
+                                {nonIndexedArgs[0].type}) :
+                              </span>
+                              <DecodedLogAddress
+                                address={nonIndexedArgs[0].value}
+                                nameTagsByAddress={nameTagsByAddress}
+                              />
+                            </>
+                          ) : (
+                            <span className="break-all mono">
+                              {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}
+                              ) :{' '}
+                              {formatEventArgumentDisplayValue(
+                                nonIndexedArgs[0].value,
+                              )}
                             </span>
-                            <DecodedLogAddress address={nonIndexedArgs[0].value} nameTagsByAddress={nameTagsByAddress} />
-                          </>
-                        ) : (
-                          <span className="break-all mono">
-                            {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) : {formatEventArgumentDisplayValue(nonIndexedArgs[0].value)}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="flex min-h-[30px] items-center py-1.5 pr-2 mono text-xs text-slate-500">
-                        No non-indexed event data.
-                      </p>
-                    )}
-                  </div>
-                </dd>
-              </div>
-            </dl>
-          </section>
-        );
-      })}
+                          )}
+                        </div>
+                      ) : (
+                        <p className="flex min-h-[30px] items-center py-1.5 pr-2 mono text-xs text-slate-500">
+                          No non-indexed event data.
+                        </p>
+                      )}
+                    </div>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          );
+        })}
       </div>
     </div>
   );
 }
 
 function extractTransactionRawField(rawJson: unknown, field: string) {
-  if (!rawJson || typeof rawJson !== "object" || !("transaction" in rawJson)) {
+  if (!rawJson || typeof rawJson !== 'object' || !('transaction' in rawJson)) {
     return null;
   }
 
   const transaction = rawJson.transaction;
 
-  if (!transaction || typeof transaction !== "object" || !(field in transaction)) {
+  if (
+    !transaction ||
+    typeof transaction !== 'object' ||
+    !(field in transaction)
+  ) {
     return null;
   }
 
   const value = transaction[field as keyof typeof transaction];
-  return typeof value === "string" || typeof value === "number" ? String(value) : null;
+  return typeof value === 'string' || typeof value === 'number'
+    ? String(value)
+    : null;
 }
 
 function extractTransactionValueInput(rawJson: unknown) {
-  const rawValue = extractTransactionRawField(rawJson, "value");
+  const rawValue = extractTransactionRawField(rawJson, 'value');
 
   if (!rawValue) {
-    return "0";
+    return '0';
   }
 
   try {
     return formatEther(BigInt(rawValue));
   } catch {
-    return "0";
+    return '0';
   }
 }
 
 function extractTransactionGasLimit(rawJson: unknown) {
-  const rawGas = extractTransactionRawField(rawJson, "gas");
+  const rawGas = extractTransactionRawField(rawJson, 'gas');
 
-  return rawGas && /^\d+$/.test(rawGas) ? rawGas : "";
+  return rawGas && /^\d+$/.test(rawGas) ? rawGas : '';
 }
 
-function resolveRewriteTransactionType(rawJson: unknown): RewriteTransactionType {
-  const rawType = extractTransactionRawField(rawJson, "type")?.toLowerCase();
+function resolveRewriteTransactionType(
+  rawJson: unknown,
+): RewriteTransactionType {
+  const rawType = extractTransactionRawField(rawJson, 'type')?.toLowerCase();
 
-  if (rawType === "eip1559" || rawType === "0x2" || rawType === "2") {
-    return "EIP1559";
+  if (rawType === 'eip1559' || rawType === '0x2' || rawType === '2') {
+    return 'EIP1559';
   }
 
-  return "LEGACY";
+  return 'LEGACY';
 }
 
 function RewriteArgumentsForm({
@@ -606,7 +699,7 @@ function RewriteArgumentsForm({
   return (
     <div className="grid gap-3">
       {args.map((arg, index) => {
-        const isComplex = arg.type.includes("[") || arg.type === "tuple";
+        const isComplex = arg.type.includes('[') || arg.type === 'tuple';
 
         return (
           <div key={`${arg.name}-${arg.type}-${index}`} className="grid gap-2">
@@ -616,12 +709,12 @@ function RewriteArgumentsForm({
             {isComplex ? (
               <textarea
                 className="min-h-24 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400"
-                value={values[index] ?? ""}
+                value={values[index] ?? ''}
                 onChange={(event) => onChange(index, event.target.value)}
               />
             ) : (
               <Input
-                value={values[index] ?? ""}
+                value={values[index] ?? ''}
                 onChange={(event) => onChange(index, event.target.value)}
                 placeholder={arg.type}
               />
@@ -639,48 +732,65 @@ export default function EvmTxPage() {
   const hash = params.hash;
   const { status } = useEvmHomeData();
   const isValid = useMemo(() => /^0x[a-fA-F0-9]{64}$/.test(hash), [hash]);
-  const [transaction, setTransaction] = useState<Awaited<ReturnType<typeof getEvmTransactionByHashDirect>> | null>(null);
+  const [transaction, setTransaction] = useState<Awaited<
+    ReturnType<typeof getEvmTransactionByHashDirect>
+  > | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "logs" | "debugTrace" | "json">("overview");
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'logs' | 'debugTrace' | 'json'
+  >('overview');
   const [traceData, setTraceData] = useState<unknown>(null);
-  const [traceErrorMessage, setTraceErrorMessage] = useState<string | null>(null);
+  const [traceErrorMessage, setTraceErrorMessage] = useState<string | null>(
+    null,
+  );
   const [traceLoading, setTraceLoading] = useState(false);
-  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
-  const [inputDataView, setInputDataView] = useState<"default" | "utf8" | "original">("default");
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<
+    Record<string, string | null>
+  >({});
+  const [inputDataView, setInputDataView] = useState<
+    'default' | 'utf8' | 'original'
+  >('default');
   const [showDecodedInputTable, setShowDecodedInputTable] = useState(false);
   const [decodeVersion, setDecodeVersion] = useState(0);
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
-  const [rewriteEnvironment, setRewriteEnvironment] = useState<RewriteEnvironmentState>(null);
+  const [rewriteEnvironment, setRewriteEnvironment] =
+    useState<RewriteEnvironmentState>(null);
   const [rewriteDialogOpen, setRewriteDialogOpen] = useState(false);
-  const [rewriteArgumentValues, setRewriteArgumentValues] = useState<string[]>([]);
-  const [rewriteDialogValues, setRewriteDialogValues] = useState<RewriteDialogState>(createInitialRewriteDialogState());
+  const [rewriteArgumentValues, setRewriteArgumentValues] = useState<string[]>(
+    [],
+  );
+  const [rewriteDialogValues, setRewriteDialogValues] =
+    useState<RewriteDialogState>(createInitialRewriteDialogState());
   const [rewriteError, setRewriteError] = useState<string | null>(null);
-  const [rewriteActionLoading, setRewriteActionLoading] = useState<"fill" | "rewrite" | null>(null);
+  const [rewriteActionLoading, setRewriteActionLoading] = useState<
+    'fill' | 'rewrite' | null
+  >(null);
   const [rewriteUnlockDialogOpen, setRewriteUnlockDialogOpen] = useState(false);
-  const [rewriteUnlockPassword, setRewriteUnlockPassword] = useState("");
-  const [rewriteUnlockError, setRewriteUnlockError] = useState<string | null>(null);
-  const [pendingRewriteAction, setPendingRewriteAction] = useState<"fill" | "rewrite" | null>(null);
+  const [rewriteUnlockPassword, setRewriteUnlockPassword] = useState('');
+  const [rewriteUnlockError, setRewriteUnlockError] = useState<string | null>(
+    null,
+  );
+  const [pendingRewriteAction, setPendingRewriteAction] = useState<
+    'fill' | 'rewrite' | null
+  >(null);
   const rewriteDefaultsRequestIdRef = useRef(0);
   const normalizedReceiptLogs = useMemo(
     () => normalizeReceiptLogs(transaction?.logs),
     [transaction],
   );
-  const decodedReceiptLogs = useMemo(
-    () => {
-      void decodeVersion;
+  const decodedReceiptLogs = useMemo(() => {
+    void decodeVersion;
 
-      return normalizedReceiptLogs.map((log, index) => ({
-        key: `${log.logIndex ?? index}-${log.address}-${index}`,
-        raw: log,
-        decoded: decodeBoundEvmReceiptLog({
-          address: log.address,
-          topics: log.topics,
-          data: log.data,
-        }),
-      }));
-    },
-    [normalizedReceiptLogs, decodeVersion],
-  );
+    return normalizedReceiptLogs.map((log, index) => ({
+      key: `${log.logIndex ?? index}-${log.address}-${index}`,
+      raw: log,
+      decoded: decodeBoundEvmReceiptLog({
+        address: log.address,
+        topics: log.topics,
+        data: log.data,
+      }),
+    }));
+  }, [normalizedReceiptLogs, decodeVersion]);
   const visibleAddresses = useMemo(
     () =>
       transaction
@@ -690,41 +800,35 @@ export default function EvmTxPage() {
             ...(transaction.interactedWith ? [transaction.interactedWith] : []),
             ...decodedReceiptLogs.flatMap((log) => [
               log.raw.address,
-              ...((log.decoded?.args ?? [])
+              ...(log.decoded?.args ?? [])
                 .map((arg) => arg.value)
-                .filter((value) => isAddressValue(value))),
+                .filter((value) => isAddressValue(value)),
             ]),
           ]
         : [],
     [decodedReceiptLogs, transaction],
   );
-  const decodedTransactionInput = useMemo(
-    () => {
-      void decodeVersion;
+  const decodedTransactionInput = useMemo(() => {
+    void decodeVersion;
 
-      return transaction
-        ? decodeBoundEvmTransactionInput({
-            to: transaction.interactedWith ?? transaction.to,
-            inputData: transaction.inputData,
-          })
-        : null;
-    },
-    [transaction, decodeVersion],
-  );
-  const decodedMethodLabel = useMemo(
-    () => {
-      void decodeVersion;
+    return transaction
+      ? decodeBoundEvmTransactionInput({
+          to: transaction.interactedWith ?? transaction.to,
+          inputData: transaction.inputData,
+        })
+      : null;
+  }, [transaction, decodeVersion]);
+  const decodedMethodLabel = useMemo(() => {
+    void decodeVersion;
 
-      return transaction
-        ? resolveEvmTransactionMethodLabel({
-            to: transaction.interactedWith ?? transaction.to,
-            inputData: transaction.inputData,
-            fallbackMethodLabel: transaction.methodLabel,
-          })
-        : "";
-    },
-    [transaction, decodeVersion],
-  );
+    return transaction
+      ? resolveEvmTransactionMethodLabel({
+          to: transaction.interactedWith ?? transaction.to,
+          inputData: transaction.inputData,
+          fallbackMethodLabel: transaction.methodLabel,
+        })
+      : '';
+  }, [transaction, decodeVersion]);
   const utf8InputData = useMemo(
     () => (transaction ? decodeHexToUtf8(transaction.inputData) : null),
     [transaction],
@@ -737,15 +841,19 @@ export default function EvmTxPage() {
             decodedTransactionInput?.functionSignature,
             decodedTransactionInput?.selector,
           )
-        : "",
+        : '',
     [transaction, decodedTransactionInput],
   );
   const rewriteTargetAddress = useMemo(
     () => transaction?.interactedWith ?? transaction?.to ?? null,
     [transaction],
   );
-  const isRewriteTransfer = Boolean(transaction?.to && transaction.inputData === "0x");
-  const canRewriteTransaction = Boolean(rewriteTargetAddress && (decodedTransactionInput || isRewriteTransfer));
+  const isRewriteTransfer = Boolean(
+    transaction?.to && transaction.inputData === '0x',
+  );
+  const canRewriteTransaction = Boolean(
+    rewriteTargetAddress && (decodedTransactionInput || isRewriteTransfer),
+  );
 
   useEffect(() => {
     if (!isValid) {
@@ -764,24 +872,28 @@ export default function EvmTxPage() {
           setTraceData(null);
           setTraceErrorMessage(null);
           setTraceLoading(false);
-          setActiveTab("overview");
-          setInputDataView("default");
+          setActiveTab('overview');
+          setInputDataView('default');
           setShowDecodedInputTable(false);
         }
       } catch (error) {
         if (!cancelled) {
           setTransaction(null);
-          setErrorMessage(error instanceof Error ? error.message : "Failed to load transaction.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load transaction.',
+          );
         }
       }
     }
 
     void load();
-    window.addEventListener("chaindev:active-rpc-profile-changed", load);
+    window.addEventListener('chaindev:active-rpc-profile-changed', load);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("chaindev:active-rpc-profile-changed", load);
+      window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
   }, [hash, isValid]);
 
@@ -816,11 +928,17 @@ export default function EvmTxPage() {
     }
 
     void loadEnvironment();
-    window.addEventListener("chaindev:active-rpc-profile-changed", loadEnvironment);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      loadEnvironment,
+    );
 
     return () => {
       cancelled = true;
-      window.removeEventListener("chaindev:active-rpc-profile-changed", loadEnvironment);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        loadEnvironment,
+      );
     };
   }, []);
 
@@ -833,11 +951,17 @@ export default function EvmTxPage() {
       setDecodeVersion((current) => current + 1);
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, []);
 
@@ -856,106 +980,130 @@ export default function EvmTxPage() {
       loadVisibleTags();
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, [visibleAddresses]);
 
-  const fillRewriteDefaults = useCallback(async (
-    password?: string,
-    overrides?: {
-      rawArgs?: string[];
-      value?: string;
-    },
-  ) => {
-    if (!transaction || !rewriteTargetAddress || !activeKey || !canRewriteTransaction) {
-      return;
-    }
-
-    setRewriteActionLoading("fill");
-    setRewriteError(null);
-    const requestId = rewriteDefaultsRequestIdRef.current + 1;
-    rewriteDefaultsRequestIdRef.current = requestId;
-
-    try {
-      const privateKey = password
-        ? await resolveEvmStoredPrivateKey(activeKey.id, password)
-        : await peekEvmStoredPrivateKey(activeKey.id);
-      const rawArgs = overrides?.rawArgs ?? rewriteArgumentValues;
-      const value = overrides?.value ?? rewriteDialogValues.value;
-      const defaults = decodedTransactionInput
-        ? await getEvmContractWriteManualDefaultsDirect({
-            address: rewriteTargetAddress,
-            abiJson: decodedTransactionInput.abiJson,
-            functionSignature: decodedTransactionInput.functionSignature,
-            rawArgs,
-            privateKey,
-            value,
-          })
-        : await getEvmTransactionManualDefaultsDirect({
-            to: rewriteTargetAddress,
-            privateKey,
-            value,
-            data: transaction.inputData,
-          });
-
-      if (requestId !== rewriteDefaultsRequestIdRef.current) {
+  const fillRewriteDefaults = useCallback(
+    async (
+      password?: string,
+      overrides?: {
+        rawArgs?: string[];
+        value?: string;
+      },
+    ) => {
+      if (
+        !transaction ||
+        !rewriteTargetAddress ||
+        !activeKey ||
+        !canRewriteTransaction
+      ) {
         return;
       }
 
-      setRewriteDialogValues((current) => ({
-        ...current,
-        transactionType: defaults.transactionType,
-        gasPrice: defaults.gasPrice,
-        maxFeePerGas: isAutoFieldValue(current.maxFeePerGas) ? "auto" : current.maxFeePerGas,
-        maxPriorityFeePerGas: isAutoFieldValue(current.maxPriorityFeePerGas)
-          ? "auto"
-          : current.maxPriorityFeePerGas,
-        gasLimit: defaults.estimatedGas || current.gasLimit,
-        nonce: isAutoFieldValue(current.nonce) ? "auto" : current.nonce,
-      }));
+      setRewriteActionLoading('fill');
+      setRewriteError(null);
+      const requestId = rewriteDefaultsRequestIdRef.current + 1;
+      rewriteDefaultsRequestIdRef.current = requestId;
 
-      if (defaults.simulationError) {
+      try {
+        const privateKey = password
+          ? await resolveEvmStoredPrivateKey(activeKey.id, password)
+          : await peekEvmStoredPrivateKey(activeKey.id);
+        const rawArgs = overrides?.rawArgs ?? rewriteArgumentValues;
+        const value = overrides?.value ?? rewriteDialogValues.value;
+        const defaults = decodedTransactionInput
+          ? await getEvmContractWriteManualDefaultsDirect({
+              address: rewriteTargetAddress,
+              abiJson: decodedTransactionInput.abiJson,
+              functionSignature: decodedTransactionInput.functionSignature,
+              rawArgs,
+              privateKey,
+              value,
+            })
+          : await getEvmTransactionManualDefaultsDirect({
+              to: rewriteTargetAddress,
+              privateKey,
+              value,
+              data: transaction.inputData,
+            });
+
+        if (requestId !== rewriteDefaultsRequestIdRef.current) {
+          return;
+        }
+
+        setRewriteDialogValues((current) => ({
+          ...current,
+          transactionType: defaults.transactionType,
+          gasPrice: defaults.gasPrice,
+          maxFeePerGas: isAutoFieldValue(current.maxFeePerGas)
+            ? 'auto'
+            : current.maxFeePerGas,
+          maxPriorityFeePerGas: isAutoFieldValue(current.maxPriorityFeePerGas)
+            ? 'auto'
+            : current.maxPriorityFeePerGas,
+          gasLimit: defaults.estimatedGas || current.gasLimit,
+          nonce: isAutoFieldValue(current.nonce) ? 'auto' : current.nonce,
+        }));
+
+        if (defaults.simulationError) {
+          setRewriteError(
+            normalizeContractActionErrorMessage(
+              defaults.simulationError,
+              'Failed to prepare rewritten transaction.',
+            ),
+          );
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Failed to prepare rewritten transaction.';
+
+        if (requestId !== rewriteDefaultsRequestIdRef.current) {
+          return;
+        }
+
+        if (message === 'Password is required.') {
+          setPendingRewriteAction('fill');
+          setRewriteUnlockPassword('');
+          setRewriteUnlockError(null);
+          setRewriteUnlockDialogOpen(true);
+          return;
+        }
+
         setRewriteError(
           normalizeContractActionErrorMessage(
-            defaults.simulationError,
-            "Failed to prepare rewritten transaction.",
+            message,
+            'Failed to prepare rewritten transaction.',
           ),
         );
+      } finally {
+        if (requestId === rewriteDefaultsRequestIdRef.current) {
+          setRewriteActionLoading(null);
+        }
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to prepare rewritten transaction.";
-
-      if (requestId !== rewriteDefaultsRequestIdRef.current) {
-        return;
-      }
-
-      if (message === "Password is required.") {
-        setPendingRewriteAction("fill");
-        setRewriteUnlockPassword("");
-        setRewriteUnlockError(null);
-        setRewriteUnlockDialogOpen(true);
-        return;
-      }
-
-      setRewriteError(normalizeContractActionErrorMessage(message, "Failed to prepare rewritten transaction."));
-    } finally {
-      if (requestId === rewriteDefaultsRequestIdRef.current) {
-        setRewriteActionLoading(null);
-      }
-    }
-  }, [
-    activeKey,
-    canRewriteTransaction,
-    decodedTransactionInput,
-    rewriteArgumentValues,
-    rewriteDialogValues.value,
-    rewriteTargetAddress,
-    transaction,
-  ]);
+    },
+    [
+      activeKey,
+      canRewriteTransaction,
+      decodedTransactionInput,
+      rewriteArgumentValues,
+      rewriteDialogValues.value,
+      rewriteTargetAddress,
+      transaction,
+    ],
+  );
 
   useEffect(() => {
     if (
@@ -963,8 +1111,9 @@ export default function EvmTxPage() {
       !canRewriteTransaction ||
       !rewriteTargetAddress ||
       !activeKey ||
-      rewriteActionLoading === "rewrite" ||
-      (activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
+      rewriteActionLoading === 'rewrite' ||
+      (activeKey.securityMode === 'encrypted' &&
+        !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
       !isValidNativeValueInput(rewriteDialogValues.value)
     ) {
       return;
@@ -997,7 +1146,9 @@ export default function EvmTxPage() {
       return;
     }
 
-    setRewriteArgumentValues(decodedTransactionInput?.args.map((arg) => arg.value) ?? []);
+    setRewriteArgumentValues(
+      decodedTransactionInput?.args.map((arg) => arg.value) ?? [],
+    );
     setRewriteDialogValues(
       createInitialRewriteDialogState({
         transactionType: resolveRewriteTransactionType(transaction.rawJson),
@@ -1008,26 +1159,34 @@ export default function EvmTxPage() {
     setRewriteError(null);
     setRewriteActionLoading(null);
     setRewriteUnlockDialogOpen(false);
-    setRewriteUnlockPassword("");
+    setRewriteUnlockPassword('');
     setRewriteUnlockError(null);
     setPendingRewriteAction(null);
     setRewriteDialogOpen(true);
   }
 
   async function executeRewriteAction(password?: string) {
-    if (!transaction || !rewriteTargetAddress || !activeKey || !canRewriteTransaction) {
+    if (
+      !transaction ||
+      !rewriteTargetAddress ||
+      !activeKey ||
+      !canRewriteTransaction
+    ) {
       return;
     }
 
-    setRewriteActionLoading("rewrite");
+    setRewriteActionLoading('rewrite');
     setRewriteError(null);
     rewriteDefaultsRequestIdRef.current += 1;
     let rewriteSucceeded = false;
 
     try {
-      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
+      const privateKey = await resolveEvmStoredPrivateKey(
+        activeKey.id,
+        password,
+      );
       const latestDefaults =
-        rewriteDialogValues.transactionType === "EIP1559" &&
+        rewriteDialogValues.transactionType === 'EIP1559' &&
         (isAutoFieldValue(rewriteDialogValues.maxFeePerGas) ||
           isAutoFieldValue(rewriteDialogValues.maxPriorityFeePerGas) ||
           isAutoFieldValue(rewriteDialogValues.nonce))
@@ -1069,8 +1228,11 @@ export default function EvmTxPage() {
         maxFeePerGas: isAutoFieldValue(rewriteDialogValues.maxFeePerGas)
           ? (latestDefaults?.maxFeePerGas ?? rewriteDialogValues.maxFeePerGas)
           : rewriteDialogValues.maxFeePerGas,
-        maxPriorityFeePerGas: isAutoFieldValue(rewriteDialogValues.maxPriorityFeePerGas)
-          ? (latestDefaults?.maxPriorityFeePerGas ?? rewriteDialogValues.maxPriorityFeePerGas)
+        maxPriorityFeePerGas: isAutoFieldValue(
+          rewriteDialogValues.maxPriorityFeePerGas,
+        )
+          ? (latestDefaults?.maxPriorityFeePerGas ??
+            rewriteDialogValues.maxPriorityFeePerGas)
           : rewriteDialogValues.maxPriorityFeePerGas,
         nonce: isAutoFieldValue(rewriteDialogValues.nonce)
           ? (latestDefaults?.nonce ?? rewriteDialogValues.nonce)
@@ -1110,30 +1272,38 @@ export default function EvmTxPage() {
       setRewriteDialogOpen(false);
       rewriteSucceeded = true;
       showToast(
-        result.receipt.status === "success"
+        result.receipt.status === 'success'
           ? {
-              title: "Rewrite submitted",
-              description: `${decodedTransactionInput?.functionName ?? "Transfer"} was re-sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
-              tone: "success",
+              title: 'Rewrite submitted',
+              description: `${decodedTransactionInput?.functionName ?? 'Transfer'} was re-sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              tone: 'success',
             }
           : {
-              title: "Rewrite reverted",
-              description: `${decodedTransactionInput?.functionName ?? "Transfer"} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
-              tone: "info",
+              title: 'Rewrite reverted',
+              description: `${decodedTransactionInput?.functionName ?? 'Transfer'} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              tone: 'info',
             },
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to rewrite transaction.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to rewrite transaction.';
 
-      if (message === "Password is required.") {
-        setPendingRewriteAction("rewrite");
-        setRewriteUnlockPassword("");
+      if (message === 'Password is required.') {
+        setPendingRewriteAction('rewrite');
+        setRewriteUnlockPassword('');
         setRewriteUnlockError(null);
         setRewriteUnlockDialogOpen(true);
         return;
       }
 
-      setRewriteError(normalizeContractActionErrorMessage(message, "Failed to rewrite transaction."));
+      setRewriteError(
+        normalizeContractActionErrorMessage(
+          message,
+          'Failed to rewrite transaction.',
+        ),
+      );
     } finally {
       if (!rewriteSucceeded) {
         setRewriteActionLoading(null);
@@ -1151,10 +1321,10 @@ export default function EvmTxPage() {
       const nextAction = pendingRewriteAction;
       setPendingRewriteAction(null);
       setRewriteUnlockDialogOpen(false);
-      setRewriteUnlockPassword("");
+      setRewriteUnlockPassword('');
       setRewriteUnlockError(null);
 
-      if (nextAction === "fill") {
+      if (nextAction === 'fill') {
         await fillRewriteDefaults(rewriteUnlockPassword);
       } else {
         await executeRewriteAction(rewriteUnlockPassword);
@@ -1162,15 +1332,17 @@ export default function EvmTxPage() {
     } catch (error) {
       setRewriteUnlockError(
         normalizeContractActionErrorMessage(
-          error instanceof Error ? error.message : "Failed to unlock private key.",
-          "Failed to unlock private key.",
+          error instanceof Error
+            ? error.message
+            : 'Failed to unlock private key.',
+          'Failed to unlock private key.',
         ),
       );
     }
   }
 
   async function handleOpenDebugTraceTab() {
-    setActiveTab("debugTrace");
+    setActiveTab('debugTrace');
 
     if (traceData !== null || traceLoading) {
       return;
@@ -1186,7 +1358,7 @@ export default function EvmTxPage() {
       setTraceErrorMessage(
         error instanceof Error
           ? error.message
-          : "The selected provider does not expose debug_traceTransaction.",
+          : 'The selected provider does not expose debug_traceTransaction.',
       );
     } finally {
       setTraceLoading(false);
@@ -1223,13 +1395,16 @@ export default function EvmTxPage() {
     );
   }
 
-  const showDebugTraceTab = transaction.status === "reverted";
+  const showDebugTraceTab = transaction.status === 'reverted';
   const traceReturnValue = extractTraceReturnValue(traceData);
   const decodedTraceReturnValue = decodeTraceReturnValue(traceReturnValue);
   const hasLogs = transaction.logsCount > 0;
   const liveConfirmationsLabel =
     transaction.blockNumber && status?.latestBlockNumber != null
-      ? Math.max(0, status.latestBlockNumber - Number(transaction.blockNumber) + 1).toLocaleString("en-US")
+      ? Math.max(
+          0,
+          status.latestBlockNumber - Number(transaction.blockNumber) + 1,
+        ).toLocaleString('en-US')
       : transaction.confirmationsLabel;
 
   return (
@@ -1237,7 +1412,9 @@ export default function EvmTxPage() {
       <main className="section-block">
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[1.171875rem] font-semibold text-slate-900">Transaction Details</h1>
+            <h1 className="text-[1.171875rem] font-semibold text-slate-900">
+              Transaction Details
+            </h1>
           </div>
         </div>
 
@@ -1245,9 +1422,11 @@ export default function EvmTxPage() {
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-              activeTab === "overview" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-500"
+              activeTab === 'overview'
+                ? 'bg-sky-600 text-white'
+                : 'bg-slate-100 text-slate-500'
             }`}
-            onClick={() => setActiveTab("overview")}
+            onClick={() => setActiveTab('overview')}
           >
             Overview
           </button>
@@ -1255,14 +1434,14 @@ export default function EvmTxPage() {
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
               !hasLogs
-                ? "cursor-not-allowed bg-slate-100 text-slate-300"
-                : activeTab === "logs"
-                  ? "bg-sky-600 text-white"
-                  : "bg-slate-100 text-slate-500"
+                ? 'cursor-not-allowed bg-slate-100 text-slate-300'
+                : activeTab === 'logs'
+                  ? 'bg-sky-600 text-white'
+                  : 'bg-slate-100 text-slate-500'
             }`}
             onClick={() => {
               if (hasLogs) {
-                setActiveTab("logs");
+                setActiveTab('logs');
               }
             }}
             disabled={!hasLogs}
@@ -1274,7 +1453,9 @@ export default function EvmTxPage() {
             <button
               type="button"
               className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-                activeTab === "debugTrace" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-500"
+                activeTab === 'debugTrace'
+                  ? 'bg-sky-600 text-white'
+                  : 'bg-slate-100 text-slate-500'
               }`}
               onClick={() => void handleOpenDebugTraceTab()}
             >
@@ -1284,31 +1465,37 @@ export default function EvmTxPage() {
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-              activeTab === "json" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-500"
+              activeTab === 'json'
+                ? 'bg-sky-600 text-white'
+                : 'bg-slate-100 text-slate-500'
             }`}
-            onClick={() => setActiveTab("json")}
+            onClick={() => setActiveTab('json')}
           >
             JSON
           </button>
         </div>
 
-        {activeTab === "overview" ? (
+        {activeTab === 'overview' ? (
           <>
             <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="p-5">
                 <DetailGroup>
                   <dl>
-                    <DetailRow label="Transaction Hash" value={transaction.hash} mono />
+                    <DetailRow
+                      label="Transaction Hash"
+                      value={transaction.hash}
+                      mono
+                    />
                     <DetailRow
                       label="Status"
                       value={
                         <span
                           className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                            transaction.status === "success"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : transaction.status === "reverted"
-                                ? "bg-rose-50 text-rose-700"
-                                : "bg-amber-50 text-amber-700"
+                            transaction.status === 'success'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : transaction.status === 'reverted'
+                                ? 'bg-rose-50 text-rose-700'
+                                : 'bg-amber-50 text-amber-700'
                           }`}
                         >
                           {transaction.statusLabel}
@@ -1320,7 +1507,10 @@ export default function EvmTxPage() {
                       value={
                         transaction.blockNumber ? (
                           <span className="inline-flex flex-wrap items-center gap-2">
-                            <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
+                            <Link
+                              className="font-medium text-sky-600 hover:text-sky-700"
+                              href={`/evm/block/${transaction.blockNumber}`}
+                            >
                               {transaction.blockNumber}
                             </Link>
                             {liveConfirmationsLabel ? (
@@ -1330,7 +1520,7 @@ export default function EvmTxPage() {
                             ) : null}
                           </span>
                         ) : (
-                          "Pending"
+                          'Pending'
                         )
                       }
                     />
@@ -1339,11 +1529,17 @@ export default function EvmTxPage() {
                       value={
                         transaction.timestampMs ? (
                           <span className="inline-flex flex-wrap items-center gap-2">
-                            <span><RelativeTime timestampMs={transaction.timestampMs} /></span>
-                            <span className="text-slate-500">({transaction.timestampLabel})</span>
+                            <span>
+                              <RelativeTime
+                                timestampMs={transaction.timestampMs}
+                              />
+                            </span>
+                            <span className="text-slate-500">
+                              ({transaction.timestampLabel})
+                            </span>
                           </span>
                         ) : (
-                          "Unavailable"
+                          'Unavailable'
                         )
                       }
                     />
@@ -1358,7 +1554,10 @@ export default function EvmTxPage() {
                         <AddressLink
                           address={transaction.from}
                           href={`/evm/address/${transaction.from}`}
-                          label={nameTagsByAddress[transaction.from] ?? transaction.from}
+                          label={
+                            nameTagsByAddress[transaction.from] ??
+                            transaction.from
+                          }
                           className="font-medium text-sky-600 hover:text-sky-700 mono"
                           tooltipClassName="max-w-[90vw]"
                         />
@@ -1371,12 +1570,15 @@ export default function EvmTxPage() {
                           <AddressLink
                             address={transaction.interactedWith}
                             href={`/evm/address/${transaction.interactedWith}`}
-                            label={resolvePreferredToAddressLabel(transaction.interactedWith, { nameTagsByAddress })}
+                            label={resolvePreferredToAddressLabel(
+                              transaction.interactedWith,
+                              { nameTagsByAddress },
+                            )}
                             className="font-medium text-sky-600 hover:text-sky-700 mono"
                             tooltipClassName="max-w-[90vw]"
                           />
                         ) : (
-                          "Contract Creation"
+                          'Contract Creation'
                         )
                       }
                     />
@@ -1401,14 +1603,23 @@ export default function EvmTxPage() {
                 <DetailGroup separated>
                   <dl>
                     <DetailRow label="Value" value={transaction.valueLabel} />
-                    <DetailRow label="Transaction Fee" value={transaction.feeLabel} />
-                    <DetailRow label="Gas Fees" value={transaction.gasFeesLabel} />
+                    <DetailRow
+                      label="Transaction Fee"
+                      value={transaction.feeLabel}
+                    />
+                    <DetailRow
+                      label="Gas Fees"
+                      value={transaction.gasFeesLabel}
+                    />
                     <DetailRow
                       label="Gas Limit & Usage by Txn"
                       value={`${transaction.gasLimitLabel} | ${transaction.gasUsedLabel} (${transaction.gasUsedPercent})`}
                     />
                     <DetailRow label="Nonce" value={transaction.nonceLabel} />
-                    <DetailRow label="Position In Block" value={transaction.positionLabel} />
+                    <DetailRow
+                      label="Position In Block"
+                      value={transaction.positionLabel}
+                    />
                     <DetailRow label="Txn Type" value={transaction.typeLabel} />
                   </dl>
                 </DetailGroup>
@@ -1425,34 +1636,53 @@ export default function EvmTxPage() {
                                 <table className="data-table">
                                   <thead className="bg-slate-50">
                                     <tr>
-                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">#</th>
-                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
-                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
-                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Data</th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">
+                                        #
+                                      </th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">
+                                        Name
+                                      </th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">
+                                        Type
+                                      </th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">
+                                        Data
+                                      </th>
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {decodedTransactionInput.args.map((arg, index) => (
-                                      <tr key={`${arg.name}-${index}`} className="border-t border-slate-200">
-                                        <td className="px-4 py-3 align-top text-sm text-slate-900 mono">{index}</td>
-                                        <td className="px-4 py-3 align-top text-sm text-slate-900 mono">{arg.name}</td>
-                                        <td className="px-4 py-3 align-top text-sm text-slate-900 mono">{arg.type}</td>
-                                        <td className="px-4 py-3 align-top text-sm text-slate-900 mono">
-                                          {arg.type === "address" ? (
-                                            <Link
-                                              href={`/evm/address/${arg.value}`}
-                                              className="break-all text-[#6d4aff] hover:text-[#5935ff]"
-                                            >
-                                              {arg.value}
-                                            </Link>
-                                          ) : (
-                                            <span className="break-all whitespace-pre-wrap">
-                                              {arg.value}
-                                            </span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
+                                    {decodedTransactionInput.args.map(
+                                      (arg, index) => (
+                                        <tr
+                                          key={`${arg.name}-${index}`}
+                                          className="border-t border-slate-200"
+                                        >
+                                          <td className="px-4 py-3 align-top text-sm text-slate-900 mono">
+                                            {index}
+                                          </td>
+                                          <td className="px-4 py-3 align-top text-sm text-slate-900 mono">
+                                            {arg.name}
+                                          </td>
+                                          <td className="px-4 py-3 align-top text-sm text-slate-900 mono">
+                                            {arg.type}
+                                          </td>
+                                          <td className="px-4 py-3 align-top text-sm text-slate-900 mono">
+                                            {arg.type === 'address' ? (
+                                              <Link
+                                                href={`/evm/address/${arg.value}`}
+                                                className="break-all text-[#6d4aff] hover:text-[#5935ff]"
+                                              >
+                                                {arg.value}
+                                              </Link>
+                                            ) : (
+                                              <span className="break-all whitespace-pre-wrap">
+                                                {arg.value}
+                                              </span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ),
+                                    )}
                                   </tbody>
                                 </table>
                               </div>
@@ -1463,7 +1693,10 @@ export default function EvmTxPage() {
                               size="sm"
                               onClick={() => setShowDecodedInputTable(false)}
                             >
-                              <IconArrowsExchange className="mr-1.5 size-3.5" stroke={1.8} />
+                              <IconArrowsExchange
+                                className="mr-1.5 size-3.5"
+                                stroke={1.8}
+                              />
                               Switch Back
                             </Button>
                           </div>
@@ -1473,10 +1706,11 @@ export default function EvmTxPage() {
                               readOnly
                               className="min-h-[150px] w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-[14px] font-medium leading-6 text-slate-500 mono outline-none"
                               value={
-                                inputDataView === "default"
+                                inputDataView === 'default'
                                   ? defaultInputDataView
-                                  : inputDataView === "utf8"
-                                    ? utf8InputData || "Unable to decode input data as UTF-8."
+                                  : inputDataView === 'utf8'
+                                    ? utf8InputData ||
+                                      'Unable to decode input data as UTF-8.'
                                     : transaction.inputData
                               }
                             />
@@ -1485,16 +1719,22 @@ export default function EvmTxPage() {
                                 <Select
                                   value={inputDataView}
                                   onValueChange={(value) =>
-                                    setInputDataView(value as "default" | "utf8" | "original")
+                                    setInputDataView(
+                                      value as 'default' | 'utf8' | 'original',
+                                    )
                                   }
                                 >
                                   <SelectTrigger className="h-8 rounded-md px-3 text-xs">
                                     <SelectValue placeholder="View Input As" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="default">Default View</SelectItem>
+                                    <SelectItem value="default">
+                                      Default View
+                                    </SelectItem>
                                     <SelectItem value="utf8">UTF-8</SelectItem>
-                                    <SelectItem value="original">Original</SelectItem>
+                                    <SelectItem value="original">
+                                      Original
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
@@ -1505,7 +1745,10 @@ export default function EvmTxPage() {
                                 disabled={!decodedTransactionInput}
                                 onClick={() => setShowDecodedInputTable(true)}
                               >
-                                <IconCode className="mr-1.5 size-3.5" stroke={1.8} />
+                                <IconCode
+                                  className="mr-1.5 size-3.5"
+                                  stroke={1.8}
+                                />
                                 Decode Input Data
                               </Button>
                               <Button
@@ -1527,9 +1770,8 @@ export default function EvmTxPage() {
                 </DetailGroup>
               </div>
             </section>
-
           </>
-        ) : activeTab === "logs" ? (
+        ) : activeTab === 'logs' ? (
           <div className="space-y-4">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               {transaction.logsCount ? (
@@ -1538,13 +1780,17 @@ export default function EvmTxPage() {
                   nameTagsByAddress={nameTagsByAddress}
                 />
               ) : (
-                <p className="text-sm text-slate-500">No receipt logs were returned for this transaction.</p>
+                <p className="text-sm text-slate-500">
+                  No receipt logs were returned for this transaction.
+                </p>
               )}
             </section>
 
             {transaction.logsCount ? (
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-                <h3 className="mb-4 text-sm font-semibold text-slate-900">Raw JSON</h3>
+                <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                  Raw JSON
+                </h3>
                 <JsonView
                   className="json-view-wrap"
                   value={transaction.logs as object}
@@ -1553,32 +1799,35 @@ export default function EvmTxPage() {
                   enableClipboard={false}
                   displayDataTypes={false}
                   displayObjectSize={false}
-                  style={{
-                    "--w-rjv-background-color": "transparent",
-                    "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
-                    "--w-rjv-font-family":
-                      '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-                    "--w-rjv-color": "#0f172a",
-                    "--w-rjv-arrow-color": "#64748b",
-                    "--w-rjv-line-color": "rgba(148, 163, 184, 0.24)",
-                    "--w-rjv-curlybraces-color": "#475569",
-                    "--w-rjv-brackets-color": "#475569",
-                    "--w-rjv-colon-color": "#94a3b8",
-                    "--w-rjv-key-string": "#0369a1",
-                    "--w-rjv-key-number": "#0369a1",
-                    "--w-rjv-type-string-color": "#b45309",
-                    "--w-rjv-type-int-color": "#7c3aed",
-                    "--w-rjv-type-float-color": "#7c3aed",
-                    "--w-rjv-type-bigint-color": "#7c3aed",
-                    "--w-rjv-type-boolean-color": "#15803d",
-                    "--w-rjv-type-null-color": "#b91c1c",
-                    "--w-rjv-type-undefined-color": "#b91c1c",
-                  } as React.CSSProperties}
+                  style={
+                    {
+                      '--w-rjv-background-color': 'transparent',
+                      '--w-rjv-border-left':
+                        '1px dashed rgba(148, 163, 184, 0.28)',
+                      '--w-rjv-font-family':
+                        '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                      '--w-rjv-color': '#0f172a',
+                      '--w-rjv-arrow-color': '#64748b',
+                      '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
+                      '--w-rjv-curlybraces-color': '#475569',
+                      '--w-rjv-brackets-color': '#475569',
+                      '--w-rjv-colon-color': '#94a3b8',
+                      '--w-rjv-key-string': '#0369a1',
+                      '--w-rjv-key-number': '#0369a1',
+                      '--w-rjv-type-string-color': '#b45309',
+                      '--w-rjv-type-int-color': '#7c3aed',
+                      '--w-rjv-type-float-color': '#7c3aed',
+                      '--w-rjv-type-bigint-color': '#7c3aed',
+                      '--w-rjv-type-boolean-color': '#15803d',
+                      '--w-rjv-type-null-color': '#b91c1c',
+                      '--w-rjv-type-undefined-color': '#b91c1c',
+                    } as React.CSSProperties
+                  }
                 />
               </section>
             ) : null}
           </div>
-        ) : activeTab === "debugTrace" ? (
+        ) : activeTab === 'debugTrace' ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             {traceLoading ? (
               <div className="space-y-3">
@@ -1590,11 +1839,20 @@ export default function EvmTxPage() {
               <p className="text-sm text-slate-500">{traceErrorMessage}</p>
             ) : traceReturnValue ? (
               <div className="space-y-2">
-                <DetailRow label="Raw Return Value" value={traceReturnValue} mono />
-                <DetailRow label="Decoded Return Value" value={decodedTraceReturnValue ?? "Unable to decode"} />
+                <DetailRow
+                  label="Raw Return Value"
+                  value={traceReturnValue}
+                  mono
+                />
+                <DetailRow
+                  label="Decoded Return Value"
+                  value={decodedTraceReturnValue ?? 'Unable to decode'}
+                />
               </div>
             ) : (
-              <p className="text-sm text-slate-500">No returnValue was returned by debug_traceTransaction.</p>
+              <p className="text-sm text-slate-500">
+                No returnValue was returned by debug_traceTransaction.
+              </p>
             )}
           </section>
         ) : (
@@ -1607,27 +1865,29 @@ export default function EvmTxPage() {
               enableClipboard={false}
               displayDataTypes={false}
               displayObjectSize={false}
-              style={{
-                "--w-rjv-background-color": "transparent",
-                "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
-                "--w-rjv-font-family":
-                  '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-                "--w-rjv-color": "#0f172a",
-                "--w-rjv-arrow-color": "#64748b",
-                "--w-rjv-line-color": "rgba(148, 163, 184, 0.24)",
-                "--w-rjv-curlybraces-color": "#475569",
-                "--w-rjv-brackets-color": "#475569",
-                "--w-rjv-colon-color": "#94a3b8",
-                "--w-rjv-key-string": "#0369a1",
-                "--w-rjv-key-number": "#0369a1",
-                "--w-rjv-type-string-color": "#b45309",
-                "--w-rjv-type-int-color": "#7c3aed",
-                "--w-rjv-type-float-color": "#7c3aed",
-                "--w-rjv-type-bigint-color": "#7c3aed",
-                "--w-rjv-type-boolean-color": "#15803d",
-                "--w-rjv-type-null-color": "#b91c1c",
-                "--w-rjv-type-undefined-color": "#b91c1c",
-              } as React.CSSProperties}
+              style={
+                {
+                  '--w-rjv-background-color': 'transparent',
+                  '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
+                  '--w-rjv-font-family':
+                    '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                  '--w-rjv-color': '#0f172a',
+                  '--w-rjv-arrow-color': '#64748b',
+                  '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
+                  '--w-rjv-curlybraces-color': '#475569',
+                  '--w-rjv-brackets-color': '#475569',
+                  '--w-rjv-colon-color': '#94a3b8',
+                  '--w-rjv-key-string': '#0369a1',
+                  '--w-rjv-key-number': '#0369a1',
+                  '--w-rjv-type-string-color': '#b45309',
+                  '--w-rjv-type-int-color': '#7c3aed',
+                  '--w-rjv-type-float-color': '#7c3aed',
+                  '--w-rjv-type-bigint-color': '#7c3aed',
+                  '--w-rjv-type-boolean-color': '#15803d',
+                  '--w-rjv-type-null-color': '#b91c1c',
+                  '--w-rjv-type-undefined-color': '#b91c1c',
+                } as React.CSSProperties
+              }
             />
           </section>
         )}
@@ -1646,8 +1906,8 @@ export default function EvmTxPage() {
         title="ReWrite Transaction"
         description={
           decodedTransactionInput
-            ? "Modify the decoded function arguments and resend this call as a force write."
-            : "Resend this transfer with updated value and transaction settings."
+            ? 'Modify the decoded function arguments and resend this call as a force write.'
+            : 'Resend this transfer with updated value and transaction settings.'
         }
         footer={
           <>
@@ -1668,17 +1928,17 @@ export default function EvmTxPage() {
                 !activeKey ||
                 !canRewriteTransaction ||
                 !isRewriteDialogReady(rewriteDialogValues) ||
-                rewriteActionLoading === "rewrite"
+                rewriteActionLoading === 'rewrite'
               }
               onClick={() => void executeRewriteAction()}
             >
-              {rewriteActionLoading === "rewrite" ? (
+              {rewriteActionLoading === 'rewrite' ? (
                 <>
                   <IconLoader2 className="mr-2 size-4 animate-spin" />
                   Sending...
                 </>
               ) : (
-                "Confirm Force Send"
+                'Confirm Force Send'
               )}
             </Button>
           </>
@@ -1689,23 +1949,39 @@ export default function EvmTxPage() {
           <div className="grid gap-4 pb-1">
             <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2">
               <div className="min-w-0 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
-                <p className="mt-1 break-all text-sm text-slate-900 mono">{rewriteTargetAddress}</p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
-                <p className="mt-1 text-sm text-slate-900">
-                  {decodedTransactionInput ? decodedTransactionInput.functionSignature : "Transfer"}
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Contract
+                </p>
+                <p className="mt-1 break-all text-sm text-slate-900 mono">
+                  {rewriteTargetAddress}
                 </p>
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
-                <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Method
+                </p>
+                <p className="mt-1 text-sm text-slate-900">
+                  {decodedTransactionInput
+                    ? decodedTransactionInput.functionSignature
+                    : 'Transfer'}
+                </p>
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Selected Key
+                </p>
+                <p className="mt-1 text-sm text-slate-900">
+                  {activeKey?.name ?? 'No Key Selected'}
+                </p>
               </div>
               {decodedTransactionInput ? (
                 <div className="min-w-0 sm:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Artifact</p>
-                  <p className="mt-1 text-sm text-slate-900">{decodedTransactionInput.artifactName}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Artifact
+                  </p>
+                  <p className="mt-1 text-sm text-slate-900">
+                    {decodedTransactionInput.artifactName}
+                  </p>
                 </div>
               ) : null}
             </div>
@@ -1718,10 +1994,15 @@ export default function EvmTxPage() {
 
             {decodedTransactionInput ? (
               <div className="grid gap-3">
-                <p className="text-sm font-medium text-slate-700">Function Arguments</p>
+                <p className="text-sm font-medium text-slate-700">
+                  Function Arguments
+                </p>
                 <div className="max-h-64 overflow-y-auto pr-1">
                   <RewriteArgumentsForm
-                    args={decodedTransactionInput.args.map((arg) => ({ name: arg.name, type: arg.type }))}
+                    args={decodedTransactionInput.args.map((arg) => ({
+                      name: arg.name,
+                      type: arg.type,
+                    }))}
                     values={rewriteArgumentValues}
                     onChange={(index, value) => {
                       const nextArgs = [...rewriteArgumentValues];
@@ -1734,13 +2015,16 @@ export default function EvmTxPage() {
               </div>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                This transaction is a native transfer. No function arguments are required.
+                This transaction is a native transfer. No function arguments are
+                required.
               </div>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Txn Type
+                </label>
                 <Select
                   value={rewriteDialogValues.transactionType}
                   onValueChange={(value) =>
@@ -1761,7 +2045,7 @@ export default function EvmTxPage() {
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium text-slate-700">
-                  Value ({rewriteEnvironment?.nativeCurrency ?? "Native"})
+                  Value ({rewriteEnvironment?.nativeCurrency ?? 'Native'})
                 </label>
                 <Input
                   value={rewriteDialogValues.value}
@@ -1774,9 +2058,11 @@ export default function EvmTxPage() {
                   placeholder="0"
                 />
               </div>
-              {rewriteDialogValues.transactionType === "LEGACY" ? (
+              {rewriteDialogValues.transactionType === 'LEGACY' ? (
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Gas Price (Gwei)
+                  </label>
                   <Input
                     value={rewriteDialogValues.gasPrice}
                     onChange={(event) =>
@@ -1791,7 +2077,9 @@ export default function EvmTxPage() {
               ) : (
                 <>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">
+                      Max Fee Per Gas (Gwei)
+                    </label>
                     <Input
                       value={rewriteDialogValues.maxFeePerGas}
                       onChange={(event) =>
@@ -1804,7 +2092,9 @@ export default function EvmTxPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">
+                      Max Priority Fee Per Gas (Gwei)
+                    </label>
                     <Input
                       value={rewriteDialogValues.maxPriorityFeePerGas}
                       onChange={(event) =>
@@ -1819,7 +2109,9 @@ export default function EvmTxPage() {
                 </>
               )}
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Gas Limit
+                </label>
                 <Input
                   value={rewriteDialogValues.gasLimit}
                   onChange={(event) =>
@@ -1832,7 +2124,9 @@ export default function EvmTxPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Nonce
+                </label>
                 <Input
                   value={rewriteDialogValues.nonce}
                   onChange={(event) =>
@@ -1860,7 +2154,7 @@ export default function EvmTxPage() {
           setRewriteUnlockDialogOpen(open);
 
           if (!open) {
-            setRewriteUnlockPassword("");
+            setRewriteUnlockPassword('');
             setRewriteUnlockError(null);
             setPendingRewriteAction(null);
           }
@@ -1869,7 +2163,7 @@ export default function EvmTxPage() {
         description={
           activeKey
             ? `Enter the password for "${activeKey.name}" to continue the rewrite flow.`
-            : "Enter the password to continue."
+            : 'Enter the password to continue.'
         }
         value={rewriteUnlockPassword}
         onValueChange={setRewriteUnlockPassword}

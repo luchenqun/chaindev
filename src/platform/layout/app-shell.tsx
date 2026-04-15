@@ -1,6 +1,6 @@
-import { ReactNode } from "react";
-import { RemoteWorkbenchSync } from "@/platform/layout/remote-workbench-sync";
-import { TopNav } from "@/platform/layout/top-nav";
+import { ReactNode } from 'react';
+import { RemoteWorkbenchSync } from '@/platform/layout/remote-workbench-sync';
+import { TopNav } from '@/platform/layout/top-nav';
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (

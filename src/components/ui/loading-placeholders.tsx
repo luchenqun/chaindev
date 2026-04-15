@@ -1,5 +1,5 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export function OverviewCardsSkeleton({
   cards = 3,
@@ -70,7 +70,9 @@ export function MetricCardsSkeleton({
           </div>
         ))}
       </div>
-      {secondRowMetrics > 0 ? <div className="border-t border-slate-200" /> : null}
+      {secondRowMetrics > 0 ? (
+        <div className="border-t border-slate-200" />
+      ) : null}
       {secondRowMetrics > 0 ? (
         <div className="grid divide-y divide-slate-200 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
           {Array.from({ length: secondRowMetrics }).map((_, index) => (
@@ -100,7 +102,7 @@ export function HomeActivitySkeleton() {
               <div
                 key={rowIndex}
                 className={`grid grid-cols-[auto_130px_minmax(0,1fr)_auto] items-center gap-4 py-4 ${
-                  rowIndex ? "border-t border-slate-200" : ""
+                  rowIndex ? 'border-t border-slate-200' : ''
                 }`}
               >
                 <Skeleton className="size-10 rounded-xl" />
@@ -130,7 +132,7 @@ export function HomeActivitySkeleton() {
               <div
                 key={rowIndex}
                 className={`grid grid-cols-[auto_160px_minmax(0,1fr)_auto] items-center gap-3 py-4 ${
-                  rowIndex ? "border-t border-slate-200" : ""
+                  rowIndex ? 'border-t border-slate-200' : ''
                 }`}
               >
                 <Skeleton className="size-10 rounded-xl" />
@@ -173,7 +175,10 @@ export function PendingTransactionsSkeleton() {
             <thead>
               <tr>
                 {Array.from({ length: 8 }).map((_, index) => (
-                  <th key={index} className="border-b border-slate-200 px-5 py-3 text-left">
+                  <th
+                    key={index}
+                    className="border-b border-slate-200 px-5 py-3 text-left"
+                  >
                     <Skeleton className="h-4 w-20" />
                   </th>
                 ))}
@@ -217,7 +222,7 @@ export function PendingTransactionsSkeleton() {
 }
 
 export function ListPageSkeleton({
-  titleWidth = "w-28",
+  titleWidth = 'w-28',
   metricCards = 0,
   rows = 8,
   columns = 8,
@@ -237,7 +242,10 @@ export function ListPageSkeleton({
       {metricCards > 0 ? (
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: metricCards }).map((_, index) => (
-            <article key={index} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+            <article
+              key={index}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]"
+            >
               <Skeleton className="h-3.5 w-24" />
               <Skeleton className="mt-3 h-9 w-36" />
               <Skeleton className="mt-3 h-4 w-28" />
@@ -245,7 +253,9 @@ export function ListPageSkeleton({
           ))}
         </section>
       ) : null}
-      <section className={`${metricCards > 0 ? "mt-4 " : ""}overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]`}>
+      <section
+        className={`${metricCards > 0 ? 'mt-4 ' : ''}overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]`}
+      >
         <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <Skeleton className="h-7 w-60" />
@@ -264,7 +274,10 @@ export function ListPageSkeleton({
             <thead>
               <tr>
                 {Array.from({ length: columns }).map((_, index) => (
-                  <th key={index} className="border-b border-slate-200 px-5 py-3 text-left">
+                  <th
+                    key={index}
+                    className="border-b border-slate-200 px-5 py-3 text-left"
+                  >
                     <Skeleton className="h-4 w-20" />
                   </th>
                 ))}
@@ -275,7 +288,9 @@ export function ListPageSkeleton({
                 <tr key={rowIndex} className="border-t border-slate-200">
                   {Array.from({ length: columns }).map((_, columnIndex) => (
                     <td key={columnIndex} className="px-5 py-3">
-                      <Skeleton className={`h-4 ${columnIndex === 0 ? "w-32" : columnIndex === columns - 1 ? "w-20" : "w-24"}`} />
+                      <Skeleton
+                        className={`h-4 ${columnIndex === 0 ? 'w-32' : columnIndex === columns - 1 ? 'w-20' : 'w-24'}`}
+                      />
                     </td>
                   ))}
                 </tr>
@@ -289,7 +304,7 @@ export function ListPageSkeleton({
 }
 
 export function DetailPageSkeleton({
-  titleWidth = "w-28",
+  titleWidth = 'w-28',
   showTabs = true,
   groups = 3,
   rowsPerGroup = 4,
@@ -323,10 +338,17 @@ export function DetailPageSkeleton({
           {Array.from({ length: groups }).map((_, groupIndex) => (
             <div
               key={groupIndex}
-              className={groupIndex ? "border-t border-slate-200 pt-2.5 pb-2.5 last:pb-0" : "pb-2.5 last:pb-0"}
+              className={
+                groupIndex
+                  ? 'border-t border-slate-200 pt-2.5 pb-2.5 last:pb-0'
+                  : 'pb-2.5 last:pb-0'
+              }
             >
               {Array.from({ length: rowsPerGroup }).map((__, rowIndex) => (
-                <div key={rowIndex} className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
+                <div
+                  key={rowIndex}
+                  className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4"
+                >
                   <Skeleton className="h-4 w-24" />
                   <Skeleton className="h-4 w-48" />
                 </div>
@@ -362,8 +384,12 @@ export function SimpleDetailSkeleton() {
         <dl className="detail-list">
           {Array.from({ length: 4 }).map((_, index) => (
             <div key={index}>
-              <dt><Skeleton className="h-4 w-20" /></dt>
-              <dd><Skeleton className="h-4 w-56" /></dd>
+              <dt>
+                <Skeleton className="h-4 w-20" />
+              </dt>
+              <dd>
+                <Skeleton className="h-4 w-56" />
+              </dd>
             </div>
           ))}
         </dl>

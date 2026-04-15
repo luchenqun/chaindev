@@ -1,50 +1,59 @@
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from 'drizzle-orm/sqlite-core';
 
-export const users = sqliteTable("user", {
-  id: text("id").primaryKey(),
-  name: text("name"),
-  username: text("username").unique(),
-  email: text("email").unique(),
-  passwordHash: text("password_hash"),
-  isAdmin: integer("is_admin", { mode: "boolean" }).notNull().default(false),
-  emailVerified: integer("email_verified", { mode: "timestamp_ms" }),
-  image: text("image"),
+export const users = sqliteTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name'),
+  username: text('username').unique(),
+  email: text('email').unique(),
+  passwordHash: text('password_hash'),
+  isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+  emailVerified: integer('email_verified', { mode: 'timestamp_ms' }),
+  image: text('image'),
 });
 
 export const accounts = sqliteTable(
-  "account",
+  'account',
   {
-    userId: text("user_id").notNull(),
-    type: text("type").notNull(),
-    provider: text("provider").notNull(),
-    providerAccountId: text("provider_account_id").notNull(),
-    refreshToken: text("refresh_token"),
-    accessToken: text("access_token"),
-    expiresAt: integer("expires_at"),
-    tokenType: text("token_type"),
-    scope: text("scope"),
-    idToken: text("id_token"),
-    sessionState: text("session_state"),
+    userId: text('user_id').notNull(),
+    type: text('type').notNull(),
+    provider: text('provider').notNull(),
+    providerAccountId: text('provider_account_id').notNull(),
+    refreshToken: text('refresh_token'),
+    accessToken: text('access_token'),
+    expiresAt: integer('expires_at'),
+    tokenType: text('token_type'),
+    scope: text('scope'),
+    idToken: text('id_token'),
+    sessionState: text('session_state'),
   },
   (table) => ({
-    providerAccountPk: primaryKey({ columns: [table.provider, table.providerAccountId] }),
+    providerAccountPk: primaryKey({
+      columns: [table.provider, table.providerAccountId],
+    }),
   }),
 );
 
-export const sessions = sqliteTable("session", {
-  sessionToken: text("session_token").primaryKey(),
-  userId: text("user_id").notNull(),
-  expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+export const sessions = sqliteTable('session', {
+  sessionToken: text('session_token').primaryKey(),
+  userId: text('user_id').notNull(),
+  expires: integer('expires', { mode: 'timestamp_ms' }).notNull(),
 });
 
 export const verificationTokens = sqliteTable(
-  "verification_token",
+  'verification_token',
   {
-    identifier: text("identifier").notNull(),
-    token: text("token").notNull(),
-    expires: integer("expires", { mode: "timestamp_ms" }).notNull(),
+    identifier: text('identifier').notNull(),
+    token: text('token').notNull(),
+    expires: integer('expires', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => ({
-    verificationTokenPk: primaryKey({ columns: [table.identifier, table.token] }),
+    verificationTokenPk: primaryKey({
+      columns: [table.identifier, table.token],
+    }),
   }),
 );

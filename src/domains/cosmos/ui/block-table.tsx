@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from 'next/link';
 
 type BlockTableProps = {
   blocks: Array<{
@@ -22,7 +22,9 @@ export function CosmosBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
           {blocks.map((block) => (
             <tr key={block.height}>
               <td>
-                <Link href={`${hrefPrefix}/${block.height}`}>#{block.height}</Link>
+                <Link href={`${hrefPrefix}/${block.height}`}>
+                  #{block.height}
+                </Link>
               </td>
               <td className="mono">{block.hash}</td>
             </tr>

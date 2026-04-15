@@ -1,16 +1,18 @@
-"use client";
+'use client';
 
-import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { SimpleDetailSkeleton } from "@/components/ui/loading-placeholders";
-import { getCosmosBlockByHeightDirect } from "@/domains/cosmos/client/queries";
-import { AppShell } from "@/platform/layout/app-shell";
+import { useParams } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { SimpleDetailSkeleton } from '@/components/ui/loading-placeholders';
+import { getCosmosBlockByHeightDirect } from '@/domains/cosmos/client/queries';
+import { AppShell } from '@/platform/layout/app-shell';
 
 export default function CosmosBlockDetailPage() {
   const params = useParams<{ height: string }>();
   const height = params.height;
   const isValid = useMemo(() => /^\d+$/.test(height), [height]);
-  const [block, setBlock] = useState<Awaited<ReturnType<typeof getCosmosBlockByHeightDirect>> | null>(null);
+  const [block, setBlock] = useState<Awaited<
+    ReturnType<typeof getCosmosBlockByHeightDirect>
+  > | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,17 +33,21 @@ export default function CosmosBlockDetailPage() {
       } catch (error) {
         if (!cancelled) {
           setBlock(null);
-          setErrorMessage(error instanceof Error ? error.message : "Failed to load Cosmos block.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load Cosmos block.',
+          );
         }
       }
     }
 
     void load();
-    window.addEventListener("chaindev:active-rpc-profile-changed", load);
+    window.addEventListener('chaindev:active-rpc-profile-changed', load);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("chaindev:active-rpc-profile-changed", load);
+      window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
   }, [height, isValid]);
 
@@ -81,7 +87,10 @@ export default function CosmosBlockDetailPage() {
         <section className="content-panel">
           <span className="kicker">Cosmos Block</span>
           <h1>Block #{block.height}</h1>
-          <p>Show height, hash, and timestamp as the base for future message and event expansion.</p>
+          <p>
+            Show height, hash, and timestamp as the base for future message and
+            event expansion.
+          </p>
         </section>
         <section className="detail-card">
           <dl className="detail-list">
@@ -95,7 +104,7 @@ export default function CosmosBlockDetailPage() {
             </div>
             <div>
               <dt>Time</dt>
-              <dd>{block.timestamp ?? "Unavailable"}</dd>
+              <dd>{block.timestamp ?? 'Unavailable'}</dd>
             </div>
           </dl>
         </section>

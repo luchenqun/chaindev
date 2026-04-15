@@ -1,8 +1,8 @@
-import { randomUUID } from "node:crypto";
-import { eq, or, sql } from "drizzle-orm";
-import { db } from "@/db/client";
-import { users } from "@/db/schema/auth";
-import { hashPassword } from "@/server/auth/password";
+import { randomUUID } from 'node:crypto';
+import { eq, or, sql } from 'drizzle-orm';
+import { db } from '@/db/client';
+import { users } from '@/db/schema/auth';
+import { hashPassword } from '@/server/auth/password';
 
 export async function findAuthUserByEmail(email: string) {
   const normalizedEmail = email.trim().toLowerCase();
@@ -30,7 +30,10 @@ export async function findAuthUserByIdentifier(identifier: string) {
   });
 }
 
-export async function findAuthUserConflict(input: { email: string; username: string }) {
+export async function findAuthUserConflict(input: {
+  email: string;
+  username: string;
+}) {
   const normalizedEmail = input.email.trim().toLowerCase();
   const normalizedUsername = input.username.trim();
   const normalizedUsernameLower = normalizedUsername.toLowerCase();

@@ -1,28 +1,36 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { RelativeTime } from "@/components/relative-time";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
-import { PaginationControls } from "@/components/ui/pagination-controls";
-import { clearEvmTransactionCache, subscribeEvmTransactionCache } from "@/domains/evm/client/transaction-cache";
+import Link from 'next/link';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { RelativeTime } from '@/components/relative-time';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
+import { PaginationControls } from '@/components/ui/pagination-controls';
+import {
+  clearEvmTransactionCache,
+  subscribeEvmTransactionCache,
+} from '@/domains/evm/client/transaction-cache';
 import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
-} from "@/domains/evm/client/address-tags";
-import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
+} from '@/domains/evm/client/address-tags';
+import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import {
   getEvmCacheDashboardDirect,
   getEvmCacheSummaryDirect,
   validateActiveEvmCacheDirect,
-} from "@/domains/evm/client/queries";
-import { AddressLink } from "@/domains/evm/ui/address-link";
-import { AppShell } from "@/platform/layout/app-shell";
-import { TransactionHashCell, TransactionPreviewButton } from "@/domains/evm/ui/transaction-list-cells";
+} from '@/domains/evm/client/queries';
+import { AddressLink } from '@/domains/evm/ui/address-link';
+import { AppShell } from '@/platform/layout/app-shell';
+import {
+  TransactionHashCell,
+  TransactionPreviewButton,
+} from '@/domains/evm/ui/transaction-list-cells';
 
 type CacheDashboard = Awaited<ReturnType<typeof getEvmCacheDashboardDirect>>;
-type CacheValidationResult = Awaited<ReturnType<typeof validateActiveEvmCacheDirect>>;
+type CacheValidationResult = Awaited<
+  ReturnType<typeof validateActiveEvmCacheDirect>
+>;
 
 function SummaryCard({
   label,
@@ -37,8 +45,12 @@ function SummaryCard({
 }) {
   return (
     <article className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <div className={`mt-2 min-w-0 text-[30px] font-semibold leading-none text-slate-900 ${valueClassName ?? ""}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        {label}
+      </p>
+      <div
+        className={`mt-2 min-w-0 text-[30px] font-semibold leading-none text-slate-900 ${valueClassName ?? ''}`}
+      >
         {value}
       </div>
       <div className="mt-2 text-sm text-slate-500">{note}</div>
@@ -50,10 +62,16 @@ export default function EvmCacheSettingsPage() {
   const [data, setData] = useState<CacheDashboard | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionState, setActionState] = useState<CacheValidationResult | null>(null);
-  const [actionLoading, setActionLoading] = useState<"validate" | "clear" | null>(null);
+  const [actionState, setActionState] = useState<CacheValidationResult | null>(
+    null,
+  );
+  const [actionLoading, setActionLoading] = useState<
+    'validate' | 'clear' | null
+  >(null);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
-  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<
+    Record<string, string | null>
+  >({});
   const [transactionPage, setTransactionPage] = useState(1);
   const [accountPage, setAccountPage] = useState(1);
 
@@ -61,15 +79,15 @@ export default function EvmCacheSettingsPage() {
     () =>
       data
         ? [
-            ...new Set(
-              [
-                ...data.cachedTransactions.transactions.flatMap((transaction) => [
-                  transaction.from,
-                  ...(transaction.to ? [transaction.to] : []),
-                ]),
-                ...data.observedAccounts.accounts.map((account) => account.address),
-              ],
-            ),
+            ...new Set([
+              ...data.cachedTransactions.transactions.flatMap((transaction) => [
+                transaction.from,
+                ...(transaction.to ? [transaction.to] : []),
+              ]),
+              ...data.observedAccounts.accounts.map(
+                (account) => account.address,
+              ),
+            ]),
           ]
         : [],
     [data],
@@ -83,7 +101,10 @@ export default function EvmCacheSettingsPage() {
       }
 
       try {
-        const next = await getEvmCacheDashboardDirect(transactionPage, accountPage);
+        const next = await getEvmCacheDashboardDirect(
+          transactionPage,
+          accountPage,
+        );
 
         if (!cancelled) {
           setData(next);
@@ -100,7 +121,11 @@ export default function EvmCacheSettingsPage() {
       } catch (error) {
         if (!cancelled) {
           setData(null);
-          setErrorMessage(error instanceof Error ? error.message : "Failed to load cache settings.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load cache settings.',
+          );
         }
       } finally {
         if (!cancelled) {
@@ -146,12 +171,18 @@ export default function EvmCacheSettingsPage() {
       })();
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       cancelled = true;
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, [accountPage, transactionPage]);
 
@@ -170,11 +201,17 @@ export default function EvmCacheSettingsPage() {
       loadVisibleTags();
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, [visibleAddresses]);
 
@@ -187,7 +224,7 @@ export default function EvmCacheSettingsPage() {
   }
 
   async function handleValidate() {
-    setActionLoading("validate");
+    setActionLoading('validate');
 
     try {
       const result = await validateActiveEvmCacheDirect();
@@ -196,8 +233,9 @@ export default function EvmCacheSettingsPage() {
       await reloadCurrentPages();
     } catch (error) {
       setActionState({
-        status: "failed",
-        label: error instanceof Error ? error.message : "Failed to validate cache.",
+        status: 'failed',
+        label:
+          error instanceof Error ? error.message : 'Failed to validate cache.',
       });
     } finally {
       setActionLoading(null);
@@ -205,20 +243,21 @@ export default function EvmCacheSettingsPage() {
   }
 
   async function handleClear() {
-    setActionLoading("clear");
+    setActionLoading('clear');
 
     try {
       await clearEvmTransactionCache();
       setActionState({
-        status: "cleared",
-        label: "Cleared current local EVM cache.",
+        status: 'cleared',
+        label: 'Cleared current local EVM cache.',
       });
       setClearDialogOpen(false);
       await reloadCurrentPages();
     } catch (error) {
       setActionState({
-        status: "failed",
-        label: error instanceof Error ? error.message : "Failed to clear cache.",
+        status: 'failed',
+        label:
+          error instanceof Error ? error.message : 'Failed to clear cache.',
       });
     } finally {
       setActionLoading(null);
@@ -226,18 +265,24 @@ export default function EvmCacheSettingsPage() {
   }
 
   const validationToneClassName =
-    actionState?.status === "valid"
-      ? "text-emerald-600"
-      : actionState?.status === "cleared"
-        ? "text-amber-600"
-        : actionState?.status === "failed"
-          ? "text-rose-600"
-          : "text-slate-900";
+    actionState?.status === 'valid'
+      ? 'text-emerald-600'
+      : actionState?.status === 'cleared'
+        ? 'text-amber-600'
+        : actionState?.status === 'failed'
+          ? 'text-rose-600'
+          : 'text-slate-900';
 
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-32" metricCards={4} rows={5} columns={3} showToolbar={false} />
+        <ListPageSkeleton
+          titleWidth="w-32"
+          metricCards={4}
+          rows={5}
+          columns={3}
+          showToolbar={false}
+        />
       </AppShell>
     );
   }
@@ -258,7 +303,9 @@ export default function EvmCacheSettingsPage() {
       <main className="section-block">
         <div className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <h1 className="text-[1.171875rem] font-semibold text-slate-900">Cache</h1>
+            <h1 className="text-[1.171875rem] font-semibold text-slate-900">
+              Cache
+            </h1>
             <p className="mt-2 text-sm text-slate-500">
               Manage the local IndexedDB cache used by the active EVM provider.
             </p>
@@ -267,26 +314,28 @@ export default function EvmCacheSettingsPage() {
             <button
               type="button"
               className={`inline-flex h-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition ${
-                actionLoading === "validate"
-                  ? "cursor-wait border-sky-200 bg-sky-50 text-sky-600"
-                  : "border-slate-200 bg-white text-slate-700 hover:text-slate-900"
+                actionLoading === 'validate'
+                  ? 'cursor-wait border-sky-200 bg-sky-50 text-sky-600'
+                  : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900'
               }`}
               disabled={actionLoading != null}
               onClick={() => void handleValidate()}
             >
-              {actionLoading === "validate" ? "Validating..." : "Validate Cache"}
+              {actionLoading === 'validate'
+                ? 'Validating...'
+                : 'Validate Cache'}
             </button>
             <button
               type="button"
               className={`inline-flex h-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition ${
-                actionLoading === "clear"
-                  ? "cursor-wait border-rose-200 bg-rose-50 text-rose-600"
-                  : "border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
+                actionLoading === 'clear'
+                  ? 'cursor-wait border-rose-200 bg-rose-50 text-rose-600'
+                  : 'border-rose-200 bg-white text-rose-600 hover:bg-rose-50'
               }`}
               disabled={actionLoading != null}
               onClick={() => setClearDialogOpen(true)}
             >
-              {actionLoading === "clear" ? "Clearing..." : "Clear Cache"}
+              {actionLoading === 'clear' ? 'Clearing...' : 'Clear Cache'}
             </button>
           </div>
         </div>
@@ -294,12 +343,12 @@ export default function EvmCacheSettingsPage() {
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <SummaryCard
             label="Cached Transactions"
-            value={data.summary.cachedTransactions.toLocaleString("en-US")}
+            value={data.summary.cachedTransactions.toLocaleString('en-US')}
             note="Stored in local IndexedDB"
           />
           <SummaryCard
             label="Observed Accounts"
-            value={data.summary.observedAccounts.toLocaleString("en-US")}
+            value={data.summary.observedAccounts.toLocaleString('en-US')}
             note="Derived from cached transaction participants"
           />
           <SummaryCard
@@ -314,24 +363,32 @@ export default function EvmCacheSettingsPage() {
                   {data.summary.latestCachedTransaction.hashLabel}
                 </Link>
               ) : (
-                "Unavailable"
+                'Unavailable'
               )
             }
             valueClassName="text-[22px] leading-tight"
             note={
               data.summary.latestCachedTransaction ? (
                 <span>
-                  <RelativeTime timestampMs={data.summary.latestCachedTransaction.timestampMs} />
+                  <RelativeTime
+                    timestampMs={
+                      data.summary.latestCachedTransaction.timestampMs
+                    }
+                  />
                   {` - Block #${data.summary.latestCachedTransaction.blockNumber}`}
                 </span>
               ) : (
-                "No cached transaction snapshot yet"
+                'No cached transaction snapshot yet'
               )
             }
           />
           <SummaryCard
             label="Validation Status"
-            value={<span className={validationToneClassName}>{actionState?.label ?? "Not checked"}</span>}
+            value={
+              <span className={validationToneClassName}>
+                {actionState?.label ?? 'Not checked'}
+              </span>
+            }
             note="Run validation against the active provider"
           />
         </section>
@@ -339,7 +396,9 @@ export default function EvmCacheSettingsPage() {
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-lg font-semibold text-slate-900">Cached Transactions</p>
+              <p className="text-lg font-semibold text-slate-900">
+                Cached Transactions
+              </p>
               <p className="mt-1 text-sm text-slate-500">
                 Browse paged cached transactions captured from recent scans.
               </p>
@@ -383,13 +442,21 @@ export default function EvmCacheSettingsPage() {
                 {data.cachedTransactions.transactions.length ? (
                   data.cachedTransactions.transactions.map((transaction) => {
                     return (
-                      <tr key={transaction.hash} className="border-t border-slate-200">
+                      <tr
+                        key={transaction.hash}
+                        className="border-t border-slate-200"
+                      >
                         <td className="px-5 py-3 text-sm">
                           <div className="flex items-center gap-3">
-                            <TransactionPreviewButton transaction={transaction} methodLabel={transaction.methodLabel} />
+                            <TransactionPreviewButton
+                              transaction={transaction}
+                              methodLabel={transaction.methodLabel}
+                            />
                             <div className="flex flex-col gap-0.5">
                               <TransactionHashCell {...transaction} />
-                              <span className="text-xs text-slate-400">Block #{transaction.blockNumber}</span>
+                              <span className="text-xs text-slate-400">
+                                Block #{transaction.blockNumber}
+                              </span>
                             </div>
                           </div>
                         </td>
@@ -397,7 +464,10 @@ export default function EvmCacheSettingsPage() {
                           <AddressLink
                             address={transaction.from}
                             href={`/evm/address/${transaction.from}`}
-                            label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
+                            label={
+                              nameTagsByAddress[transaction.from] ??
+                              transaction.fromLabel
+                            }
                             className="font-medium text-sky-600 hover:text-sky-700"
                           />
                         </td>
@@ -406,24 +476,33 @@ export default function EvmCacheSettingsPage() {
                             <AddressLink
                               address={transaction.to}
                               href={`/evm/address/${transaction.to}`}
-                              label={resolvePreferredToAddressLabel(transaction.to, {
-                                nameTagsByAddress,
-                                fallbackLabel: transaction.toLabel,
-                              })}
+                              label={resolvePreferredToAddressLabel(
+                                transaction.to,
+                                {
+                                  nameTagsByAddress,
+                                  fallbackLabel: transaction.toLabel,
+                                },
+                              )}
                               className="font-medium text-sky-600 hover:text-sky-700"
                             />
                           ) : (
-                            <span className="text-slate-500">{transaction.toLabel}</span>
+                            <span className="text-slate-500">
+                              {transaction.toLabel}
+                            </span>
                           )}
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-700">
                           <div className="flex flex-col gap-0.5">
                             <span>{transaction.methodLabel}</span>
-                            <span className="text-xs text-slate-400">{transaction.amountLabel}</span>
+                            <span className="text-xs text-slate-400">
+                              {transaction.amountLabel}
+                            </span>
                           </div>
                         </td>
                         <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                          {transaction.feeLabel ?? <span className="text-slate-400">--</span>}
+                          {transaction.feeLabel ?? (
+                            <span className="text-slate-400">--</span>
+                          )}
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-700">
                           <RelativeTime timestampMs={transaction.timestampMs} />
@@ -433,7 +512,10 @@ export default function EvmCacheSettingsPage() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-5 py-6 text-sm text-slate-500" colSpan={6}>
+                    <td
+                      className="px-5 py-6 text-sm text-slate-500"
+                      colSpan={6}
+                    >
                       No cached transactions are available yet.
                     </td>
                   </tr>
@@ -446,9 +528,12 @@ export default function EvmCacheSettingsPage() {
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-lg font-semibold text-slate-900">Observed Accounts</p>
+              <p className="text-lg font-semibold text-slate-900">
+                Observed Accounts
+              </p>
               <p className="mt-1 text-sm text-slate-500">
-                Browse paged locally observed accounts under the current provider cache.
+                Browse paged locally observed accounts under the current
+                provider cache.
               </p>
             </div>
             <PaginationControls
@@ -478,31 +563,44 @@ export default function EvmCacheSettingsPage() {
               <tbody>
                 {data.observedAccounts.accounts.length ? (
                   data.observedAccounts.accounts.map((account) => (
-                    <tr key={account.address} className="border-t border-slate-200">
+                    <tr
+                      key={account.address}
+                      className="border-t border-slate-200"
+                    >
                       <td className="px-5 py-3 text-sm">
                         <AddressLink
                           address={account.address}
                           href={`/evm/address/${account.address}`}
-                          label={nameTagsByAddress[account.address] ?? account.addressLabel}
+                          label={
+                            nameTagsByAddress[account.address] ??
+                            account.addressLabel
+                          }
                           className="font-medium text-sky-600 hover:text-sky-700"
                         />
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
-                        {account.totalTxCount.toLocaleString("en-US")}
+                        {account.totalTxCount.toLocaleString('en-US')}
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">
                         <div className="flex flex-col gap-0.5">
                           <span>
-                            <RelativeTime timestampMs={account.lastSeenTimestampMs} />
+                            <RelativeTime
+                              timestampMs={account.lastSeenTimestampMs}
+                            />
                           </span>
-                          <span className="text-xs text-slate-400">Block #{account.lastSeenBlockNumber}</span>
+                          <span className="text-xs text-slate-400">
+                            Block #{account.lastSeenBlockNumber}
+                          </span>
                         </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td className="px-5 py-6 text-sm text-slate-500" colSpan={3}>
+                    <td
+                      className="px-5 py-6 text-sm text-slate-500"
+                      colSpan={3}
+                    >
                       No observed accounts are cached yet.
                     </td>
                   </tr>

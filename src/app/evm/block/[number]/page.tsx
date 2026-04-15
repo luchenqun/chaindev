@@ -1,37 +1,54 @@
-"use client";
+'use client';
 
-import JsonView from "@uiw/react-json-view";
-import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import JsonView from '@uiw/react-json-view';
+import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import {
   IconChevronLeft,
   IconChevronRight,
   IconLanguage,
   IconMinus,
   IconPlus,
-} from "@tabler/icons-react";
-import { DetailPageSkeleton } from "@/components/ui/loading-placeholders";
-import { RelativeTime } from "@/components/relative-time";
+} from '@tabler/icons-react';
+import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
+import { RelativeTime } from '@/components/relative-time';
 import {
   getEvmAddressTags,
   subscribeEvmAddressTags,
-} from "@/domains/evm/client/address-tags";
-import { resolvePreferredToAddressLabel } from "@/domains/evm/client/address-display";
-import { subscribeEvmContractRegistry } from "@/domains/evm/client/contract-registry";
-import { resolveEvmTransactionMethodLabel } from "@/domains/evm/client/transaction-decoder";
-import { AddressLink } from "@/domains/evm/ui/address-link";
+} from '@/domains/evm/client/address-tags';
+import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
+import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
+import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
+import { AddressLink } from '@/domains/evm/ui/address-link';
+import { getEvmBlockByNumberDirect } from '@/domains/evm/client/queries';
+import { AppShell } from '@/platform/layout/app-shell';
 import {
-  getEvmBlockByNumberDirect,
-} from "@/domains/evm/client/queries";
-import { AppShell } from "@/platform/layout/app-shell";
-import { TransactionHashCell, TransactionPreviewButton } from "@/domains/evm/ui/transaction-list-cells";
+  TransactionHashCell,
+  TransactionPreviewButton,
+} from '@/domains/evm/ui/transaction-list-cells';
 
-function DetailRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+}) {
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
       <dt className="text-sm font-medium text-slate-500">{label}</dt>
-      <dd className={mono ? "self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono" : "self-start text-sm text-slate-900"}>{value}</dd>
+      <dd
+        className={
+          mono
+            ? 'self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono'
+            : 'self-start text-sm text-slate-900'
+        }
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -42,18 +59,26 @@ function DetailRowWithAction({
   action,
   mono = false,
 }: {
-      label: string;
-      value: React.ReactNode;
-      action: React.ReactNode;
-      mono?: boolean;
-    }) {
+  label: string;
+  value: React.ReactNode;
+  action: React.ReactNode;
+  mono?: boolean;
+}) {
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
       <dt className="flex items-center gap-0.5 text-sm font-medium text-slate-500">
         <span>{label}</span>
         {action}
       </dt>
-      <dd className={mono ? "self-start break-all whitespace-pre-wrap text-left text-sm text-slate-900 mono" : "self-start text-left text-sm text-slate-900"}>{value}</dd>
+      <dd
+        className={
+          mono
+            ? 'self-start break-all whitespace-pre-wrap text-left text-sm text-slate-900 mono'
+            : 'self-start text-left text-sm text-slate-900'
+        }
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -98,38 +123,54 @@ function DetailRowBlockHeight({
   );
 }
 
-function DetailGroup({ children, separated = false }: { children: React.ReactNode; separated?: boolean }) {
-  return <div className={separated ? "border-t border-slate-200 pt-2.5 pb-2.5 last:pb-0" : "pb-2.5 last:pb-0"}>{children}</div>;
+function DetailGroup({
+  children,
+  separated = false,
+}: {
+  children: React.ReactNode;
+  separated?: boolean;
+}) {
+  return (
+    <div
+      className={
+        separated
+          ? 'border-t border-slate-200 pt-2.5 pb-2.5 last:pb-0'
+          : 'pb-2.5 last:pb-0'
+      }
+    >
+      {children}
+    </div>
+  );
 }
 
 function decodeHexToAscii(value: string) {
-  if (!value.startsWith("0x")) {
+  if (!value.startsWith('0x')) {
     return value;
   }
 
   const hex = value.slice(2);
 
   if (!hex || hex.length % 2 !== 0) {
-    return "ASCII unavailable";
+    return 'ASCII unavailable';
   }
 
-  let output = "";
+  let output = '';
 
   for (let index = 0; index < hex.length; index += 2) {
     const byte = Number.parseInt(hex.slice(index, index + 2), 16);
 
     if (Number.isNaN(byte)) {
-      return "ASCII unavailable";
+      return 'ASCII unavailable';
     }
 
     if (byte === 0) {
       continue;
     }
 
-    output += byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : ".";
+    output += byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.';
   }
 
-  return output || "ASCII unavailable";
+  return output || 'ASCII unavailable';
 }
 
 export default function EvmBlockDetailPage() {
@@ -137,21 +178,28 @@ export default function EvmBlockDetailPage() {
   const params = useParams<{ number: string }>();
   const number = params.number;
   const isValid = useMemo(() => /^\d+$/.test(number), [number]);
-  const [block, setBlock] = useState<Awaited<ReturnType<typeof getEvmBlockByNumberDirect>> | null>(null);
+  const [block, setBlock] = useState<Awaited<
+    ReturnType<typeof getEvmBlockByNumberDirect>
+  > | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "transactions" | "json">("overview");
-  const [extraDataView, setExtraDataView] = useState<"hex" | "ascii">("hex");
-  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const [activeTab, setActiveTab] = useState<
+    'overview' | 'transactions' | 'json'
+  >('overview');
+  const [extraDataView, setExtraDataView] = useState<'hex' | 'ascii'>('hex');
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<
+    Record<string, string | null>
+  >({});
   const [decodeVersion, setDecodeVersion] = useState(0);
   const visibleAddresses = useMemo(
-    () =>
-      [...new Set(
+    () => [
+      ...new Set(
         block?.transactions.flatMap((transaction) => [
           transaction.from,
           ...(transaction.to ? [transaction.to] : []),
         ]) ?? [],
-      )],
+      ),
+    ],
     [block],
   );
   const decodedMethodLabelByHash = useMemo(() => {
@@ -187,17 +235,21 @@ export default function EvmBlockDetailPage() {
       } catch (error) {
         if (!cancelled) {
           setBlock(null);
-          setErrorMessage(error instanceof Error ? error.message : "Failed to load block detail.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load block detail.',
+          );
         }
       }
     }
 
     void load();
-    window.addEventListener("chaindev:active-rpc-profile-changed", load);
+    window.addEventListener('chaindev:active-rpc-profile-changed', load);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("chaindev:active-rpc-profile-changed", load);
+      window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
   }, [isValid, number]);
 
@@ -210,11 +262,17 @@ export default function EvmBlockDetailPage() {
       setDecodeVersion((current) => current + 1);
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, []);
 
@@ -233,11 +291,17 @@ export default function EvmBlockDetailPage() {
       loadVisibleTags();
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, [visibleAddresses]);
 
@@ -276,7 +340,8 @@ export default function EvmBlockDetailPage() {
   const decodedExtraData = decodeHexToAscii(block.extraData);
   const hasTransactions = block.transactions.length > 0;
   const currentBlock = block;
-  const resolvedActiveTab = activeTab === "transactions" && !hasTransactions ? "overview" : activeTab;
+  const resolvedActiveTab =
+    activeTab === 'transactions' && !hasTransactions ? 'overview' : activeTab;
   void currentBlock;
 
   return (
@@ -284,8 +349,12 @@ export default function EvmBlockDetailPage() {
       <main className="section-block">
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[1.171875rem] font-semibold text-slate-900">Block</h1>
-            <span className="text-sm font-medium text-slate-500">#{block.height}</span>
+            <h1 className="text-[1.171875rem] font-semibold text-slate-900">
+              Block
+            </h1>
+            <span className="text-sm font-medium text-slate-500">
+              #{block.height}
+            </span>
           </div>
         </div>
 
@@ -293,9 +362,11 @@ export default function EvmBlockDetailPage() {
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-              resolvedActiveTab === "overview" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-500"
+              resolvedActiveTab === 'overview'
+                ? 'bg-sky-600 text-white'
+                : 'bg-slate-100 text-slate-500'
             }`}
-            onClick={() => setActiveTab("overview")}
+            onClick={() => setActiveTab('overview')}
           >
             Overview
           </button>
@@ -303,33 +374,37 @@ export default function EvmBlockDetailPage() {
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
               !hasTransactions
-                ? "cursor-not-allowed bg-slate-100 text-slate-300"
-                : resolvedActiveTab === "transactions"
-                  ? "bg-sky-600 text-white"
-                  : "bg-slate-100 text-slate-500"
+                ? 'cursor-not-allowed bg-slate-100 text-slate-300'
+                : resolvedActiveTab === 'transactions'
+                  ? 'bg-sky-600 text-white'
+                  : 'bg-slate-100 text-slate-500'
             }`}
             onClick={() => {
               if (hasTransactions) {
-                setActiveTab("transactions");
+                setActiveTab('transactions');
               }
             }}
             disabled={!hasTransactions}
             aria-disabled={!hasTransactions}
           >
-            {hasTransactions ? `Transactions (${block.transactions.length})` : "Transactions"}
+            {hasTransactions
+              ? `Transactions (${block.transactions.length})`
+              : 'Transactions'}
           </button>
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-              resolvedActiveTab === "json" ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-500"
+              resolvedActiveTab === 'json'
+                ? 'bg-sky-600 text-white'
+                : 'bg-slate-100 text-slate-500'
             }`}
-            onClick={() => setActiveTab("json")}
+            onClick={() => setActiveTab('json')}
           >
             JSON
           </button>
         </div>
 
-        {resolvedActiveTab === "overview" ? (
+        {resolvedActiveTab === 'overview' ? (
           <>
             <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="p-5">
@@ -344,15 +419,28 @@ export default function EvmBlockDetailPage() {
                           router.push(`/evm/block/${previousBlockNumber}`);
                         }
                       }}
-                      onOpenNext={() => router.push(`/evm/block/${Number(block.height) + 1}`)}
+                      onOpenNext={() =>
+                        router.push(`/evm/block/${Number(block.height) + 1}`)
+                      }
                     />
-                    <DetailRow label="Status" value={<span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Confirmed</span>} />
+                    <DetailRow
+                      label="Status"
+                      value={
+                        <span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                          Confirmed
+                        </span>
+                      }
+                    />
                     <DetailRow
                       label="Timestamp"
                       value={
                         <span className="inline-flex flex-wrap items-center gap-2">
-                          <span><RelativeTime timestampMs={block.timestamp} /></span>
-                          <span className="text-slate-500">({block.timestampLabel})</span>
+                          <span>
+                            <RelativeTime timestampMs={block.timestamp} />
+                          </span>
+                          <span className="text-slate-500">
+                            ({block.timestampLabel})
+                          </span>
                         </span>
                       }
                     />
@@ -363,7 +451,7 @@ export default function EvmBlockDetailPage() {
                           <button
                             type="button"
                             className="font-medium text-sky-600 transition hover:text-sky-700"
-                            onClick={() => setActiveTab("transactions")}
+                            onClick={() => setActiveTab('transactions')}
                           >
                             {block.txCount} transactions
                           </button>
@@ -384,19 +472,48 @@ export default function EvmBlockDetailPage() {
                         />
                       }
                     />
-                    <DetailRow label="Withdrawals" value={block.withdrawalsCount ? `${block.withdrawalsCount} withdrawals` : "0 withdrawals"} />
+                    <DetailRow
+                      label="Withdrawals"
+                      value={
+                        block.withdrawalsCount
+                          ? `${block.withdrawalsCount} withdrawals`
+                          : '0 withdrawals'
+                      }
+                    />
                   </dl>
                 </DetailGroup>
 
                 <DetailGroup separated>
                   <dl>
                     <DetailRow label="Block Size" value={block.sizeLabel} />
-                    <DetailRow label="Gas Used" value={<span>{block.gasUsedLabel} <span className="text-slate-500">({block.gasUsedPercent})</span></span>} />
+                    <DetailRow
+                      label="Gas Used"
+                      value={
+                        <span>
+                          {block.gasUsedLabel}{' '}
+                          <span className="text-slate-500">
+                            ({block.gasUsedPercent})
+                          </span>
+                        </span>
+                      }
+                    />
                     <DetailRow label="Gas Limit" value={block.gasLimitLabel} />
-                    <DetailRow label="Base Fee Per Gas" value={block.baseFeeLabel} />
-                    <DetailRow label="Difficulty" value={block.difficultyLabel} />
-                    <DetailRow label="Total Difficulty" value={block.totalDifficultyLabel} />
-                    <DetailRow label="Blob Gas Used" value={block.blobGasUsedLabel} />
+                    <DetailRow
+                      label="Base Fee Per Gas"
+                      value={block.baseFeeLabel}
+                    />
+                    <DetailRow
+                      label="Difficulty"
+                      value={block.difficultyLabel}
+                    />
+                    <DetailRow
+                      label="Total Difficulty"
+                      value={block.totalDifficultyLabel}
+                    />
+                    <DetailRow
+                      label="Blob Gas Used"
+                      value={block.blobGasUsedLabel}
+                    />
                   </dl>
                 </DetailGroup>
 
@@ -408,15 +525,29 @@ export default function EvmBlockDetailPage() {
                         <button
                           type="button"
                           className="inline-flex size-4 shrink-0 items-center justify-center text-slate-400 transition hover:text-slate-700"
-                          onClick={() => setExtraDataView((current) => (current === "hex" ? "ascii" : "hex"))}
-                          aria-label={extraDataView === "hex" ? "Convert extra data to ASCII" : "Show extra data as hex"}
-                          title={extraDataView === "hex" ? "Hex to ASCII" : "Show Hex"}
+                          onClick={() =>
+                            setExtraDataView((current) =>
+                              current === 'hex' ? 'ascii' : 'hex',
+                            )
+                          }
+                          aria-label={
+                            extraDataView === 'hex'
+                              ? 'Convert extra data to ASCII'
+                              : 'Show extra data as hex'
+                          }
+                          title={
+                            extraDataView === 'hex'
+                              ? 'Hex to ASCII'
+                              : 'Show Hex'
+                          }
                         >
                           <IconLanguage className="size-3.5" stroke={1.8} />
                         </button>
                       }
                       value={
-                        extraDataView === "hex" ? block.extraData : decodedExtraData
+                        extraDataView === 'hex'
+                          ? block.extraData
+                          : decodedExtraData
                       }
                       mono
                     />
@@ -429,7 +560,9 @@ export default function EvmBlockDetailPage() {
               <div className="p-5">
                 {!showMoreDetails ? (
                   <div className="grid gap-1 md:grid-cols-[180px_minmax(0,1fr)] md:gap-4">
-                    <dt className="text-sm font-medium text-slate-500">More Details</dt>
+                    <dt className="text-sm font-medium text-slate-500">
+                      More Details
+                    </dt>
                     <dd>
                       <button
                         type="button"
@@ -449,7 +582,10 @@ export default function EvmBlockDetailPage() {
                         label="Parent Hash"
                         value={
                           canOpenPrevious ? (
-                            <Link className="text-sky-600 hover:text-sky-700 mono" href={`/evm/block/${previousBlockNumber}`}>
+                            <Link
+                              className="text-sky-600 hover:text-sky-700 mono"
+                              href={`/evm/block/${previousBlockNumber}`}
+                            >
                               {block.parentHash}
                             </Link>
                           ) : (
@@ -458,17 +594,39 @@ export default function EvmBlockDetailPage() {
                         }
                         mono
                       />
-                      <DetailRow label="State Root" value={block.stateRoot} mono />
-                      <DetailRow label="Transactions Root" value={block.transactionsRoot} mono />
-                      <DetailRow label="Receipts Root" value={block.receiptsRoot} mono />
-                      <DetailRow label="Withdrawals Root" value={block.withdrawalsRoot} mono />
+                      <DetailRow
+                        label="State Root"
+                        value={block.stateRoot}
+                        mono
+                      />
+                      <DetailRow
+                        label="Transactions Root"
+                        value={block.transactionsRoot}
+                        mono
+                      />
+                      <DetailRow
+                        label="Receipts Root"
+                        value={block.receiptsRoot}
+                        mono
+                      />
+                      <DetailRow
+                        label="Withdrawals Root"
+                        value={block.withdrawalsRoot}
+                        mono
+                      />
                       <DetailRow label="Nonce" value={block.nonce} mono />
-                      <DetailRow label="SHA3 Uncles" value={block.sha3Uncles} mono />
+                      <DetailRow
+                        label="SHA3 Uncles"
+                        value={block.sha3Uncles}
+                        mono
+                      />
                     </dl>
 
                     <div className="mt-4 border-t border-slate-200 pt-4">
                       <div className="grid gap-1 md:grid-cols-[180px_minmax(0,1fr)] md:gap-4">
-                        <dt className="text-sm font-medium text-slate-500">More Details</dt>
+                        <dt className="text-sm font-medium text-slate-500">
+                          More Details
+                        </dt>
                         <dd>
                           <button
                             type="button"
@@ -486,35 +644,61 @@ export default function EvmBlockDetailPage() {
               </div>
             </section>
           </>
-        ) : resolvedActiveTab === "transactions" ? (
+        ) : resolvedActiveTab === 'transactions' ? (
           <div className="p-5">
             <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-                <p className="text-base font-semibold text-slate-900">A total of {block.transactions.length} transactions found</p>
+                <p className="text-base font-semibold text-slate-900">
+                  A total of {block.transactions.length} transactions found
+                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Transaction Hash</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">To</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Fee</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Transaction Hash
+                      </th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Method
+                      </th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Block
+                      </th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Age
+                      </th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        From
+                      </th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        To
+                      </th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Amount
+                      </th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Txn Fee
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {block.transactions.map((transaction) => {
-                      const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
+                      const decodedMethodLabel =
+                        decodedMethodLabelByHash[transaction.hash] ??
+                        transaction.methodLabel;
 
                       return (
-                        <tr key={transaction.hash} className="border-t border-slate-200">
+                        <tr
+                          key={transaction.hash}
+                          className="border-t border-slate-200"
+                        >
                           <td className="px-5 py-3 text-sm">
                             <div className="flex items-center gap-3">
-                              <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
+                              <TransactionPreviewButton
+                                transaction={transaction}
+                                methodLabel={decodedMethodLabel}
+                              />
                               <TransactionHashCell {...transaction} />
                             </div>
                           </td>
@@ -524,18 +708,26 @@ export default function EvmBlockDetailPage() {
                             </span>
                           </td>
                           <td className="px-5 py-3 text-sm tabular-nums">
-                            <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
+                            <Link
+                              className="font-medium text-sky-600 hover:text-sky-700"
+                              href={`/evm/block/${transaction.blockNumber}`}
+                            >
                               {transaction.blockNumber}
                             </Link>
                           </td>
                           <td className="px-5 py-3 text-sm text-slate-700">
-                            <RelativeTime timestampMs={transaction.timestampMs} />
+                            <RelativeTime
+                              timestampMs={transaction.timestampMs}
+                            />
                           </td>
                           <td className="px-5 py-3 text-sm">
                             <AddressLink
                               address={transaction.from}
                               href={`/evm/address/${transaction.from}`}
-                              label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
+                              label={
+                                nameTagsByAddress[transaction.from] ??
+                                transaction.fromLabel
+                              }
                               className="font-medium text-sky-600 hover:text-sky-700"
                             />
                           </td>
@@ -544,19 +736,28 @@ export default function EvmBlockDetailPage() {
                               <AddressLink
                                 address={transaction.to}
                                 href={`/evm/address/${transaction.to}`}
-                                label={resolvePreferredToAddressLabel(transaction.to, {
-                                  nameTagsByAddress,
-                                  fallbackLabel: transaction.toLabel,
-                                })}
+                                label={resolvePreferredToAddressLabel(
+                                  transaction.to,
+                                  {
+                                    nameTagsByAddress,
+                                    fallbackLabel: transaction.toLabel,
+                                  },
+                                )}
                                 className="font-medium text-sky-600 hover:text-sky-700"
                               />
                             ) : (
-                              <span className="text-slate-500">{transaction.toLabel}</span>
+                              <span className="text-slate-500">
+                                {transaction.toLabel}
+                              </span>
                             )}
                           </td>
-                          <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.valueLabel}</td>
+                          <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
+                            {transaction.valueLabel}
+                          </td>
                           <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                            {transaction.feeLabel ?? <span className="text-slate-400">--</span>}
+                            {transaction.feeLabel ?? (
+                              <span className="text-slate-400">--</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -576,27 +777,29 @@ export default function EvmBlockDetailPage() {
               enableClipboard={false}
               displayDataTypes={false}
               displayObjectSize={false}
-              style={{
-                "--w-rjv-background-color": "transparent",
-                "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
-                "--w-rjv-font-family":
-                  '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-                "--w-rjv-color": "#0f172a",
-                "--w-rjv-arrow-color": "#64748b",
-                "--w-rjv-line-color": "rgba(148, 163, 184, 0.24)",
-                "--w-rjv-curlybraces-color": "#475569",
-                "--w-rjv-brackets-color": "#475569",
-                "--w-rjv-colon-color": "#94a3b8",
-                "--w-rjv-key-string": "#0369a1",
-                "--w-rjv-key-number": "#0369a1",
-                "--w-rjv-type-string-color": "#b45309",
-                "--w-rjv-type-int-color": "#7c3aed",
-                "--w-rjv-type-float-color": "#7c3aed",
-                "--w-rjv-type-bigint-color": "#7c3aed",
-                "--w-rjv-type-boolean-color": "#15803d",
-                "--w-rjv-type-null-color": "#b91c1c",
-                "--w-rjv-type-undefined-color": "#b91c1c",
-              } as React.CSSProperties}
+              style={
+                {
+                  '--w-rjv-background-color': 'transparent',
+                  '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
+                  '--w-rjv-font-family':
+                    '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                  '--w-rjv-color': '#0f172a',
+                  '--w-rjv-arrow-color': '#64748b',
+                  '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
+                  '--w-rjv-curlybraces-color': '#475569',
+                  '--w-rjv-brackets-color': '#475569',
+                  '--w-rjv-colon-color': '#94a3b8',
+                  '--w-rjv-key-string': '#0369a1',
+                  '--w-rjv-key-number': '#0369a1',
+                  '--w-rjv-type-string-color': '#b45309',
+                  '--w-rjv-type-int-color': '#7c3aed',
+                  '--w-rjv-type-float-color': '#7c3aed',
+                  '--w-rjv-type-bigint-color': '#7c3aed',
+                  '--w-rjv-type-boolean-color': '#15803d',
+                  '--w-rjv-type-null-color': '#b91c1c',
+                  '--w-rjv-type-undefined-color': '#b91c1c',
+                } as React.CSSProperties
+              }
             />
           </section>
         )}

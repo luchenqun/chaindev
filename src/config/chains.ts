@@ -1,3 +1,3 @@
-export type PlatformMode = "evm" | "cosmos";
+export type PlatformMode = 'evm' | 'cosmos';
 
-export const platformModes = ["evm", "cosmos"] as const;
+export const platformModes = ['evm', 'cosmos'] as const;

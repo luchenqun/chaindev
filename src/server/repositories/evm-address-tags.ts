@@ -1,8 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
-import { isAddress } from "viem";
-import { db } from "@/db/client";
-import { evmAddressTags } from "@/db/schema/workbench";
-import type { ImportedEvmAddressTag } from "@/server/schemas/workbench-migration";
+import { and, desc, eq } from 'drizzle-orm';
+import { isAddress } from 'viem';
+import { db } from '@/db/client';
+import { evmAddressTags } from '@/db/schema/workbench';
+import type { ImportedEvmAddressTag } from '@/server/schemas/workbench-migration';
 
 function getScopedImportId(userId: string, localId: string) {
   return `${userId}:${localId}`;
@@ -10,7 +10,7 @@ function getScopedImportId(userId: string, localId: string) {
 
 function normalizeAddress(address: string) {
   if (!isAddress(address)) {
-    throw new Error("Invalid EVM address.");
+    throw new Error('Invalid EVM address.');
   }
 
   return address.toLowerCase();
@@ -35,10 +35,13 @@ export async function upsertServerEvmAddressTag(input: {
   const trimmedNameTag = input.nameTag.trim();
 
   if (!trimmedNameTag) {
-    throw new Error("Name tag is required.");
+    throw new Error('Name tag is required.');
   }
 
-  const id = getScopedImportId(input.userId, `${input.providerProfileId}:${normalizedAddressLower}`);
+  const id = getScopedImportId(
+    input.userId,
+    `${input.providerProfileId}:${normalizedAddressLower}`,
+  );
   const existing = await db.query.evmAddressTags.findFirst({
     where: eq(evmAddressTags.id, id),
   });
@@ -77,8 +80,7 @@ export async function deleteServerEvmAddressTag(input: {
 }) {
   const normalizedAddressLower = normalizeAddress(input.address);
 
-  db
-    .delete(evmAddressTags)
+  db.delete(evmAddressTags)
     .where(
       and(
         eq(evmAddressTags.userId, input.userId),
@@ -94,18 +96,29 @@ export async function deleteServerEvmAddressTag(input: {
   };
 }
 
-export async function clearServerEvmAddressTags(userId: string, providerProfileId: string) {
-  db
-    .delete(evmAddressTags)
-    .where(and(eq(evmAddressTags.userId, userId), eq(evmAddressTags.providerProfileId, providerProfileId)))
+export async function clearServerEvmAddressTags(
+  userId: string,
+  providerProfileId: string,
+) {
+  db.delete(evmAddressTags)
+    .where(
+      and(
+        eq(evmAddressTags.userId, userId),
+        eq(evmAddressTags.providerProfileId, providerProfileId),
+      ),
+    )
     .run();
 
   return { providerProfileId };
 }
 
-export async function importServerEvmAddressTags(userId: string, tags: ImportedEvmAddressTag[]) {
+export async function importServerEvmAddressTags(
+  userId: string,
+  tags: ImportedEvmAddressTag[],
+) {
   for (const tag of tags) {
-    const normalizedAddressLower = tag.addressLower?.toLowerCase() ?? normalizeAddress(tag.address);
+    const normalizedAddressLower =
+      tag.addressLower?.toLowerCase() ?? normalizeAddress(tag.address);
     const scopedId = getScopedImportId(
       userId,
       `${tag.providerProfileId}:${normalizedAddressLower}`,

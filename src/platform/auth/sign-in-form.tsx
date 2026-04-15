@@ -1,20 +1,23 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
-import { signIn } from "next-auth/react";
-import { IconEye, IconEyeOff } from "@tabler/icons-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { AuthFormShell } from "@/platform/auth/auth-form-shell";
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { signIn } from 'next-auth/react';
+import { IconEye, IconEyeOff } from '@tabler/icons-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AuthFormShell } from '@/platform/auth/auth-form-shell';
 
 export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = useMemo(() => searchParams.get("callbackUrl") ?? "/", [searchParams]);
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  const callbackUrl = useMemo(
+    () => searchParams.get('callbackUrl') ?? '/',
+    [searchParams],
+  );
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -24,7 +27,7 @@ export function SignInForm() {
     setSubmitting(true);
     setError(null);
 
-    const result = await signIn("credentials", {
+    const result = await signIn('credentials', {
       identifier: identifier.trim(),
       password,
       redirect: false,
@@ -33,7 +36,7 @@ export function SignInForm() {
 
     if (!result || result.error) {
       setSubmitting(false);
-      setError("用户名、邮箱或密码错误。");
+      setError('用户名、邮箱或密码错误。');
       return;
     }
 
@@ -47,7 +50,10 @@ export function SignInForm() {
       subtitle={
         <>
           没有账号？
-          <Link href="/signup" className="ml-2 font-medium text-sky-600 hover:text-sky-700">
+          <Link
+            href="/signup"
+            className="ml-2 font-medium text-sky-600 hover:text-sky-700"
+          >
             Sign Up
           </Link>
         </>
@@ -55,7 +61,9 @@ export function SignInForm() {
     >
       <form className="grid gap-7" onSubmit={handleSubmit}>
         <label className="grid gap-3">
-          <span className="text-[15px] font-semibold text-slate-900">Username or Email</span>
+          <span className="text-[15px] font-semibold text-slate-900">
+            Username or Email
+          </span>
           <Input
             type="text"
             autoComplete="username"
@@ -69,11 +77,13 @@ export function SignInForm() {
 
         <label className="grid gap-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[15px] font-semibold text-slate-900">Password</span>
+            <span className="text-[15px] font-semibold text-slate-900">
+              Password
+            </span>
           </div>
           <div className="relative">
             <Input
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -83,11 +93,15 @@ export function SignInForm() {
             />
             <button
               type="button"
-              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
               onClick={() => setShowPassword((current) => !current)}
             >
-              {showPassword ? <IconEyeOff className="size-6" stroke={1.8} /> : <IconEye className="size-6" stroke={1.8} />}
+              {showPassword ? (
+                <IconEyeOff className="size-6" stroke={1.8} />
+              ) : (
+                <IconEye className="size-6" stroke={1.8} />
+              )}
             </button>
           </div>
         </label>
@@ -98,8 +112,12 @@ export function SignInForm() {
           </div>
         ) : null}
 
-        <Button type="submit" className="h-16 rounded-2xl text-[18px] font-semibold uppercase" disabled={submitting}>
-          {submitting ? "Signing In..." : "Login"}
+        <Button
+          type="submit"
+          className="h-16 rounded-2xl text-[18px] font-semibold uppercase"
+          disabled={submitting}
+        >
+          {submitting ? 'Signing In...' : 'Login'}
         </Button>
       </form>
     </AuthFormShell>

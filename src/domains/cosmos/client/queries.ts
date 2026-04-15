@@ -1,17 +1,20 @@
-"use client";
+'use client';
 
-import { formatCosmosBlock, formatCosmosTx } from "@/domains/cosmos/server/formatters";
-import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
+import {
+  formatCosmosBlock,
+  formatCosmosTx,
+} from '@/domains/cosmos/server/formatters';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 function getActiveCosmosProvider() {
-  const profile = readActiveRpcProfileCookie("cosmos");
+  const profile = readActiveRpcProfileCookie('cosmos');
 
   if (!profile) {
-    throw new Error("No active Cosmos provider selected.");
+    throw new Error('No active Cosmos provider selected.');
   }
 
   if (!profile.restUrl) {
-    throw new Error("The selected Cosmos provider is missing a REST URL.");
+    throw new Error('The selected Cosmos provider is missing a REST URL.');
   }
 
   return profile;
@@ -19,7 +22,7 @@ function getActiveCosmosProvider() {
 
 async function fetchJson<T>(url: string, init?: RequestInit) {
   const response = await fetch(url, {
-    cache: "no-store",
+    cache: 'no-store',
     ...init,
   });
 
@@ -32,7 +35,7 @@ async function fetchJson<T>(url: string, init?: RequestInit) {
 
 function formatLocalTimestamp(value: string | undefined) {
   if (!value) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
   const timestamp = new Date(value);
@@ -41,21 +44,28 @@ function formatLocalTimestamp(value: string | undefined) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
     hour12: false,
   }).format(timestamp);
 }
 
-function normalizeBaseAccount(account: unknown): { sequence: number; accountNumber: number } {
-  if (!account || typeof account !== "object") {
+function normalizeBaseAccount(account: unknown): {
+  sequence: number;
+  accountNumber: number;
+} {
+  if (!account || typeof account !== 'object') {
     return { sequence: 0, accountNumber: 0 };
   }
 
-  if ("base_account" in account && account.base_account && typeof account.base_account === "object") {
+  if (
+    'base_account' in account &&
+    account.base_account &&
+    typeof account.base_account === 'object'
+  ) {
     return normalizeBaseAccount(account.base_account);
   }
 
@@ -78,9 +88,12 @@ export async function getCosmosOverviewDirect() {
 
   return {
     chainLabel: profile.name,
-    latestHeight: payload.result?.sync_info?.latest_block_height ?? "Unavailable",
-    latestBlockTime: formatLocalTimestamp(payload.result?.sync_info?.latest_block_time),
-    chainId: payload.result?.node_info?.network ?? "Unavailable",
+    latestHeight:
+      payload.result?.sync_info?.latest_block_height ?? 'Unavailable',
+    latestBlockTime: formatLocalTimestamp(
+      payload.result?.sync_info?.latest_block_time,
+    ),
+    chainId: payload.result?.node_info?.network ?? 'Unavailable',
   };
 }
 
@@ -89,7 +102,9 @@ export async function getRecentCosmosBlocksDirect(limit = 8) {
   const status = await fetchJson<{
     result?: { sync_info?: { latest_block_height?: string } };
   }>(`${profile.rpcUrl}/status`);
-  const latestHeight = Number(status.result?.sync_info?.latest_block_height ?? 0);
+  const latestHeight = Number(
+    status.result?.sync_info?.latest_block_height ?? 0,
+  );
   const blocks = [];
 
   for (let cursor = latestHeight; blocks.length < limit; cursor -= 1) {
@@ -100,7 +115,10 @@ export async function getRecentCosmosBlocksDirect(limit = 8) {
       };
     }>(`${profile.rpcUrl}/block?height=${cursor}`);
 
-    if (payload.result?.block_id?.hash && payload.result.block?.header?.height) {
+    if (
+      payload.result?.block_id?.hash &&
+      payload.result.block?.header?.height
+    ) {
       blocks.push(
         formatCosmosBlock({
           blockId: { hash: payload.result.block_id.hash },
@@ -131,8 +149,11 @@ export async function getCosmosBlockByHeightDirect(height: number) {
     };
   }>(`${profile.rpcUrl}/block?height=${height}`);
 
-  if (!payload.result?.block_id?.hash || !payload.result.block?.header?.height) {
-    throw new Error("Failed to load Cosmos block.");
+  if (
+    !payload.result?.block_id?.hash ||
+    !payload.result.block?.header?.height
+  ) {
+    throw new Error('Failed to load Cosmos block.');
   }
 
   return formatCosmosBlock({
@@ -161,7 +182,7 @@ export async function getCosmosTxByHashDirect(hash: string) {
   const tx = payload.tx_response;
 
   if (!tx?.txhash || !tx.height) {
-    throw new Error("Failed to load Cosmos transaction.");
+    throw new Error('Failed to load Cosmos transaction.');
   }
 
   return formatCosmosTx({
@@ -169,7 +190,7 @@ export async function getCosmosTxByHashDirect(hash: string) {
     height: Number(tx.height),
     code: tx.code ?? 0,
     gasUsed: Number(tx.gas_used ?? 0),
-    rawLog: tx.raw_log ?? "",
+    rawLog: tx.raw_log ?? '',
   });
 }
 
@@ -179,7 +200,9 @@ export async function getCosmosAccountSummaryDirect(address: string) {
     fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(
       `${profile.restUrl}/cosmos/bank/v1beta1/balances/${address}`,
     ),
-    fetchJson<{ account?: unknown }>(`${profile.restUrl}/cosmos/auth/v1beta1/accounts/${address}`).catch(() => ({
+    fetchJson<{ account?: unknown }>(
+      `${profile.restUrl}/cosmos/auth/v1beta1/accounts/${address}`,
+    ).catch(() => ({
       account: null,
     })),
   ]);
@@ -196,8 +219,14 @@ export async function getCosmosAccountSummaryDirect(address: string) {
 export async function getCosmosValidatorsDirect() {
   const profile = getActiveCosmosProvider();
   const payload = await fetchJson<{
-    validators?: Array<{ operator_address: string; description?: { moniker?: string }; status?: string }>;
-  }>(`${profile.restUrl}/cosmos/staking/v1beta1/validators?pagination.limit=20`);
+    validators?: Array<{
+      operator_address: string;
+      description?: { moniker?: string };
+      status?: string;
+    }>;
+  }>(
+    `${profile.restUrl}/cosmos/staking/v1beta1/validators?pagination.limit=20`,
+  );
 
   return payload.validators ?? [];
 }
@@ -205,12 +234,17 @@ export async function getCosmosValidatorsDirect() {
 export async function getCosmosProposalsDirect() {
   const profile = getActiveCosmosProvider();
   const payload = await fetchJson<{
-    proposals?: Array<{ id: string; title?: string; status?: string; metadata?: string }>;
+    proposals?: Array<{
+      id: string;
+      title?: string;
+      status?: string;
+      metadata?: string;
+    }>;
   }>(`${profile.restUrl}/cosmos/gov/v1/proposals?pagination.limit=20`);
 
   return (payload.proposals ?? []).map((proposal) => ({
     ...proposal,
-    title: proposal.title ?? proposal.metadata ?? "Untitled Proposal",
+    title: proposal.title ?? proposal.metadata ?? 'Untitled Proposal',
   }));
 }
 
@@ -222,13 +256,20 @@ export async function requestCosmosRpcDirect(input: {
 }) {
   const profile = getActiveCosmosProvider();
   const baseUrl = input.useRpc ? profile.rpcUrl : profile.restUrl;
-  const target = input.endpoint.startsWith("http") ? input.endpoint : `${baseUrl}${input.endpoint}`;
+  const target = input.endpoint.startsWith('http')
+    ? input.endpoint
+    : `${baseUrl}${input.endpoint}`;
   const response = await fetch(target, {
     method: input.method,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
     },
-    body: input.method === "GET" ? undefined : input.payload ? JSON.stringify(input.payload) : undefined,
+    body:
+      input.method === 'GET'
+        ? undefined
+        : input.payload
+          ? JSON.stringify(input.payload)
+          : undefined,
   });
   const text = await response.text();
 

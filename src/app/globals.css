@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
   --background: #f5f7fb;
@@ -168,11 +168,6 @@
 
   .mono {
     font-family:
-      "SFMono-Regular",
-      Menlo,
-      Monaco,
-      Consolas,
-      "Liberation Mono",
-      monospace;
+      'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
   }
 }

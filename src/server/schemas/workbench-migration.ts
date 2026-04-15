@@ -1,8 +1,8 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const importedRpcProfileSchema = z.object({
   id: z.string().min(1),
-  mode: z.enum(["evm", "cosmos"]),
+  mode: z.enum(['evm', 'cosmos']),
   name: z.string().trim().min(1),
   nativeCurrencySymbol: z.string().trim().min(1).nullable(),
   rpcUrl: z.string().url(),
@@ -46,5 +46,9 @@ export const importedEvmContractBindingSchema = z.object({
 
 export type ImportedRpcProfile = z.infer<typeof importedRpcProfileSchema>;
 export type ImportedEvmAddressTag = z.infer<typeof importedEvmAddressTagSchema>;
-export type ImportedEvmContractArtifact = z.infer<typeof importedEvmContractArtifactSchema>;
-export type ImportedEvmContractBinding = z.infer<typeof importedEvmContractBindingSchema>;
+export type ImportedEvmContractArtifact = z.infer<
+  typeof importedEvmContractArtifactSchema
+>;
+export type ImportedEvmContractBinding = z.infer<
+  typeof importedEvmContractBindingSchema
+>;

@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { IconCopy } from "@tabler/icons-react";
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { IconCopy } from '@tabler/icons-react';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 type AddressLinkProps = {
   address: string;
@@ -38,14 +38,14 @@ export function AddressLink({
     try {
       await navigator.clipboard.writeText(address);
     } catch {
-      const textarea = document.createElement("textarea");
+      const textarea = document.createElement('textarea');
       textarea.value = address;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "absolute";
-      textarea.style.left = "-9999px";
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
       document.body.appendChild(textarea);
       textarea.select();
-      document.execCommand("copy");
+      document.execCommand('copy');
       document.body.removeChild(textarea);
     }
 
@@ -80,8 +80,8 @@ export function AddressLink({
           </button>
           <span
             className={cn(
-              "pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition-opacity",
-              copied ? "opacity-100" : "",
+              'pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition-opacity',
+              copied ? 'opacity-100' : '',
             )}
           >
             <span className="block whitespace-nowrap">Copied!</span>

@@ -1,31 +1,31 @@
-"use client";
+'use client';
 
-import { IconChevronDown, IconSearch } from "@tabler/icons-react";
-import { useRouter } from "next/navigation";
-import { FormEvent, useId, useState } from "react";
-import { getMessages } from "@/i18n";
-import type { PlatformMode } from "@/config/chains";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { IconChevronDown, IconSearch } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
+import { FormEvent, useId, useState } from 'react';
+import { getMessages } from '@/i18n';
+import type { PlatformMode } from '@/config/chains';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 type GlobalSearchProps = {
   mode: PlatformMode;
   placeholder?: string;
-  variant?: "hero" | "compact" | "topbar";
+  variant?: 'hero' | 'compact' | 'topbar';
   showLabel?: boolean;
 };
 
 export function GlobalSearch({
   mode,
-  placeholder = "Search by block, tx, or address",
-  variant = "hero",
+  placeholder = 'Search by block, tx, or address',
+  variant = 'hero',
   showLabel = true,
 }: GlobalSearchProps) {
   const messages = getMessages();
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [message, setMessage] = useState("");
+  const [query, setQuery] = useState('');
+  const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const inputId = useId();
 
@@ -38,12 +38,16 @@ export function GlobalSearch({
     }
 
     setPending(true);
-    setMessage("");
+    setMessage('');
 
     try {
       const params = new URLSearchParams({ q: query, mode });
       const response = await fetch(`/api/search/resolve?${params.toString()}`);
-      const payload = (await response.json()) as { ok: boolean; target?: string; message?: string };
+      const payload = (await response.json()) as {
+        ok: boolean;
+        target?: string;
+        message?: string;
+      };
 
       if (!payload.ok || !payload.target) {
         setMessage(payload.message ?? messages.search.unsupported);
@@ -52,22 +56,33 @@ export function GlobalSearch({
 
       router.push(payload.target);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : messages.search.failed);
+      setMessage(
+        error instanceof Error ? error.message : messages.search.failed,
+      );
     } finally {
       setPending(false);
     }
   }
 
-  if (variant === "topbar") {
+  if (variant === 'topbar') {
     return (
-      <form className="flex w-full min-w-0 max-w-[400px] flex-col gap-1" onSubmit={handleSubmit}>
+      <form
+        className="flex w-full min-w-0 max-w-[400px] flex-col gap-1"
+        onSubmit={handleSubmit}
+      >
         {showLabel ? (
-          <label className="text-xs font-semibold text-slate-500" htmlFor={inputId}>
+          <label
+            className="text-xs font-semibold text-slate-500"
+            htmlFor={inputId}
+          >
             Global Search
           </label>
         ) : null}
         <div className="flex h-[34px] items-center rounded-md border border-slate-200 bg-slate-50 px-3 shadow-sm transition focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400">
-          <IconSearch className="mr-2 size-3.5 shrink-0 text-slate-400" stroke={2} />
+          <IconSearch
+            className="mr-2 size-3.5 shrink-0 text-slate-400"
+            stroke={2}
+          />
           <Input
             id={inputId}
             className="h-full border-0 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
@@ -88,11 +103,17 @@ export function GlobalSearch({
     );
   }
 
-  if (variant === "compact") {
+  if (variant === 'compact') {
     return (
-      <form className="flex w-full max-w-[470px] flex-col gap-1" onSubmit={handleSubmit}>
+      <form
+        className="flex w-full max-w-[470px] flex-col gap-1"
+        onSubmit={handleSubmit}
+      >
         {showLabel ? (
-          <label className="text-xs font-semibold text-slate-500" htmlFor={inputId}>
+          <label
+            className="text-xs font-semibold text-slate-500"
+            htmlFor={inputId}
+          >
             Global Search
           </label>
         ) : null}
@@ -104,8 +125,13 @@ export function GlobalSearch({
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder}
           />
-          <Button className="h-11 rounded-l-none px-3" size="icon" type="submit" aria-label="Search">
-            {pending ? "..." : <IconSearch className="size-4" stroke={2} />}
+          <Button
+            className="h-11 rounded-l-none px-3"
+            size="icon"
+            type="submit"
+            aria-label="Search"
+          >
+            {pending ? '...' : <IconSearch className="size-4" stroke={2} />}
           </Button>
         </div>
         {message ? <p className="text-xs text-red-500">{message}</p> : null}
@@ -114,9 +140,15 @@ export function GlobalSearch({
   }
 
   return (
-    <form className="flex w-full max-w-3xl flex-col gap-2" onSubmit={handleSubmit}>
+    <form
+      className="flex w-full max-w-3xl flex-col gap-2"
+      onSubmit={handleSubmit}
+    >
       {showLabel ? (
-        <label className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70" htmlFor={inputId}>
+        <label
+          className="text-xs font-semibold uppercase tracking-[0.12em] text-white/70"
+          htmlFor={inputId}
+        >
           Search / Address / Txn Hash / Block
         </label>
       ) : null}
@@ -130,13 +162,16 @@ export function GlobalSearch({
         </button>
         <Input
           id={inputId}
-          className={cn("h-14 rounded-xl border-slate-200 bg-white text-base", "placeholder:text-slate-400")}
+          className={cn(
+            'h-14 rounded-xl border-slate-200 bg-white text-base',
+            'placeholder:text-slate-400',
+          )}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder={placeholder}
         />
         <Button className="h-14 rounded-xl" type="submit" aria-label="Search">
-          {pending ? "..." : <IconSearch className="size-5" stroke={2} />}
+          {pending ? '...' : <IconSearch className="size-5" stroke={2} />}
         </Button>
       </div>
       {message ? <p className="text-sm text-red-300">{message}</p> : null}

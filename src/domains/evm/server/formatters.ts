@@ -1,15 +1,15 @@
-import { formatEther, formatGwei } from "viem";
+import { formatEther, formatGwei } from 'viem';
 
 function formatInteger(value: bigint | number | null | undefined) {
   if (value == null) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
-  return new Intl.NumberFormat("en-US").format(Number(value));
+  return new Intl.NumberFormat('en-US').format(Number(value));
 }
 
 function formatPercent(value: number) {
-  return `${value.toFixed(2).replace(/\.?0+$/, "")}%`;
+  return `${value.toFixed(2).replace(/\.?0+$/, '')}%`;
 }
 
 function formatTimestamp(timestamp: bigint | null | undefined) {
@@ -22,24 +22,24 @@ function formatTimestamp(timestamp: bigint | null | undefined) {
 
 function formatTimestampLabel(timestamp: bigint | null | undefined) {
   if (timestamp == null) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
     hour12: false,
-    timeZoneName: "short",
+    timeZoneName: 'short',
   }).format(new Date(Number(timestamp) * 1000));
 }
 
 function formatBytes(value: bigint | null | undefined) {
   if (value == null) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
   return `${formatInteger(value)} bytes`;
@@ -47,14 +47,16 @@ function formatBytes(value: bigint | null | undefined) {
 
 function formatBaseFee(value: bigint | null | undefined) {
   if (value == null) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
-  return `${Number(formatGwei(value)).toFixed(3).replace(/\.?0+$/, "")} Gwei`;
+  return `${Number(formatGwei(value))
+    .toFixed(3)
+    .replace(/\.?0+$/, '')} Gwei`;
 }
 
 function toJsonSafe(value: unknown): unknown {
-  if (typeof value === "bigint") {
+  if (typeof value === 'bigint') {
     return value.toString();
   }
 
@@ -62,28 +64,34 @@ function toJsonSafe(value: unknown): unknown {
     return value.map((item) => toJsonSafe(item));
   }
 
-  if (value && typeof value === "object") {
+  if (value && typeof value === 'object') {
     return Object.fromEntries(
-      Object.entries(value).map(([key, entryValue]) => [key, toJsonSafe(entryValue)]),
+      Object.entries(value).map(([key, entryValue]) => [
+        key,
+        toJsonSafe(entryValue),
+      ]),
     );
   }
 
   return value;
 }
 
-function formatDisplayAmount(value: bigint | null | undefined, currencyName: string) {
+function formatDisplayAmount(
+  value: bigint | null | undefined,
+  currencyName: string,
+) {
   const amount = Number(formatEther(value ?? 0n));
 
   if (amount === 0) {
     return `0 ${currencyName}`;
   }
 
-  return `${amount.toFixed(6).replace(/\.?0+$/, "")} ${currencyName}`;
+  return `${amount.toFixed(6).replace(/\.?0+$/, '')} ${currencyName}`;
 }
 
 function shortenHash(value: string | null | undefined, start = 10, end = 8) {
   if (!value) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
   if (end <= 0) {
@@ -99,7 +107,7 @@ function shortenHash(value: string | null | undefined, start = 10, end = 8) {
 
 function shortenAddress(value: string | null | undefined) {
   if (!value) {
-    return "Contract Creation";
+    return 'Contract Creation';
   }
 
   if (value.length <= 15) {
@@ -137,16 +145,24 @@ export function formatEvmBlock(block: {
   const gasLimit = Number(block.gasLimit ?? 0n);
   const gasUsedRatio = gasLimit > 0 ? (gasUsed / gasLimit) * 100 : 0;
   const transactions = block.transactions
-    .filter((transaction): transaction is {
-      hash: string;
-      from: string;
-      to?: string | null;
-      value?: bigint;
-      gas?: bigint;
-      gasPrice?: bigint | null;
-      input?: string;
-      nonce?: number;
-    } => typeof transaction === "object" && transaction !== null && "hash" in transaction && "from" in transaction)
+    .filter(
+      (
+        transaction,
+      ): transaction is {
+        hash: string;
+        from: string;
+        to?: string | null;
+        value?: bigint;
+        gas?: bigint;
+        gasPrice?: bigint | null;
+        input?: string;
+        nonce?: number;
+      } =>
+        typeof transaction === 'object' &&
+        transaction !== null &&
+        'hash' in transaction &&
+        'from' in transaction,
+    )
     .map((transaction) => ({
       hash: transaction.hash,
       hashLabel: shortenHash(transaction.hash, 12, 0),
@@ -157,19 +173,24 @@ export function formatEvmBlock(block: {
       to: transaction.to ?? null,
       toLabel: shortenAddress(transaction.to),
       methodLabel: formatMethodLabel(transaction.input, transaction.to),
-      inputData: transaction.input ?? "0x",
-      valueLabel: formatDisplayAmount(transaction.value, block.currencyName ?? "ETH"),
+      inputData: transaction.input ?? '0x',
+      valueLabel: formatDisplayAmount(
+        transaction.value,
+        block.currencyName ?? 'ETH',
+      ),
       maxTxCostLabel:
         transaction.gas != null && transaction.gasPrice != null
-          ? `${Number(formatEther(transaction.gas * transaction.gasPrice)).toFixed(6).replace(/\.?0+$/, "")} ${block.currencyName ?? "ETH"}`
-          : "Unavailable",
+          ? `${Number(formatEther(transaction.gas * transaction.gasPrice))
+              .toFixed(6)
+              .replace(/\.?0+$/, '')} ${block.currencyName ?? 'ETH'}`
+          : 'Unavailable',
       gasLabel: formatInteger(transaction.gas),
       nonce: transaction.nonce ?? null,
     }));
 
   return {
     height: block.number.toString(),
-    hash: block.hash ?? "",
+    hash: block.hash ?? '',
     txCount: block.transactions.length,
     timestamp: formatTimestamp(block.timestamp),
     timestampLabel: formatTimestampLabel(block.timestamp),
@@ -184,13 +205,13 @@ export function formatEvmBlock(block: {
     blobGasUsedLabel: formatInteger(block.blobGasUsed),
     withdrawalsCount: block.withdrawals?.length ?? 0,
     parentHash: block.parentHash,
-    stateRoot: block.stateRoot ?? "Unavailable",
-    receiptsRoot: block.receiptsRoot ?? "Unavailable",
-    transactionsRoot: block.transactionsRoot ?? "Unavailable",
-    withdrawalsRoot: block.withdrawalsRoot ?? "Unavailable",
-    sha3Uncles: block.sha3Uncles ?? "Unavailable",
-    nonce: block.nonce ?? "Unavailable",
-    extraData: block.extraData ?? "Unavailable",
+    stateRoot: block.stateRoot ?? 'Unavailable',
+    receiptsRoot: block.receiptsRoot ?? 'Unavailable',
+    transactionsRoot: block.transactionsRoot ?? 'Unavailable',
+    withdrawalsRoot: block.withdrawalsRoot ?? 'Unavailable',
+    sha3Uncles: block.sha3Uncles ?? 'Unavailable',
+    nonce: block.nonce ?? 'Unavailable',
+    extraData: block.extraData ?? 'Unavailable',
     transactions,
     rawJson: toJsonSafe(block),
   };
@@ -216,7 +237,10 @@ export function formatEvmTransaction(transaction: {
   };
 }
 
-function formatDetailedAmount(value: bigint | null | undefined, currencyName: string) {
+function formatDetailedAmount(
+  value: bigint | null | undefined,
+  currencyName: string,
+) {
   if (value == null) {
     return `0 ${currencyName}`;
   }
@@ -227,12 +251,15 @@ function formatDetailedAmount(value: bigint | null | undefined, currencyName: st
     return `0 ${currencyName}`;
   }
 
-  return `${amount.toFixed(6).replace(/\.?0+$/, "")} ${currencyName}`;
+  return `${amount.toFixed(6).replace(/\.?0+$/, '')} ${currencyName}`;
 }
 
-function formatDetailedFee(value: bigint | null | undefined, currencyName: string) {
+function formatDetailedFee(
+  value: bigint | null | undefined,
+  currencyName: string,
+) {
   if (value == null) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
   const amount = Number(formatEther(value));
@@ -241,16 +268,19 @@ function formatDetailedFee(value: bigint | null | undefined, currencyName: strin
     return `0 ${currencyName}`;
   }
 
-  return `${amount.toFixed(9).replace(/\.?0+$/, "")} ${currencyName}`;
+  return `${amount.toFixed(9).replace(/\.?0+$/, '')} ${currencyName}`;
 }
 
-function formatMethodLabel(input: string | null | undefined, to: string | null | undefined) {
+function formatMethodLabel(
+  input: string | null | undefined,
+  to: string | null | undefined,
+) {
   if (!to) {
-    return "Contract Creation";
+    return 'Contract Creation';
   }
 
-  if (!input || input === "0x") {
-    return "Transfer";
+  if (!input || input === '0x') {
+    return 'Transfer';
   }
 
   return input.slice(0, 10);
@@ -258,11 +288,11 @@ function formatMethodLabel(input: string | null | undefined, to: string | null |
 
 function formatTransactionTypeLabel(value: string | null | undefined) {
   if (!value) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
-  if (value.toLowerCase() === "eip1559") {
-    return "EIP-1559";
+  if (value.toLowerCase() === 'eip1559') {
+    return 'EIP-1559';
   }
 
   return value.toUpperCase();
@@ -286,24 +316,28 @@ function formatTransactionGasFeesLabel(input: {
 }) {
   const type = input.type?.toLowerCase();
 
-  if (type === "eip1559") {
+  if (type === 'eip1559') {
     const parts = [
-      ["Base", formatGasFeeValue(input.baseFeePerGas)],
-      ["Max", formatGasFeeValue(input.maxFeePerGas ?? input.effectiveGasPrice)],
+      ['Base', formatGasFeeValue(input.baseFeePerGas)],
+      ['Max', formatGasFeeValue(input.maxFeePerGas ?? input.effectiveGasPrice)],
       [
-        "Max Priority",
-        formatGasFeeValue(input.maxPriorityFeePerGas ?? input.effectiveGasPrice),
+        'Max Priority',
+        formatGasFeeValue(
+          input.maxPriorityFeePerGas ?? input.effectiveGasPrice,
+        ),
       ],
     ]
       .filter(([, value]) => value !== null)
       .map(([label, value]) => `${label}: ${value}`);
 
-    return parts.length ? parts.join(" | ") : "Unavailable";
+    return parts.length ? parts.join(' | ') : 'Unavailable';
   }
 
-  const baseLabel = formatGasFeeValue(input.gasPrice ?? input.effectiveGasPrice);
+  const baseLabel = formatGasFeeValue(
+    input.gasPrice ?? input.effectiveGasPrice,
+  );
 
-  return baseLabel ? `Base: ${baseLabel}` : "Unavailable";
+  return baseLabel ? `Base: ${baseLabel}` : 'Unavailable';
 }
 
 export function formatEvmTransactionDetail(input: {
@@ -325,7 +359,7 @@ export function formatEvmTransactionDetail(input: {
     type?: string | null;
   };
   receipt: {
-    status?: "success" | "reverted" | null;
+    status?: 'success' | 'reverted' | null;
     gasUsed?: bigint | null;
     effectiveGasPrice?: bigint | null;
     contractAddress?: string | null;
@@ -336,7 +370,8 @@ export function formatEvmTransactionDetail(input: {
     baseFeePerGas?: bigint | null;
   } | null;
 }) {
-  const { transaction, receipt, block, latestBlockNumber, currencyName } = input;
+  const { transaction, receipt, block, latestBlockNumber, currencyName } =
+    input;
   const blockNumber = transaction.blockNumber ?? null;
   const gasLimit = transaction.gas ?? null;
   const gasUsed = receipt?.gasUsed ?? null;
@@ -344,24 +379,36 @@ export function formatEvmTransactionDetail(input: {
     gasLimit != null && gasUsed != null && Number(gasLimit) > 0
       ? (Number(gasUsed) / Number(gasLimit)) * 100
       : null;
-  const effectiveGasPrice = receipt?.effectiveGasPrice ?? transaction.gasPrice ?? null;
-  const feeValue = gasUsed != null && effectiveGasPrice != null ? gasUsed * effectiveGasPrice : null;
+  const effectiveGasPrice =
+    receipt?.effectiveGasPrice ?? transaction.gasPrice ?? null;
+  const feeValue =
+    gasUsed != null && effectiveGasPrice != null
+      ? gasUsed * effectiveGasPrice
+      : null;
   const confirmations =
-    latestBlockNumber != null && blockNumber != null && latestBlockNumber >= blockNumber
+    latestBlockNumber != null &&
+    blockNumber != null &&
+    latestBlockNumber >= blockNumber
       ? latestBlockNumber - blockNumber + 1n
       : null;
-  const status = receipt?.status ?? (blockNumber != null ? "success" : "pending");
+  const status =
+    receipt?.status ?? (blockNumber != null ? 'success' : 'pending');
   const interactedWith = transaction.to ?? receipt?.contractAddress ?? null;
 
   return {
     hash: transaction.hash,
     blockNumber: blockNumber?.toString() ?? null,
-    confirmationsLabel: confirmations != null ? formatInteger(confirmations) : null,
+    confirmationsLabel:
+      confirmations != null ? formatInteger(confirmations) : null,
     timestampMs: formatTimestamp(block?.timestamp),
     timestampLabel: formatTimestampLabel(block?.timestamp),
     status,
     statusLabel:
-      status === "success" ? "Success" : status === "reverted" ? "Failed" : "Pending",
+      status === 'success'
+        ? 'Success'
+        : status === 'reverted'
+          ? 'Failed'
+          : 'Pending',
     from: transaction.from,
     fromLabel: shortenAddress(transaction.from),
     to: transaction.to ?? null,
@@ -371,7 +418,10 @@ export function formatEvmTransactionDetail(input: {
     contractAddress: receipt?.contractAddress ?? null,
     valueLabel: formatDetailedAmount(transaction.value, currencyName),
     feeLabel: formatDetailedFee(feeValue, currencyName),
-    gasPriceLabel: effectiveGasPrice != null ? `${formatGwei(effectiveGasPrice)} Gwei` : "Unavailable",
+    gasPriceLabel:
+      effectiveGasPrice != null
+        ? `${formatGwei(effectiveGasPrice)} Gwei`
+        : 'Unavailable',
     gasFeesLabel: formatTransactionGasFeesLabel({
       type: transaction.type,
       baseFeePerGas: block?.baseFeePerGas,
@@ -382,13 +432,17 @@ export function formatEvmTransactionDetail(input: {
     }),
     gasLimitLabel: formatInteger(gasLimit),
     gasUsedLabel: formatInteger(gasUsed),
-    gasUsedPercent: gasUsedRatio != null ? formatPercent(gasUsedRatio) : "Unavailable",
-    nonceLabel: transaction.nonce != null ? String(transaction.nonce) : "Unavailable",
+    gasUsedPercent:
+      gasUsedRatio != null ? formatPercent(gasUsedRatio) : 'Unavailable',
+    nonceLabel:
+      transaction.nonce != null ? String(transaction.nonce) : 'Unavailable',
     positionLabel:
-      transaction.transactionIndex != null ? String(transaction.transactionIndex) : "Unavailable",
+      transaction.transactionIndex != null
+        ? String(transaction.transactionIndex)
+        : 'Unavailable',
     typeLabel: formatTransactionTypeLabel(transaction.type),
     methodLabel: formatMethodLabel(transaction.input, transaction.to),
-    inputData: transaction.input ?? "0x",
+    inputData: transaction.input ?? '0x',
     logsCount: receipt?.logs?.length ?? 0,
     logs: toJsonSafe(receipt?.logs ?? []),
     rawJson: toJsonSafe({

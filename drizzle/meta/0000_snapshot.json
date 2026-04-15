@@ -89,10 +89,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "account_provider_provider_account_id_pk": {
-          "columns": [
-            "provider",
-            "provider_account_id"
-          ],
+          "columns": ["provider", "provider_account_id"],
           "name": "account_provider_provider_account_id_pk"
         }
       },
@@ -172,9 +169,7 @@
       "indexes": {
         "user_email_unique": {
           "name": "user_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -212,10 +207,7 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {
         "verification_token_identifier_token_pk": {
-          "columns": [
-            "identifier",
-            "token"
-          ],
+          "columns": ["identifier", "token"],
           "name": "verification_token_identifier_token_pk"
         }
       },

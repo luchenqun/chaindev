@@ -1,9 +1,9 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
-import type { PlatformMode } from "@/config/chains";
-import { db } from "@/db/client";
-import { rpcProfiles } from "@/db/schema/workbench";
-import type { ImportedRpcProfile } from "@/server/schemas/workbench-migration";
+import { and, desc, eq, sql } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import type { PlatformMode } from '@/config/chains';
+import { db } from '@/db/client';
+import { rpcProfiles } from '@/db/schema/workbench';
+import type { ImportedRpcProfile } from '@/server/schemas/workbench-migration';
 
 type RpcProfileInput = {
   userId: string;
@@ -31,7 +31,10 @@ export async function addRpcProfile(input: RpcProfileInput) {
   return row;
 }
 
-export async function importRpcProfiles(userId: string, profiles: ImportedRpcProfile[]) {
+export async function importRpcProfiles(
+  userId: string,
+  profiles: ImportedRpcProfile[],
+) {
   for (const profile of profiles) {
     const row = {
       id: `${userId}:${profile.id}`,
@@ -53,10 +56,18 @@ export async function importRpcProfiles(userId: string, profiles: ImportedRpcPro
 }
 
 export async function listRpcProfiles(userId: string) {
-  return db.select().from(rpcProfiles).where(eq(rpcProfiles.userId, userId)).orderBy(desc(rpcProfiles.updatedAt)).all();
+  return db
+    .select()
+    .from(rpcProfiles)
+    .where(eq(rpcProfiles.userId, userId))
+    .orderBy(desc(rpcProfiles.updatedAt))
+    .all();
 }
 
-export async function getLatestRpcProfileByMode(userId: string, mode: PlatformMode) {
+export async function getLatestRpcProfileByMode(
+  userId: string,
+  mode: PlatformMode,
+) {
   return (
     db
       .select()
@@ -78,18 +89,23 @@ export async function deleteRpcProfile(userId: string, id: string) {
       .get()?.count ?? 0;
 
   if (rowCount <= 1) {
-    throw new Error("At least one provider must remain.");
+    throw new Error('At least one provider must remain.');
   }
 
-  db.delete(rpcProfiles).where(and(eq(rpcProfiles.userId, userId), eq(rpcProfiles.id, id))).run();
+  db.delete(rpcProfiles)
+    .where(and(eq(rpcProfiles.userId, userId), eq(rpcProfiles.id, id)))
+    .run();
   return { id };
 }
 
-export async function updateRpcProfile(userId: string, id: string, input: RpcProfileInput) {
+export async function updateRpcProfile(
+  userId: string,
+  id: string,
+  input: RpcProfileInput,
+) {
   const updatedAt = Date.now();
 
-  db
-    .update(rpcProfiles)
+  db.update(rpcProfiles)
     .set({
       mode: input.mode,
       name: input.name,

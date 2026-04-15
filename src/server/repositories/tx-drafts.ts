@@ -1,7 +1,7 @@
-import { desc, eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
-import { db } from "@/db/client";
-import { txDrafts } from "@/db/schema/workbench";
+import { desc, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { db } from '@/db/client';
+import { txDrafts } from '@/db/schema/workbench';
 
 type TxDraftInput = {
   userId: string;
@@ -25,5 +25,10 @@ export async function addTxDraft(input: TxDraftInput) {
 }
 
 export async function listTxDrafts(userId: string) {
-  return db.select().from(txDrafts).where(eq(txDrafts.userId, userId)).orderBy(desc(txDrafts.updatedAt)).all();
+  return db
+    .select()
+    .from(txDrafts)
+    .where(eq(txDrafts.userId, userId))
+    .orderBy(desc(txDrafts.updatedAt))
+    .all();
 }

@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { IconPencil, IconTrash } from "@tabler/icons-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { useEffect, useMemo, useState } from "react";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
+import { IconPencil, IconTrash } from '@tabler/icons-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { useEffect, useMemo, useState } from 'react';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Input } from '@/components/ui/input';
+import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import {
   clearEvmAddressTags,
   deleteEvmAddressTag,
@@ -18,21 +18,21 @@ import {
   subscribeEvmAddressTags,
   upsertEvmAddressTag,
   type EvmAddressTagItem,
-} from "@/domains/evm/client/address-tags";
-import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
-import { AppShell } from "@/platform/layout/app-shell";
-import { AccountWorkbenchShell } from "@/platform/layout/account-workbench-shell";
+} from '@/domains/evm/client/address-tags';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
+import { AppShell } from '@/platform/layout/app-shell';
+import { AccountWorkbenchShell } from '@/platform/layout/account-workbench-shell';
 
 function formatAddressLabel(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
 }
 
 function formatUpdatedAt(timestamp: number) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
     hour12: false,
   }).format(new Date(timestamp));
 }
@@ -42,24 +42,28 @@ export default function EvmNameTagsPage() {
   const { status } = useSession();
   const [items, setItems] = useState<EvmAddressTagItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchText, setSearchText] = useState("");
-  const [newAddress, setNewAddress] = useState("");
-  const [newNameTag, setNewNameTag] = useState("");
+  const [searchText, setSearchText] = useState('');
+  const [newAddress, setNewAddress] = useState('');
+  const [newNameTag, setNewNameTag] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [editingAddress, setEditingAddress] = useState<string | null>(null);
-  const [editingValue, setEditingValue] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<EvmAddressTagItem | null>(null);
+  const [editingValue, setEditingValue] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<EvmAddressTagItem | null>(
+    null,
+  );
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
-  const [providerName, setProviderName] = useState("Current Provider");
+  const [providerName, setProviderName] = useState('Current Provider');
 
   function goToLogin() {
-    router.push("/login?callbackUrl=%2Fevm%2Fsettings%2Fname-tags");
+    router.push('/login?callbackUrl=%2Fevm%2Fsettings%2Fname-tags');
   }
 
   useEffect(() => {
     function load() {
       setItems(listEvmAddressTags());
-      setProviderName(readActiveRpcProfileCookie("evm")?.name ?? "Current Provider");
+      setProviderName(
+        readActiveRpcProfileCookie('evm')?.name ?? 'Current Provider',
+      );
       setLoading(false);
     }
 
@@ -71,20 +75,26 @@ export default function EvmNameTagsPage() {
 
     const handleProfileChanged = () => {
       setEditingAddress(null);
-      setEditingValue("");
+      setEditingValue('');
       setDeleteTarget(null);
       setClearDialogOpen(false);
-      setNewAddress("");
-      setNewNameTag("");
+      setNewAddress('');
+      setNewNameTag('');
       setCreateError(null);
       load();
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, []);
 
@@ -105,21 +115,23 @@ export default function EvmNameTagsPage() {
   async function handleCreate() {
     try {
       await upsertEvmAddressTag(newAddress, newNameTag);
-      setNewAddress("");
-      setNewNameTag("");
+      setNewAddress('');
+      setNewNameTag('');
       setCreateError(null);
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
-      setCreateError(error instanceof Error ? error.message : "Failed to save name tag.");
+      setCreateError(
+        error instanceof Error ? error.message : 'Failed to save name tag.',
+      );
     }
   }
 
   function handleStartEdit(item: EvmAddressTagItem) {
-    if (status !== "authenticated") {
+    if (status !== 'authenticated') {
       goToLogin();
       return;
     }
@@ -133,9 +145,9 @@ export default function EvmNameTagsPage() {
     try {
       await upsertEvmAddressTag(address, editingValue);
       setEditingAddress(null);
-      setEditingValue("");
+      setEditingValue('');
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
       }
 
@@ -147,7 +159,7 @@ export default function EvmNameTagsPage() {
     try {
       await deleteEvmAddressTag(address);
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
       }
 
@@ -156,7 +168,7 @@ export default function EvmNameTagsPage() {
 
     if (editingAddress === address) {
       setEditingAddress(null);
-      setEditingValue("");
+      setEditingValue('');
     }
   }
 
@@ -164,7 +176,7 @@ export default function EvmNameTagsPage() {
     try {
       await clearEvmAddressTags();
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
       }
 
@@ -172,7 +184,7 @@ export default function EvmNameTagsPage() {
     }
 
     setEditingAddress(null);
-    setEditingValue("");
+    setEditingValue('');
     setDeleteTarget(null);
     setClearDialogOpen(false);
   }
@@ -181,7 +193,12 @@ export default function EvmNameTagsPage() {
     return (
       <AppShell>
         <AccountWorkbenchShell mode="evm">
-          <ListPageSkeleton titleWidth="w-36" rows={8} columns={4} showToolbar={false} />
+          <ListPageSkeleton
+            titleWidth="w-36"
+            rows={8}
+            columns={4}
+            showToolbar={false}
+          />
         </AccountWorkbenchShell>
       </AppShell>
     );
@@ -192,7 +209,9 @@ export default function EvmNameTagsPage() {
       <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[1.171875rem] font-semibold text-slate-900">Name Tags</h1>
+            <h1 className="text-[1.171875rem] font-semibold text-slate-900">
+              Name Tags
+            </h1>
             <Badge variant="secondary">{providerName}</Badge>
           </div>
           <p className="mt-2 text-sm text-slate-500">
@@ -202,9 +221,12 @@ export default function EvmNameTagsPage() {
 
         <section className="rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="border-b border-slate-200 px-5 py-4">
-            <p className="text-lg font-semibold text-slate-900">Create Name Tag</p>
+            <p className="text-lg font-semibold text-slate-900">
+              Create Name Tag
+            </p>
             <p className="mt-1 text-sm text-slate-500">
-              Add a manual label for an address under the current provider scope.
+              Add a manual label for an address under the current provider
+              scope.
             </p>
           </div>
           <div className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_auto]">
@@ -222,7 +244,7 @@ export default function EvmNameTagsPage() {
               type="button"
               disabled={!newAddress.trim() || !newNameTag.trim()}
               onClick={() => {
-                if (status !== "authenticated") {
+                if (status !== 'authenticated') {
                   goToLogin();
                   return;
                 }
@@ -230,20 +252,23 @@ export default function EvmNameTagsPage() {
                 void handleCreate();
               }}
             >
-              {status === "authenticated" ? "Save Tag" : "Sign In to Save"}
+              {status === 'authenticated' ? 'Save Tag' : 'Sign In to Save'}
             </Button>
           </div>
-          {createError ? <p className="px-5 pb-4 text-sm text-rose-600">{createError}</p> : null}
+          {createError ? (
+            <p className="px-5 pb-4 text-sm text-rose-600">{createError}</p>
+          ) : null}
         </section>
 
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <p className="text-lg font-semibold text-slate-900">
-                {filteredItems.length.toLocaleString("en-US")} visible tags
+                {filteredItems.length.toLocaleString('en-US')} visible tags
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Search by address or label. Edit and delete directly from this table.
+                Search by address or label. Edit and delete directly from this
+                table.
               </p>
             </div>
             <div className="flex w-full max-w-lg items-center justify-end gap-3">
@@ -259,7 +284,7 @@ export default function EvmNameTagsPage() {
                 variant="outline"
                 disabled={!items.length}
                 onClick={() => {
-                  if (status !== "authenticated") {
+                  if (status !== 'authenticated') {
                     goToLogin();
                     return;
                   }
@@ -293,7 +318,10 @@ export default function EvmNameTagsPage() {
               <tbody>
                 {filteredItems.length ? (
                   filteredItems.map((item) => (
-                    <tr key={item.addressLower} className="border-t border-slate-200">
+                    <tr
+                      key={item.addressLower}
+                      className="border-t border-slate-200"
+                    >
                       <td className="px-5 py-3 text-sm">
                         <div className="flex flex-col gap-0.5">
                           <Link
@@ -302,26 +330,40 @@ export default function EvmNameTagsPage() {
                           >
                             {formatAddressLabel(item.address)}
                           </Link>
-                          <span className="text-xs text-slate-400">{item.address}</span>
+                          <span className="text-xs text-slate-400">
+                            {item.address}
+                          </span>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">
                         {editingAddress === item.address ? (
                           <Input
                             value={editingValue}
-                            onChange={(event) => setEditingValue(event.target.value)}
+                            onChange={(event) =>
+                              setEditingValue(event.target.value)
+                            }
                             placeholder="Name tag"
                           />
                         ) : (
-                          <span className="font-medium text-slate-900">{item.nameTag}</span>
+                          <span className="font-medium text-slate-900">
+                            {item.nameTag}
+                          </span>
                         )}
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-500">{formatUpdatedAt(item.updatedAt)}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">
+                        {formatUpdatedAt(item.updatedAt)}
+                      </td>
                       <td className="px-5 py-3 text-sm">
                         <div className="flex justify-end gap-0">
                           {editingAddress === item.address ? (
                             <>
-                              <Button size="sm" type="button" onClick={() => void handleSaveEdit(item.address)}>
+                              <Button
+                                size="sm"
+                                type="button"
+                                onClick={() =>
+                                  void handleSaveEdit(item.address)
+                                }
+                              >
                                 Save
                               </Button>
                               <Button
@@ -330,7 +372,7 @@ export default function EvmNameTagsPage() {
                                 variant="ghost"
                                 onClick={() => {
                                   setEditingAddress(null);
-                                  setEditingValue("");
+                                  setEditingValue('');
                                   setDeleteTarget(null);
                                 }}
                               >
@@ -352,7 +394,7 @@ export default function EvmNameTagsPage() {
                                 tooltip="Delete name tag"
                                 aria-label="Delete name tag"
                                 onClick={() => {
-                                  if (status !== "authenticated") {
+                                  if (status !== 'authenticated') {
                                     goToLogin();
                                     return;
                                   }
@@ -370,7 +412,10 @@ export default function EvmNameTagsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td className="px-5 py-6 text-sm text-slate-500" colSpan={4}>
+                    <td
+                      className="px-5 py-6 text-sm text-slate-500"
+                      colSpan={4}
+                    >
                       No name tags found under the current provider scope.
                     </td>
                   </tr>
@@ -403,7 +448,7 @@ export default function EvmNameTagsPage() {
           open={clearDialogOpen}
           onOpenChange={setClearDialogOpen}
           title="Clear All Name Tags"
-          description={`Clear all ${items.length.toLocaleString("en-US")} name tags under the current provider scope?`}
+          description={`Clear all ${items.length.toLocaleString('en-US')} name tags under the current provider scope?`}
           confirmLabel="Clear All"
           onConfirm={() => {
             void handleClearAll();

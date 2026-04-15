@@ -1,12 +1,14 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { ListPageSkeleton } from "@/components/ui/loading-placeholders";
-import { getCosmosValidatorsDirect } from "@/domains/cosmos/client/queries";
-import { AppShell } from "@/platform/layout/app-shell";
+import { useEffect, useState } from 'react';
+import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
+import { getCosmosValidatorsDirect } from '@/domains/cosmos/client/queries';
+import { AppShell } from '@/platform/layout/app-shell';
 
 export default function CosmosValidatorsPage() {
-  const [validators, setValidators] = useState<Awaited<ReturnType<typeof getCosmosValidatorsDirect>> | null>(null);
+  const [validators, setValidators] = useState<Awaited<
+    ReturnType<typeof getCosmosValidatorsDirect>
+  > | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,17 +25,21 @@ export default function CosmosValidatorsPage() {
       } catch (error) {
         if (!cancelled) {
           setValidators(null);
-          setErrorMessage(error instanceof Error ? error.message : "Failed to load validators.");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : 'Failed to load validators.',
+          );
         }
       }
     }
 
     void load();
-    window.addEventListener("chaindev:active-rpc-profile-changed", load);
+    window.addEventListener('chaindev:active-rpc-profile-changed', load);
 
     return () => {
       cancelled = true;
-      window.removeEventListener("chaindev:active-rpc-profile-changed", load);
+      window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
   }, []);
 
@@ -41,7 +47,12 @@ export default function CosmosValidatorsPage() {
     if (!errorMessage) {
       return (
         <AppShell>
-          <ListPageSkeleton titleWidth="w-28" rows={8} columns={3} showToolbar={false} />
+          <ListPageSkeleton
+            titleWidth="w-28"
+            rows={8}
+            columns={3}
+            showToolbar={false}
+          />
         </AppShell>
       );
     }
@@ -64,7 +75,9 @@ export default function CosmosValidatorsPage() {
             <span className="kicker">Cosmos Explorer</span>
             <h1>Validators</h1>
           </div>
-          <p className="eyebrow">Show the validator list returned by the selected REST endpoint.</p>
+          <p className="eyebrow">
+            Show the validator list returned by the selected REST endpoint.
+          </p>
         </div>
         <div className="table-card">
           <table className="table-shell">
@@ -78,9 +91,9 @@ export default function CosmosValidatorsPage() {
             <tbody>
               {validators.map((validator) => (
                 <tr key={validator.operator_address}>
-                  <td>{validator.description?.moniker ?? "Unnamed"}</td>
+                  <td>{validator.description?.moniker ?? 'Unnamed'}</td>
                   <td className="mono">{validator.operator_address}</td>
-                  <td>{validator.status ?? "Unknown"}</td>
+                  <td>{validator.status ?? 'Unknown'}</td>
                 </tr>
               ))}
             </tbody>

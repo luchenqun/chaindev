@@ -1,12 +1,12 @@
-import { z } from "zod";
+import { z } from 'zod';
 import {
   importedEvmContractArtifactSchema,
   importedEvmContractBindingSchema,
-} from "@/server/schemas/workbench-migration";
-import { fail, ok } from "@/server/utils/api-response";
-import { normalizeApiError } from "@/server/utils/error-normalizer";
-import { requireSessionUserId } from "@/server/utils/auth-user";
-import { importServerEvmContractRegistry } from "@/server/repositories/evm-contract-registry";
+} from '@/server/schemas/workbench-migration';
+import { fail, ok } from '@/server/utils/api-response';
+import { normalizeApiError } from '@/server/utils/error-normalizer';
+import { requireSessionUserId } from '@/server/utils/auth-user';
+import { importServerEvmContractRegistry } from '@/server/repositories/evm-contract-registry';
 
 const importEvmContractRegistrySchema = z.object({
   artifacts: z.array(importedEvmContractArtifactSchema),
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const userId = await requireSessionUserId();
 
     if (!userId) {
-      return fail({ category: "auth", message: "Unauthorized" }, 401);
+      return fail({ category: 'auth', message: 'Unauthorized' }, 401);
     }
 
     const body = importEvmContractRegistrySchema.parse(await request.json());

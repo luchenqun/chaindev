@@ -1,4 +1,4 @@
-import type { PlatformMode } from "@/config/chains";
+import type { PlatformMode } from '@/config/chains';
 
 export type AccountMenuItem = {
   href: string;
@@ -14,18 +14,22 @@ export type AccountMenuSection = {
 
 export const accountMenuSections: AccountMenuSection[] = [
   {
-    id: "account",
-    label: "Account",
+    id: 'account',
+    label: 'Account',
     items: [
-      { href: "/evm/settings/providers", label: "Providers", modes: ["evm"] },
-      { href: "/evm/settings/private-keys", label: "Private Keys", modes: ["evm"] },
-      { href: "/evm/settings/name-tags", label: "Name Tags", modes: ["evm"] },
+      { href: '/evm/settings/providers', label: 'Providers', modes: ['evm'] },
+      {
+        href: '/evm/settings/private-keys',
+        label: 'Private Keys',
+        modes: ['evm'],
+      },
+      { href: '/evm/settings/name-tags', label: 'Name Tags', modes: ['evm'] },
     ],
   },
   {
-    id: "workspace",
-    label: "Workspace",
-    items: [{ href: "/evm/contracts", label: "Contracts", modes: ["evm"] }],
+    id: 'workspace',
+    label: 'Workspace',
+    items: [{ href: '/evm/contracts', label: 'Contracts', modes: ['evm'] }],
   },
 ];
 
@@ -33,7 +37,9 @@ export function getAccountMenuSections(mode: PlatformMode) {
   return accountMenuSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.modes || item.modes.includes(mode)),
+      items: section.items.filter(
+        (item) => !item.modes || item.modes.includes(mode),
+      ),
     }))
     .filter((section) => section.items.length > 0);
 }

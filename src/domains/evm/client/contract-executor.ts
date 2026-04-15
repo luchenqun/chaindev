@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   createPublicClient,
@@ -10,17 +10,17 @@ import {
   parseEther,
   parseGwei,
   type Hex,
-} from "viem";
-import { privateKeyToAccount } from "viem/accounts";
+} from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
 import {
   getContractConstructor,
   getContractFunctionBySignature,
   parseContractAbiJson,
   parseContractFunctionArgs,
-} from "@/domains/evm/client/abi-utils";
-import { createEvmTransport } from "@/domains/evm/lib/transport";
-import { getEvmCurrencyName } from "@/platform/workbench/rpc-profile";
-import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
+} from '@/domains/evm/client/abi-utils';
+import { createEvmTransport } from '@/domains/evm/lib/transport';
+import { getEvmCurrencyName } from '@/platform/workbench/rpc-profile';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 const EVM_GAS_LIMIT_MULTIPLIER = 1.35;
 const EVM_GAS_LIMIT_MULTIPLIER_SCALE = 100n;
@@ -29,10 +29,10 @@ const EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR = BigInt(
 );
 
 function getActiveEvmProfile() {
-  const profile = readActiveRpcProfileCookie("evm");
+  const profile = readActiveRpcProfileCookie('evm');
 
   if (!profile) {
-    throw new Error("No active EVM provider selected.");
+    throw new Error('No active EVM provider selected.');
   }
 
   return profile;
@@ -52,14 +52,16 @@ function normalizePrivateKey(privateKey: string) {
   const value = privateKey.trim();
 
   if (!/^0x[0-9a-fA-F]{64}$/.test(value)) {
-    throw new Error("Private key must be a 32-byte hex string.");
+    throw new Error('Private key must be a 32-byte hex string.');
   }
 
   return value as Hex;
 }
 
 function formatNativeAmount(value: bigint, currencyName: string) {
-  return `${Number(formatEther(value)).toFixed(6).replace(/\.?0+$/, "")} ${currencyName}`;
+  return `${Number(formatEther(value))
+    .toFixed(6)
+    .replace(/\.?0+$/, '')} ${currencyName}`;
 }
 
 function parseNativeValue(value: string) {
@@ -70,17 +72,17 @@ function parseGasLimit(gasLimit: string) {
   const value = gasLimit.trim();
 
   if (!value) {
-    throw new Error("Gas limit is required for force send.");
+    throw new Error('Gas limit is required for force send.');
   }
 
   if (!/^\d+$/.test(value)) {
-    throw new Error("Gas limit must be a positive integer.");
+    throw new Error('Gas limit must be a positive integer.');
   }
 
   const normalizedValue = BigInt(value);
 
   if (normalizedValue <= 0n) {
-    throw new Error("Gas limit must be greater than zero.");
+    throw new Error('Gas limit must be greater than zero.');
   }
 
   return normalizedValue;
@@ -88,19 +90,21 @@ function parseGasLimit(gasLimit: string) {
 
 function applyGasLimitMultiplier(gasLimit: bigint) {
   return (
-    gasLimit * EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR + (EVM_GAS_LIMIT_MULTIPLIER_SCALE - 1n)
-  ) / EVM_GAS_LIMIT_MULTIPLIER_SCALE;
+    (gasLimit * EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR +
+      (EVM_GAS_LIMIT_MULTIPLIER_SCALE - 1n)) /
+    EVM_GAS_LIMIT_MULTIPLIER_SCALE
+  );
 }
 
 function parseGasPrice(gasPrice: string) {
   const value = gasPrice.trim();
 
   if (!value) {
-    throw new Error("Gas price is required for force send.");
+    throw new Error('Gas price is required for force send.');
   }
 
   if (!/^\d+(\.\d+)?$/.test(value)) {
-    throw new Error("Gas price must be a valid Gwei value.");
+    throw new Error('Gas price must be a valid Gwei value.');
   }
 
   return parseGwei(value);
@@ -124,11 +128,11 @@ function parseNonce(nonce: string) {
   const value = nonce.trim();
 
   if (!value) {
-    throw new Error("Nonce is required for force send.");
+    throw new Error('Nonce is required for force send.');
   }
 
   if (!/^\d+$/.test(value)) {
-    throw new Error("Nonce must be a non-negative integer.");
+    throw new Error('Nonce must be a non-negative integer.');
   }
 
   return Number(value);
@@ -138,11 +142,11 @@ function normalizeDeployBytecode(bytecode: string) {
   const value = bytecode.trim();
 
   if (!value) {
-    throw new Error("Contract bytecode is required for deployment.");
+    throw new Error('Contract bytecode is required for deployment.');
   }
 
   if (!/^0x[0-9a-fA-F]*$/.test(value) || value.length % 2 !== 0) {
-    throw new Error("Contract bytecode must be a valid hex string.");
+    throw new Error('Contract bytecode must be a valid hex string.');
   }
 
   return value as Hex;
@@ -151,55 +155,65 @@ function normalizeDeployBytecode(bytecode: string) {
 function normalizeTransactionData(data: string | undefined) {
   const value = data?.trim();
 
-  if (!value || value === "0x") {
+  if (!value || value === '0x') {
     return undefined;
   }
 
   if (!/^0x[0-9a-fA-F]*$/.test(value) || value.length % 2 !== 0) {
-    throw new Error("Transaction data must be a valid hex string.");
+    throw new Error('Transaction data must be a valid hex string.');
   }
 
   return value as Hex;
 }
 
 function formatGweiValue(value: bigint) {
-  return Number(formatGwei(value)).toFixed(3).replace(/\.?0+$/, "");
+  return Number(formatGwei(value))
+    .toFixed(3)
+    .replace(/\.?0+$/, '');
 }
 
-function formatEip1559GasLabel(maxFeePerGas: bigint, maxPriorityFeePerGas: bigint) {
+function formatEip1559GasLabel(
+  maxFeePerGas: bigint,
+  maxPriorityFeePerGas: bigint,
+) {
   return `Max Fee ${formatGweiValue(maxFeePerGas)} Gwei / Priority Fee ${formatGweiValue(maxPriorityFeePerGas)} Gwei`;
 }
 
 async function getReceiptBlockTimestamp(
-  publicClient: ReturnType<typeof getActiveEvmClients>["publicClient"],
+  publicClient: ReturnType<typeof getActiveEvmClients>['publicClient'],
   blockNumber: bigint,
 ) {
   const block = await publicClient.getBlock({ blockNumber });
   return Number(block.timestamp);
 }
 
-async function getManualWriteFeeDefaults(publicClient: ReturnType<typeof getActiveEvmClients>["publicClient"]) {
+async function getManualWriteFeeDefaults(
+  publicClient: ReturnType<typeof getActiveEvmClients>['publicClient'],
+) {
   try {
     const fees = await publicClient.estimateFeesPerGas({
       chain: undefined,
-      type: "eip1559",
+      type: 'eip1559',
     });
 
     return {
-      transactionType: "EIP1559" as const,
-      gasPrice: "",
+      transactionType: 'EIP1559' as const,
+      gasPrice: '',
       maxFeePerGas: formatGweiValue(fees.maxFeePerGas),
       maxPriorityFeePerGas: formatGweiValue(fees.maxPriorityFeePerGas),
-      gasPriceLabel: formatEip1559GasLabel(fees.maxFeePerGas, fees.maxPriorityFeePerGas),
+      gasPriceLabel: formatEip1559GasLabel(
+        fees.maxFeePerGas,
+        fees.maxPriorityFeePerGas,
+      ),
     };
   } catch {
     const gasPrice = await publicClient.getGasPrice();
 
     return {
-      transactionType: "LEGACY" as const,
+      transactionType: 'LEGACY' as const,
       gasPrice: formatGweiValue(gasPrice),
-      maxFeePerGas: "",
-      maxPriorityFeePerGas: "",
+      maxFeePerGas: '',
+      maxPriorityFeePerGas: '',
       gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
     };
   }
@@ -224,7 +238,10 @@ export async function readEvmContractMethodDirect(input: {
   rawArgs: string[];
 }) {
   const { publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
+  const fn = getContractFunctionBySignature(
+    input.abiJson,
+    input.functionSignature,
+  );
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
 
   const result = await publicClient.readContract({
@@ -250,14 +267,17 @@ export async function prepareEvmContractWriteDirect(input: {
   value: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
+  const fn = getContractFunctionBySignature(
+    input.abiJson,
+    input.functionSignature,
+  );
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
   const value = input.value.trim() ? parseEther(input.value.trim()) : 0n;
 
-  if (fn.stateMutability !== "payable" && value > 0n) {
-    throw new Error("Only payable contract methods can send native value.");
+  if (fn.stateMutability !== 'payable' && value > 0n) {
+    throw new Error('Only payable contract methods can send native value.');
   }
 
   const estimatedGas = await publicClient.estimateContractGas({
@@ -279,7 +299,13 @@ export async function prepareEvmContractWriteDirect(input: {
     estimatedGas: bufferedEstimatedGas.toString(),
     gasPrice: gasPrice.toString(),
     gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
-    valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+    valueLabel:
+      value > 0n
+        ? formatNativeAmount(
+            value,
+            getEvmCurrencyName(profile.nativeCurrencySymbol),
+          )
+        : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
   };
 }
 
@@ -292,14 +318,17 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
   value: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
+  const fn = getContractFunctionBySignature(
+    input.abiJson,
+    input.functionSignature,
+  );
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
   const value = input.value.trim() ? parseEther(input.value.trim()) : 0n;
 
-  if (fn.stateMutability !== "payable" && value > 0n) {
-    throw new Error("Only payable contract methods can send native value.");
+  if (fn.stateMutability !== 'payable' && value > 0n) {
+    throw new Error('Only payable contract methods can send native value.');
   }
 
   const [feeDefaults, nonce] = await Promise.all([
@@ -329,10 +358,13 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
       maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
-      value: input.value.trim() || "0",
+      value: input.value.trim() || '0',
       valueLabel:
         value > 0n
-          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          ? formatNativeAmount(
+              value,
+              getEvmCurrencyName(profile.nativeCurrencySymbol),
+            )
           : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
       simulationError: null,
     };
@@ -341,19 +373,23 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
       accountAddress: account.address,
       functionName: fn.name,
       functionSignature: fn.signature,
-      estimatedGas: "",
+      estimatedGas: '',
       transactionType: feeDefaults.transactionType,
       gasPrice: feeDefaults.gasPrice,
       maxFeePerGas: feeDefaults.maxFeePerGas,
       maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
-      value: input.value.trim() || "0",
+      value: input.value.trim() || '0',
       valueLabel:
         value > 0n
-          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          ? formatNativeAmount(
+              value,
+              getEvmCurrencyName(profile.nativeCurrencySymbol),
+            )
           : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
-      simulationError: error instanceof Error ? error.message : "Simulation failed.",
+      simulationError:
+        error instanceof Error ? error.message : 'Simulation failed.',
     };
   }
 }
@@ -393,29 +429,36 @@ export async function getEvmTransactionManualDefaultsDirect(input: {
       maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
-      value: input.value.trim() || "0",
+      value: input.value.trim() || '0',
       valueLabel:
         value > 0n
-          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          ? formatNativeAmount(
+              value,
+              getEvmCurrencyName(profile.nativeCurrencySymbol),
+            )
           : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
       simulationError: null,
     };
   } catch (error) {
     return {
       accountAddress: account.address,
-      estimatedGas: "",
+      estimatedGas: '',
       transactionType: feeDefaults.transactionType,
       gasPrice: feeDefaults.gasPrice,
       maxFeePerGas: feeDefaults.maxFeePerGas,
       maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
-      value: input.value.trim() || "0",
+      value: input.value.trim() || '0',
       valueLabel:
         value > 0n
-          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          ? formatNativeAmount(
+              value,
+              getEvmCurrencyName(profile.nativeCurrencySymbol),
+            )
           : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
-      simulationError: error instanceof Error ? error.message : "Simulation failed.",
+      simulationError:
+        error instanceof Error ? error.message : 'Simulation failed.',
     };
   }
 }
@@ -429,7 +472,10 @@ export async function writeEvmContractMethodDirect(input: {
   value: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
+  const fn = getContractFunctionBySignature(
+    input.abiJson,
+    input.functionSignature,
+  );
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -439,8 +485,8 @@ export async function writeEvmContractMethodDirect(input: {
   });
   const value = input.value.trim() ? parseEther(input.value.trim()) : 0n;
 
-  if (fn.stateMutability !== "payable" && value > 0n) {
-    throw new Error("Only payable contract methods can send native value.");
+  if (fn.stateMutability !== 'payable' && value > 0n) {
+    throw new Error('Only payable contract methods can send native value.');
   }
 
   const simulation = await publicClient.simulateContract({
@@ -469,7 +515,10 @@ export async function writeEvmContractMethodDirect(input: {
     gas,
   } as never);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
+  const blockTimestamp = await getReceiptBlockTimestamp(
+    publicClient,
+    receipt.blockNumber,
+  );
 
   return {
     hash,
@@ -478,9 +527,12 @@ export async function writeEvmContractMethodDirect(input: {
       blockNumber: receipt.blockNumber.toString(),
       blockTimestamp,
       gasUsed: receipt.gasUsed.toString(),
-      effectiveGasPrice: receipt.effectiveGasPrice !== null
-        ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
-        : "Unavailable",
+      effectiveGasPrice:
+        receipt.effectiveGasPrice !== null
+          ? `${Number(formatGwei(receipt.effectiveGasPrice))
+              .toFixed(3)
+              .replace(/\.?0+$/, '')} Gwei`
+          : 'Unavailable',
     },
   };
 }
@@ -491,7 +543,7 @@ export async function forceWriteEvmContractMethodDirect(input: {
   functionSignature: string;
   rawArgs: string[];
   privateKey: string;
-  transactionType: "LEGACY" | "EIP1559";
+  transactionType: 'LEGACY' | 'EIP1559';
   value: string;
   gasLimit: string;
   gasPrice?: string;
@@ -500,7 +552,10 @@ export async function forceWriteEvmContractMethodDirect(input: {
   nonce?: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
+  const fn = getContractFunctionBySignature(
+    input.abiJson,
+    input.functionSignature,
+  );
   const abi = parseContractAbiJson(input.abiJson);
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
@@ -513,24 +568,29 @@ export async function forceWriteEvmContractMethodDirect(input: {
   const gas = parseGasLimit(input.gasLimit);
   const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
   const feeParameters =
-    input.transactionType === "LEGACY"
+    input.transactionType === 'LEGACY'
       ? {
-          type: "legacy" as const,
-          gasPrice: parseGasPrice(input.gasPrice ?? ""),
+          type: 'legacy' as const,
+          gasPrice: parseGasPrice(input.gasPrice ?? ''),
         }
       : (() => {
-          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? "", "Max fee per gas");
+          const maxFeePerGas = parseFeePerGas(
+            input.maxFeePerGas ?? '',
+            'Max fee per gas',
+          );
           const maxPriorityFeePerGas = parseFeePerGas(
-            input.maxPriorityFeePerGas ?? "",
-            "Max priority fee per gas",
+            input.maxPriorityFeePerGas ?? '',
+            'Max priority fee per gas',
           );
 
           if (maxFeePerGas < maxPriorityFeePerGas) {
-            throw new Error("Max fee per gas cannot be less than max priority fee per gas.");
+            throw new Error(
+              'Max fee per gas cannot be less than max priority fee per gas.',
+            );
           }
 
           return {
-            type: "eip1559" as const,
+            type: 'eip1559' as const,
             maxFeePerGas,
             maxPriorityFeePerGas,
           };
@@ -552,7 +612,10 @@ export async function forceWriteEvmContractMethodDirect(input: {
     ...feeParameters,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
+  const blockTimestamp = await getReceiptBlockTimestamp(
+    publicClient,
+    receipt.blockNumber,
+  );
 
   return {
     hash,
@@ -561,9 +624,12 @@ export async function forceWriteEvmContractMethodDirect(input: {
       blockNumber: receipt.blockNumber.toString(),
       blockTimestamp,
       gasUsed: receipt.gasUsed.toString(),
-      effectiveGasPrice: receipt.effectiveGasPrice !== null
-        ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
-        : "Unavailable",
+      effectiveGasPrice:
+        receipt.effectiveGasPrice !== null
+          ? `${Number(formatGwei(receipt.effectiveGasPrice))
+              .toFixed(3)
+              .replace(/\.?0+$/, '')} Gwei`
+          : 'Unavailable',
     },
   };
 }
@@ -571,7 +637,7 @@ export async function forceWriteEvmContractMethodDirect(input: {
 export async function forceSendEvmTransactionDirect(input: {
   to: string;
   privateKey: string;
-  transactionType: "LEGACY" | "EIP1559";
+  transactionType: 'LEGACY' | 'EIP1559';
   value: string;
   gasLimit: string;
   gasPrice?: string;
@@ -592,24 +658,29 @@ export async function forceSendEvmTransactionDirect(input: {
   const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
   const data = normalizeTransactionData(input.data);
   const feeParameters =
-    input.transactionType === "LEGACY"
+    input.transactionType === 'LEGACY'
       ? {
-          type: "legacy" as const,
-          gasPrice: parseGasPrice(input.gasPrice ?? ""),
+          type: 'legacy' as const,
+          gasPrice: parseGasPrice(input.gasPrice ?? ''),
         }
       : (() => {
-          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? "", "Max fee per gas");
+          const maxFeePerGas = parseFeePerGas(
+            input.maxFeePerGas ?? '',
+            'Max fee per gas',
+          );
           const maxPriorityFeePerGas = parseFeePerGas(
-            input.maxPriorityFeePerGas ?? "",
-            "Max priority fee per gas",
+            input.maxPriorityFeePerGas ?? '',
+            'Max priority fee per gas',
           );
 
           if (maxFeePerGas < maxPriorityFeePerGas) {
-            throw new Error("Max fee per gas cannot be less than max priority fee per gas.");
+            throw new Error(
+              'Max fee per gas cannot be less than max priority fee per gas.',
+            );
           }
 
           return {
-            type: "eip1559" as const,
+            type: 'eip1559' as const,
             maxFeePerGas,
             maxPriorityFeePerGas,
           };
@@ -626,7 +697,10 @@ export async function forceSendEvmTransactionDirect(input: {
     ...feeParameters,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
+  const blockTimestamp = await getReceiptBlockTimestamp(
+    publicClient,
+    receipt.blockNumber,
+  );
 
   return {
     hash,
@@ -635,9 +709,12 @@ export async function forceSendEvmTransactionDirect(input: {
       blockNumber: receipt.blockNumber.toString(),
       blockTimestamp,
       gasUsed: receipt.gasUsed.toString(),
-      effectiveGasPrice: receipt.effectiveGasPrice !== null
-        ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
-        : "Unavailable",
+      effectiveGasPrice:
+        receipt.effectiveGasPrice !== null
+          ? `${Number(formatGwei(receipt.effectiveGasPrice))
+              .toFixed(3)
+              .replace(/\.?0+$/, '')} Gwei`
+          : 'Unavailable',
     },
   };
 }
@@ -675,10 +752,15 @@ export async function prepareEvmContractDeployDirect(input: {
     accountAddress: account.address,
     constructorArgCount: constructorItem.inputs.length,
     estimatedGas: bufferedEstimatedGas.toString(),
-    gasPriceLabel: `${Number(formatGwei(gasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`,
+    gasPriceLabel: `${Number(formatGwei(gasPrice))
+      .toFixed(3)
+      .replace(/\.?0+$/, '')} Gwei`,
     valueLabel:
       value > 0n
-        ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+        ? formatNativeAmount(
+            value,
+            getEvmCurrencyName(profile.nativeCurrencySymbol),
+          )
         : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
   };
 }
@@ -727,10 +809,13 @@ export async function getEvmContractDeployManualDefaultsDirect(input: {
       maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
-      value: input.value.trim() || "0",
+      value: input.value.trim() || '0',
       valueLabel:
         value > 0n
-          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          ? formatNativeAmount(
+              value,
+              getEvmCurrencyName(profile.nativeCurrencySymbol),
+            )
           : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
       simulationError: null,
     };
@@ -738,19 +823,23 @@ export async function getEvmContractDeployManualDefaultsDirect(input: {
     return {
       accountAddress: account.address,
       constructorArgCount: constructorItem.inputs.length,
-      estimatedGas: "",
+      estimatedGas: '',
       transactionType: feeDefaults.transactionType,
       gasPrice: feeDefaults.gasPrice,
       maxFeePerGas: feeDefaults.maxFeePerGas,
       maxPriorityFeePerGas: feeDefaults.maxPriorityFeePerGas,
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
-      value: input.value.trim() || "0",
+      value: input.value.trim() || '0',
       valueLabel:
         value > 0n
-          ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol))
+          ? formatNativeAmount(
+              value,
+              getEvmCurrencyName(profile.nativeCurrencySymbol),
+            )
           : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
-      simulationError: error instanceof Error ? error.message : "Simulation failed.",
+      simulationError:
+        error instanceof Error ? error.message : 'Simulation failed.',
     };
   }
 }
@@ -764,7 +853,10 @@ export async function deployEvmContractDirect(input: {
 }) {
   const { profile, publicClient } = getActiveEvmClients();
   const abi = parseContractAbiJson(input.abiJson);
-  const args = parseContractFunctionArgs(getContractConstructor(input.abiJson).inputs, input.rawArgs);
+  const args = parseContractFunctionArgs(
+    getContractConstructor(input.abiJson).inputs,
+    input.rawArgs,
+  );
   const bytecode = normalizeDeployBytecode(input.bytecode);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -796,7 +888,7 @@ export async function deployEvmContractDirect(input: {
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
   if (!receipt.contractAddress) {
-    throw new Error("Deployment completed without a contract address.");
+    throw new Error('Deployment completed without a contract address.');
   }
 
   return {
@@ -807,8 +899,10 @@ export async function deployEvmContractDirect(input: {
       blockNumber: receipt.blockNumber.toString(),
       gasUsed: receipt.gasUsed.toString(),
       effectiveGasPrice: receipt.effectiveGasPrice
-        ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
-        : "Unavailable",
+        ? `${Number(formatGwei(receipt.effectiveGasPrice))
+            .toFixed(3)
+            .replace(/\.?0+$/, '')} Gwei`
+        : 'Unavailable',
     },
   };
 }
@@ -818,7 +912,7 @@ export async function forceDeployEvmContractDirect(input: {
   bytecode: string;
   rawArgs: string[];
   privateKey: string;
-  transactionType: "LEGACY" | "EIP1559";
+  transactionType: 'LEGACY' | 'EIP1559';
   value: string;
   gasLimit: string;
   gasPrice?: string;
@@ -828,7 +922,10 @@ export async function forceDeployEvmContractDirect(input: {
 }) {
   const { profile, publicClient } = getActiveEvmClients();
   const abi = parseContractAbiJson(input.abiJson);
-  const args = parseContractFunctionArgs(getContractConstructor(input.abiJson).inputs, input.rawArgs);
+  const args = parseContractFunctionArgs(
+    getContractConstructor(input.abiJson).inputs,
+    input.rawArgs,
+  );
   const bytecode = normalizeDeployBytecode(input.bytecode);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -840,24 +937,29 @@ export async function forceDeployEvmContractDirect(input: {
   const gas = parseGasLimit(input.gasLimit);
   const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
   const feeParameters =
-    input.transactionType === "LEGACY"
+    input.transactionType === 'LEGACY'
       ? {
-          type: "legacy" as const,
-          gasPrice: parseGasPrice(input.gasPrice ?? ""),
+          type: 'legacy' as const,
+          gasPrice: parseGasPrice(input.gasPrice ?? ''),
         }
       : (() => {
-          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? "", "Max fee per gas");
+          const maxFeePerGas = parseFeePerGas(
+            input.maxFeePerGas ?? '',
+            'Max fee per gas',
+          );
           const maxPriorityFeePerGas = parseFeePerGas(
-            input.maxPriorityFeePerGas ?? "",
-            "Max priority fee per gas",
+            input.maxPriorityFeePerGas ?? '',
+            'Max priority fee per gas',
           );
 
           if (maxFeePerGas < maxPriorityFeePerGas) {
-            throw new Error("Max fee per gas cannot be less than max priority fee per gas.");
+            throw new Error(
+              'Max fee per gas cannot be less than max priority fee per gas.',
+            );
           }
 
           return {
-            type: "eip1559" as const,
+            type: 'eip1559' as const,
             maxFeePerGas,
             maxPriorityFeePerGas,
           };
@@ -880,7 +982,7 @@ export async function forceDeployEvmContractDirect(input: {
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
 
   if (!receipt.contractAddress) {
-    throw new Error("Deployment completed without a contract address.");
+    throw new Error('Deployment completed without a contract address.');
   }
 
   return {
@@ -891,8 +993,10 @@ export async function forceDeployEvmContractDirect(input: {
       blockNumber: receipt.blockNumber.toString(),
       gasUsed: receipt.gasUsed.toString(),
       effectiveGasPrice: receipt.effectiveGasPrice
-        ? `${Number(formatGwei(receipt.effectiveGasPrice)).toFixed(3).replace(/\.?0+$/, "")} Gwei`
-        : "Unavailable",
+        ? `${Number(formatGwei(receipt.effectiveGasPrice))
+            .toFixed(3)
+            .replace(/\.?0+$/, '')} Gwei`
+        : 'Unavailable',
     },
   };
 }

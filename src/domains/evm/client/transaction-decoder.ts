@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   decodeEventLog,
@@ -8,14 +8,17 @@ import {
   type Abi,
   type AbiEvent,
   type Hex,
-} from "viem";
-import { getContractFunctions, parseContractAbiJson } from "@/domains/evm/client/abi-utils";
+} from 'viem';
+import {
+  getContractFunctions,
+  parseContractAbiJson,
+} from '@/domains/evm/client/abi-utils';
 import {
   getEvmContractArtifact,
   listEvmContractArtifacts,
   listEvmContractBindings,
-} from "@/domains/evm/client/contract-registry";
-import { readActiveRpcProfileCookie } from "@/platform/workbench/rpc-profile-client";
+} from '@/domains/evm/client/contract-registry';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 export type EvmDecodedTransactionInput = {
   methodLabel: string;
@@ -63,118 +66,118 @@ const COMMON_EVM_EVENT_ARTIFACTS: Array<{
   abiJson: string;
 }> = [
   {
-    artifactName: "Common ERC20",
-    bindingLabel: "Standard ERC20 Event",
+    artifactName: 'Common ERC20',
+    bindingLabel: 'Standard ERC20 Event',
     abiJson: JSON.stringify([
       {
         anonymous: false,
         inputs: [
-          { indexed: true, name: "from", type: "address" },
-          { indexed: true, name: "to", type: "address" },
-          { indexed: false, name: "value", type: "uint256" },
+          { indexed: true, name: 'from', type: 'address' },
+          { indexed: true, name: 'to', type: 'address' },
+          { indexed: false, name: 'value', type: 'uint256' },
         ],
-        name: "Transfer",
-        type: "event",
+        name: 'Transfer',
+        type: 'event',
       },
       {
         anonymous: false,
         inputs: [
-          { indexed: true, name: "owner", type: "address" },
-          { indexed: true, name: "spender", type: "address" },
-          { indexed: false, name: "value", type: "uint256" },
+          { indexed: true, name: 'owner', type: 'address' },
+          { indexed: true, name: 'spender', type: 'address' },
+          { indexed: false, name: 'value', type: 'uint256' },
         ],
-        name: "Approval",
-        type: "event",
+        name: 'Approval',
+        type: 'event',
       },
     ]),
   },
   {
-    artifactName: "Common WETH",
-    bindingLabel: "Standard WETH Event",
+    artifactName: 'Common WETH',
+    bindingLabel: 'Standard WETH Event',
     abiJson: JSON.stringify([
       {
         anonymous: false,
         inputs: [
-          { indexed: true, name: "dst", type: "address" },
-          { indexed: false, name: "wad", type: "uint256" },
+          { indexed: true, name: 'dst', type: 'address' },
+          { indexed: false, name: 'wad', type: 'uint256' },
         ],
-        name: "Deposit",
-        type: "event",
+        name: 'Deposit',
+        type: 'event',
       },
       {
         anonymous: false,
         inputs: [
-          { indexed: true, name: "src", type: "address" },
-          { indexed: false, name: "wad", type: "uint256" },
+          { indexed: true, name: 'src', type: 'address' },
+          { indexed: false, name: 'wad', type: 'uint256' },
         ],
-        name: "Withdrawal",
-        type: "event",
+        name: 'Withdrawal',
+        type: 'event',
       },
     ]),
   },
   {
-    artifactName: "Common UniswapV2Pair",
-    bindingLabel: "Standard AMM Pair Event",
+    artifactName: 'Common UniswapV2Pair',
+    bindingLabel: 'Standard AMM Pair Event',
     abiJson: JSON.stringify([
       {
         anonymous: false,
         inputs: [
-          { indexed: true, name: "sender", type: "address" },
-          { indexed: false, name: "amount0In", type: "uint256" },
-          { indexed: false, name: "amount1In", type: "uint256" },
-          { indexed: false, name: "amount0Out", type: "uint256" },
-          { indexed: false, name: "amount1Out", type: "uint256" },
-          { indexed: true, name: "to", type: "address" },
+          { indexed: true, name: 'sender', type: 'address' },
+          { indexed: false, name: 'amount0In', type: 'uint256' },
+          { indexed: false, name: 'amount1In', type: 'uint256' },
+          { indexed: false, name: 'amount0Out', type: 'uint256' },
+          { indexed: false, name: 'amount1Out', type: 'uint256' },
+          { indexed: true, name: 'to', type: 'address' },
         ],
-        name: "Swap",
-        type: "event",
+        name: 'Swap',
+        type: 'event',
       },
       {
         anonymous: false,
         inputs: [
-          { indexed: false, name: "reserve0", type: "uint112" },
-          { indexed: false, name: "reserve1", type: "uint112" },
+          { indexed: false, name: 'reserve0', type: 'uint112' },
+          { indexed: false, name: 'reserve1', type: 'uint112' },
         ],
-        name: "Sync",
-        type: "event",
+        name: 'Sync',
+        type: 'event',
       },
       {
         anonymous: false,
         inputs: [
-          { indexed: true, name: "sender", type: "address" },
-          { indexed: false, name: "amount0", type: "uint256" },
-          { indexed: false, name: "amount1", type: "uint256" },
-          { indexed: true, name: "to", type: "address" },
+          { indexed: true, name: 'sender', type: 'address' },
+          { indexed: false, name: 'amount0', type: 'uint256' },
+          { indexed: false, name: 'amount1', type: 'uint256' },
+          { indexed: true, name: 'to', type: 'address' },
         ],
-        name: "Burn",
-        type: "event",
+        name: 'Burn',
+        type: 'event',
       },
       {
         anonymous: false,
         inputs: [
-          { indexed: true, name: "sender", type: "address" },
-          { indexed: false, name: "amount0", type: "uint256" },
-          { indexed: false, name: "amount1", type: "uint256" },
+          { indexed: true, name: 'sender', type: 'address' },
+          { indexed: false, name: 'amount0', type: 'uint256' },
+          { indexed: false, name: 'amount1', type: 'uint256' },
         ],
-        name: "Mint",
-        type: "event",
+        name: 'Mint',
+        type: 'event',
       },
     ]),
   },
 ];
 
 function stringifyDecodedValue(value: unknown) {
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return value;
   }
 
-  if (typeof value === "bigint") {
+  if (typeof value === 'bigint') {
     return value.toString();
   }
 
   if (
-    typeof value === "number" ||
-    typeof value === "boolean" ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
     value === null
   ) {
     return String(value);
@@ -182,25 +185,29 @@ function stringifyDecodedValue(value: unknown) {
 
   return JSON.stringify(
     value,
-    (_, currentValue) => (typeof currentValue === "bigint" ? currentValue.toString() : currentValue),
+    (_, currentValue) =>
+      typeof currentValue === 'bigint' ? currentValue.toString() : currentValue,
     2,
   );
 }
 
-function formatFallbackMethodLabel(inputData: string | undefined, to: string | null | undefined) {
+function formatFallbackMethodLabel(
+  inputData: string | undefined,
+  to: string | null | undefined,
+) {
   if (!to) {
-    return "Create";
+    return 'Create';
   }
 
-  if (!inputData || inputData === "0x") {
-    return "Transfer";
+  if (!inputData || inputData === '0x') {
+    return 'Transfer';
   }
 
   return inputData.slice(0, 10);
 }
 
 function findBoundArtifact(address: string | null | undefined) {
-  const profile = readActiveRpcProfileCookie("evm");
+  const profile = readActiveRpcProfileCookie('evm');
 
   if (!address || !profile) {
     return null;
@@ -237,7 +244,11 @@ function findMatchingEventInAbi(abiJson: string, topic0: string | null) {
   const events = abi.filter(isAbiEventItem);
 
   return (
-    events.find((event) => !event.anonymous && toEventSelector(getEventSignature(event)).toLowerCase() === topic0) ?? null
+    events.find(
+      (event) =>
+        !event.anonymous &&
+        toEventSelector(getEventSignature(event)).toLowerCase() === topic0,
+    ) ?? null
   );
 }
 
@@ -248,7 +259,10 @@ function resolveReceiptLogEvent(input: {
   const boundArtifact = findBoundArtifact(input.address);
 
   if (boundArtifact) {
-    const matchedEvent = findMatchingEventInAbi(boundArtifact.artifact.abiJson, input.topic0);
+    const matchedEvent = findMatchingEventInAbi(
+      boundArtifact.artifact.abiJson,
+      input.topic0,
+    );
 
     if (matchedEvent) {
       return {
@@ -266,7 +280,7 @@ function resolveReceiptLogEvent(input: {
     if (matchedEvent) {
       return {
         artifactName: artifact.name,
-        bindingLabel: "Imported Artifact Match",
+        bindingLabel: 'Imported Artifact Match',
         abiJson: artifact.abiJson,
         event: matchedEvent,
       };
@@ -290,23 +304,23 @@ function resolveReceiptLogEvent(input: {
 }
 
 function isAbiEventItem(item: Abi[number]): item is AbiEvent {
-  return item.type === "event";
+  return item.type === 'event';
 }
 
 function getEventSignature(event: AbiEvent) {
-  return `${event.name}(${event.inputs.map((input) => input.type).join(",")})`;
+  return `${event.name}(${event.inputs.map((input) => input.type).join(',')})`;
 }
 
 function readDecodedEventArgument(
   decodedArgs: unknown,
-  input: AbiEvent["inputs"][number],
+  input: AbiEvent['inputs'][number],
   index: number,
 ) {
   if (Array.isArray(decodedArgs)) {
     return decodedArgs[index];
   }
 
-  if (decodedArgs && typeof decodedArgs === "object") {
+  if (decodedArgs && typeof decodedArgs === 'object') {
     if (input.name && input.name in decodedArgs) {
       return (decodedArgs as Record<string, unknown>)[input.name];
     }
@@ -319,7 +333,11 @@ function readDecodedEventArgument(
   return undefined;
 }
 
-function resolveIndexedTopicHex(event: AbiEvent, topics: string[], inputIndex: number) {
+function resolveIndexedTopicHex(
+  event: AbiEvent,
+  topics: string[],
+  inputIndex: number,
+) {
   const indexedPosition = event.inputs
     .slice(0, inputIndex + 1)
     .filter((input) => input.indexed).length;
@@ -328,10 +346,10 @@ function resolveIndexedTopicHex(event: AbiEvent, topics: string[], inputIndex: n
 }
 
 export function decodeHexToUtf8(value: string) {
-  const normalizedValue = value.startsWith("0x") ? value.slice(2) : value;
+  const normalizedValue = value.startsWith('0x') ? value.slice(2) : value;
 
   if (!normalizedValue) {
-    return "";
+    return '';
   }
 
   if (normalizedValue.length % 2 !== 0 || /[^0-9a-f]/i.test(normalizedValue)) {
@@ -340,10 +358,12 @@ export function decodeHexToUtf8(value: string) {
 
   try {
     const bytes = Uint8Array.from(
-      normalizedValue.match(/.{1,2}/g)?.map((item) => Number.parseInt(item, 16)) ?? [],
+      normalizedValue
+        .match(/.{1,2}/g)
+        ?.map((item) => Number.parseInt(item, 16)) ?? [],
     );
 
-    return new TextDecoder().decode(bytes).replace(/\u0000/g, "");
+    return new TextDecoder().decode(bytes).replace(/\u0000/g, '');
   } catch {
     return null;
   }
@@ -353,17 +373,18 @@ export function decodeBoundEvmTransactionInput(input: {
   to: string | null | undefined;
   inputData: string | undefined;
 }): EvmDecodedTransactionInput | null {
-  const normalizedInputData = input.inputData ?? "0x";
+  const normalizedInputData = input.inputData ?? '0x';
   const boundArtifact = findBoundArtifact(input.to);
 
-  if (!boundArtifact || normalizedInputData === "0x") {
+  if (!boundArtifact || normalizedInputData === '0x') {
     return null;
   }
 
   const selector = normalizedInputData.slice(0, 10).toLowerCase();
   const functions = getContractFunctions(boundArtifact.artifact.abiJson);
   const matchedFunction = functions.find(
-    (fn) => toFunctionSelector(`function ${fn.signature}`).toLowerCase() === selector,
+    (fn) =>
+      toFunctionSelector(`function ${fn.signature}`).toLowerCase() === selector,
   );
 
   if (!matchedFunction) {
@@ -424,10 +445,14 @@ export function decodeBoundEvmReceiptLog(input: {
     return null;
   }
 
-  const normalizedTopics = input.topics.map((topic) => topic.toLowerCase()) as Hex[];
+  const normalizedTopics = input.topics.map((topic) =>
+    topic.toLowerCase(),
+  ) as Hex[];
   const decodedTopics: [] | [Hex, ...Hex[]] =
-    normalizedTopics.length > 0 ? [normalizedTopics[0], ...normalizedTopics.slice(1)] : [];
-  const normalizedData = (input.data ?? "0x") as Hex;
+    normalizedTopics.length > 0
+      ? [normalizedTopics[0], ...normalizedTopics.slice(1)]
+      : [];
+  const normalizedData = (input.data ?? '0x') as Hex;
 
   try {
     const decoded = decodeEventLog({
@@ -448,8 +473,16 @@ export function decodeBoundEvmReceiptLog(input: {
         name: eventInput.name || `arg${index + 1}`,
         type: eventInput.type,
         indexed: Boolean(eventInput.indexed),
-        value: stringifyDecodedValue(readDecodedEventArgument(decoded.args, eventInput, index)),
-        rawHex: eventInput.indexed ? resolveIndexedTopicHex(matchedArtifact.event, normalizedTopics, index) : null,
+        value: stringifyDecodedValue(
+          readDecodedEventArgument(decoded.args, eventInput, index),
+        ),
+        rawHex: eventInput.indexed
+          ? resolveIndexedTopicHex(
+              matchedArtifact.event,
+              normalizedTopics,
+              index,
+            )
+          : null,
       })),
     };
   } catch {
@@ -465,9 +498,15 @@ export function decodeBoundEvmReceiptLog(input: {
         type: eventInput.type,
         indexed: Boolean(eventInput.indexed),
         value: eventInput.indexed
-          ? resolveIndexedTopicHex(matchedArtifact.event, input.topics, index) ?? "Unavailable"
-          : input.data ?? "0x",
-        rawHex: eventInput.indexed ? resolveIndexedTopicHex(matchedArtifact.event, input.topics, index) : null,
+          ? (resolveIndexedTopicHex(
+              matchedArtifact.event,
+              input.topics,
+              index,
+            ) ?? 'Unavailable')
+          : (input.data ?? '0x'),
+        rawHex: eventInput.indexed
+          ? resolveIndexedTopicHex(matchedArtifact.event, input.topics, index)
+          : null,
       })),
     };
   }
@@ -480,5 +519,9 @@ export function resolveEvmTransactionMethodLabel(input: {
 }) {
   const decoded = decodeBoundEvmTransactionInput(input);
 
-  return decoded?.methodLabel ?? input.fallbackMethodLabel ?? formatFallbackMethodLabel(input.inputData, input.to);
+  return (
+    decoded?.methodLabel ??
+    input.fallbackMethodLabel ??
+    formatFallbackMethodLabel(input.inputData, input.to)
+  );
 }

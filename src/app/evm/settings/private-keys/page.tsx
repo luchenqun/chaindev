@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   IconCopy,
@@ -6,26 +6,26 @@ import {
   IconInfoCircle,
   IconPencil,
   IconTrash,
-} from "@tabler/icons-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { ModalDialog } from "@/components/ui/modal-dialog";
-import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
+} from '@tabler/icons-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Input } from '@/components/ui/input';
+import { ModalDialog } from '@/components/ui/modal-dialog';
+import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast";
+} from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import {
   createEvmStoredPrivateKey,
   deleteEvmStoredPrivateKey,
@@ -38,9 +38,9 @@ import {
   updateEvmStoredPrivateKey,
   type EvmStoredPrivateKey,
   type EvmStoredPrivateKeySecurityMode,
-} from "@/domains/evm/client/keyring";
-import { AppShell } from "@/platform/layout/app-shell";
-import { AccountWorkbenchShell } from "@/platform/layout/account-workbench-shell";
+} from '@/domains/evm/client/keyring';
+import { AppShell } from '@/platform/layout/app-shell';
+import { AccountWorkbenchShell } from '@/platform/layout/account-workbench-shell';
 
 function formatAddressLabel(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
@@ -48,20 +48,20 @@ function formatAddressLabel(address: string) {
 
 function formatTimestamp(timestamp: number | null) {
   if (!timestamp) {
-    return "Never";
+    return 'Never';
   }
 
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
     hour12: false,
   }).format(new Date(timestamp));
 }
 
 type ProtectedActionState = {
-  type: "view" | "edit";
+  type: 'view' | 'edit';
   item: EvmStoredPrivateKey;
 } | null;
 
@@ -70,14 +70,16 @@ export default function EvmPrivateKeysPage() {
   const { status } = useSession();
   const { showToast } = useToast();
   const [items, setItems] = useState<EvmStoredPrivateKey[]>([]);
-  const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(null);
-  const [source, setSource] = useState<"guest" | "server">("guest");
+  const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(
+    null,
+  );
+  const [source, setSource] = useState<'guest' | 'server'>('guest');
   const [loading, setLoading] = useState(true);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [form, setForm] = useState({
-    name: "",
-    privateKey: "",
-    password: "",
+    name: '',
+    privateKey: '',
+    password: '',
   });
   const [createError, setCreateError] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -88,22 +90,29 @@ export default function EvmPrivateKeysPage() {
     securityMode: EvmStoredPrivateKeySecurityMode;
     password: string;
   }>({
-    id: "",
-    name: "",
-    privateKey: "",
-    securityMode: "plain",
-    password: "",
+    id: '',
+    name: '',
+    privateKey: '',
+    securityMode: 'plain',
+    password: '',
   });
   const [editError, setEditError] = useState<string | null>(null);
-  const [editUnlockPasswordFallback, setEditUnlockPasswordFallback] = useState<string | null>(null);
+  const [editUnlockPasswordFallback, setEditUnlockPasswordFallback] = useState<
+    string | null
+  >(null);
   const [revealDialogOpen, setRevealDialogOpen] = useState(false);
-  const [revealedItem, setRevealedItem] = useState<EvmStoredPrivateKey | null>(null);
-  const [revealedPrivateKey, setRevealedPrivateKey] = useState("");
+  const [revealedItem, setRevealedItem] = useState<EvmStoredPrivateKey | null>(
+    null,
+  );
+  const [revealedPrivateKey, setRevealedPrivateKey] = useState('');
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
-  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
-  const [pendingProtectedAction, setPendingProtectedAction] = useState<ProtectedActionState>(null);
-  const [deleteTarget, setDeleteTarget] = useState<EvmStoredPrivateKey | null>(null);
+  const [pendingProtectedAction, setPendingProtectedAction] =
+    useState<ProtectedActionState>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EvmStoredPrivateKey | null>(
+    null,
+  );
 
   useEffect(() => {
     function load() {
@@ -119,29 +128,29 @@ export default function EvmPrivateKeysPage() {
     return subscribeEvmKeyring(load);
   }, []);
 
-  const isAuthenticated = status === "authenticated";
-  const isUsingFallback = source !== "server";
+  const isAuthenticated = status === 'authenticated';
+  const isUsingFallback = source !== 'server';
 
   function goToLogin() {
-    router.push("/login?callbackUrl=%2Fevm%2Fsettings%2Fprivate-keys");
+    router.push('/login?callbackUrl=%2Fevm%2Fsettings%2Fprivate-keys');
   }
 
   function resetImportForm() {
     setForm({
-      name: "",
-      privateKey: "",
-      password: "",
+      name: '',
+      privateKey: '',
+      password: '',
     });
     setCreateError(null);
   }
 
   function resetEditForm() {
     setEditForm({
-      id: "",
-      name: "",
-      privateKey: "",
-      securityMode: "plain",
-      password: "",
+      id: '',
+      name: '',
+      privateKey: '',
+      securityMode: 'plain',
+      password: '',
     });
     setEditError(null);
     setEditUnlockPasswordFallback(null);
@@ -153,33 +162,42 @@ export default function EvmPrivateKeysPage() {
     setRevealDialogOpen(true);
   }
 
-  function openEditDialog(item: EvmStoredPrivateKey, privateKey: string, passwordFallback?: string) {
+  function openEditDialog(
+    item: EvmStoredPrivateKey,
+    privateKey: string,
+    passwordFallback?: string,
+  ) {
     setEditForm({
       id: item.id,
       name: item.name,
       privateKey,
       securityMode: item.securityMode,
-      password: "",
+      password: '',
     });
     setEditUnlockPasswordFallback(passwordFallback ?? null);
     setEditError(null);
     setEditDialogOpen(true);
   }
 
-  async function handleOpenProtectedAction(action: NonNullable<ProtectedActionState>) {
+  async function handleOpenProtectedAction(
+    action: NonNullable<ProtectedActionState>,
+  ) {
     try {
       const privateKey = await peekEvmStoredPrivateKey(action.item.id);
 
-      if (action.type === "view") {
+      if (action.type === 'view') {
         openRevealDialog(action.item, privateKey);
       } else {
         openEditDialog(action.item, privateKey);
       }
     } catch (error) {
       showToast({
-        title: "Failed to load private key.",
-        description: error instanceof Error ? error.message : "Failed to load private key.",
-        tone: "error",
+        title: 'Failed to load private key.',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Failed to load private key.',
+        tone: 'error',
       });
     }
   }
@@ -189,35 +207,37 @@ export default function EvmPrivateKeysPage() {
       await createEvmStoredPrivateKey({
         name: form.name,
         privateKey: form.privateKey,
-        securityMode: form.password ? "encrypted" : "plain",
+        securityMode: form.password ? 'encrypted' : 'plain',
         password: form.password || undefined,
       });
       await syncEvmKeyringFromServer();
       resetImportForm();
       setImportDialogOpen(false);
       showToast({
-        title: "Private key added successfully.",
-        description: "The latest keys have been reloaded from your account.",
-        tone: "success",
+        title: 'Private key added successfully.',
+        description: 'The latest keys have been reloaded from your account.',
+        tone: 'success',
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
-      setCreateError(error instanceof Error ? error.message : "Failed to save private key.");
+      setCreateError(
+        error instanceof Error ? error.message : 'Failed to save private key.',
+      );
     }
   }
 
   async function handleSaveEdit() {
     const passwordForSave =
-      editForm.securityMode === "encrypted"
+      editForm.securityMode === 'encrypted'
         ? editForm.password || editUnlockPasswordFallback || undefined
         : undefined;
 
-    if (editForm.securityMode === "encrypted" && !passwordForSave) {
-      setEditError("Password is required for encrypted private keys.");
+    if (editForm.securityMode === 'encrypted' && !passwordForSave) {
+      setEditError('Password is required for encrypted private keys.');
       return;
     }
 
@@ -233,17 +253,21 @@ export default function EvmPrivateKeysPage() {
       setEditDialogOpen(false);
       resetEditForm();
       showToast({
-        title: "Private key updated successfully.",
-        description: "The latest keys have been reloaded from your account.",
-        tone: "success",
+        title: 'Private key updated successfully.',
+        description: 'The latest keys have been reloaded from your account.',
+        tone: 'success',
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
-      setEditError(error instanceof Error ? error.message : "Failed to update private key.");
+      setEditError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update private key.',
+      );
     }
   }
 
@@ -256,11 +280,11 @@ export default function EvmPrivateKeysPage() {
       await deleteEvmStoredPrivateKey(deleteTarget.id);
       setDeleteTarget(null);
       showToast({
-        title: "Private key deleted successfully.",
-        tone: "success",
+        title: 'Private key deleted successfully.',
+        tone: 'success',
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
       }
     }
@@ -272,20 +296,27 @@ export default function EvmPrivateKeysPage() {
     }
 
     try {
-      const privateKey = await peekEvmStoredPrivateKey(pendingProtectedAction.item.id, unlockPassword);
+      const privateKey = await peekEvmStoredPrivateKey(
+        pendingProtectedAction.item.id,
+        unlockPassword,
+      );
 
-      if (pendingProtectedAction.type === "view") {
+      if (pendingProtectedAction.type === 'view') {
         openRevealDialog(pendingProtectedAction.item, privateKey);
       } else {
         openEditDialog(pendingProtectedAction.item, privateKey, unlockPassword);
       }
 
       setUnlockDialogOpen(false);
-      setUnlockPassword("");
+      setUnlockPassword('');
       setUnlockError(null);
       setPendingProtectedAction(null);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : "Failed to unlock private key.");
+      setUnlockError(
+        error instanceof Error
+          ? error.message
+          : 'Failed to unlock private key.',
+      );
     }
   }
 
@@ -305,9 +336,12 @@ export default function EvmPrivateKeysPage() {
     <AppShell>
       <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Private Keys</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">
+            Private Keys
+          </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Save EVM private keys to your account, choose one as the active key, and use it across deploy and write actions.
+            Save EVM private keys to your account, choose one as the active key,
+            and use it across deploy and write actions.
           </p>
         </div>
 
@@ -321,9 +355,9 @@ export default function EvmPrivateKeysPage() {
                 tooltip={
                   isAuthenticated
                     ? isUsingFallback
-                      ? "No saved account keys yet. Using the built-in Alice key until you add one."
-                      : "Stored in your signed-in account."
-                    : "Guest mode uses the built-in Alice key."
+                      ? 'No saved account keys yet. Using the built-in Alice key until you add one.'
+                      : 'Stored in your signed-in account.'
+                    : 'Guest mode uses the built-in Alice key.'
                 }
                 className="text-slate-400 hover:text-slate-600"
                 wrapperClassName="shrink-0"
@@ -331,7 +365,9 @@ export default function EvmPrivateKeysPage() {
                 <IconInfoCircle className="size-3.5" stroke={1.8} />
               </ActionIconButton>
             </div>
-            <p className="mt-2 text-3xl font-semibold leading-none text-slate-900">{items.length}</p>
+            <p className="mt-2 text-3xl font-semibold leading-none text-slate-900">
+              {items.length}
+            </p>
           </article>
           <article className="rounded-3xl border border-slate-200 bg-white px-5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="flex items-start justify-between gap-3">
@@ -347,10 +383,12 @@ export default function EvmPrivateKeysPage() {
               </ActionIconButton>
             </div>
             <p className="mt-2 text-xl font-semibold text-slate-900">
-              {activeItem ? activeItem.name : "Not Selected"}
+              {activeItem ? activeItem.name : 'Not Selected'}
             </p>
             <p className="mt-1 text-sm text-slate-500">
-              {activeItem ? formatAddressLabel(activeItem.address) : "No active key"}
+              {activeItem
+                ? formatAddressLabel(activeItem.address)
+                : 'No active key'}
             </p>
           </article>
           <article className="rounded-3xl border border-slate-200 bg-white px-5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
@@ -362,9 +400,9 @@ export default function EvmPrivateKeysPage() {
                 tooltip={
                   isAuthenticated
                     ? isUsingFallback
-                      ? "You are signed in, but no account keys are saved yet."
-                      : "All private keys are synced to your account."
-                    : "Sign in to manage account private keys."
+                      ? 'You are signed in, but no account keys are saved yet.'
+                      : 'All private keys are synced to your account.'
+                    : 'Sign in to manage account private keys.'
                 }
                 className="text-slate-400 hover:text-slate-600"
                 wrapperClassName="shrink-0"
@@ -372,7 +410,9 @@ export default function EvmPrivateKeysPage() {
                 <IconInfoCircle className="size-3.5" stroke={1.8} />
               </ActionIconButton>
             </div>
-            <p className="mt-2 text-3xl font-semibold leading-none text-slate-900">{isAuthenticated ? "Account" : "Guest"}</p>
+            <p className="mt-2 text-3xl font-semibold leading-none text-slate-900">
+              {isAuthenticated ? 'Account' : 'Guest'}
+            </p>
           </article>
         </section>
 
@@ -380,9 +420,12 @@ export default function EvmPrivateKeysPage() {
           <div className="border-b border-slate-200 px-5 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-lg font-semibold text-slate-900">Saved Keys</p>
+                <p className="text-lg font-semibold text-slate-900">
+                  Saved Keys
+                </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Choose the active key for global EVM actions, rename entries, or delete them.
+                  Choose the active key for global EVM actions, rename entries,
+                  or delete them.
                 </p>
               </div>
               <Button
@@ -398,7 +441,7 @@ export default function EvmPrivateKeysPage() {
                   setImportDialogOpen(true);
                 }}
               >
-                {isAuthenticated ? "Add" : "Sign In to Add"}
+                {isAuthenticated ? 'Add' : 'Sign In to Add'}
               </Button>
             </div>
           </div>
@@ -430,7 +473,9 @@ export default function EvmPrivateKeysPage() {
                       <tr key={item.id} className="border-t border-slate-200">
                         <td className="px-5 py-3 text-sm">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-slate-900">{item.name}</span>
+                            <span className="font-medium text-slate-900">
+                              {item.name}
+                            </span>
                           </div>
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-700">
@@ -444,13 +489,15 @@ export default function EvmPrivateKeysPage() {
                         <td className="px-5 py-3 text-sm text-slate-700">
                           <Badge
                             className={
-                              item.securityMode === "encrypted"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50"
-                                : "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-50"
+                              item.securityMode === 'encrypted'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50'
+                                : 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-50'
                             }
                             variant="secondary"
                           >
-                            {item.securityMode === "encrypted" ? "Encrypted" : "Plain"}
+                            {item.securityMode === 'encrypted'
+                              ? 'Encrypted'
+                              : 'Plain'}
                           </Badge>
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-500">
@@ -463,35 +510,47 @@ export default function EvmPrivateKeysPage() {
                               tooltip="View private key"
                               aria-label="View private key"
                               onClick={() => {
-                                if (item.securityMode === "encrypted") {
-                                  setPendingProtectedAction({ type: "view", item });
-                                  setUnlockPassword("");
+                                if (item.securityMode === 'encrypted') {
+                                  setPendingProtectedAction({
+                                    type: 'view',
+                                    item,
+                                  });
+                                  setUnlockPassword('');
                                   setUnlockError(null);
                                   setUnlockDialogOpen(true);
                                   return;
                                 }
 
-                                void handleOpenProtectedAction({ type: "view", item });
+                                void handleOpenProtectedAction({
+                                  type: 'view',
+                                  item,
+                                });
                               }}
                             >
                               <IconEye className="size-4" stroke={1.8} />
                             </ActionIconButton>
-                            {source === "server" ? (
+                            {source === 'server' ? (
                               <>
                                 <ActionIconButton
                                   className="text-slate-400 hover:text-slate-700"
                                   tooltip="Edit private key"
                                   aria-label="Edit private key"
                                   onClick={() => {
-                                    if (item.securityMode === "encrypted") {
-                                      setPendingProtectedAction({ type: "edit", item });
-                                      setUnlockPassword("");
+                                    if (item.securityMode === 'encrypted') {
+                                      setPendingProtectedAction({
+                                        type: 'edit',
+                                        item,
+                                      });
+                                      setUnlockPassword('');
                                       setUnlockError(null);
                                       setUnlockDialogOpen(true);
                                       return;
                                     }
 
-                                    void handleOpenProtectedAction({ type: "edit", item });
+                                    void handleOpenProtectedAction({
+                                      type: 'edit',
+                                      item,
+                                    });
                                   }}
                                 >
                                   <IconPencil className="size-4" stroke={1.8} />
@@ -513,7 +572,10 @@ export default function EvmPrivateKeysPage() {
                   })
                 ) : (
                   <tr>
-                    <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={5}>
+                    <td
+                      className="px-5 py-10 text-center text-sm text-slate-500"
+                      colSpan={5}
+                    >
                       No private keys saved yet.
                     </td>
                   </tr>
@@ -560,25 +622,40 @@ export default function EvmPrivateKeysPage() {
           <div className="grid gap-3">
             <Input
               value={form.name}
-              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, name: event.target.value }))
+              }
               placeholder="Key name"
             />
             <Input
               type="password"
               value={form.privateKey}
-              onChange={(event) => setForm((current) => ({ ...current, privateKey: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  privateKey: event.target.value,
+                }))
+              }
               placeholder="0x..."
             />
             <Input
               type="password"
               value={form.password}
-              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  password: event.target.value,
+                }))
+              }
               placeholder="Optional password for remote encryption"
             />
             <p className="text-xs text-slate-500">
-              Leave the password empty to store the key as plain text in your remote account.
+              Leave the password empty to store the key as plain text in your
+              remote account.
             </p>
-            {createError ? <p className="text-sm text-rose-600">{createError}</p> : null}
+            {createError ? (
+              <p className="text-sm text-rose-600">{createError}</p>
+            ) : null}
           </div>
         </ModalDialog>
 
@@ -619,13 +696,23 @@ export default function EvmPrivateKeysPage() {
           <div className="grid gap-3">
             <Input
               value={editForm.name}
-              onChange={(event) => setEditForm((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) =>
+                setEditForm((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
               placeholder="Key name"
             />
             <Input
               type="text"
               value={editForm.privateKey}
-              onChange={(event) => setEditForm((current) => ({ ...current, privateKey: event.target.value }))}
+              onChange={(event) =>
+                setEditForm((current) => ({
+                  ...current,
+                  privateKey: event.target.value,
+                }))
+              }
               placeholder="0x..."
             />
             <Select
@@ -648,27 +735,35 @@ export default function EvmPrivateKeysPage() {
             <Input
               type="password"
               value={editForm.password}
-              onChange={(event) => setEditForm((current) => ({ ...current, password: event.target.value }))}
+              onChange={(event) =>
+                setEditForm((current) => ({
+                  ...current,
+                  password: event.target.value,
+                }))
+              }
               placeholder={
-                editForm.securityMode === "encrypted"
+                editForm.securityMode === 'encrypted'
                   ? editUnlockPasswordFallback
-                    ? "Leave empty to keep the current password"
-                    : "Password for encrypted storage"
-                  : "Password not required for plain storage"
+                    ? 'Leave empty to keep the current password'
+                    : 'Password for encrypted storage'
+                  : 'Password not required for plain storage'
               }
             />
-            {editForm.securityMode === "encrypted" ? (
+            {editForm.securityMode === 'encrypted' ? (
               <p className="text-xs text-slate-500">
                 {editUnlockPasswordFallback
-                  ? "Leave the password empty to keep the current encryption password."
-                  : "Encrypted storage requires a password."}
+                  ? 'Leave the password empty to keep the current encryption password.'
+                  : 'Encrypted storage requires a password.'}
               </p>
             ) : (
               <p className="text-xs text-slate-500">
-                Plain storage keeps the private key unencrypted in your remote account.
+                Plain storage keeps the private key unencrypted in your remote
+                account.
               </p>
             )}
-            {editError ? <p className="text-sm text-rose-600">{editError}</p> : null}
+            {editError ? (
+              <p className="text-sm text-rose-600">{editError}</p>
+            ) : null}
           </div>
         </ModalDialog>
 
@@ -679,11 +774,15 @@ export default function EvmPrivateKeysPage() {
 
             if (!open) {
               setRevealedItem(null);
-              setRevealedPrivateKey("");
+              setRevealedPrivateKey('');
             }
           }}
           title="View Private Key"
-          description={revealedItem ? `Showing the private key for "${revealedItem.name}".` : undefined}
+          description={
+            revealedItem
+              ? `Showing the private key for "${revealedItem.name}".`
+              : undefined
+          }
           footer={
             <>
               <Button
@@ -692,7 +791,7 @@ export default function EvmPrivateKeysPage() {
                 onClick={() => {
                   setRevealDialogOpen(false);
                   setRevealedItem(null);
-                  setRevealedPrivateKey("");
+                  setRevealedPrivateKey('');
                 }}
               >
                 Close
@@ -702,8 +801,8 @@ export default function EvmPrivateKeysPage() {
                 onClick={() => {
                   void navigator.clipboard.writeText(revealedPrivateKey);
                   showToast({
-                    title: "Private key copied.",
-                    tone: "success",
+                    title: 'Private key copied.',
+                    tone: 'success',
                   });
                 }}
                 disabled={!revealedPrivateKey}
@@ -717,7 +816,9 @@ export default function EvmPrivateKeysPage() {
         >
           <div className="grid gap-3">
             <Input type="text" value={revealedPrivateKey} readOnly />
-            <p className="text-xs text-rose-600">Anyone with this value can control the account.</p>
+            <p className="text-xs text-rose-600">
+              Anyone with this value can control the account.
+            </p>
           </div>
         </ModalDialog>
 
@@ -727,7 +828,7 @@ export default function EvmPrivateKeysPage() {
             setUnlockDialogOpen(open);
 
             if (!open) {
-              setUnlockPassword("");
+              setUnlockPassword('');
               setUnlockError(null);
               setPendingProtectedAction(null);
             }
@@ -735,8 +836,8 @@ export default function EvmPrivateKeysPage() {
           title="Unlock Private Key"
           description={
             pendingProtectedAction
-              ? `Enter the password for "${pendingProtectedAction.item.name}" to ${pendingProtectedAction.type === "view" ? "view" : "edit"} the private key.`
-              : "Enter the password to continue."
+              ? `Enter the password for "${pendingProtectedAction.item.name}" to ${pendingProtectedAction.type === 'view' ? 'view' : 'edit'} the private key.`
+              : 'Enter the password to continue.'
           }
           value={unlockPassword}
           onValueChange={setUnlockPassword}

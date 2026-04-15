@@ -1,7 +1,7 @@
-import { http, webSocket } from "viem";
+import { http, webSocket } from 'viem';
 
 export function isWebSocketUrl(url: string) {
-  return url.startsWith("ws://") || url.startsWith("wss://");
+  return url.startsWith('ws://') || url.startsWith('wss://');
 }
 
 export function createEvmTransport(rpcUrl: string) {

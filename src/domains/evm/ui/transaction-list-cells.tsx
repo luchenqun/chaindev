@@ -1,9 +1,14 @@
-"use client";
+'use client';
 
-import { IconAlertCircle, IconArrowUpRight, IconCopy, IconEye } from "@tabler/icons-react";
-import Link from "next/link";
-import { createPortal } from "react-dom";
-import { useEffect, useRef, useState } from "react";
+import {
+  IconAlertCircle,
+  IconArrowUpRight,
+  IconCopy,
+  IconEye,
+} from '@tabler/icons-react';
+import Link from 'next/link';
+import { createPortal } from 'react-dom';
+import { useEffect, useRef, useState } from 'react';
 
 export type TransactionPreviewData = {
   hash: string;
@@ -18,15 +23,15 @@ export type TransactionPreviewData = {
 };
 
 function getCachedStatusClasses(status?: string) {
-  if (status === "success") {
-    return "text-emerald-600";
+  if (status === 'success') {
+    return 'text-emerald-600';
   }
 
-  if (status === "reverted") {
-    return "text-rose-600";
+  if (status === 'reverted') {
+    return 'text-rose-600';
   }
 
-  return "text-slate-500";
+  return 'text-slate-500';
 }
 
 export function TransactionHashCell(props: TransactionPreviewData) {
@@ -46,14 +51,14 @@ export function TransactionHashCell(props: TransactionPreviewData) {
     try {
       await navigator.clipboard.writeText(hash);
     } catch {
-      const textarea = document.createElement("textarea");
+      const textarea = document.createElement('textarea');
       textarea.value = hash;
-      textarea.setAttribute("readonly", "");
-      textarea.style.position = "absolute";
-      textarea.style.left = "-9999px";
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
       document.body.appendChild(textarea);
       textarea.select();
-      document.execCommand("copy");
+      document.execCommand('copy');
       document.body.removeChild(textarea);
     }
 
@@ -71,11 +76,17 @@ export function TransactionHashCell(props: TransactionPreviewData) {
 
   return (
     <div className="flex items-center gap-0.5">
-      {receiptStatus === "reverted" ? (
-        <IconAlertCircle className="size-5 shrink-0 text-rose-500" stroke={1.9} />
+      {receiptStatus === 'reverted' ? (
+        <IconAlertCircle
+          className="size-5 shrink-0 text-rose-500"
+          stroke={1.9}
+        />
       ) : null}
       <div className="relative inline-flex items-center gap-1.5">
-        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${hash}`}>
+        <Link
+          className="font-medium text-sky-600 hover:text-sky-700"
+          href={`/evm/tx/${hash}`}
+        >
           {hashLabel}
         </Link>
         <button
@@ -88,7 +99,7 @@ export function TransactionHashCell(props: TransactionPreviewData) {
         </button>
         <span
           className={`pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition-opacity ${
-            copied ? "opacity-100" : "opacity-0"
+            copied ? 'opacity-100' : 'opacity-0'
           }`}
         >
           <span className="block whitespace-nowrap">Copied!</span>
@@ -104,7 +115,10 @@ export function TransactionPreviewButton(props: {
 }) {
   const { transaction, methodLabel } = props;
   const [open, setOpen] = useState(false);
-  const [panelPosition, setPanelPosition] = useState<{ top: number; left: number } | null>(null);
+  const [panelPosition, setPanelPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -155,22 +169,22 @@ export function TransactionPreviewButton(props: {
     }
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         setOpen(false);
       }
     }
 
     updatePosition();
-    document.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("keydown", handleEscape);
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
 
     return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("keydown", handleEscape);
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
     };
   }, [open]);
 
@@ -179,15 +193,17 @@ export function TransactionPreviewButton(props: {
       <button
         ref={triggerRef}
         type="button"
-        aria-label={open ? "Hide transaction preview" : "Show transaction preview"}
+        aria-label={
+          open ? 'Hide transaction preview' : 'Show transaction preview'
+        }
         className={`inline-flex size-5 items-center justify-center transition ${
-          open ? "text-slate-700" : "text-slate-500 hover:text-slate-700"
+          open ? 'text-slate-700' : 'text-slate-500 hover:text-slate-700'
         }`}
         onClick={() => setOpen((current) => !current)}
       >
         <IconEye className="size-4.5" stroke={1.8} />
       </button>
-      {open && panelPosition && typeof document !== "undefined"
+      {open && panelPosition && typeof document !== 'undefined'
         ? createPortal(
             <div
               ref={panelRef}
@@ -198,38 +214,61 @@ export function TransactionPreviewButton(props: {
               }}
             >
               <div className="border-b border-slate-200 pb-4">
-                <p className="text-lg font-semibold text-slate-900">Additional Info</p>
+                <p className="text-lg font-semibold text-slate-900">
+                  Additional Info
+                </p>
               </div>
 
               <div className="space-y-2 py-2">
                 <section className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Status</p>
-                  <p className={`text-sm font-semibold ${getCachedStatusClasses(transaction.receiptStatus)}`}>
-                    {transaction.receiptStatusLabel ?? "Unavailable"}
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Status
+                  </p>
+                  <p
+                    className={`text-sm font-semibold ${getCachedStatusClasses(transaction.receiptStatus)}`}
+                  >
+                    {transaction.receiptStatusLabel ?? 'Unavailable'}
                   </p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
-                  <p className="text-sm font-medium text-slate-900">{methodLabel}</p>
-                </section>
-
-                <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Transaction Fee</p>
-                  <p className="text-sm font-medium text-slate-900">{transaction.feeLabel ?? "Unavailable"}</p>
-                </section>
-
-                <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Info</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Method
+                  </p>
                   <p className="text-sm font-medium text-slate-900">
-                    {transaction.gasUsedLabel ?? "Unavailable"} gas used from {transaction.gasLimitLabel ?? "Unavailable"} limit
+                    {methodLabel}
                   </p>
-                  <p className="text-xs text-slate-500">@ {transaction.effectiveGasPriceLabel ?? "Unavailable"}</p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Nonce</p>
-                  <p className="text-sm font-medium text-slate-900">{transaction.nonceLabel ?? "Unavailable"}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Transaction Fee
+                  </p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {transaction.feeLabel ?? 'Unavailable'}
+                  </p>
+                </section>
+
+                <section className="space-y-1 border-t border-slate-200 pt-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Gas Info
+                  </p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {transaction.gasUsedLabel ?? 'Unavailable'} gas used from{' '}
+                    {transaction.gasLimitLabel ?? 'Unavailable'} limit
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    @ {transaction.effectiveGasPriceLabel ?? 'Unavailable'}
+                  </p>
+                </section>
+
+                <section className="space-y-1 border-t border-slate-200 pt-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Nonce
+                  </p>
+                  <p className="text-sm font-medium text-slate-900">
+                    {transaction.nonceLabel ?? 'Unavailable'}
+                  </p>
                 </section>
               </div>
 
@@ -239,7 +278,10 @@ export function TransactionPreviewButton(props: {
                   href={`/evm/tx/${transaction.hash}`}
                 >
                   See more details
-                  <IconArrowUpRight className="size-3.5 text-slate-400" stroke={1.8} />
+                  <IconArrowUpRight
+                    className="size-3.5 text-slate-400"
+                    stroke={1.8}
+                  />
                 </Link>
               </div>
             </div>,

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   IconListDetails,
@@ -10,28 +10,31 @@ import {
   IconRocket,
   IconTrash,
   IconX,
-} from "@tabler/icons-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { isAddress, type AbiParameter } from "viem";
-import { ActionIconButton } from "@/components/ui/action-icon-button";
-import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Input } from "@/components/ui/input";
-import { JsonInput } from "@/components/ui/json-input";
-import { ModalDialog } from "@/components/ui/modal-dialog";
-import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
+} from '@tabler/icons-react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { isAddress, type AbiParameter } from 'viem';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Input } from '@/components/ui/input';
+import { JsonInput } from '@/components/ui/json-input';
+import { ModalDialog } from '@/components/ui/modal-dialog';
+import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useToast } from "@/components/ui/toast";
-import { getContractConstructor, getContractFunctions } from "@/domains/evm/client/abi-utils";
+} from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
+import {
+  getContractConstructor,
+  getContractFunctions,
+} from '@/domains/evm/client/abi-utils';
 import {
   createEvmContractArtifact,
   createEvmContractBinding,
@@ -46,13 +49,13 @@ import {
   updateEvmContractBinding,
   type EvmContractArtifact,
   type EvmContractBinding,
-} from "@/domains/evm/client/contract-registry";
+} from '@/domains/evm/client/contract-registry';
 import {
   forceDeployEvmContractDirect,
   getActiveEvmContractEnvironmentDirect,
   getEvmContractDeployManualDefaultsDirect,
-} from "@/domains/evm/client/contract-executor";
-import { getArtifactDefaultAddressByName } from "@/domains/evm/lib/precompile-artifact-default-addresses";
+} from '@/domains/evm/client/contract-executor';
+import { getArtifactDefaultAddressByName } from '@/domains/evm/lib/precompile-artifact-default-addresses';
 import {
   getActiveEvmStoredPrivateKey,
   isEvmStoredPrivateKeyUnlocked,
@@ -60,15 +63,15 @@ import {
   resolveEvmStoredPrivateKey,
   subscribeEvmKeyring,
   type EvmStoredPrivateKey,
-} from "@/domains/evm/client/keyring";
-import { AddressLink } from "@/domains/evm/ui/address-link";
-import { AppShell } from "@/platform/layout/app-shell";
-import { AccountWorkbenchShell } from "@/platform/layout/account-workbench-shell";
+} from '@/domains/evm/client/keyring';
+import { AddressLink } from '@/domains/evm/ui/address-link';
+import { AppShell } from '@/platform/layout/app-shell';
+import { AccountWorkbenchShell } from '@/platform/layout/account-workbench-shell';
 
 const textareaClassName =
-  "min-h-32 w-full resize-none overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
+  'min-h-32 w-full resize-none overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400';
 const importTextareaClassName =
-  "min-h-24 max-h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
+  'min-h-24 max-h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400';
 type EnvironmentState = {
   providerProfileId: string;
   providerName: string;
@@ -76,7 +79,7 @@ type EnvironmentState = {
   nativeCurrency: string;
 } | null;
 
-type DeployTransactionType = "LEGACY" | "EIP1559";
+type DeployTransactionType = 'LEGACY' | 'EIP1559';
 
 type DeployDialogState = {
   transactionType: DeployTransactionType;
@@ -91,12 +94,12 @@ type DeployDialogState = {
 function hasTupleComponents(
   parameter: AbiParameter,
 ): parameter is AbiParameter & { components: readonly AbiParameter[] } {
-  return "components" in parameter && Array.isArray(parameter.components);
+  return 'components' in parameter && Array.isArray(parameter.components);
 }
 
 function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
-  if (parameter.type.endsWith("]")) {
-    const baseType = parameter.type.slice(0, parameter.type.lastIndexOf("["));
+  if (parameter.type.endsWith(']')) {
+    const baseType = parameter.type.slice(0, parameter.type.lastIndexOf('['));
     const baseParameter = {
       ...parameter,
       type: baseType,
@@ -105,8 +108,10 @@ function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
     return [createComplexParameterTemplateValue(baseParameter)];
   }
 
-  if (parameter.type === "tuple") {
-    const components = hasTupleComponents(parameter) ? parameter.components : [];
+  if (parameter.type === 'tuple') {
+    const components = hasTupleComponents(parameter)
+      ? parameter.components
+      : [];
 
     return Object.fromEntries(
       components.map((component, index) => [
@@ -116,33 +121,37 @@ function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
     );
   }
 
-  if (parameter.type === "bool") {
-    return "false";
+  if (parameter.type === 'bool') {
+    return 'false';
   }
 
   if (/^u?int\d*$/.test(parameter.type)) {
-    return "0";
+    return '0';
   }
 
-  if (parameter.type === "address") {
-    return "0x0000000000000000000000000000000000000000";
+  if (parameter.type === 'address') {
+    return '0x0000000000000000000000000000000000000000';
   }
 
-  if (parameter.type === "bytes" || /^bytes\d+$/.test(parameter.type)) {
-    return "0x";
+  if (parameter.type === 'bytes' || /^bytes\d+$/.test(parameter.type)) {
+    return '0x';
   }
 
-  return "";
+  return '';
 }
 
 function getComplexParameterTemplate(parameter: AbiParameter) {
-  return JSON.stringify(createComplexParameterTemplateValue(parameter), null, 2);
+  return JSON.stringify(
+    createComplexParameterTemplateValue(parameter),
+    null,
+    2,
+  );
 }
 
 function getInitialArgumentValue(parameter: AbiParameter) {
-  return parameter.type.includes("[") || parameter.type === "tuple"
+  return parameter.type.includes('[') || parameter.type === 'tuple'
     ? getComplexParameterTemplate(parameter)
-    : "";
+    : '';
 }
 
 function ContractInputsForm({
@@ -155,13 +164,17 @@ function ContractInputsForm({
   onChange: (index: number, value: string) => void;
 }) {
   if (!inputs.length) {
-    return <p className="text-sm text-slate-500">This contract deployment does not require constructor arguments.</p>;
+    return (
+      <p className="text-sm text-slate-500">
+        This contract deployment does not require constructor arguments.
+      </p>
+    );
   }
 
   return (
     <div className="grid gap-3">
       {inputs.map((input, index) => {
-        const isComplex = input.type.includes("[") || input.type === "tuple";
+        const isComplex = input.type.includes('[') || input.type === 'tuple';
         const label = input.name || `arg${index + 1}`;
 
         return (
@@ -171,16 +184,18 @@ function ContractInputsForm({
             </label>
             {isComplex ? (
               <JsonInput
-                value={values[index] ?? ""}
+                value={values[index] ?? ''}
                 onChange={(value) => onChange(index, value)}
                 placeholder={getComplexParameterTemplate(input)}
                 textareaClassName={textareaClassName}
               />
             ) : (
               <Input
-                value={values[index] ?? ""}
+                value={values[index] ?? ''}
                 onChange={(event) => onChange(index, event.target.value)}
-                placeholder={input.type === "bool" ? "true or false" : input.type}
+                placeholder={
+                  input.type === 'bool' ? 'true or false' : input.type
+                }
               />
             )}
           </div>
@@ -191,18 +206,18 @@ function ContractInputsForm({
 }
 
 function formatTimestamp(timestamp: number) {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
     hour12: false,
   }).format(new Date(timestamp));
 }
 
 function normalizeDeployErrorMessage(message: string) {
   if (/only developer can create contract/i.test(message)) {
-    return "Deployment rejected by the current chain. Only developer-authorized accounts can create contracts.";
+    return 'Deployment rejected by the current chain. Only developer-authorized accounts can create contracts.';
   }
 
   const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
@@ -212,7 +227,7 @@ function normalizeDeployErrorMessage(message: string) {
   }
 
   if (/Missing or invalid parameters\./i.test(message)) {
-    return "Deployment failed. The current RPC node rejected the request parameters.";
+    return 'Deployment failed. The current RPC node rejected the request parameters.';
   }
 
   return message;
@@ -220,7 +235,7 @@ function normalizeDeployErrorMessage(message: string) {
 
 function normalizeWorkbenchErrorMessage(message: string, fallback: string) {
   if (/only developer can create contract/i.test(message)) {
-    return "Deployment rejected by the current chain. Only developer-authorized accounts can create contracts.";
+    return 'Deployment rejected by the current chain. Only developer-authorized accounts can create contracts.';
   }
 
   const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
@@ -240,29 +255,31 @@ function formatAddressLabel(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
 }
 
-function getDefaultBindingAddressForArtifact(artifact?: Pick<EvmContractArtifact, "name"> | null) {
+function getDefaultBindingAddressForArtifact(
+  artifact?: Pick<EvmContractArtifact, 'name'> | null,
+) {
   if (!artifact) {
-    return "";
+    return '';
   }
 
-  return getArtifactDefaultAddressByName(artifact.name) ?? "";
+  return getArtifactDefaultAddressByName(artifact.name) ?? '';
 }
 
 function createInitialDeployDialogState(): DeployDialogState {
   return {
-    transactionType: "EIP1559",
-    value: "0",
-    gasPrice: "",
-    maxFeePerGas: "auto",
-    maxPriorityFeePerGas: "auto",
-    gasLimit: "",
-    nonce: "auto",
+    transactionType: 'EIP1559',
+    value: '0',
+    gasPrice: '',
+    maxFeePerGas: 'auto',
+    maxPriorityFeePerGas: 'auto',
+    gasLimit: '',
+    nonce: 'auto',
   };
 }
 
 function isAutoFieldValue(value: string) {
   const normalizedValue = value.trim().toLowerCase();
-  return !normalizedValue || normalizedValue === "auto";
+  return !normalizedValue || normalizedValue === 'auto';
 }
 
 function isValidNativeValueInput(value: string) {
@@ -280,18 +297,22 @@ function isDeployDialogReady(state: DeployDialogState) {
     return false;
   }
 
-  if (state.transactionType === "LEGACY") {
+  if (state.transactionType === 'LEGACY') {
     return !!state.gasPrice.trim();
   }
 
   return (
     (isAutoFieldValue(state.nonce) || !!state.nonce.trim()) &&
     (isAutoFieldValue(state.maxFeePerGas) || !!state.maxFeePerGas.trim()) &&
-    (isAutoFieldValue(state.maxPriorityFeePerGas) || !!state.maxPriorityFeePerGas.trim())
+    (isAutoFieldValue(state.maxPriorityFeePerGas) ||
+      !!state.maxPriorityFeePerGas.trim())
   );
 }
 
-function areDeployConstructorArgsReady(inputs: readonly AbiParameter[], values: string[]) {
+function areDeployConstructorArgsReady(
+  inputs: readonly AbiParameter[],
+  values: string[],
+) {
   return inputs.every((_, index) => !!values[index]?.trim());
 }
 
@@ -318,28 +339,37 @@ export default function EvmContractsRegistryPage() {
   const [artifactDialogOpen, setArtifactDialogOpen] = useState(false);
   const [artifactForm, setArtifactForm] = useState({
     id: null as string | null,
-    scope: "user" as "system" | "user",
-    name: "",
-    abiJson: "",
-    bytecode: "",
-    contractAddress: "",
+    scope: 'user' as 'system' | 'user',
+    name: '',
+    abiJson: '',
+    bytecode: '',
+    contractAddress: '',
   });
-  const [artifactImportText, setArtifactImportText] = useState("");
+  const [artifactImportText, setArtifactImportText] = useState('');
   const [bindingForm, setBindingForm] = useState({
     id: null as string | null,
-    artifactId: "",
-    address: "",
-    label: "",
+    artifactId: '',
+    address: '',
+    label: '',
   });
-  const [artifactDetailsTarget, setArtifactDetailsTarget] = useState<EvmContractArtifact | null>(null);
-  const [defaultBindingDialogOpen, setDefaultBindingDialogOpen] = useState(false);
-  const [selectedDefaultBindingArtifactIds, setSelectedDefaultBindingArtifactIds] = useState<string[]>([]);
-  const [importSystemBindingsLoading, setImportSystemBindingsLoading] = useState(false);
+  const [artifactDetailsTarget, setArtifactDetailsTarget] =
+    useState<EvmContractArtifact | null>(null);
+  const [defaultBindingDialogOpen, setDefaultBindingDialogOpen] =
+    useState(false);
+  const [
+    selectedDefaultBindingArtifactIds,
+    setSelectedDefaultBindingArtifactIds,
+  ] = useState<string[]>([]);
+  const [importSystemBindingsLoading, setImportSystemBindingsLoading] =
+    useState(false);
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false);
   const [deployArtifactId, setDeployArtifactId] = useState<string | null>(null);
-  const [deployArgumentValues, setDeployArgumentValues] = useState<string[]>([]);
-  const [deployDialogValues, setDeployDialogValues] = useState<DeployDialogState>(createInitialDeployDialogState());
-  const [deployBindingLabel, setDeployBindingLabel] = useState("");
+  const [deployArgumentValues, setDeployArgumentValues] = useState<string[]>(
+    [],
+  );
+  const [deployDialogValues, setDeployDialogValues] =
+    useState<DeployDialogState>(createInitialDeployDialogState());
+  const [deployBindingLabel, setDeployBindingLabel] = useState('');
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployResult, setDeployResult] = useState<{
     hash: string;
@@ -347,43 +377,53 @@ export default function EvmContractsRegistryPage() {
     bindingId: string | null;
     bindingError: string | null;
   } | null>(null);
-  const [deployActionLoading, setDeployActionLoading] = useState<"fill" | "deploy" | null>(null);
+  const [deployActionLoading, setDeployActionLoading] = useState<
+    'fill' | 'deploy' | null
+  >(null);
   const [deployUnlockDialogOpen, setDeployUnlockDialogOpen] = useState(false);
-  const [deployUnlockPassword, setDeployUnlockPassword] = useState("");
-  const [deployUnlockError, setDeployUnlockError] = useState<string | null>(null);
-  const [pendingDeployAction, setPendingDeployAction] = useState<"fill" | "deploy" | null>(null);
+  const [deployUnlockPassword, setDeployUnlockPassword] = useState('');
+  const [deployUnlockError, setDeployUnlockError] = useState<string | null>(
+    null,
+  );
+  const [pendingDeployAction, setPendingDeployAction] = useState<
+    'fill' | 'deploy' | null
+  >(null);
 
   function goToLogin() {
-    router.push("/login?callbackUrl=%2Fevm%2Fcontracts");
+    router.push('/login?callbackUrl=%2Fevm%2Fcontracts');
   }
   const [artifactError, setArtifactError] = useState<string | null>(null);
   const [bindingError, setBindingError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<
-    | { type: "artifact"; id: string; title: string; description: string }
-    | { type: "binding"; id: string; title: string; description: string }
+    | { type: 'artifact'; id: string; title: string; description: string }
+    | { type: 'binding'; id: string; title: string; description: string }
     | null
   >(null);
   const environmentRef = useRef<EnvironmentState>(null);
   const deployDefaultsRequestIdRef = useRef(0);
   const deploySimulationFailureRef = useRef<{ key: string; attempts: number }>({
-    key: "",
+    key: '',
     attempts: 0,
   });
 
   useEffect(() => {
-    if (status === "loading") {
+    if (status === 'loading') {
       return;
     }
 
     let cancelled = false;
 
     async function load() {
-      if (status === "authenticated") {
+      if (status === 'authenticated') {
         try {
           await syncEvmContractRegistryFromServer();
         } catch (error) {
           if (!cancelled) {
-            setArtifactError(error instanceof Error ? error.message : "Failed to load contract registry.");
+            setArtifactError(
+              error instanceof Error
+                ? error.message
+                : 'Failed to load contract registry.',
+            );
           }
         }
       }
@@ -397,7 +437,12 @@ export default function EvmContractsRegistryPage() {
       environmentRef.current = nextEnvironment;
       setEnvironment(nextEnvironment);
       setArtifacts(listEvmContractArtifacts());
-      setBindings(listEvmContractBindingsByScope(nextEnvironment.chainId, nextEnvironment.providerProfileId));
+      setBindings(
+        listEvmContractBindingsByScope(
+          nextEnvironment.chainId,
+          nextEnvironment.providerProfileId,
+        ),
+      );
     }
 
     void load();
@@ -423,19 +468,25 @@ export default function EvmContractsRegistryPage() {
       setBindingDialogOpen(false);
       setBindingForm({
         id: null,
-        artifactId: "",
-        address: "",
-        label: "",
+        artifactId: '',
+        address: '',
+        label: '',
       });
       void load();
     };
 
-    window.addEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+    window.addEventListener(
+      'chaindev:active-rpc-profile-changed',
+      handleProfileChanged,
+    );
 
     return () => {
       cancelled = true;
       unsubscribe();
-      window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
+      window.removeEventListener(
+        'chaindev:active-rpc-profile-changed',
+        handleProfileChanged,
+      );
     };
   }, [status]);
 
@@ -450,32 +501,46 @@ export default function EvmContractsRegistryPage() {
   }, []);
 
   const artifactsById = useMemo(
-    () => Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifact])),
+    () =>
+      Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifact])),
     [artifacts],
   );
-  const isAdmin = Boolean((session?.user as { isAdmin?: boolean } | undefined)?.isAdmin);
+  const isAdmin = Boolean(
+    (session?.user as { isAdmin?: boolean } | undefined)?.isAdmin,
+  );
   const myArtifacts = useMemo(
-    () => artifacts.filter((artifact) => artifact.scope === "user"),
+    () => artifacts.filter((artifact) => artifact.scope === 'user'),
     [artifacts],
   );
   const systemArtifacts = useMemo(
-    () => artifacts.filter((artifact) => artifact.scope === "system"),
+    () => artifacts.filter((artifact) => artifact.scope === 'system'),
     [artifacts],
   );
   const importableSystemArtifacts = useMemo(
-    () => systemArtifacts.filter((artifact) => getArtifactDefaultAddressByName(artifact.name) !== null),
+    () =>
+      systemArtifacts.filter(
+        (artifact) => getArtifactDefaultAddressByName(artifact.name) !== null,
+      ),
     [systemArtifacts],
   );
   const deployArtifact = useMemo(
-    () => (deployArtifactId ? artifacts.find((artifact) => artifact.id === deployArtifactId) ?? null : null),
+    () =>
+      deployArtifactId
+        ? (artifacts.find((artifact) => artifact.id === deployArtifactId) ??
+          null)
+        : null,
     [artifacts, deployArtifactId],
   );
   const artifactDetailsFunctions = useMemo(
-    () => (artifactDetailsTarget ? getContractFunctions(artifactDetailsTarget.abiJson) : []),
+    () =>
+      artifactDetailsTarget
+        ? getContractFunctions(artifactDetailsTarget.abiJson)
+        : [],
     [artifactDetailsTarget],
   );
   const deployConstructor = useMemo(
-    () => (deployArtifact ? getContractConstructor(deployArtifact.abiJson) : null),
+    () =>
+      deployArtifact ? getContractConstructor(deployArtifact.abiJson) : null,
     [deployArtifact],
   );
   const deploySimulationKey = useMemo(
@@ -488,7 +553,11 @@ export default function EvmContractsRegistryPage() {
     [deployArgumentValues, deployArtifact?.id, deployDialogValues.value],
   );
   const isDeploySimulationReady = useMemo(
-    () => areDeployConstructorArgsReady(deployConstructor?.inputs ?? [], deployArgumentValues),
+    () =>
+      areDeployConstructorArgsReady(
+        deployConstructor?.inputs ?? [],
+        deployArgumentValues,
+      ),
     [deployConstructor, deployArgumentValues],
   );
 
@@ -504,22 +573,22 @@ export default function EvmContractsRegistryPage() {
   function resetArtifactForm() {
     setArtifactForm({
       id: null,
-      scope: "user",
-      name: "",
-      abiJson: "",
-      bytecode: "",
-      contractAddress: "",
+      scope: 'user',
+      name: '',
+      abiJson: '',
+      bytecode: '',
+      contractAddress: '',
     });
-    setArtifactImportText("");
+    setArtifactImportText('');
     setArtifactError(null);
   }
 
   function resetBindingForm() {
     setBindingForm({
       id: null,
-      artifactId: "",
-      address: "",
-      label: "",
+      artifactId: '',
+      address: '',
+      label: '',
     });
     setBindingError(null);
   }
@@ -528,22 +597,22 @@ export default function EvmContractsRegistryPage() {
     setDeployArtifactId(null);
     setDeployArgumentValues([]);
     setDeployDialogValues(createInitialDeployDialogState());
-    setDeployBindingLabel("");
+    setDeployBindingLabel('');
     setDeployError(null);
     setDeployResult(null);
     setDeployActionLoading(null);
     setDeployUnlockDialogOpen(false);
-    setDeployUnlockPassword("");
+    setDeployUnlockPassword('');
     setDeployUnlockError(null);
     setPendingDeployAction(null);
     deploySimulationFailureRef.current = {
-      key: "",
+      key: '',
       attempts: 0,
     };
   }
 
   function startArtifactEdit(artifact: EvmContractArtifact) {
-    if (status !== "authenticated") {
+    if (status !== 'authenticated') {
       goToLogin();
       return;
     }
@@ -553,16 +622,16 @@ export default function EvmContractsRegistryPage() {
       scope: artifact.scope,
       name: artifact.name,
       abiJson: artifact.abiJson,
-      bytecode: artifact.bytecode ?? "",
-      contractAddress: "",
+      bytecode: artifact.bytecode ?? '',
+      contractAddress: '',
     });
-    setArtifactImportText("");
+    setArtifactImportText('');
     setArtifactError(null);
     setArtifactDialogOpen(true);
   }
 
-  function startArtifactCreate(scope: "system" | "user" = "user") {
-    if (status !== "authenticated") {
+  function startArtifactCreate(scope: 'system' | 'user' = 'user') {
+    if (status !== 'authenticated') {
       goToLogin();
       return;
     }
@@ -576,11 +645,11 @@ export default function EvmContractsRegistryPage() {
   }
 
   function canManageArtifact(artifact: EvmContractArtifact) {
-    return artifact.scope === "user" || isAdmin;
+    return artifact.scope === 'user' || isAdmin;
   }
 
   function startBindingEdit(binding: EvmContractBinding) {
-    if (status !== "authenticated") {
+    if (status !== 'authenticated') {
       goToLogin();
       return;
     }
@@ -596,57 +665,60 @@ export default function EvmContractsRegistryPage() {
   }
 
   function startBindingCreate(artifact?: EvmContractArtifact) {
-    if (status !== "authenticated") {
+    if (status !== 'authenticated') {
       goToLogin();
       return;
     }
 
     setBindingForm({
       id: null,
-      artifactId: artifact?.id ?? "",
+      artifactId: artifact?.id ?? '',
       address: getDefaultBindingAddressForArtifact(artifact),
-      label: artifact?.name ?? "",
+      label: artifact?.name ?? '',
     });
     setBindingError(null);
     setBindingDialogOpen(true);
   }
 
   function openDefaultBindingDialog() {
-    if (status !== "authenticated") {
+    if (status !== 'authenticated') {
       goToLogin();
       return;
     }
 
     if (!environment) {
       showToast({
-        title: "Import failed",
-        description: "No active EVM provider selected.",
+        title: 'Import failed',
+        description: 'No active EVM provider selected.',
       });
       return;
     }
 
     if (!importableSystemArtifacts.length) {
       showToast({
-        title: "No default contracts",
-        description: "No system artifacts with default contract addresses were found.",
+        title: 'No default contracts',
+        description:
+          'No system artifacts with default contract addresses were found.',
       });
       return;
     }
 
-    setSelectedDefaultBindingArtifactIds(importableSystemArtifacts.map((artifact) => artifact.id));
+    setSelectedDefaultBindingArtifactIds(
+      importableSystemArtifacts.map((artifact) => artifact.id),
+    );
     setDefaultBindingDialogOpen(true);
   }
 
   async function handleImportSystemBindings() {
-    if (status !== "authenticated") {
+    if (status !== 'authenticated') {
       goToLogin();
       return;
     }
 
     if (!environment) {
       showToast({
-        title: "Import failed",
-        description: "No active EVM provider selected.",
+        title: 'Import failed',
+        description: 'No active EVM provider selected.',
       });
       return;
     }
@@ -657,7 +729,9 @@ export default function EvmContractsRegistryPage() {
       const importableArtifacts = importableSystemArtifacts.filter((artifact) =>
         selectedDefaultBindingArtifactIds.includes(artifact.id),
       );
-      const boundAddressSet = new Set(bindings.map((binding) => binding.addressLower));
+      const boundAddressSet = new Set(
+        bindings.map((binding) => binding.addressLower),
+      );
 
       let createdCount = 0;
       let skippedCount = 0;
@@ -689,7 +763,7 @@ export default function EvmContractsRegistryPage() {
           boundAddressSet.add(addressLower);
           createdCount += 1;
         } catch (error) {
-          if (error instanceof Error && error.name === "AuthRequiredError") {
+          if (error instanceof Error && error.name === 'AuthRequiredError') {
             goToLogin();
             return;
           }
@@ -699,11 +773,11 @@ export default function EvmContractsRegistryPage() {
       }
 
       showToast({
-        title: "System bindings imported",
+        title: 'System bindings imported',
         description:
           createdCount || skippedCount || failedCount
             ? `${createdCount} added, ${skippedCount} skipped, ${failedCount} failed.`
-            : "No importable system artifacts were found.",
+            : 'No importable system artifacts were found.',
       });
       setDefaultBindingDialogOpen(false);
     } finally {
@@ -714,18 +788,20 @@ export default function EvmContractsRegistryPage() {
   function startDeployArtifact(artifact: EvmContractArtifact) {
     setDeployArtifactId(artifact.id);
     const constructorItem = getContractConstructor(artifact.abiJson);
-    setDeployArgumentValues(constructorItem.inputs.map((input) => getInitialArgumentValue(input)));
+    setDeployArgumentValues(
+      constructorItem.inputs.map((input) => getInitialArgumentValue(input)),
+    );
     setDeployDialogValues(createInitialDeployDialogState());
     setDeployBindingLabel(artifact.name);
     setDeployError(null);
     setDeployResult(null);
     setDeployActionLoading(null);
     setDeployUnlockDialogOpen(false);
-    setDeployUnlockPassword("");
+    setDeployUnlockPassword('');
     setDeployUnlockError(null);
     setPendingDeployAction(null);
     deploySimulationFailureRef.current = {
-      key: "",
+      key: '',
       attempts: 0,
     };
   }
@@ -735,8 +811,9 @@ export default function EvmContractsRegistryPage() {
       !deployArtifact ||
       !deployArtifact.bytecode ||
       !activeKey ||
-      deployActionLoading === "deploy" ||
-      (activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
+      deployActionLoading === 'deploy' ||
+      (activeKey.securityMode === 'encrypted' &&
+        !isEvmStoredPrivateKeyUnlocked(activeKey.id)) ||
       !isDeploySimulationReady ||
       !isValidNativeValueInput(deployDialogValues.value)
     ) {
@@ -760,9 +837,9 @@ export default function EvmContractsRegistryPage() {
     return () => {
       window.clearTimeout(timeout);
     };
-  // fillDeployDefaults is intentionally omitted here so the debounce effect only reacts
-  // to simulation inputs, not to the recreated function identity on every render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // fillDeployDefaults is intentionally omitted here so the debounce effect only reacts
+    // to simulation inputs, not to the recreated function identity on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeKey,
     deployActionLoading,
@@ -778,7 +855,7 @@ export default function EvmContractsRegistryPage() {
       if (artifactForm.id) {
         await updateEvmContractArtifact(artifactForm.id, artifactForm);
         showToast({
-          title: "Artifact updated",
+          title: 'Artifact updated',
           description: `"${artifactForm.name.trim()}" was saved successfully.`,
         });
       } else {
@@ -786,11 +863,11 @@ export default function EvmContractsRegistryPage() {
 
         if (contractAddress) {
           if (!environment) {
-            throw new Error("No active EVM provider selected.");
+            throw new Error('No active EVM provider selected.');
           }
 
           if (!isAddress(contractAddress)) {
-            throw new Error("Contract address must be a valid EVM address.");
+            throw new Error('Contract address must be a valid EVM address.');
           }
         }
 
@@ -808,7 +885,7 @@ export default function EvmContractsRegistryPage() {
         }
 
         showToast({
-          title: "Artifact created",
+          title: 'Artifact created',
           description: contractAddress
             ? `"${artifactForm.name.trim()}" was added and bound successfully.`
             : `"${artifactForm.name.trim()}" was added successfully.`,
@@ -818,15 +895,17 @@ export default function EvmContractsRegistryPage() {
       resetArtifactForm();
       setArtifactDialogOpen(false);
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
       setArtifactError(
         normalizeWorkbenchErrorMessage(
-          error instanceof Error ? error.message : "Failed to save contract artifact.",
-          "Failed to save contract artifact.",
+          error instanceof Error
+            ? error.message
+            : 'Failed to save contract artifact.',
+          'Failed to save contract artifact.',
         ),
       );
     }
@@ -846,8 +925,10 @@ export default function EvmContractsRegistryPage() {
     } catch (error) {
       setArtifactError(
         normalizeWorkbenchErrorMessage(
-          error instanceof Error ? error.message : "Failed to parse contract artifact.",
-          "Failed to parse contract artifact.",
+          error instanceof Error
+            ? error.message
+            : 'Failed to parse contract artifact.',
+          'Failed to parse contract artifact.',
         ),
       );
     }
@@ -864,8 +945,8 @@ export default function EvmContractsRegistryPage() {
     }
 
     const looksCompleteJson =
-      (trimmedValue.startsWith("{") && trimmedValue.endsWith("}")) ||
-      (trimmedValue.startsWith("[") && trimmedValue.endsWith("]"));
+      (trimmedValue.startsWith('{') && trimmedValue.endsWith('}')) ||
+      (trimmedValue.startsWith('[') && trimmedValue.endsWith(']'));
 
     if (!looksCompleteJson) {
       return;
@@ -876,7 +957,7 @@ export default function EvmContractsRegistryPage() {
 
   async function handleSaveBinding() {
     if (!environment) {
-      setBindingError("No active EVM provider selected.");
+      setBindingError('No active EVM provider selected.');
       return;
     }
 
@@ -889,7 +970,7 @@ export default function EvmContractsRegistryPage() {
           providerName: environment.providerName,
         });
         showToast({
-          title: "Binding updated",
+          title: 'Binding updated',
           description: `"${bindingForm.label.trim() || bindingForm.address}" was updated successfully.`,
         });
       } else {
@@ -900,7 +981,7 @@ export default function EvmContractsRegistryPage() {
           providerName: environment.providerName,
         });
         showToast({
-          title: "Binding created",
+          title: 'Binding created',
           description: `"${bindingForm.label.trim() || bindingForm.address}" was added successfully.`,
         });
       }
@@ -908,15 +989,17 @@ export default function EvmContractsRegistryPage() {
       resetBindingForm();
       setBindingDialogOpen(false);
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
       setBindingError(
         normalizeWorkbenchErrorMessage(
-          error instanceof Error ? error.message : "Failed to save contract binding.",
-          "Failed to save contract binding.",
+          error instanceof Error
+            ? error.message
+            : 'Failed to save contract binding.',
+          'Failed to save contract binding.',
         ),
       );
     }
@@ -937,21 +1020,21 @@ export default function EvmContractsRegistryPage() {
     },
   ) {
     if (!deployArtifact) {
-      setDeployError("Select a contract artifact first.");
+      setDeployError('Select a contract artifact first.');
       return;
     }
 
     if (!deployArtifact.bytecode) {
-      setDeployError("This artifact does not include deployable bytecode.");
+      setDeployError('This artifact does not include deployable bytecode.');
       return;
     }
 
     if (!activeKey) {
-      setDeployError("Select a global private key first.");
+      setDeployError('Select a global private key first.');
       return;
     }
 
-    setDeployActionLoading("fill");
+    setDeployActionLoading('fill');
     const requestId = deployDefaultsRequestIdRef.current + 1;
     deployDefaultsRequestIdRef.current = requestId;
     const rawArgs = overrides?.rawArgs ?? deployArgumentValues;
@@ -982,12 +1065,14 @@ export default function EvmContractsRegistryPage() {
         ...current,
         transactionType: defaults.transactionType,
         gasPrice: defaults.gasPrice,
-        maxFeePerGas: isAutoFieldValue(current.maxFeePerGas) ? "auto" : current.maxFeePerGas,
+        maxFeePerGas: isAutoFieldValue(current.maxFeePerGas)
+          ? 'auto'
+          : current.maxFeePerGas,
         maxPriorityFeePerGas: isAutoFieldValue(current.maxPriorityFeePerGas)
-          ? "auto"
+          ? 'auto'
           : current.maxPriorityFeePerGas,
         gasLimit: defaults.estimatedGas || current.gasLimit,
-        nonce: isAutoFieldValue(current.nonce) ? "auto" : current.nonce,
+        nonce: isAutoFieldValue(current.nonce) ? 'auto' : current.nonce,
       }));
 
       if (defaults.simulationError) {
@@ -1007,15 +1092,18 @@ export default function EvmContractsRegistryPage() {
         setDeployError(null);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to simulate deployment.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to simulate deployment.';
 
       if (requestId !== deployDefaultsRequestIdRef.current) {
         return;
       }
 
-      if (message === "Password is required.") {
-        setPendingDeployAction("fill");
-        setDeployUnlockPassword("");
+      if (message === 'Password is required.') {
+        setPendingDeployAction('fill');
+        setDeployUnlockPassword('');
         setDeployUnlockError(null);
         setDeployUnlockDialogOpen(true);
         return;
@@ -1038,21 +1126,21 @@ export default function EvmContractsRegistryPage() {
 
   async function executeDeployAction() {
     if (!deployArtifact) {
-      setDeployError("Select a contract artifact first.");
+      setDeployError('Select a contract artifact first.');
       return;
     }
 
     if (!deployArtifact.bytecode) {
-      setDeployError("This artifact does not include deployable bytecode.");
+      setDeployError('This artifact does not include deployable bytecode.');
       return;
     }
 
     if (!activeKey) {
-      setDeployError("Select a global private key first.");
+      setDeployError('Select a global private key first.');
       return;
     }
 
-    setDeployActionLoading("deploy");
+    setDeployActionLoading('deploy');
     setDeployError(null);
     deployDefaultsRequestIdRef.current += 1;
     let deploySucceeded = false;
@@ -1060,7 +1148,7 @@ export default function EvmContractsRegistryPage() {
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id);
       const latestDefaults =
-        deployDialogValues.transactionType === "EIP1559" &&
+        deployDialogValues.transactionType === 'EIP1559' &&
         (isAutoFieldValue(deployDialogValues.maxFeePerGas) ||
           isAutoFieldValue(deployDialogValues.maxPriorityFeePerGas) ||
           isAutoFieldValue(deployDialogValues.nonce))
@@ -1085,8 +1173,11 @@ export default function EvmContractsRegistryPage() {
         maxFeePerGas: isAutoFieldValue(deployDialogValues.maxFeePerGas)
           ? (latestDefaults?.maxFeePerGas ?? deployDialogValues.maxFeePerGas)
           : deployDialogValues.maxFeePerGas,
-        maxPriorityFeePerGas: isAutoFieldValue(deployDialogValues.maxPriorityFeePerGas)
-          ? (latestDefaults?.maxPriorityFeePerGas ?? deployDialogValues.maxPriorityFeePerGas)
+        maxPriorityFeePerGas: isAutoFieldValue(
+          deployDialogValues.maxPriorityFeePerGas,
+        )
+          ? (latestDefaults?.maxPriorityFeePerGas ??
+            deployDialogValues.maxPriorityFeePerGas)
           : deployDialogValues.maxPriorityFeePerGas,
         nonce: isAutoFieldValue(deployDialogValues.nonce)
           ? (latestDefaults?.nonce ?? deployDialogValues.nonce)
@@ -1124,14 +1215,16 @@ export default function EvmContractsRegistryPage() {
           bindingId = binding.id;
         } catch (error) {
           deployBindingError = normalizeWorkbenchErrorMessage(
-            error instanceof Error ? error.message : "Failed to create a binding for the deployed contract.",
-            "Failed to create a binding for the deployed contract.",
+            error instanceof Error
+              ? error.message
+              : 'Failed to create a binding for the deployed contract.',
+            'Failed to create a binding for the deployed contract.',
           );
         }
       }
 
       showToast({
-        title: "Contract deployed",
+        title: 'Contract deployed',
         description: deployBindingError
           ? `Deployed to ${result.contractAddress}. Binding was not created.`
           : bindingId
@@ -1141,11 +1234,12 @@ export default function EvmContractsRegistryPage() {
       deploySucceeded = true;
       resetDeployState();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to deploy contract.";
+      const message =
+        error instanceof Error ? error.message : 'Failed to deploy contract.';
 
-      if (message === "Password is required.") {
-        setPendingDeployAction("deploy");
-        setDeployUnlockPassword("");
+      if (message === 'Password is required.') {
+        setPendingDeployAction('deploy');
+        setDeployUnlockPassword('');
         setDeployUnlockError(null);
         setDeployUnlockDialogOpen(true);
         return;
@@ -1169,9 +1263,9 @@ export default function EvmContractsRegistryPage() {
       const nextAction = pendingDeployAction;
       setPendingDeployAction(null);
       setDeployUnlockDialogOpen(false);
-      setDeployUnlockPassword("");
+      setDeployUnlockPassword('');
       setDeployUnlockError(null);
-      if (nextAction === "fill") {
+      if (nextAction === 'fill') {
         await fillDeployDefaults(deployUnlockPassword);
       } else {
         await executeDeployAction();
@@ -1179,8 +1273,10 @@ export default function EvmContractsRegistryPage() {
     } catch (error) {
       setDeployUnlockError(
         normalizeWorkbenchErrorMessage(
-          error instanceof Error ? error.message : "Failed to unlock the selected private key.",
-          "Failed to unlock the selected private key.",
+          error instanceof Error
+            ? error.message
+            : 'Failed to unlock the selected private key.',
+          'Failed to unlock the selected private key.',
         ),
       );
     }
@@ -1192,7 +1288,7 @@ export default function EvmContractsRegistryPage() {
     }
 
     try {
-      if (deleteTarget.type === "artifact") {
+      if (deleteTarget.type === 'artifact') {
         await deleteEvmContractArtifact(deleteTarget.id);
 
         if (artifactForm.id === deleteTarget.id) {
@@ -1208,23 +1304,27 @@ export default function EvmContractsRegistryPage() {
 
       setDeleteTarget(null);
     } catch (error) {
-      if (error instanceof Error && error.name === "AuthRequiredError") {
+      if (error instanceof Error && error.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
-      if (deleteTarget.type === "artifact") {
+      if (deleteTarget.type === 'artifact') {
         setArtifactError(
           normalizeWorkbenchErrorMessage(
-            error instanceof Error ? error.message : "Failed to delete contract artifact.",
-            "Failed to delete contract artifact.",
+            error instanceof Error
+              ? error.message
+              : 'Failed to delete contract artifact.',
+            'Failed to delete contract artifact.',
           ),
         );
       } else {
         setBindingError(
           normalizeWorkbenchErrorMessage(
-            error instanceof Error ? error.message : "Failed to delete contract binding.",
-            "Failed to delete contract binding.",
+            error instanceof Error
+              ? error.message
+              : 'Failed to delete contract binding.',
+            'Failed to delete contract binding.',
           ),
         );
       }
@@ -1235,34 +1335,55 @@ export default function EvmContractsRegistryPage() {
     <AppShell>
       <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Contract Registry</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">
+            Contract Registry
+          </h1>
           <p className="mt-2 text-sm text-slate-500">
-            Store contract artifacts and bind deployed contracts to the active EVM environment.
+            Store contract artifacts and bind deployed contracts to the active
+            EVM environment.
           </p>
         </div>
 
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="border-b border-slate-200 px-5 py-4">
-            <p className="text-lg font-semibold text-slate-900">Bound Contracts</p>
-            <p className="mt-1 text-sm text-slate-500">Deployed contracts bound to the active provider and chain scope.</p>
+            <p className="text-lg font-semibold text-slate-900">
+              Bound Contracts
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Deployed contracts bound to the active provider and chain scope.
+            </p>
           </div>
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Label</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Address</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Artifact</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Chain ID</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Provider</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Label
+                  </th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Address
+                  </th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Artifact
+                  </th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Chain ID
+                  </th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                    Provider
+                  </th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {bindings.length ? (
                   bindings.map((binding) => (
                     <tr key={binding.id} className="border-t border-slate-200">
-                      <td className="px-5 py-3 text-sm font-medium text-slate-900">{binding.label}</td>
+                      <td className="px-5 py-3 text-sm font-medium text-slate-900">
+                        {binding.label}
+                      </td>
                       <td className="px-5 py-3 text-sm">
                         <AddressLink
                           address={binding.address}
@@ -1271,9 +1392,16 @@ export default function EvmContractsRegistryPage() {
                           className="font-medium text-sky-600 hover:text-sky-700 mono"
                         />
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{artifactsById[binding.artifactId]?.name ?? "Missing Artifact"}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{binding.chainId}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{binding.providerName}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">
+                        {artifactsById[binding.artifactId]?.name ??
+                          'Missing Artifact'}
+                      </td>
+                      <td className="px-5 py-3 text-sm text-slate-700">
+                        {binding.chainId}
+                      </td>
+                      <td className="px-5 py-3 text-sm text-slate-700">
+                        {binding.providerName}
+                      </td>
                       <td className="px-5 py-3 text-sm">
                         <div className="flex items-center justify-end gap-0">
                           <span className="group relative inline-flex">
@@ -1302,9 +1430,9 @@ export default function EvmContractsRegistryPage() {
                             aria-label="Delete binding"
                             onClick={() =>
                               setDeleteTarget({
-                                type: "binding",
+                                type: 'binding',
                                 id: binding.id,
-                                title: "Delete Bound Contract",
+                                title: 'Delete Bound Contract',
                                 description: `Delete the contract binding "${binding.label}"?`,
                               })
                             }
@@ -1317,7 +1445,10 @@ export default function EvmContractsRegistryPage() {
                   ))
                 ) : (
                   <tr>
-                    <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
+                    <td
+                      className="px-5 py-10 text-center text-sm text-slate-500"
+                      colSpan={6}
+                    >
                       No contract bindings found for the active provider scope.
                     </td>
                   </tr>
@@ -1329,24 +1460,26 @@ export default function EvmContractsRegistryPage() {
 
         {[
           {
-            title: "System Artifacts",
-            description: "Shared ABI and bytecode definitions published by administrators for all users.",
+            title: 'System Artifacts',
+            description:
+              'Shared ABI and bytecode definitions published by administrators for all users.',
             items: systemArtifacts,
             showAdd: isAdmin,
             showImport: true,
             showDefaultContract: true,
-            addScope: "system" as const,
-            emptyText: "No system artifacts yet.",
+            addScope: 'system' as const,
+            emptyText: 'No system artifacts yet.',
           },
           {
-            title: "My Artifacts",
-            description: "Your reusable ABI and bytecode definitions for the current account.",
+            title: 'My Artifacts',
+            description:
+              'Your reusable ABI and bytecode definitions for the current account.',
             items: myArtifacts,
             showAdd: true,
             showImport: false,
             showDefaultContract: false,
-            addScope: "user" as const,
-            emptyText: "No personal artifacts yet.",
+            addScope: 'user' as const,
+            emptyText: 'No personal artifacts yet.',
           },
         ].map((group) => (
           <section
@@ -1355,8 +1488,12 @@ export default function EvmContractsRegistryPage() {
           >
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
               <div>
-                <p className="text-lg font-semibold text-slate-900">{group.title}</p>
-                <p className="mt-1 text-sm text-slate-500">{group.description}</p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {group.title}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  {group.description}
+                </p>
               </div>
               {group.showAdd || group.showImport ? (
                 <div className="flex justify-end gap-2">
@@ -1373,7 +1510,11 @@ export default function EvmContractsRegistryPage() {
                     </Button>
                   ) : null}
                   {group.showAdd ? (
-                    <Button type="button" size="sm" onClick={() => startArtifactCreate(group.addScope)}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => startArtifactCreate(group.addScope)}
+                    >
                       Add
                     </Button>
                   ) : null}
@@ -1384,29 +1525,56 @@ export default function EvmContractsRegistryPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Name
+                    </th>
                     {group.showDefaultContract ? (
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Default Contract</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                        Default Contract
+                      </th>
                     ) : null}
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Functions</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Events</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Bytecode</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Updated</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Functions
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Events
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Bytecode
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Updated
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {group.items.length ? (
                     group.items.map((artifact) => (
-                      <tr key={artifact.id} className="border-t border-slate-200">
-                        <td className="px-5 py-3 text-sm font-medium text-slate-900">{artifact.name}</td>
+                      <tr
+                        key={artifact.id}
+                        className="border-t border-slate-200"
+                      >
+                        <td className="px-5 py-3 text-sm font-medium text-slate-900">
+                          {artifact.name}
+                        </td>
                         {group.showDefaultContract ? (
                           <td className="px-5 py-3 text-sm">
                             {getArtifactDefaultAddressByName(artifact.name) ? (
                               <AddressLink
-                                address={getArtifactDefaultAddressByName(artifact.name) ?? ""}
+                                address={
+                                  getArtifactDefaultAddressByName(
+                                    artifact.name,
+                                  ) ?? ''
+                                }
                                 href={`/evm/address/${getArtifactDefaultAddressByName(artifact.name)}`}
-                                label={formatAddressLabel(getArtifactDefaultAddressByName(artifact.name) ?? "")}
+                                label={formatAddressLabel(
+                                  getArtifactDefaultAddressByName(
+                                    artifact.name,
+                                  ) ?? '',
+                                )}
                                 className="font-medium text-sky-600 hover:text-sky-700 mono"
                               />
                             ) : (
@@ -1414,12 +1582,20 @@ export default function EvmContractsRegistryPage() {
                             )}
                           </td>
                         ) : null}
-                        <td className="px-5 py-3 text-sm text-slate-700">{artifact.functionCount}</td>
-                        <td className="px-5 py-3 text-sm text-slate-700">{artifact.eventCount}</td>
-                        <td className={`px-5 py-3 text-sm ${artifact.bytecode ? "text-emerald-600" : "text-slate-700"}`}>
-                          {artifact.bytecode ? "Available" : "Missing"}
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          {artifact.functionCount}
                         </td>
-                        <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(artifact.updatedAt)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          {artifact.eventCount}
+                        </td>
+                        <td
+                          className={`px-5 py-3 text-sm ${artifact.bytecode ? 'text-emerald-600' : 'text-slate-700'}`}
+                        >
+                          {artifact.bytecode ? 'Available' : 'Missing'}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-500">
+                          {formatTimestamp(artifact.updatedAt)}
+                        </td>
                         <td className="px-5 py-3 text-sm">
                           <div className="flex items-center justify-end gap-0">
                             <ActionIconButton
@@ -1428,11 +1604,18 @@ export default function EvmContractsRegistryPage() {
                               aria-label="View artifact methods"
                               onClick={() => setArtifactDetailsTarget(artifact)}
                             >
-                              <IconListDetails className="size-4" stroke={1.8} />
+                              <IconListDetails
+                                className="size-4"
+                                stroke={1.8}
+                              />
                             </ActionIconButton>
                             <ActionIconButton
                               disabled={!artifact.bytecode}
-                              className={artifact.bytecode ? "text-slate-400 hover:text-sky-600" : "text-slate-300"}
+                              className={
+                                artifact.bytecode
+                                  ? 'text-slate-400 hover:text-sky-600'
+                                  : 'text-slate-300'
+                              }
                               tooltip="Deploy contract artifact"
                               aria-label="Deploy contract artifact"
                               onClick={() => startDeployArtifact(artifact)}
@@ -1445,7 +1628,10 @@ export default function EvmContractsRegistryPage() {
                               aria-label="Bind contract address"
                               onClick={() => startBindingCreate(artifact)}
                             >
-                              <IconPlugConnected className="size-4" stroke={1.8} />
+                              <IconPlugConnected
+                                className="size-4"
+                                stroke={1.8}
+                              />
                             </ActionIconButton>
                             {canManageArtifact(artifact) ? (
                               <>
@@ -1463,9 +1649,9 @@ export default function EvmContractsRegistryPage() {
                                   aria-label="Delete artifact"
                                   onClick={() =>
                                     setDeleteTarget({
-                                      type: "artifact",
+                                      type: 'artifact',
                                       id: artifact.id,
-                                      title: "Delete Contract Artifact",
+                                      title: 'Delete Contract Artifact',
                                       description: `Delete the artifact "${artifact.name}"?`,
                                     })
                                   }
@@ -1480,7 +1666,10 @@ export default function EvmContractsRegistryPage() {
                     ))
                   ) : (
                     <tr>
-                      <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={group.showDefaultContract ? 7 : 6}>
+                      <td
+                        className="px-5 py-10 text-center text-sm text-slate-500"
+                        colSpan={group.showDefaultContract ? 7 : 6}
+                      >
                         {group.emptyText}
                       </td>
                     </tr>
@@ -1498,7 +1687,7 @@ export default function EvmContractsRegistryPage() {
               setDeleteTarget(null);
             }
           }}
-          title={deleteTarget?.title ?? "Delete"}
+          title={deleteTarget?.title ?? 'Delete'}
           description={deleteTarget?.description}
           confirmLabel="Delete"
           onConfirm={() => {
@@ -1532,7 +1721,10 @@ export default function EvmContractsRegistryPage() {
               <Button
                 type="button"
                 onClick={() => void handleImportSystemBindings()}
-                disabled={!selectedDefaultBindingArtifactIds.length || importSystemBindingsLoading}
+                disabled={
+                  !selectedDefaultBindingArtifactIds.length ||
+                  importSystemBindingsLoading
+                }
               >
                 {importSystemBindingsLoading ? (
                   <IconLoader2 className="mr-1.5 size-4 animate-spin" />
@@ -1548,8 +1740,11 @@ export default function EvmContractsRegistryPage() {
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 <ul className="divide-y divide-slate-200">
                   {importableSystemArtifacts.map((artifact) => {
-                    const defaultAddress = getArtifactDefaultAddressByName(artifact.name) ?? "";
-                    const checked = selectedDefaultBindingArtifactIds.includes(artifact.id);
+                    const defaultAddress =
+                      getArtifactDefaultAddressByName(artifact.name) ?? '';
+                    const checked = selectedDefaultBindingArtifactIds.includes(
+                      artifact.id,
+                    );
 
                     return (
                       <li key={artifact.id} className="px-4 py-3">
@@ -1568,8 +1763,12 @@ export default function EvmContractsRegistryPage() {
                           />
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-slate-900">{artifact.name}</span>
-                              <span className="font-mono text-xs text-slate-500">{defaultAddress}</span>
+                              <span className="text-sm font-medium text-slate-900">
+                                {artifact.name}
+                              </span>
+                              <span className="font-mono text-xs text-slate-500">
+                                {defaultAddress}
+                              </span>
                             </div>
                           </div>
                         </label>
@@ -1593,10 +1792,18 @@ export default function EvmContractsRegistryPage() {
               setArtifactDetailsTarget(null);
             }
           }}
-          title={artifactDetailsTarget ? `${artifactDetailsTarget.name} Methods` : "Artifact Methods"}
+          title={
+            artifactDetailsTarget
+              ? `${artifactDetailsTarget.name} Methods`
+              : 'Artifact Methods'
+          }
           description="List of contract methods parsed from the saved ABI."
           footer={
-            <Button type="button" variant="ghost" onClick={() => setArtifactDetailsTarget(null)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setArtifactDetailsTarget(null)}
+            >
               Close
             </Button>
           }
@@ -1607,8 +1814,13 @@ export default function EvmContractsRegistryPage() {
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 <ul className="divide-y divide-slate-200">
                   {artifactDetailsFunctions.map((fn) => (
-                    <li key={fn.signature} className="flex items-center justify-between gap-4 px-4 py-3">
-                      <span className="min-w-0 truncate font-mono text-sm text-slate-900">{fn.signature}</span>
+                    <li
+                      key={fn.signature}
+                      className="flex items-center justify-between gap-4 px-4 py-3"
+                    >
+                      <span className="min-w-0 truncate font-mono text-sm text-slate-900">
+                        {fn.signature}
+                      </span>
                       <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-600">
                         {fn.stateMutability}
                       </span>
@@ -1633,7 +1845,7 @@ export default function EvmContractsRegistryPage() {
               resetArtifactForm();
             }
           }}
-          title={artifactForm.id ? "Edit Artifact" : "Create Artifact"}
+          title={artifactForm.id ? 'Edit Artifact' : 'Create Artifact'}
           description="Save ABI and optional bytecode for reuse across environments."
           footer={
             <>
@@ -1648,7 +1860,7 @@ export default function EvmContractsRegistryPage() {
                 Cancel
               </Button>
               <Button type="button" onClick={() => void handleSaveArtifact()}>
-                {artifactForm.id ? "Update Artifact" : "Save Artifact"}
+                {artifactForm.id ? 'Update Artifact' : 'Save Artifact'}
               </Button>
             </>
           }
@@ -1670,7 +1882,7 @@ export default function EvmContractsRegistryPage() {
                     className="text-slate-400 hover:text-slate-700"
                     tooltip="Clear import input"
                     aria-label="Clear import input"
-                    onClick={() => handleImportInputChange("")}
+                    onClick={() => handleImportInputChange('')}
                   >
                     <IconX className="size-4" stroke={1.8} />
                   </ActionIconButton>
@@ -1679,7 +1891,9 @@ export default function EvmContractsRegistryPage() {
               <textarea
                 className={`mt-2 ${importTextareaClassName}`}
                 value={artifactImportText}
-                onChange={(event) => handleImportInputChange(event.target.value)}
+                onChange={(event) =>
+                  handleImportInputChange(event.target.value)
+                }
                 placeholder='{"contractName":"Simple","abi":[...],"bytecode":"0x..."}'
               />
             </div>
@@ -1687,7 +1901,10 @@ export default function EvmContractsRegistryPage() {
               <Select
                 value={artifactForm.scope}
                 onValueChange={(value) =>
-                  setArtifactForm((current) => ({ ...current, scope: value as "system" | "user" }))
+                  setArtifactForm((current) => ({
+                    ...current,
+                    scope: value as 'system' | 'user',
+                  }))
                 }
               >
                 <SelectTrigger>
@@ -1701,29 +1918,51 @@ export default function EvmContractsRegistryPage() {
             ) : null}
             <Input
               value={artifactForm.name}
-              onChange={(event) => setArtifactForm((current) => ({ ...current, name: event.target.value }))}
+              onChange={(event) =>
+                setArtifactForm((current) => ({
+                  ...current,
+                  name: event.target.value,
+                }))
+              }
               placeholder="Contract Name"
             />
             <textarea
               className={textareaClassName}
               value={artifactForm.abiJson}
-              onChange={(event) => setArtifactForm((current) => ({ ...current, abiJson: event.target.value }))}
+              onChange={(event) =>
+                setArtifactForm((current) => ({
+                  ...current,
+                  abiJson: event.target.value,
+                }))
+              }
               placeholder='[{"type":"function","name":"balanceOf","inputs":[{"name":"owner","type":"address"}],"outputs":[{"type":"uint256"}],"stateMutability":"view"}]'
             />
             <textarea
               className={textareaClassName}
               value={artifactForm.bytecode}
-              onChange={(event) => setArtifactForm((current) => ({ ...current, bytecode: event.target.value }))}
+              onChange={(event) =>
+                setArtifactForm((current) => ({
+                  ...current,
+                  bytecode: event.target.value,
+                }))
+              }
               placeholder="Optional bytecode (0x...)"
             />
             {!artifactForm.id ? (
               <Input
                 value={artifactForm.contractAddress}
-                onChange={(event) => setArtifactForm((current) => ({ ...current, contractAddress: event.target.value }))}
+                onChange={(event) =>
+                  setArtifactForm((current) => ({
+                    ...current,
+                    contractAddress: event.target.value,
+                  }))
+                }
                 placeholder="Optional contract address (auto-bind after create)"
               />
             ) : null}
-            {artifactError ? <p className="text-sm text-rose-600">{artifactError}</p> : null}
+            {artifactError ? (
+              <p className="text-sm text-rose-600">{artifactError}</p>
+            ) : null}
           </div>
         </ModalDialog>
 
@@ -1736,7 +1975,7 @@ export default function EvmContractsRegistryPage() {
               resetBindingForm();
             }
           }}
-          title={bindingForm.id ? "Edit Binding" : "Bind Contract Address"}
+          title={bindingForm.id ? 'Edit Binding' : 'Bind Contract Address'}
           description="Bind a deployed contract address to the active provider and chain."
           footer={
             <>
@@ -1750,8 +1989,12 @@ export default function EvmContractsRegistryPage() {
               >
                 Cancel
               </Button>
-              <Button type="button" onClick={() => void handleSaveBinding()} disabled={!artifacts.length}>
-                {bindingForm.id ? "Update Binding" : "Save Binding"}
+              <Button
+                type="button"
+                onClick={() => void handleSaveBinding()}
+                disabled={!artifacts.length}
+              >
+                {bindingForm.id ? 'Update Binding' : 'Save Binding'}
               </Button>
             </>
           }
@@ -1762,16 +2005,24 @@ export default function EvmContractsRegistryPage() {
               value={bindingForm.artifactId || undefined}
               onValueChange={(value) =>
                 setBindingForm((current) => {
-                  const previousArtifact = current.artifactId ? artifactsById[current.artifactId] ?? null : null;
+                  const previousArtifact = current.artifactId
+                    ? (artifactsById[current.artifactId] ?? null)
+                    : null;
                   const nextArtifact = artifactsById[value] ?? null;
-                  const previousDefaultAddress = getDefaultBindingAddressForArtifact(previousArtifact);
-                  const nextDefaultAddress = getDefaultBindingAddressForArtifact(nextArtifact);
-                  const shouldReplaceAddress = !current.address || current.address === previousDefaultAddress;
+                  const previousDefaultAddress =
+                    getDefaultBindingAddressForArtifact(previousArtifact);
+                  const nextDefaultAddress =
+                    getDefaultBindingAddressForArtifact(nextArtifact);
+                  const shouldReplaceAddress =
+                    !current.address ||
+                    current.address === previousDefaultAddress;
 
                   return {
                     ...current,
                     artifactId: value,
-                    address: shouldReplaceAddress ? nextDefaultAddress : current.address,
+                    address: shouldReplaceAddress
+                      ? nextDefaultAddress
+                      : current.address,
                   };
                 })
               }
@@ -1782,22 +2033,36 @@ export default function EvmContractsRegistryPage() {
               <SelectContent>
                 {artifacts.map((artifact) => (
                   <SelectItem key={artifact.id} value={artifact.id}>
-                    {artifact.scope === "system" ? `[System] ${artifact.name}` : artifact.name}
+                    {artifact.scope === 'system'
+                      ? `[System] ${artifact.name}`
+                      : artifact.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Input
               value={bindingForm.address}
-              onChange={(event) => setBindingForm((current) => ({ ...current, address: event.target.value }))}
+              onChange={(event) =>
+                setBindingForm((current) => ({
+                  ...current,
+                  address: event.target.value,
+                }))
+              }
               placeholder="Deployed Contract Address"
             />
             <Input
               value={bindingForm.label}
-              onChange={(event) => setBindingForm((current) => ({ ...current, label: event.target.value }))}
+              onChange={(event) =>
+                setBindingForm((current) => ({
+                  ...current,
+                  label: event.target.value,
+                }))
+              }
               placeholder="Binding Label"
             />
-            {bindingError ? <p className="text-sm text-rose-600">{bindingError}</p> : null}
+            {bindingError ? (
+              <p className="text-sm text-rose-600">{bindingError}</p>
+            ) : null}
           </div>
         </ModalDialog>
 
@@ -1826,19 +2091,19 @@ export default function EvmContractsRegistryPage() {
                 onClick={() => void executeDeployAction()}
                 disabled={
                   !deployArtifact ||
-                  deployActionLoading === "deploy" ||
+                  deployActionLoading === 'deploy' ||
                   !deployArtifact.bytecode ||
                   !isDeployDialogReady(deployDialogValues)
                 }
-                aria-busy={deployActionLoading === "deploy"}
+                aria-busy={deployActionLoading === 'deploy'}
               >
-                {deployActionLoading === "deploy" ? (
+                {deployActionLoading === 'deploy' ? (
                   <>
                     <IconLoader2 className="mr-2 size-4 animate-spin" />
                     Deploying...
                   </>
                 ) : (
-                  "Deploy Contract"
+                  'Deploy Contract'
                 )}
               </Button>
             </>
@@ -1848,30 +2113,48 @@ export default function EvmContractsRegistryPage() {
           <div className="grid max-h-[68vh] gap-4 overflow-y-auto pr-1">
             <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Artifact</p>
-                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{deployArtifact?.name ?? "Unavailable"}</p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Constructor</p>
-                <p className="mt-1 text-sm text-slate-700">
-                  {deployConstructor?.inputs.length ? `${deployConstructor.inputs.length} argument(s)` : "No arguments"}
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Artifact
+                </p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-900">
+                  {deployArtifact?.name ?? 'Unavailable'}
                 </p>
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Selected Key</p>
-                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{activeKey?.name ?? "No Key Selected"}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Constructor
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  {deployConstructor?.inputs.length
+                    ? `${deployConstructor.inputs.length} argument(s)`
+                    : 'No arguments'}
+                </p>
               </div>
-              {activeKey && activeKey.securityMode === "encrypted" && !isEvmStoredPrivateKeyUnlocked(activeKey.id) ? (
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Selected Key
+                </p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-900">
+                  {activeKey?.name ?? 'No Key Selected'}
+                </p>
+              </div>
+              {activeKey &&
+              activeKey.securityMode === 'encrypted' &&
+              !isEvmStoredPrivateKeyUnlocked(activeKey.id) ? (
                 <p className="text-xs text-amber-600 sm:col-span-2 lg:col-span-3">
-                  This key is encrypted and will require unlock before deployment.
+                  This key is encrypted and will require unlock before
+                  deployment.
                 </p>
               ) : null}
             </div>
 
             {!activeKey ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Select a global private key first from{" "}
-                <Link href="/evm/settings/private-keys" className="font-semibold underline underline-offset-2">
+                Select a global private key first from{' '}
+                <Link
+                  href="/evm/settings/private-keys"
+                  className="font-semibold underline underline-offset-2"
+                >
                   Settings / Private Keys
                 </Link>
                 .
@@ -1885,7 +2168,9 @@ export default function EvmContractsRegistryPage() {
             ) : null}
 
             <div className="grid gap-3">
-              <p className="text-sm font-medium text-slate-700">Constructor Arguments</p>
+              <p className="text-sm font-medium text-slate-700">
+                Constructor Arguments
+              </p>
               <div className="max-h-64 overflow-y-auto pr-1">
                 <ContractInputsForm
                   inputs={deployConstructor?.inputs ?? []}
@@ -1895,14 +2180,17 @@ export default function EvmContractsRegistryPage() {
               </div>
               {deployConstructor?.inputs.length && !isDeploySimulationReady ? (
                 <p className="text-xs text-slate-500">
-                  Fill all constructor arguments first. Gas and nonce will be simulated automatically after that.
+                  Fill all constructor arguments first. Gas and nonce will be
+                  simulated automatically after that.
                 </p>
               ) : null}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Txn Type
+                </label>
                 <Select
                   value={deployDialogValues.transactionType}
                   onValueChange={(value) =>
@@ -1923,7 +2211,7 @@ export default function EvmContractsRegistryPage() {
               </div>
               <div className="grid gap-2">
                 <label className="text-sm font-medium text-slate-700">
-                  Native Value ({environment?.nativeCurrency ?? "Native"})
+                  Native Value ({environment?.nativeCurrency ?? 'Native'})
                 </label>
                 <Input
                   value={deployDialogValues.value}
@@ -1938,9 +2226,11 @@ export default function EvmContractsRegistryPage() {
                   placeholder="0"
                 />
               </div>
-              {deployDialogValues.transactionType === "LEGACY" ? (
+              {deployDialogValues.transactionType === 'LEGACY' ? (
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <label className="text-sm font-medium text-slate-700">
+                    Gas Price (Gwei)
+                  </label>
                   <Input
                     value={deployDialogValues.gasPrice}
                     onChange={(event) =>
@@ -1955,7 +2245,9 @@ export default function EvmContractsRegistryPage() {
               ) : (
                 <>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">
+                      Max Fee Per Gas (Gwei)
+                    </label>
                     <Input
                       value={deployDialogValues.maxFeePerGas}
                       onChange={(event) =>
@@ -1968,7 +2260,9 @@ export default function EvmContractsRegistryPage() {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">
+                      Max Priority Fee Per Gas (Gwei)
+                    </label>
                     <Input
                       value={deployDialogValues.maxPriorityFeePerGas}
                       onChange={(event) =>
@@ -1983,7 +2277,9 @@ export default function EvmContractsRegistryPage() {
                 </>
               )}
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Gas Limit
+                </label>
                 <Input
                   value={deployDialogValues.gasLimit}
                   onChange={(event) =>
@@ -1996,7 +2292,9 @@ export default function EvmContractsRegistryPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Nonce
+                </label>
                 <Input
                   value={deployDialogValues.nonce}
                   onChange={(event) =>
@@ -2009,32 +2307,49 @@ export default function EvmContractsRegistryPage() {
                 />
               </div>
               <div className="grid gap-2 sm:col-span-2">
-                <label className="text-sm font-medium text-slate-700">Binding Label</label>
+                <label className="text-sm font-medium text-slate-700">
+                  Binding Label
+                </label>
                 <Input
                   value={deployBindingLabel}
-                  onChange={(event) => setDeployBindingLabel(event.target.value)}
-                  placeholder={deployArtifact?.name ?? "Binding label"}
+                  onChange={(event) =>
+                    setDeployBindingLabel(event.target.value)
+                  }
+                  placeholder={deployArtifact?.name ?? 'Binding label'}
                 />
                 <p className="text-xs text-slate-500">
-                  Leave empty if you do not want to create a binding after deployment.
+                  Leave empty if you do not want to create a binding after
+                  deployment.
                 </p>
               </div>
             </div>
 
             {deployResult ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Deployment Result</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                  Deployment Result
+                </p>
                 <dl className="mt-3 grid gap-3">
                   <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">Contract Address</dt>
-                    <dd className="mt-1 text-sm text-slate-900 mono">{deployResult.contractAddress}</dd>
+                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">
+                      Contract Address
+                    </dt>
+                    <dd className="mt-1 text-sm text-slate-900 mono">
+                      {deployResult.contractAddress}
+                    </dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">Transaction Hash</dt>
-                    <dd className="mt-1 text-sm text-slate-900 mono">{deployResult.hash}</dd>
+                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">
+                      Transaction Hash
+                    </dt>
+                    <dd className="mt-1 text-sm text-slate-900 mono">
+                      {deployResult.hash}
+                    </dd>
                   </div>
                   {deployResult.bindingError ? (
-                    <div className="text-sm text-amber-700">{deployResult.bindingError}</div>
+                    <div className="text-sm text-amber-700">
+                      {deployResult.bindingError}
+                    </div>
                   ) : null}
                   {deployResult.bindingId ? (
                     <div>
@@ -2064,7 +2379,7 @@ export default function EvmContractsRegistryPage() {
           onOpenChange={(open) => {
             if (!open) {
               setDeployUnlockDialogOpen(false);
-              setDeployUnlockPassword("");
+              setDeployUnlockPassword('');
               setDeployUnlockError(null);
               setPendingDeployAction(null);
             }
@@ -2073,7 +2388,7 @@ export default function EvmContractsRegistryPage() {
           description={
             activeKey
               ? `Enter the password for "${activeKey.name}" to continue the deployment flow.`
-              : "Enter the password to continue."
+              : 'Enter the password to continue.'
           }
           value={deployUnlockPassword}
           onValueChange={setDeployUnlockPassword}

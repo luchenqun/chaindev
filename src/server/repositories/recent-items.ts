@@ -1,7 +1,7 @@
-import { desc, eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
-import { db } from "@/db/client";
-import { recentItems } from "@/db/schema/workbench";
+import { desc, eq } from 'drizzle-orm';
+import { randomUUID } from 'node:crypto';
+import { db } from '@/db/client';
+import { recentItems } from '@/db/schema/workbench';
 
 type RecentItemInput = {
   userId: string;
@@ -25,5 +25,10 @@ export async function addRecentItem(input: RecentItemInput) {
 }
 
 export async function listRecentItems(userId: string) {
-  return db.select().from(recentItems).where(eq(recentItems.userId, userId)).orderBy(desc(recentItems.createdAt)).all();
+  return db
+    .select()
+    .from(recentItems)
+    .where(eq(recentItems.userId, userId))
+    .orderBy(desc(recentItems.createdAt))
+    .all();
 }

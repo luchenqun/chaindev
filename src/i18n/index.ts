@@ -1,5 +1,5 @@
-import { defaultLocale, type Locale } from "@/i18n/config";
-import { en } from "@/i18n/messages/en";
+import { defaultLocale, type Locale } from '@/i18n/config';
+import { en } from '@/i18n/messages/en';
 
 const messages = {
   en,

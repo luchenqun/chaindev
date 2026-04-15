@@ -1,4 +1,4 @@
-import { StargateClient } from "@cosmjs/stargate";
+import { StargateClient } from '@cosmjs/stargate';
 export async function getCosmosClient(rpcUrl: string) {
   return StargateClient.connect(rpcUrl);
 }

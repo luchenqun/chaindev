@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { createPortal } from "react-dom";
-import { Button } from "@/components/ui/button";
+import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Button } from '@/components/ui/button';
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -19,8 +19,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
   onConfirm,
 }: ConfirmDialogProps) {
   useEffect(() => {
@@ -29,23 +29,23 @@ export function ConfirmDialog({
     }
 
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    document.body.style.overflow = 'hidden';
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         onOpenChange(false);
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
       document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [open, onOpenChange]);
 
-  if (!open || typeof document === "undefined") {
+  if (!open || typeof document === 'undefined') {
     return null;
   }
 
@@ -60,10 +60,18 @@ export function ConfirmDialog({
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.24)]">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          {description ? <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p> : null}
+          {description ? (
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              {description}
+            </p>
+          ) : null}
         </div>
         <div className="mt-6 flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             {cancelLabel}
           </Button>
           <Button

@@ -30,7 +30,7 @@ export function CosmosTxSummary({ transaction }: TxSummaryProps) {
         </div>
         <div>
           <dt>Raw Log</dt>
-          <dd className="mono">{transaction.rawLog || "No log"}</dd>
+          <dd className="mono">{transaction.rawLog || 'No log'}</dd>
         </div>
       </dl>
     </div>

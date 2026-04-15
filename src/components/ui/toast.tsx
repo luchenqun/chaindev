@@ -1,10 +1,21 @@
-"use client";
+'use client';
 
-import { IconAlertCircleFilled, IconCircleCheckFilled, IconInfoCircleFilled } from "@tabler/icons-react";
-import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import {
+  IconAlertCircleFilled,
+  IconCircleCheckFilled,
+  IconInfoCircleFilled,
+} from '@tabler/icons-react';
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { cn } from '@/lib/utils';
 
-type ToastTone = "success" | "info" | "error";
+type ToastTone = 'success' | 'info' | 'error';
 
 type ToastInput = {
   title: string;
@@ -37,23 +48,25 @@ function ToastCard({
   return (
     <div
       className={cn(
-        "w-full max-w-md rounded-2xl border bg-white px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.16)]",
-        tone === "success" && "border-emerald-200",
-        tone === "info" && "border-sky-200",
-        tone === "error" && "border-rose-200",
+        'w-full max-w-md rounded-2xl border bg-white px-4 py-3 shadow-[0_16px_40px_rgba(15,23,42,0.16)]',
+        tone === 'success' && 'border-emerald-200',
+        tone === 'info' && 'border-sky-200',
+        tone === 'error' && 'border-rose-200',
       )}
     >
       <div className="flex items-start gap-3">
-        {tone === "success" ? (
+        {tone === 'success' ? (
           <IconCircleCheckFilled className="mt-0.5 size-5 shrink-0 text-emerald-600" />
-        ) : tone === "error" ? (
+        ) : tone === 'error' ? (
           <IconAlertCircleFilled className="mt-0.5 size-5 shrink-0 text-rose-600" />
         ) : (
           <IconInfoCircleFilled className="mt-0.5 size-5 shrink-0 text-sky-600" />
         )}
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-900">{title}</p>
-          {description ? <div className="mt-1 text-sm text-slate-600">{description}</div> : null}
+          {description ? (
+            <div className="mt-1 text-sm text-slate-600">{description}</div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -76,7 +89,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             id,
             title: input.title,
             description: input.description,
-            tone: input.tone ?? "success",
+            tone: input.tone ?? 'success',
           },
         ]);
 
@@ -124,7 +137,7 @@ export function useToast() {
   const context = useContext(ToastContext);
 
   if (!context) {
-    throw new Error("useToast must be used within a ToastProvider.");
+    throw new Error('useToast must be used within a ToastProvider.');
   }
 
   return context;

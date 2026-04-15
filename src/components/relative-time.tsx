@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 function formatRelativeAge(timestampMs: number | null, nowMs: number) {
   if (!timestampMs) {
-    return "Unavailable";
+    return 'Unavailable';
   }
 
   const seconds = Math.max(0, Math.floor((nowMs - timestampMs) / 1000));

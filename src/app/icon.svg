@@ -1,11 +1,37 @@
 <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="64" height="64" rx="16" fill="#0F172A" />
+  <rect width="64" height="64" rx="16" fill="url(#bg)" />
+  <circle cx="32" cy="32" r="24" fill="url(#innerGlow)" fill-opacity="0.32" />
+  <circle cx="32" cy="32" r="19.5" stroke="white" stroke-opacity="0.12" stroke-width="1.5" />
   <path
-    d="M15 39.9048C15 30.0172 23.0172 22 32.9048 22C36.503 22 39.8533 23.0672 42.6548 24.9008L39.2887 29.0868C37.4214 27.8834 35.1987 27.181 32.8129 27.181C25.8451 27.181 20.1967 32.8293 20.1967 39.7971C20.1967 41.4562 20.5169 43.0405 21.0994 44.4919H15.9127C15.3137 43.0391 15 41.4477 15 39.9048Z"
-    fill="white"
-    fill-opacity="0.96"
+    d="M46.2 17.8C43.1 15.4 39.3 14 35.1 14C25.7 14 18 21.7 18 31.1C18 36.3 20.4 41 24.1 44.2"
+    stroke="white"
+    stroke-width="5.6"
+    stroke-linecap="round"
+    stroke-opacity="0.96"
+    fill="none"
   />
-  <rect x="23" y="30" width="5.5" height="14" rx="1.8" fill="#38BDF8" />
-  <rect x="30.25" y="24.5" width="5.5" height="19.5" rx="1.8" fill="white" />
-  <rect x="37.5" y="19" width="5.5" height="25" rx="1.8" fill="#7DD3FC" />
+  <path d="M24.5 44.5H45.2" stroke="white" stroke-width="3.2" stroke-linecap="round" stroke-opacity="0.94" />
+  <rect x="25.3" y="30" width="5" height="14.5" rx="2.1" fill="white" fill-opacity="0.98" />
+  <rect x="32.1" y="24.9" width="5" height="19.6" rx="2.1" fill="white" fill-opacity="0.98" />
+  <rect x="38.9" y="19.1" width="5" height="25.4" rx="2.1" fill="white" fill-opacity="0.98" />
+  <path d="M38.7 19.6L47.2 12.3" stroke="#8FD3FF" stroke-width="2.3" stroke-linecap="round" />
+  <circle cx="49.4" cy="10.8" r="2.8" fill="#0B84D8" />
+  <circle cx="49.4" cy="10.8" r="1.25" fill="white" fill-opacity="0.96" />
+  <defs>
+    <linearGradient id="bg" x1="8" y1="0" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#253B63" />
+      <stop offset="1" stop-color="#101C33" />
+    </linearGradient>
+    <radialGradient
+      id="innerGlow"
+      cx="0"
+      cy="0"
+      r="1"
+      gradientUnits="userSpaceOnUse"
+      gradientTransform="translate(33 23) rotate(90) scale(29 29)"
+    >
+      <stop stop-color="#4FA7F7" />
+      <stop offset="1" stop-color="#4FA7F7" stop-opacity="0" />
+    </radialGradient>
+  </defs>
 </svg>

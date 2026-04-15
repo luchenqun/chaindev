@@ -1,6 +1,6 @@
-import { EvmHomeActivity } from "@/domains/evm/ui/home-activity";
-import { EvmHomeMetrics } from "@/domains/evm/ui/home-metrics";
-import { AppShell } from "@/platform/layout/app-shell";
+import { EvmHomeActivity } from '@/domains/evm/ui/home-activity';
+import { EvmHomeMetrics } from '@/domains/evm/ui/home-metrics';
+import { AppShell } from '@/platform/layout/app-shell';
 
 export default function HomePage() {
   return (

@@ -1,12 +1,12 @@
 import {
   DEFAULT_EVM_PRIVATE_KEY_VALUE,
   DEFAULT_EVM_RPC_PROFILE,
-} from "@/platform/workbench/defaults";
-import { db } from "@/db/client";
-import { evmPrivateKeys, rpcProfiles } from "@/db/schema/workbench";
-import { createServerEvmPrivateKey } from "@/server/repositories/evm-private-keys";
-import { addRpcProfile } from "@/server/repositories/rpc-profiles";
-import { eq, sql } from "drizzle-orm";
+} from '@/platform/workbench/defaults';
+import { db } from '@/db/client';
+import { evmPrivateKeys, rpcProfiles } from '@/db/schema/workbench';
+import { createServerEvmPrivateKey } from '@/server/repositories/evm-private-keys';
+import { addRpcProfile } from '@/server/repositories/rpc-profiles';
+import { eq, sql } from 'drizzle-orm';
 
 export async function seedDefaultWorkbenchForUser(userId: string) {
   const rpcProfileCount =
@@ -41,9 +41,9 @@ export async function seedDefaultWorkbenchForUser(userId: string) {
   if (privateKeyCount === 0) {
     await createServerEvmPrivateKey({
       userId,
-      name: "Alice",
+      name: 'Alice',
       privateKey: DEFAULT_EVM_PRIVATE_KEY_VALUE,
-      securityMode: "plain",
+      securityMode: 'plain',
     });
   }
 }
