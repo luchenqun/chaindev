@@ -1,7 +1,7 @@
 'use client';
 
 import { IconClockHour4, IconStack2 } from '@tabler/icons-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCosmosOverviewDirect } from '@/domains/cosmos/client/queries';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { type PlatformMode } from '@/config/chains';
@@ -26,20 +26,24 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
     buildFallbackItem('Unavailable'),
   );
   const timeoutRef = useRef<number | null>(null);
+  const displayItem = useMemo<StatusItem>(() => {
+    if (mode === 'evm') {
+      return status
+        ? {
+            label: 'Latest Block',
+            value: status.latestBlock,
+            toneClassName: 'text-sky-600',
+          }
+        : buildFallbackItem('Unavailable');
+    }
+
+    return item;
+  }, [item, mode, status]);
 
   useEffect(() => {
     let cancelled = false;
 
     if (mode === 'evm') {
-      setItem(
-        status
-          ? {
-              label: 'Latest Block',
-              value: status.latestBlock,
-              toneClassName: 'text-sky-600',
-            }
-          : buildFallbackItem('Unavailable'),
-      );
       return;
     }
 
@@ -96,7 +100,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
       clearPoll();
       window.removeEventListener('chaindev:active-rpc-profile-changed', reload);
     };
-  }, [mode, status]);
+  }, [mode]);
 
   return (
     <div className="flex flex-wrap items-center gap-5">
@@ -109,15 +113,17 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
         </span>
         <span className="flex flex-col leading-tight">
           <span className="inline-flex items-center gap-1.5">
-            <span>{item.label}:</span>
-            <strong className={item.toneClassName ?? 'text-slate-800'}>
-              {item.value}
+            <span>{displayItem.label}:</span>
+            <strong className={displayItem.toneClassName ?? 'text-slate-800'}>
+              {displayItem.value}
             </strong>
           </span>
           {mode === 'evm' ? (
             <span className="mt-0.5 inline-flex items-center gap-1.5">
               <span>Poll:</span>
-              <strong className={item.toneClassName ?? 'text-slate-800'}>
+              <strong
+                className={displayItem.toneClassName ?? 'text-slate-800'}
+              >
                 {Math.round(pollIntervalMs)} ms
               </strong>
             </span>
