@@ -91,6 +91,7 @@ function formatTimestamp(timestamp: number) {
 export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderManagerProps) {
   const router = useRouter();
   const { status } = useSession();
+  const isAuthenticated = status === "authenticated";
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -104,12 +105,12 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
   const [draft, setDraft] = useState<DraftState>(getInitialDraft(mode));
   const hasPersistedProfiles = profiles.length > 0;
   const topbarProfiles = useMemo(
-    () => (profiles.length ? profiles : getDefaultGuestRpcProfiles()),
-    [profiles],
+    () => (isAuthenticated ? profiles : profiles.length ? profiles : getDefaultGuestRpcProfiles()),
+    [isAuthenticated, profiles],
   );
   const topbarSelected = useMemo(
-    () => (profiles.length ? selected : getDefaultGuestSelectedRpcProfiles()),
-    [profiles.length, selected],
+    () => (isAuthenticated ? selected : profiles.length ? selected : getDefaultGuestSelectedRpcProfiles()),
+    [isAuthenticated, profiles.length, selected],
   );
 
   const activeProfile = useMemo(
@@ -148,6 +149,10 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
   }, [mode]);
 
   useEffect(() => {
+    if (status === "loading") {
+      return;
+    }
+
     let cancelled = false;
 
     async function load() {
@@ -180,7 +185,7 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [status]);
 
   useEffect(() => {
     if (loading) {
@@ -214,8 +219,6 @@ export function RpcProviderManager({ mode, variant = "compact" }: RpcProviderMan
     !draft.name.trim() ||
     !draft.rpcUrl.trim() ||
     (draft.mode === "evm" ? !draft.nativeCurrencySymbol.trim() : !draft.restUrl.trim());
-  const isAuthenticated = status === "authenticated";
-
   function goToLogin() {
     const callbackUrl = encodeURIComponent(window.location.pathname);
     router.push(`/login?callbackUrl=${callbackUrl}`);

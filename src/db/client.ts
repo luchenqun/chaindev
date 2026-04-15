@@ -82,22 +82,6 @@ function ensureAuthSchema() {
   }
 
   sqlite.exec(`
-    UPDATE user
-    SET is_admin = 1
-    WHERE id = (
-      SELECT id
-      FROM user
-      ORDER BY rowid ASC
-      LIMIT 1
-    )
-    AND NOT EXISTS (
-      SELECT 1
-      FROM user
-      WHERE is_admin = 1
-    );
-  `);
-
-  sqlite.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS user_email_unique ON user(email);
     CREATE UNIQUE INDEX IF NOT EXISTS user_username_unique ON user(username);
   `);
@@ -253,13 +237,12 @@ export const db = drizzle(sqlite, {
 });
 
 declare global {
-  var __chaindevDevSeedPromise: Promise<void> | undefined;
+  var __chaindevBootstrapPromise: Promise<void> | undefined;
 }
 
-if (process.env.NODE_ENV !== "production") {
-  globalThis.__chaindevDevSeedPromise ??= import("@/server/dev/ensure-dev-seed")
-    .then(({ ensureDevSeed }) => ensureDevSeed())
+globalThis.__chaindevBootstrapPromise ??= import("@/server/bootstrap/ensure-system-bootstrap")
+  .then(({ ensureSystemBootstrap }) => ensureSystemBootstrap())
+  .then(() => undefined)
     .catch((error) => {
-      console.error("Failed to initialize development seed data.", error);
+      console.error("Failed to initialize system bootstrap data.", error);
     });
-}

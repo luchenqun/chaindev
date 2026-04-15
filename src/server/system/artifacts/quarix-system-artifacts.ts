@@ -1,10 +1,10 @@
-export type DevPrecompileArtifact = {
+export type SystemContractArtifact = {
   contractName: string;
   abi: unknown;
   bytecode: string | null;
 };
 
-export const QUARIX_SYSTEM_ARTIFACTS = [
+export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
   {
     contractName: 'QuarixBank',
     abi: [
@@ -7202,4 +7202,4 @@ export const QUARIX_SYSTEM_ARTIFACTS = [
     contractName: 'QuarixServiceWrapper',
     bytecode: null,
   },
-] satisfies ReadonlyArray<DevPrecompileArtifact>;
+] satisfies ReadonlyArray<SystemContractArtifact>;

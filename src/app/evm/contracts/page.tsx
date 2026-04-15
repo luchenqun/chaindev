@@ -20,6 +20,7 @@ import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { JsonInput } from "@/components/ui/json-input";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
 import {
@@ -40,6 +41,7 @@ import {
   listEvmContractBindingsByScope,
   parseEvmContractArtifactImportPayload,
   subscribeEvmContractRegistry,
+  syncEvmContractRegistryFromServer,
   updateEvmContractArtifact,
   updateEvmContractBinding,
   type EvmContractArtifact,
@@ -64,7 +66,7 @@ import { AppShell } from "@/platform/layout/app-shell";
 import { AccountWorkbenchShell } from "@/platform/layout/account-workbench-shell";
 
 const textareaClassName =
-  "min-h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
+  "min-h-32 w-full resize-none overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
 const importTextareaClassName =
   "min-h-24 max-h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-xs text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
 type EnvironmentState = {
@@ -85,6 +87,63 @@ type DeployDialogState = {
   gasLimit: string;
   nonce: string;
 };
+
+function hasTupleComponents(
+  parameter: AbiParameter,
+): parameter is AbiParameter & { components: readonly AbiParameter[] } {
+  return "components" in parameter && Array.isArray(parameter.components);
+}
+
+function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
+  if (parameter.type.endsWith("]")) {
+    const baseType = parameter.type.slice(0, parameter.type.lastIndexOf("["));
+    const baseParameter = {
+      ...parameter,
+      type: baseType,
+    } satisfies AbiParameter;
+
+    return [createComplexParameterTemplateValue(baseParameter)];
+  }
+
+  if (parameter.type === "tuple") {
+    const components = hasTupleComponents(parameter) ? parameter.components : [];
+
+    return Object.fromEntries(
+      components.map((component, index) => [
+        component.name || `field${index + 1}`,
+        createComplexParameterTemplateValue(component),
+      ]),
+    );
+  }
+
+  if (parameter.type === "bool") {
+    return "false";
+  }
+
+  if (/^u?int\d*$/.test(parameter.type)) {
+    return "0";
+  }
+
+  if (parameter.type === "address") {
+    return "0x0000000000000000000000000000000000000000";
+  }
+
+  if (parameter.type === "bytes" || /^bytes\d+$/.test(parameter.type)) {
+    return "0x";
+  }
+
+  return "";
+}
+
+function getComplexParameterTemplate(parameter: AbiParameter) {
+  return JSON.stringify(createComplexParameterTemplateValue(parameter), null, 2);
+}
+
+function getInitialArgumentValue(parameter: AbiParameter) {
+  return parameter.type.includes("[") || parameter.type === "tuple"
+    ? getComplexParameterTemplate(parameter)
+    : "";
+}
 
 function ContractInputsForm({
   inputs,
@@ -111,11 +170,11 @@ function ContractInputsForm({
               {label} <span className="text-slate-400">({input.type})</span>
             </label>
             {isComplex ? (
-              <textarea
-                className={textareaClassName}
+              <JsonInput
                 value={values[index] ?? ""}
-                onChange={(event) => onChange(index, event.target.value)}
-                placeholder={input.type === "tuple" ? '{"value":"..."}' : '["value"]'}
+                onChange={(value) => onChange(index, value)}
+                placeholder={getComplexParameterTemplate(input)}
+                textareaClassName={textareaClassName}
               />
             ) : (
               <Input
@@ -312,9 +371,23 @@ export default function EvmContractsRegistryPage() {
   });
 
   useEffect(() => {
+    if (status === "loading") {
+      return;
+    }
+
     let cancelled = false;
 
     async function load() {
+      if (status === "authenticated") {
+        try {
+          await syncEvmContractRegistryFromServer();
+        } catch (error) {
+          if (!cancelled) {
+            setArtifactError(error instanceof Error ? error.message : "Failed to load contract registry.");
+          }
+        }
+      }
+
       const nextEnvironment = await getActiveEvmContractEnvironmentDirect();
 
       if (cancelled) {
@@ -364,7 +437,7 @@ export default function EvmContractsRegistryPage() {
       unsubscribe();
       window.removeEventListener("chaindev:active-rpc-profile-changed", handleProfileChanged);
     };
-  }, []);
+  }, [status]);
 
   useEffect(() => {
     function loadActiveKey() {
@@ -641,7 +714,7 @@ export default function EvmContractsRegistryPage() {
   function startDeployArtifact(artifact: EvmContractArtifact) {
     setDeployArtifactId(artifact.id);
     const constructorItem = getContractConstructor(artifact.abiJson);
-    setDeployArgumentValues(constructorItem.inputs.map(() => ""));
+    setDeployArgumentValues(constructorItem.inputs.map((input) => getInitialArgumentValue(input)));
     setDeployDialogValues(createInitialDeployDialogState());
     setDeployBindingLabel(artifact.name);
     setDeployError(null);

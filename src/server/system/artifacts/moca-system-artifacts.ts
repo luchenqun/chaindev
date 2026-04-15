@@ -1,6 +1,6 @@
-import type { DevPrecompileArtifact } from '@/server/dev/dev-precompile-artifacts';
+import type { SystemContractArtifact } from '@/server/system/artifacts/quarix-system-artifacts';
 
-export const MOCA_SYSTEM_ARTIFACTS: DevPrecompileArtifact[] = [
+export const MOCA_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
   {
     contractName: 'MocaBank',
     abi: [

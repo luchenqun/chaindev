@@ -26,7 +26,7 @@ export function ActionIconButton({
       >
         {children}
       </button>
-      <span className="pointer-events-none absolute bottom-full right-0 z-20 mb-1.5 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-[0_8px_20px_rgba(15,23,42,0.18)] transition duration-75 group-hover:opacity-100 group-focus-within:opacity-100">
+      <span className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-[0_8px_20px_rgba(15,23,42,0.18)] transition-opacity duration-0 group-hover:opacity-100 group-focus-within:opacity-100">
         {tooltip}
       </span>
     </span>

@@ -21,10 +21,11 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
-import { toFunctionSelector } from "viem";
+import { toFunctionSelector, type AbiParameter } from "viem";
 import { ActionIconButton } from "@/components/ui/action-icon-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { JsonInput } from "@/components/ui/json-input";
 import { ModalDialog } from "@/components/ui/modal-dialog";
 import { SecretInputDialog } from "@/components/ui/secret-input-dialog";
 import {
@@ -60,7 +61,7 @@ import {
 } from "@/domains/evm/client/contract-registry";
 
 const textareaClassName =
-  "min-h-32 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
+  "min-h-32 w-full resize-none overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400";
 
 type EnvironmentState = {
   providerProfileId: string;
@@ -92,6 +93,84 @@ type ManualWriteDialogState = {
 };
 
 const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
+const jsonViewStyle = {
+  "--w-rjv-background-color": "transparent",
+  "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
+  "--w-rjv-font-family":
+    '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+  "--w-rjv-color": "#0f172a",
+  "--w-rjv-arrow-color": "#64748b",
+  "--w-rjv-line-color": "rgba(148, 163, 184, 0.24)",
+  "--w-rjv-curlybraces-color": "#475569",
+  "--w-rjv-brackets-color": "#475569",
+  "--w-rjv-colon-color": "#94a3b8",
+  "--w-rjv-key-string": "#0369a1",
+  "--w-rjv-key-number": "#0369a1",
+  "--w-rjv-type-string-color": "#b45309",
+  "--w-rjv-type-int-color": "#7c3aed",
+  "--w-rjv-type-float-color": "#7c3aed",
+  "--w-rjv-type-bigint-color": "#7c3aed",
+  "--w-rjv-type-boolean-color": "#15803d",
+  "--w-rjv-type-null-color": "#b91c1c",
+  "--w-rjv-type-undefined-color": "#b91c1c",
+} as CSSProperties;
+
+function hasTupleComponents(
+  parameter: AbiParameter,
+): parameter is AbiParameter & { components: readonly AbiParameter[] } {
+  return "components" in parameter && Array.isArray(parameter.components);
+}
+
+function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
+  if (parameter.type.endsWith("]")) {
+    const baseType = parameter.type.slice(0, parameter.type.lastIndexOf("["));
+    const baseParameter = {
+      ...parameter,
+      type: baseType,
+    } satisfies AbiParameter;
+
+    return [createComplexParameterTemplateValue(baseParameter)];
+  }
+
+  if (parameter.type === "tuple") {
+    const components = hasTupleComponents(parameter) ? parameter.components : [];
+
+    return Object.fromEntries(
+      components.map((component, index) => [
+        component.name || `field${index + 1}`,
+        createComplexParameterTemplateValue(component),
+      ]),
+    );
+  }
+
+  if (parameter.type === "bool") {
+    return "false";
+  }
+
+  if (/^u?int\d*$/.test(parameter.type)) {
+    return "0";
+  }
+
+  if (parameter.type === "address") {
+    return "0x0000000000000000000000000000000000000000";
+  }
+
+  if (parameter.type === "bytes" || /^bytes\d+$/.test(parameter.type)) {
+    return "0x";
+  }
+
+  return "";
+}
+
+function getComplexParameterTemplate(parameter: AbiParameter) {
+  return JSON.stringify(createComplexParameterTemplateValue(parameter), null, 2);
+}
+
+function getInitialArgumentValue(parameter: AbiParameter) {
+  return parameter.type.includes("[") || parameter.type === "tuple"
+    ? getComplexParameterTemplate(parameter)
+    : "";
+}
 
 function stringifyResult(value: unknown) {
   return JSON.stringify(
@@ -158,11 +237,11 @@ function FunctionArgumentsForm({
               {label} <span className="text-slate-400">({input.type})</span>
             </label>
             {isComplex ? (
-              <textarea
-                className={textareaClassName}
+              <JsonInput
                 value={values[index] ?? ""}
-                onChange={(event) => onChange(index, event.target.value)}
-                placeholder={input.type === "tuple" ? '{"value":"..."}' : '["value"]'}
+                onChange={(value) => onChange(index, value)}
+                placeholder={getComplexParameterTemplate(input)}
+                textareaClassName={textareaClassName}
               />
             ) : (
               <div className="relative">
@@ -236,7 +315,9 @@ function FunctionArgumentsForm({
 }
 
 function getInitialValues(functions: EvmContractFunctionDescriptor[]) {
-  return Object.fromEntries(functions.map((fn) => [fn.signature, fn.inputs.map(() => "")]));
+  return Object.fromEntries(
+    functions.map((fn) => [fn.signature, fn.inputs.map((input) => getInitialArgumentValue(input))]),
+  );
 }
 
 function copyText(value: string) {
@@ -256,7 +337,16 @@ function parseDisplayValue(value: string) {
 }
 
 function ValuePreview({ value }: { value: string }) {
+  const { showToast } = useToast();
   const parsedValue = parseDisplayValue(value);
+
+  async function handleCopy() {
+    await copyText(value);
+    showToast({
+      title: "Result copied",
+      description: "Call result was copied successfully.",
+    });
+  }
 
   if (
     typeof parsedValue === "string" ||
@@ -265,16 +355,45 @@ function ValuePreview({ value }: { value: string }) {
     parsedValue === null
   ) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900">
+      <div className="relative rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm font-medium text-slate-900">
+        <div className="absolute right-[6px] top-[6px]">
+          <ActionIconButton
+            className="text-slate-400 hover:text-slate-700"
+            tooltip="Copy result"
+            aria-label="Copy result"
+            onClick={() => void handleCopy()}
+          >
+            <IconCopy className="size-4" stroke={1.8} />
+          </ActionIconButton>
+        </div>
         <span className="break-all">{String(parsedValue)}</span>
       </div>
     );
   }
 
   return (
-    <pre className="max-h-[260px] overflow-auto rounded-2xl border border-slate-200 bg-white p-4 text-xs leading-6 text-slate-800">
-      {value}
-    </pre>
+    <div className="relative rounded-2xl border border-slate-200 bg-white p-4 pr-10">
+      <div className="absolute right-[6px] top-[6px] z-10">
+        <ActionIconButton
+          className="text-slate-400 hover:text-slate-700"
+          tooltip="Copy result"
+          aria-label="Copy result"
+          onClick={() => void handleCopy()}
+        >
+          <IconCopy className="size-4" stroke={1.8} />
+        </ActionIconButton>
+      </div>
+      <JsonView
+        className="json-view-wrap"
+        value={parsedValue}
+        collapsed={false}
+        shortenTextAfterLength={0}
+        enableClipboard={false}
+        displayDataTypes={false}
+        displayObjectSize={false}
+        style={jsonViewStyle}
+      />
+    </div>
   );
 }
 
@@ -776,7 +895,7 @@ export function AddressContractPanel({
         address: binding.address,
         abiJson: artifact.abiJson,
         functionSignature: signature,
-        rawArgs: readArgumentValues[signature] ?? fn.inputs.map(() => ""),
+        rawArgs: readArgumentValues[signature] ?? fn.inputs.map((input) => getInitialArgumentValue(input)),
       });
 
       setReadResults((current) => ({
@@ -819,7 +938,7 @@ export function AddressContractPanel({
 
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
-      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map(() => "");
+      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map((input) => getInitialArgumentValue(input));
       const value = writeValueBySignature[signature] ?? "";
       const preview = await prepareEvmContractWriteDirect({
         address: binding.address,
@@ -913,7 +1032,7 @@ export function AddressContractPanel({
 
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
-      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map(() => "");
+      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map((input) => getInitialArgumentValue(input));
       const value = fn.stateMutability === "payable" ? (writeValueBySignature[signature] ?? "0") : "0";
       const defaults = await getEvmContractWriteManualDefaultsDirect({
         address: binding.address,
@@ -987,7 +1106,7 @@ export function AddressContractPanel({
 
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
-      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map(() => "");
+      const rawArgs = writeArgumentValues[signature] ?? fn.inputs.map((input) => getInitialArgumentValue(input));
       const value = manualWriteDialogValues.value;
       const latestDefaults =
         manualWriteDialogValues.transactionType === "EIP1559" &&
@@ -1272,27 +1391,7 @@ export function AddressContractPanel({
                     enableClipboard={false}
                     displayDataTypes={false}
                     displayObjectSize={false}
-                    style={{
-                      "--w-rjv-background-color": "transparent",
-                      "--w-rjv-border-left": "1px dashed rgba(148, 163, 184, 0.28)",
-                      "--w-rjv-font-family":
-                        '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-                      "--w-rjv-color": "#0f172a",
-                      "--w-rjv-arrow-color": "#64748b",
-                      "--w-rjv-line-color": "rgba(148, 163, 184, 0.24)",
-                      "--w-rjv-curlybraces-color": "#475569",
-                      "--w-rjv-brackets-color": "#475569",
-                      "--w-rjv-colon-color": "#94a3b8",
-                      "--w-rjv-key-string": "#0369a1",
-                      "--w-rjv-key-number": "#0369a1",
-                      "--w-rjv-type-string-color": "#b45309",
-                      "--w-rjv-type-int-color": "#7c3aed",
-                      "--w-rjv-type-float-color": "#7c3aed",
-                      "--w-rjv-type-bigint-color": "#7c3aed",
-                      "--w-rjv-type-boolean-color": "#15803d",
-                      "--w-rjv-type-null-color": "#b91c1c",
-                      "--w-rjv-type-undefined-color": "#b91c1c",
-                    } as CSSProperties}
+                    style={jsonViewStyle}
                   />
                 </div>
               </div>
@@ -1351,7 +1450,10 @@ export function AddressContractPanel({
               <div className="grid gap-4">
                 <FunctionArgumentsForm
                   fn={fn}
-                  values={readArgumentValues[fn.signature] ?? fn.inputs.map(() => "")}
+                  values={
+                    readArgumentValues[fn.signature] ??
+                    fn.inputs.map((input) => getInitialArgumentValue(input))
+                  }
                   onChange={(index, value) => updateReadArgumentValue(fn.signature, index, value)}
                   selfAddress={activeKey?.address ?? null}
                 />
@@ -1459,7 +1561,10 @@ export function AddressContractPanel({
               <div className="grid gap-4">
                 <FunctionArgumentsForm
                   fn={fn}
-                  values={writeArgumentValues[fn.signature] ?? fn.inputs.map(() => "")}
+                  values={
+                    writeArgumentValues[fn.signature] ??
+                    fn.inputs.map((input) => getInitialArgumentValue(input))
+                  }
                   onChange={(index, value) => updateWriteArgumentValue(fn.signature, index, value)}
                   selfAddress={activeKey?.address ?? null}
                 />

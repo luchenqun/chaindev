@@ -55,25 +55,44 @@ function getTopbarFallbackKey(): EvmStoredPrivateKey {
 
 export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelectorProps) {
   const { status } = useSession();
+  const isAuthenticated = status === "authenticated";
   const [items, setItems] = useState<EvmStoredPrivateKey[]>([]);
   const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(null);
   const hasPersistedItems = items.length > 0;
-  const topbarItems = items.length ? items : [getTopbarFallbackKey()];
-  const topbarActiveItem = activeItem ?? topbarItems[0] ?? null;
+  const topbarItems = isAuthenticated ? items : items.length ? items : [getTopbarFallbackKey()];
+  const topbarActiveItem = isAuthenticated ? activeItem : activeItem ?? topbarItems[0] ?? null;
 
   useEffect(() => {
+    if (status === "loading") {
+      return;
+    }
+
+    let cancelled = false;
+
     function load() {
+      if (cancelled) {
+        return;
+      }
+
       setItems(listEvmStoredPrivateKeys());
       setActiveItem(getActiveEvmStoredPrivateKey());
     }
 
-    load();
-    void syncEvmKeyringFromServer().catch(() => undefined);
+    async function bootstrap() {
+      await syncEvmKeyringFromServer().catch(() => undefined);
+      load();
+    }
 
-    return subscribeEvmKeyring(load);
-  }, []);
+    void bootstrap();
 
-  const isAuthenticated = status === "authenticated";
+    const unsubscribe = subscribeEvmKeyring(load);
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [status]);
+
   const manageHref = status === "authenticated" ? "/evm/settings/private-keys" : "/login?callbackUrl=%2Fevm%2Fsettings%2Fprivate-keys";
 
   if (!items.length) {
@@ -84,7 +103,9 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
             <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] font-normal leading-none shadow-none focus:ring-0">
               <div className="flex min-w-0 items-center gap-1.5">
                 <IconKey className="size-3.5 shrink-0 text-slate-500" stroke={2} />
-                <span className="truncate">{topbarActiveItem?.name ?? "Alice"}</span>
+                <span className="truncate">
+                  {status === "loading" || isAuthenticated ? topbarActiveItem?.name ?? "Loading keys..." : topbarActiveItem?.name ?? "Alice"}
+                </span>
               </div>
             </SelectTrigger>
             <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
@@ -96,6 +117,15 @@ export function ActiveEvmKeySelector({ variant = "default" }: ActiveEvmKeySelect
             </SelectContent>
           </Select>
         </div>
+      );
+    }
+
+    if (status === "loading" || isAuthenticated) {
+      return (
+        <Button variant="ghost" disabled className="h-8 gap-1.5 px-2 text-[13px] font-normal text-slate-500">
+          <IconKey className="size-4" stroke={2} />
+          Loading Keys...
+        </Button>
       );
     }
 

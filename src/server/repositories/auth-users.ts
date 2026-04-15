@@ -50,26 +50,21 @@ export async function createCredentialUser(input: {
   email: string;
   username: string;
   password: string;
+  name?: string;
+  isAdmin?: boolean;
 }) {
   const normalizedEmail = input.email.trim().toLowerCase();
   const normalizedUsername = input.username.trim();
   const id = randomUUID();
-  const existingUserCount =
-    db
-      .select({
-        count: sql<number>`count(*)`,
-      })
-      .from(users)
-      .get()?.count ?? 0;
 
   db.insert(users)
     .values({
       id,
       email: normalizedEmail,
       username: normalizedUsername,
-      name: normalizedUsername,
+      name: input.name?.trim() || normalizedUsername,
       passwordHash: hashPassword(input.password),
-      isAdmin: existingUserCount === 0,
+      isAdmin: input.isAdmin ?? false,
       emailVerified: new Date(),
     })
     .run();
