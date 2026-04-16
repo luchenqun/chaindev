@@ -7,6 +7,7 @@ export const importedRpcProfileSchema = z.object({
   nativeCurrencySymbol: z.string().trim().min(1).nullable(),
   rpcUrl: z.string().url(),
   restUrl: z.string().url().nullable(),
+  wsUrl: z.string().url().nullable(),
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),
 });

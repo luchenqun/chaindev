@@ -8,6 +8,7 @@ export const rpcProfiles = sqliteTable('rpc_profiles', {
   nativeCurrencySymbol: text('native_currency_symbol'),
   rpcUrl: text('rpc_url').notNull(),
   restUrl: text('rest_url'),
+  wsUrl: text('ws_url'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

@@ -19,6 +19,11 @@ export const accountMenuSections: AccountMenuSection[] = [
     items: [
       { href: '/evm/settings/providers', label: 'Providers', modes: ['evm'] },
       {
+        href: '/cosmos/settings/providers',
+        label: 'Providers',
+        modes: ['cosmos'],
+      },
+      {
         href: '/evm/settings/private-keys',
         label: 'Private Keys',
         modes: ['evm'],

@@ -97,10 +97,10 @@ function matchesNavGroup(pathname: string, groupId: string) {
   return false;
 }
 
-export function TopNav() {
+export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const messages = getMessages();
   const pathname = usePathname();
-  const mode = inferMode(pathname);
+  const mode = modeOverride ?? inferMode(pathname);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { data: session, status } = useSession();
   const username =

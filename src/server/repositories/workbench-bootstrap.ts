@@ -1,4 +1,5 @@
 import {
+  DEFAULT_COSMOS_RPC_PROFILE,
   DEFAULT_EVM_PRIVATE_KEY_VALUE,
   DEFAULT_EVM_RPC_PROFILE,
 } from '@/platform/workbench/defaults';
@@ -26,6 +27,16 @@ export async function seedDefaultWorkbenchForUser(userId: string) {
       nativeCurrencySymbol: DEFAULT_EVM_RPC_PROFILE.nativeCurrencySymbol,
       rpcUrl: DEFAULT_EVM_RPC_PROFILE.rpcUrl,
       restUrl: DEFAULT_EVM_RPC_PROFILE.restUrl,
+      wsUrl: DEFAULT_EVM_RPC_PROFILE.wsUrl,
+    });
+    await addRpcProfile({
+      userId,
+      mode: DEFAULT_COSMOS_RPC_PROFILE.mode,
+      name: DEFAULT_COSMOS_RPC_PROFILE.name,
+      nativeCurrencySymbol: DEFAULT_COSMOS_RPC_PROFILE.nativeCurrencySymbol,
+      rpcUrl: DEFAULT_COSMOS_RPC_PROFILE.rpcUrl,
+      restUrl: DEFAULT_COSMOS_RPC_PROFILE.restUrl,
+      wsUrl: DEFAULT_COSMOS_RPC_PROFILE.wsUrl,
     });
   }
 

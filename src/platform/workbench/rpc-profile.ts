@@ -1,8 +1,12 @@
 import { z } from 'zod';
 import { type PlatformMode } from '@/config/chains';
-import { DEFAULT_EVM_RPC_PROFILE } from '@/platform/workbench/defaults';
+import {
+  DEFAULT_COSMOS_RPC_PROFILE,
+  DEFAULT_EVM_RPC_PROFILE,
+} from '@/platform/workbench/defaults';
 
 export const platformModeSchema = z.enum(['evm', 'cosmos']);
+export const ACTIVE_PLATFORM_MODE_COOKIE_NAME = 'chaindev-active-platform-mode';
 
 const baseRpcProfileDraftSchema = z.object({
   name: z.string().trim().min(1, 'Provider name is required.'),
@@ -20,6 +24,13 @@ export const rpcProfileDraftSchema = z.discriminatedUnion('mode', [
   baseRpcProfileDraftSchema.extend({
     mode: z.literal('cosmos'),
     restUrl: z.string().trim().url('A valid REST URL is required.'),
+    wsUrl: z
+      .string()
+      .trim()
+      .url('A valid WebSocket URL is required.')
+      .or(z.literal(''))
+      .optional()
+      .transform((value) => value?.trim() || ''),
   }),
 ]);
 
@@ -32,6 +43,12 @@ export const rpcProfileSchema = z.object({
   nativeCurrencySymbol: z.string().min(1).nullable(),
   rpcUrl: z.string().url(),
   restUrl: z.string().url().nullable(),
+  wsUrl: z
+    .string()
+    .url()
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null),
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),
 });
@@ -69,7 +86,11 @@ export function getGuestFallbackRpcProfile(mode: PlatformMode) {
     return DEFAULT_EVM_RPC_PROFILE;
   }
 
-  return null;
+  return DEFAULT_COSMOS_RPC_PROFILE;
+}
+
+export function getDefaultActivePlatformMode(): PlatformMode {
+  return 'evm';
 }
 
 export function isPlatformMode(value: string): value is PlatformMode {

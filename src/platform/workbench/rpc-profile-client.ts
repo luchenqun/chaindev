@@ -2,6 +2,8 @@
 
 import type { PlatformMode } from '@/config/chains';
 import {
+  ACTIVE_PLATFORM_MODE_COOKIE_NAME,
+  getDefaultActivePlatformMode,
   getActiveRpcProfileCookieName,
   getGuestFallbackRpcProfile,
   LOCAL_RPC_PROFILES_STORAGE_KEY,
@@ -113,6 +115,7 @@ export function saveLocalRpcProfile(input: RpcProfileDraft) {
       input.mode === 'evm' ? input.nativeCurrencySymbol : null,
     rpcUrl: input.rpcUrl,
     restUrl: input.mode === 'cosmos' ? input.restUrl : null,
+    wsUrl: input.mode === 'cosmos' ? input.wsUrl || null : null,
     createdAt: now,
     updatedAt: now,
   };
@@ -141,6 +144,7 @@ export function updateLocalRpcProfile(
       input.mode === 'evm' ? input.nativeCurrencySymbol : null,
     rpcUrl: input.rpcUrl,
     restUrl: input.mode === 'cosmos' ? input.restUrl : null,
+    wsUrl: input.mode === 'cosmos' ? input.wsUrl || null : null,
     updatedAt: Date.now(),
   };
   const next = [
@@ -308,6 +312,27 @@ export function writeActiveRpcProfileCookie(profile: RpcProfile | null) {
 
   document.cookie = `${name}=${encodeURIComponent(JSON.stringify(profile))}; Max-Age=${60 * 60 * 24 * 365}; Path=/; SameSite=Lax`;
   notifyActiveRpcProfileChanged();
+}
+
+export function writeActivePlatformModeCookie(mode: PlatformMode) {
+  document.cookie = `${ACTIVE_PLATFORM_MODE_COOKIE_NAME}=${mode}; Max-Age=${60 * 60 * 24 * 365}; Path=/; SameSite=Lax`;
+}
+
+export function readActivePlatformModeCookie() {
+  if (typeof document === 'undefined') {
+    return getDefaultActivePlatformMode();
+  }
+
+  const pair = document.cookie
+    .split('; ')
+    .find((item) => item.startsWith(`${ACTIVE_PLATFORM_MODE_COOKIE_NAME}=`));
+
+  if (!pair) {
+    return getDefaultActivePlatformMode();
+  }
+
+  const value = pair.slice(pair.indexOf('=') + 1);
+  return value === 'cosmos' ? 'cosmos' : getDefaultActivePlatformMode();
 }
 
 export function clearActiveRpcProfileCookie(mode: PlatformMode) {

@@ -31,6 +31,9 @@ Run `npm run typecheck` and `npm run build` before opening a PR.
 - Do not run `npm run typecheck` by default after every small change. Prefer running it only before `push`, before a PR, or when the user explicitly asks for verification.
 - Do not delete `.next` unless the user explicitly approves it. Removing `.next` while `npm run dev` is running can break the active local dev server.
 - Avoid disruptive cleanup actions during active local development. If cache cleanup is truly needed, explain the impact first and let the user restart the dev server on purpose.
+- Do not store any blockchain data on the server. All chain data must be fetched from the client, and cached in IndexedDB only when it is actually useful for UX or performance.
+- Do not design or add server-side persistence, snapshots, or indexing for chain state, blocks, transactions, validators, proposals, or similar on-chain data unless the user explicitly changes this rule.
+- For chain queries and chain data decoding, prefer direct client-side RPC/REST requests. Do not add backend proxy or server-side decode routes for on-chain reads unless the user explicitly asks for that architecture.
 
 ## Coding Style & Naming Conventions
 

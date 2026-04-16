@@ -12,6 +12,7 @@ type RpcProfileInput = {
   nativeCurrencySymbol?: string | null;
   rpcUrl: string;
   restUrl?: string | null;
+  wsUrl?: string | null;
 };
 
 export async function addRpcProfile(input: RpcProfileInput) {
@@ -23,6 +24,7 @@ export async function addRpcProfile(input: RpcProfileInput) {
     nativeCurrencySymbol: input.nativeCurrencySymbol ?? null,
     rpcUrl: input.rpcUrl,
     restUrl: input.restUrl ?? null,
+    wsUrl: input.wsUrl || null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -44,6 +46,7 @@ export async function importRpcProfiles(
       nativeCurrencySymbol: profile.nativeCurrencySymbol ?? null,
       rpcUrl: profile.rpcUrl,
       restUrl: profile.restUrl ?? null,
+      wsUrl: profile.wsUrl || null,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
     };
@@ -112,6 +115,7 @@ export async function updateRpcProfile(
       nativeCurrencySymbol: input.nativeCurrencySymbol ?? null,
       rpcUrl: input.rpcUrl,
       restUrl: input.restUrl ?? null,
+      wsUrl: input.wsUrl || null,
       updatedAt,
     })
     .where(and(eq(rpcProfiles.userId, userId), eq(rpcProfiles.id, id)))

@@ -17,6 +17,7 @@ import {
   getEvmHomeSnapshotDirect,
   validateActiveEvmCacheDirect,
 } from '@/domains/evm/client/queries';
+import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
 
 type EvmHomeSnapshot = Awaited<ReturnType<typeof getEvmHomeSnapshotDirect>>;
 type EvmLatestFeed = Awaited<ReturnType<typeof getEvmLatestFeedDirect>>;
@@ -266,7 +267,10 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let disposed = false;
-    const isEvmRoute = !pathname.startsWith('/cosmos');
+    const isEvmRoute =
+      pathname === '/'
+        ? readActivePlatformModeCookie() === 'evm'
+        : !pathname.startsWith('/cosmos');
     const isHomePage = pathname === '/';
 
     function clearPoll() {

@@ -15,17 +15,32 @@ export const DEFAULT_EVM_RPC_PROFILE: RpcProfile = {
   nativeCurrencySymbol: 'QARE',
   rpcUrl: 'http://127.0.0.1:8545',
   restUrl: null,
+  wsUrl: null,
+  createdAt: DEFAULT_TIMESTAMP,
+  updatedAt: DEFAULT_TIMESTAMP,
+};
+
+export const DEFAULT_COSMOS_PROVIDER_ID = 'default-cosmos-localnode0';
+export const DEFAULT_COSMOS_RPC_PROFILE: RpcProfile = {
+  id: DEFAULT_COSMOS_PROVIDER_ID,
+  mode: 'cosmos',
+  name: 'LocalNode0',
+  nativeCurrencySymbol: null,
+  rpcUrl: 'http://127.0.0.1:26657',
+  restUrl: 'http://127.0.0.1:1317',
+  wsUrl: 'ws://127.0.0.1:26657/websocket',
   createdAt: DEFAULT_TIMESTAMP,
   updatedAt: DEFAULT_TIMESTAMP,
 };
 
 export function getDefaultGuestRpcProfiles() {
-  return [DEFAULT_EVM_RPC_PROFILE];
+  return [DEFAULT_EVM_RPC_PROFILE, DEFAULT_COSMOS_RPC_PROFILE];
 }
 
 export function getDefaultGuestSelectedRpcProfiles() {
   return {
     evm: DEFAULT_EVM_RPC_PROFILE.id,
+    cosmos: DEFAULT_COSMOS_RPC_PROFILE.id,
   } as const;
 }
 

@@ -24,6 +24,7 @@ import {
   editRpcProfile,
   fetchRpcProfiles,
   readActiveRpcProfileCookie,
+  writeActivePlatformModeCookie,
   removeRpcProfile,
   setLocalSelectedRpcProfile,
   writeActiveRpcProfileCookie,
@@ -49,6 +50,7 @@ type DraftState = {
   nativeCurrencySymbol: string;
   rpcUrl: string;
   restUrl: string;
+  wsUrl: string;
 };
 
 function getInitialDraft(mode: PlatformMode): DraftState {
@@ -58,6 +60,7 @@ function getInitialDraft(mode: PlatformMode): DraftState {
     nativeCurrencySymbol: mode === 'evm' ? 'ETH' : '',
     rpcUrl: '',
     restUrl: '',
+    wsUrl: '',
   };
 }
 
@@ -87,6 +90,7 @@ function getDraftFromProfile(profile: RpcProfile): DraftState {
     nativeCurrencySymbol: profile.nativeCurrencySymbol ?? 'ETH',
     rpcUrl: profile.rpcUrl,
     restUrl: profile.restUrl ?? '',
+    wsUrl: profile.wsUrl ?? '',
   };
 }
 
@@ -238,7 +242,8 @@ export function RpcProviderManager({
     if (
       cookieProfile?.id !== preferred.id ||
       cookieProfile.rpcUrl !== preferred.rpcUrl ||
-      cookieProfile.restUrl !== preferred.restUrl
+      cookieProfile.restUrl !== preferred.restUrl ||
+      cookieProfile.wsUrl !== preferred.wsUrl
     ) {
       writeActiveRpcProfileCookie(preferred);
       router.refresh();
@@ -299,6 +304,7 @@ export function RpcProviderManager({
               name: draft.name.trim(),
               rpcUrl: draft.rpcUrl.trim(),
               restUrl: draft.restUrl.trim(),
+              wsUrl: draft.wsUrl.trim(),
             };
 
       const { profile } = editingId
@@ -315,6 +321,7 @@ export function RpcProviderManager({
 
       setProfiles(nextProfiles);
       setSelected(nextSelected);
+      writeActivePlatformModeCookie(profile.mode);
       writeActiveRpcProfileCookie(profile);
       setLocalSelectedRpcProfile(profile.mode, profile.id);
       setDraft(getInitialDraft(mode));
@@ -365,6 +372,7 @@ export function RpcProviderManager({
 
       if (selected[profile.mode] === profile.id) {
         if (fallback) {
+          writeActivePlatformModeCookie(fallback.mode);
           writeActiveRpcProfileCookie(fallback);
           setLocalSelectedRpcProfile(profile.mode, fallback.id);
         } else {
@@ -407,14 +415,15 @@ export function RpcProviderManager({
 
     setSelected(nextSelected);
     setLocalSelectedRpcProfile(profile.mode, profile.id);
+    writeActivePlatformModeCookie(profile.mode);
     writeActiveRpcProfileCookie(profile);
 
-    if (profile.mode !== mode) {
-      router.push(`/${profile.mode}/blocks`);
+    if (window.location.pathname === '/') {
+      router.refresh();
       return;
     }
 
-    router.refresh();
+    router.push('/');
   }
 
   function renderProfilesTable() {
@@ -469,9 +478,14 @@ export function RpcProviderManager({
                           Currency: {profile.nativeCurrencySymbol ?? 'ETH'}
                         </span>
                       ) : (
-                        <span className="block truncate">
-                          REST: {profile.restUrl ?? '-'}
-                        </span>
+                        <div className="grid gap-1">
+                          <span className="block truncate">
+                            REST: {profile.restUrl ?? '-'}
+                          </span>
+                          <span className="block truncate">
+                            WS: {profile.wsUrl ?? '-'}
+                          </span>
+                        </div>
                       )}
                     </td>
                     <td className="px-5 py-3 text-sm text-slate-500">
@@ -665,21 +679,38 @@ export function RpcProviderManager({
               />
             </label>
             {draft.mode === 'cosmos' ? (
-              <label className="grid gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">
-                  REST URL
-                </span>
-                <Input
-                  value={draft.restUrl}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      restUrl: event.target.value,
-                    }))
-                  }
-                  placeholder="http://127.0.0.1:1317"
-                />
-              </label>
+              <>
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-medium text-slate-700">
+                    REST URL
+                  </span>
+                  <Input
+                    value={draft.restUrl}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        restUrl: event.target.value,
+                      }))
+                    }
+                    placeholder="http://127.0.0.1:1317"
+                  />
+                </label>
+                <label className="grid gap-2 md:col-span-2">
+                  <span className="text-sm font-medium text-slate-700">
+                    WebSocket URL
+                  </span>
+                  <Input
+                    value={draft.wsUrl}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        wsUrl: event.target.value,
+                      }))
+                    }
+                    placeholder="ws://127.0.0.1:26657/websocket"
+                  />
+                </label>
+              </>
             ) : null}
           </div>
           {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}

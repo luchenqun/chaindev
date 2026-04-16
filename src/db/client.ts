@@ -106,6 +106,7 @@ function ensureWorkbenchSchema() {
       native_currency_symbol TEXT,
       rpc_url TEXT NOT NULL,
       rest_url TEXT,
+      ws_url TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -230,6 +231,13 @@ function ensureWorkbenchSchema() {
   const contractArtifactColumns = new Set(
     getTableColumns('evm_contract_artifacts').map((column) => column.name),
   );
+  const rpcProfileColumns = new Set(
+    getTableColumns('rpc_profiles').map((column) => column.name),
+  );
+
+  if (!rpcProfileColumns.has('ws_url')) {
+    sqlite.exec('ALTER TABLE rpc_profiles ADD COLUMN ws_url TEXT');
+  }
 
   if (!contractArtifactColumns.has('scope')) {
     sqlite.exec(
