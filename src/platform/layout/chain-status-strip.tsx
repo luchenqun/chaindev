@@ -4,12 +4,13 @@ import { usePathname } from 'next/navigation';
 import { IconClockHour4, IconStack2 } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getCosmosOverviewDirect } from '@/domains/cosmos/client/queries';
-import {
-  isCosmosHomeRoute,
-  useCosmosHomeData,
-} from '@/domains/cosmos/ui/home-data-provider';
+import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { type PlatformMode } from '@/config/chains';
+import {
+  isCosmosHomeRouteActive,
+  type ActivePlatformMode,
+} from '@/platform/workbench/home-route-state';
 
 type StatusItem = {
   label: string;
@@ -27,6 +28,7 @@ function buildFallbackItem(reason: string): StatusItem {
 
 export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
   const pathname = usePathname();
+  const activeMode = mode as ActivePlatformMode;
   const { status, pollIntervalMs } = useEvmHomeData();
   const { snapshot: cosmosSnapshot } = useCosmosHomeData();
   const [item, setItem] = useState<StatusItem>(() =>
@@ -44,7 +46,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
         : buildFallbackItem('Unavailable');
     }
 
-    if (isCosmosHomeRoute(pathname)) {
+    if (isCosmosHomeRouteActive(pathname, activeMode)) {
       return cosmosSnapshot
         ? {
             label: 'Latest Block',
@@ -55,12 +57,12 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
     }
 
     return item;
-  }, [cosmosSnapshot, item, mode, pathname, status]);
+  }, [activeMode, cosmosSnapshot, item, mode, pathname, status]);
 
   useEffect(() => {
     let cancelled = false;
     const shouldUseSharedCosmosHomeData =
-      mode === 'cosmos' && isCosmosHomeRoute(pathname);
+      mode === 'cosmos' && isCosmosHomeRouteActive(pathname, activeMode);
 
     if (mode === 'evm' || shouldUseSharedCosmosHomeData) {
       return;
@@ -119,7 +121,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
       clearPoll();
       window.removeEventListener('chaindev:active-rpc-profile-changed', reload);
     };
-  }, [cosmosSnapshot, mode, pathname]);
+  }, [activeMode, cosmosSnapshot, mode, pathname]);
 
   return (
     <div className="flex flex-wrap items-center gap-5">

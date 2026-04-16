@@ -17,6 +17,7 @@ import {
 } from '@/domains/cosmos/client/queries';
 import { decodeCosmosHomeTransactionsByHashes } from '@/domains/cosmos/client/home-transactions';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
+import { isCosmosHomeRouteActive } from '@/platform/workbench/home-route-state';
 
 type CosmosHomeDataContextValue = {
   snapshot: CosmosHomeSnapshot | null;
@@ -152,16 +153,6 @@ function mergeLatestBlocks(
   );
 }
 
-function mergeLatestTransactions(
-  current: CosmosHomeSnapshot['activity']['transactions'],
-  next: CosmosHomeSnapshot['activity']['transactions'][number],
-) {
-  return [next, ...current.filter((item) => item.hash !== next.hash)].slice(
-    0,
-    COSMOS_HOME_TX_LIMIT,
-  );
-}
-
 async function sha256HexFromBase64(input: string) {
   const raw = window.atob(input);
   const bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0));
@@ -172,24 +163,13 @@ async function sha256HexFromBase64(input: string) {
     .toUpperCase();
 }
 
-export function isCosmosHomeRoute(pathname: string) {
-  if (pathname === '/cosmos/overview') {
-    return true;
-  }
-
-  if (pathname !== '/') {
-    return false;
-  }
-
-  return readActivePlatformModeCookie() === 'cosmos';
-}
-
 export function CosmosHomeDataProvider({
   children,
 }: {
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const activeMode = readActivePlatformModeCookie();
   const [snapshot, setSnapshot] = useState<CosmosHomeSnapshot | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -548,7 +528,7 @@ export function CosmosHomeDataProvider({
       setErrorMessage(null);
     }
 
-    if (!isCosmosHomeRoute(pathname)) {
+    if (!isCosmosHomeRouteActive(pathname, activeMode)) {
       resetState();
       return () => {
         disposed = true;
@@ -580,7 +560,7 @@ export function CosmosHomeDataProvider({
         handleProfileChanged,
       );
     };
-  }, [autoRefreshEnabled, pathname]);
+  }, [activeMode, autoRefreshEnabled, pathname]);
 
   const value = useMemo(
     () => ({

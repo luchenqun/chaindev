@@ -18,6 +18,7 @@ import {
   validateActiveEvmCacheDirect,
 } from '@/domains/evm/client/queries';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
+import { isEvmRouteActive } from '@/platform/workbench/home-route-state';
 
 type EvmHomeSnapshot = Awaited<ReturnType<typeof getEvmHomeSnapshotDirect>>;
 type EvmLatestFeed = Awaited<ReturnType<typeof getEvmLatestFeedDirect>>;
@@ -232,6 +233,7 @@ function buildDerivedHomeSnapshot(input: {
 
 export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const activeMode = readActivePlatformModeCookie();
   const [snapshot, setSnapshot] = useState<EvmHomeSnapshot | null>(null);
   const [status, setStatus] = useState<EvmLiveStatus | null>(null);
   const [latestFeed, setLatestFeed] = useState<EvmLatestFeed | null>(null);
@@ -267,10 +269,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let disposed = false;
-    const isEvmRoute =
-      pathname === '/'
-        ? readActivePlatformModeCookie() === 'evm'
-        : !pathname.startsWith('/cosmos');
+    const isEvmRoute = isEvmRouteActive(pathname, activeMode);
     const isHomePage = pathname === '/';
 
     function clearPoll() {
@@ -477,7 +476,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         handleProfileChanged,
       );
     };
-  }, [pathname]);
+  }, [activeMode, pathname]);
 
   const value = useMemo(
     () => ({
