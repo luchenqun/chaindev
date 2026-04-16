@@ -129,7 +129,7 @@
   }
 
   .data-table {
-    @apply min-w-full w-max border-collapse whitespace-nowrap;
+    @apply min-w-full w-full border-collapse whitespace-nowrap;
   }
 
   .data-table thead th {
