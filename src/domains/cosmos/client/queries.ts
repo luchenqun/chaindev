@@ -345,7 +345,6 @@ const READABLE_DENOM_ALIASES: Record<string, string> = {
   athbs: 'thbs',
   acbo: 'cbo',
   azkme: 'zkme',
-  amud: 'mud',
   azeta: 'zeta',
   aabtc: 'abtc',
   aakk: 'akk',
@@ -650,7 +649,9 @@ async function getDecodedLatestTransactions(input: {
     const gasUsed = detail.tx_response?.gas_used ?? tx.tx_result?.gas_used ?? '0';
     const gasWanted =
       detail.tx_response?.gas_wanted ?? tx.tx_result?.gas_wanted ?? '0';
-    const feeLabel = formatDenomCollection(detail.tx?.auth_info?.fee?.amount);
+    const feeLabel = formatReadableDenomCollection(
+      detail.tx?.auth_info?.fee?.amount,
+    );
     const item: CosmosHomeTransactionItem = {
       hash: tx.hash,
       hashLabel: formatCompactHash(tx.hash),

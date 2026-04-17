@@ -76,7 +76,71 @@ function formatDenomAmount(amount: string) {
   }`;
 }
 
-function formatDenomCollection(
+const READABLE_DENOM_ALIASES: Record<string, string> = {
+  aevmos: 'evmos',
+  aethos: 'ethos',
+  aqare: 'qare',
+  aqrx: 'qrx',
+  avoucher: 'voucher',
+  aqvoucher: 'qvoucher',
+  athbs: 'thbs',
+  acbo: 'cbo',
+  azkme: 'zkme',
+  azeta: 'zeta',
+  aabtc: 'abtc',
+  aakk: 'akk',
+  apepe: 'pepe',
+  ahopp: 'hopp',
+  amoca: 'moca',
+};
+
+function shortenDenom(denom: string) {
+  return denom.length > 12
+    ? `${denom.slice(0, 8)}...${denom.slice(-4)}`
+    : denom;
+}
+
+function formatReadableTokenAmount(amount: string, decimals = 18) {
+  const normalized = amount.trim();
+
+  if (!normalized) {
+    return '0';
+  }
+
+  if (normalized.includes('.')) {
+    return formatDenomAmount(normalized);
+  }
+
+  const negative = normalized.startsWith('-');
+  const digits = (negative ? normalized.slice(1) : normalized).replace(
+    /^0+(?=\d)/,
+    '',
+  ) || '0';
+
+  if (decimals <= 0) {
+    return formatDenomAmount(`${negative ? '-' : ''}${digits}`);
+  }
+
+  const padded = digits.padStart(decimals + 1, '0');
+  const integerPart = padded.slice(0, -decimals) || '0';
+  const fractionPart = padded.slice(-decimals).replace(/0+$/, '');
+  const value = fractionPart
+    ? `${integerPart}.${fractionPart}`
+    : integerPart;
+
+  return formatDenomAmount(`${negative ? '-' : ''}${value}`);
+}
+
+function formatReadableDenom(denom: string) {
+  const shortened = shortenDenom(denom);
+  return (
+    READABLE_DENOM_ALIASES[shortened] ??
+    READABLE_DENOM_ALIASES[denom] ??
+    shortened
+  );
+}
+
+function formatReadableDenomCollection(
   items: Array<{ denom: string; amount: string }> | undefined,
 ) {
   if (!items?.length) {
@@ -84,7 +148,7 @@ function formatDenomCollection(
   }
 
   const visible = items.slice(0, 2).map((item) => {
-    return `${formatDenomAmount(item.amount)} ${item.denom}`;
+    return `${formatReadableTokenAmount(item.amount)} ${formatReadableDenom(item.denom)}`;
   });
 
   if (items.length > 2) {
@@ -198,7 +262,7 @@ function decodeCosmosHomeTransaction(
     type: extractTypeLabel(rawType),
     sender,
     senderLabel: formatSenderLabel(sender),
-    feeLabel: formatDenomCollection(payload.tx?.auth_info?.fee?.amount),
+    feeLabel: formatReadableDenomCollection(payload.tx?.auth_info?.fee?.amount),
     gasUsed: payload.tx_response?.gas_used ?? '0',
     gasWanted: payload.tx_response?.gas_wanted ?? '0',
     status,
