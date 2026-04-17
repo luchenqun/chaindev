@@ -15,6 +15,17 @@ export function isCosmosHomeRouteActive(
   return activeMode === 'cosmos';
 }
 
+export function isCosmosRouteActive(
+  pathname: string,
+  activeMode: ActivePlatformMode,
+) {
+  if (pathname.startsWith('/cosmos')) {
+    return true;
+  }
+
+  return pathname === '/' && activeMode === 'cosmos';
+}
+
 export function isEvmRouteActive(
   pathname: string,
   activeMode: ActivePlatformMode,

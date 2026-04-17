@@ -48,8 +48,10 @@ type TendermintBlockMeta = {
     height?: string;
     time?: string;
     proposer_address?: string;
+    app_hash?: string;
   };
   num_txs?: string;
+  block_size?: string;
 };
 
 type TendermintBlockchainResponse = {
@@ -65,6 +67,20 @@ type TendermintBlockResponse = {
       header?: {
         height?: string;
         time?: string;
+      };
+    };
+  };
+};
+
+type TendermintCommitResponse = {
+  result?: {
+    signed_header?: {
+      commit?: {
+        signatures?: Array<{
+          block_id_flag?: number | string;
+          validator_address?: string;
+          signature?: string | null;
+        }>;
       };
     };
   };
@@ -168,6 +184,31 @@ export type CosmosHomeBlockItem = {
   timestampMs: number | null;
 };
 
+export type CosmosBlocksPageItem = {
+  height: string;
+  hash: string;
+  hashLabel: string;
+  proposer: string;
+  proposerLabel: string;
+  proposerAddressLabel: string;
+  txCount: number;
+  txCountLabel: string;
+  blockSizeLabel: string;
+  appHash: string;
+  appHashLabel: string;
+  signaturesLabel: string;
+  timeLabel: string;
+  timestampMs: number | null;
+};
+
+export type CosmosLatestBlockFeed = {
+  latestBlock: string;
+  latestBlockNumber: number;
+  latestBlockTime: string;
+  latestBlockTimestampMs: number | null;
+  blockPageItem: CosmosBlocksPageItem;
+};
+
 export type CosmosHomeTransactionItem = {
   hash: string;
   hashLabel: string;
@@ -214,6 +255,16 @@ export function getActiveCosmosProvider() {
 
   return profile;
 }
+
+type CachedCosmosValidatorMaps = {
+  providerId: string;
+  cachedAt: number;
+  monikerByPubKey: Map<string, string>;
+  proposerMonikerByAddress: Map<string, string>;
+};
+
+const COSMOS_VALIDATOR_CACHE_TTL_MS = 60_000;
+let cachedCosmosValidatorMaps: CachedCosmosValidatorMaps | null = null;
 
 async function fetchJson<T>(url: string, init?: RequestInit) {
   const response = await fetch(url, {
@@ -413,6 +464,32 @@ function formatReadableDenomCollection(
   return visible.join(', ');
 }
 
+function formatBytes(
+  value: string | number | null | undefined,
+  fallback = 'Unavailable',
+) {
+  if (value == null) {
+    return fallback;
+  }
+
+  const bytes =
+    typeof value === 'number' ? value : Number.parseInt(String(value), 10);
+
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return fallback;
+  }
+
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1).replace(/\.0$/, '')} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
+}
+
 function formatDenomCollection(
   items: Array<{ denom: string; amount: string }> | undefined,
 ) {
@@ -550,8 +627,16 @@ async function getBlockchainDirect(
   limit: number,
 ) {
   const minHeight = Math.max(1, latestHeight - limit + 1);
+  return getBlockchainRangeDirect(profile, minHeight, latestHeight);
+}
+
+async function getBlockchainRangeDirect(
+  profile: CosmosProvider,
+  minHeight: number,
+  maxHeight: number,
+) {
   return fetchJson<TendermintBlockchainResponse>(
-    `${profile.rpcUrl}/blockchain?minHeight=${minHeight}&maxHeight=${latestHeight}`,
+    `${profile.rpcUrl}/blockchain?minHeight=${minHeight}&maxHeight=${maxHeight}`,
   );
 }
 
@@ -576,6 +661,58 @@ async function getRpcValidatorsDirect(
 ) {
   return fetchJson<TendermintValidatorsResponse>(
     `${profile.rpcUrl}/validators?height=${height}&page=1&per_page=200`,
+  );
+}
+
+async function getCosmosValidatorMapsDirect(
+  profile: CosmosProvider,
+  height: number,
+) {
+  const now = Date.now();
+
+  if (
+    cachedCosmosValidatorMaps &&
+    cachedCosmosValidatorMaps.providerId === profile.id &&
+    now - cachedCosmosValidatorMaps.cachedAt < COSMOS_VALIDATOR_CACHE_TTL_MS
+  ) {
+    return cachedCosmosValidatorMaps;
+  }
+
+  const [restValidatorsPayload, rpcValidatorsPayload] = await Promise.all([
+    getRestValidatorsDirect(profile).catch(() => ({
+      validators: [],
+      pagination: { total: '0' },
+    })),
+    getRpcValidatorsDirect(profile, height).catch(() => ({
+      result: { validators: [] },
+    })),
+  ]);
+  const monikerByPubKey = new Map(
+    (restValidatorsPayload.validators ?? []).map((validator) => [
+      validator.consensus_pubkey?.key ?? '',
+      validator.description?.moniker ?? 'Unknown',
+    ]),
+  );
+  const proposerMonikerByAddress = new Map(
+    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [
+      validator.address ?? '',
+      monikerByPubKey.get(validator.pub_key?.value ?? '') ?? 'Unknown',
+    ]),
+  );
+  const nextCache = {
+    providerId: profile.id,
+    cachedAt: now,
+    monikerByPubKey,
+    proposerMonikerByAddress,
+  };
+
+  cachedCosmosValidatorMaps = nextCache;
+  return nextCache;
+}
+
+async function getCommitDirect(profile: CosmosProvider, height: string) {
+  return fetchJson<TendermintCommitResponse>(
+    `${profile.rpcUrl}/commit?height=${height}`,
   );
 }
 
@@ -731,6 +868,235 @@ export async function getRecentCosmosBlocksDirect(limit = 8) {
     .sort((left, right) => Number(right.height) - Number(left.height));
 
   return blocks.slice(0, limit);
+}
+
+function formatCosmosCommitSummary(
+  signatures:
+    | Array<{
+        block_id_flag?: number | string;
+        signature?: string | null;
+      }>
+    | undefined,
+) {
+  if (!signatures?.length) {
+    return 'Unavailable';
+  }
+
+  const counts = new Map<number, number>();
+
+  signatures.forEach((signature) => {
+    const flag = Number.parseInt(String(signature.block_id_flag ?? 0), 10);
+    counts.set(flag, (counts.get(flag) ?? 0) + 1);
+  });
+
+  const labels = new Map<number, string>([
+    [1, 'Absent'],
+    [2, 'Commit'],
+    [3, 'Nil'],
+  ]);
+  const parts = [...counts.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([flag, count]) => `${labels.get(flag) ?? `Flag ${flag}`}: ${count}`);
+
+  return parts.join(' · ');
+}
+
+function formatCosmosBlocksPageItem(input: {
+  block: TendermintBlockMeta;
+  signatures?: Array<{
+    block_id_flag?: number | string;
+    validator_address?: string;
+    signature?: string | null;
+  }>;
+  proposerMonikerByAddress: Map<string, string>;
+}) {
+  const height = input.block.header?.height ?? '0';
+  const hash = input.block.block_id?.hash ?? 'Unavailable';
+  const timestamp = input.block.header?.time;
+  const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
+  const proposer = input.block.header?.proposer_address ?? 'Unknown';
+  const proposerMoniker = input.proposerMonikerByAddress.get(proposer) ?? null;
+  const proposerLabel =
+    proposerMoniker && proposerMoniker !== 'Unknown'
+      ? proposerMoniker
+      : formatCompactHash(proposer, 10, 6);
+  const appHash = input.block.header?.app_hash ?? 'Unavailable';
+
+  return {
+    height,
+    hash,
+    hashLabel: formatCompactHash(hash, 10, 8),
+    proposer,
+    proposerLabel,
+    proposerAddressLabel:
+      proposer === 'Unknown' ? proposer : formatCompactHash(proposer, 12, 8),
+    txCount: Number.parseInt(input.block.num_txs ?? '0', 10) || 0,
+    txCountLabel: formatInteger(input.block.num_txs ?? '0', '0'),
+    blockSizeLabel: formatBytes(input.block.block_size),
+    appHash,
+    appHashLabel: formatCompactHash(appHash, 10, 8),
+    signaturesLabel: formatCosmosCommitSummary(input.signatures),
+    timeLabel: formatLocalTimestamp(timestamp),
+    timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
+  } satisfies CosmosBlocksPageItem;
+}
+
+export async function getCosmosBlocksPageDirect(
+  requestedPage = 1,
+  pageSize = 20,
+) {
+  const profile = getActiveCosmosProvider();
+  const statusPayload = await getStatusDirect(profile);
+  const latestHeight = Number(
+    statusPayload.result?.sync_info?.latest_block_height ?? 0,
+  );
+  const totalBlocks = Math.max(0, latestHeight);
+  const totalPages = Math.max(1, Math.ceil(Math.max(totalBlocks, 1) / pageSize));
+  const page = Math.min(Math.max(1, requestedPage), totalPages);
+
+  if (totalBlocks === 0) {
+    return {
+      page,
+      pageSize,
+      totalBlocks,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+      totalLabel: 'No blocks returned',
+      summary: [
+        {
+          label: 'Latest Block',
+          value: '0',
+          note: 'The selected Cosmos provider did not return a latest height.',
+        },
+        {
+          label: 'Average Block Time',
+          value: 'Unavailable',
+          note: 'Not enough block data to compute a sample window.',
+        },
+        {
+          label: 'Validator Count',
+          value: '0',
+          note: 'Validator metadata is unavailable for this provider.',
+        },
+        {
+          label: 'Current Range',
+          value: 'Unavailable',
+          note: 'No block heights were returned for this page.',
+        },
+      ],
+      blocks: [] as CosmosBlocksPageItem[],
+    };
+  }
+
+  const pageMaxHeight = Math.max(1, latestHeight - (page - 1) * pageSize);
+  const pageMinHeight = Math.max(1, pageMaxHeight - pageSize + 1);
+  const [blockchainPayload, restValidatorsPayload, validatorMaps] = await Promise.all([
+    getBlockchainRangeDirect(profile, pageMinHeight, pageMaxHeight),
+    getRestValidatorsDirect(profile).catch(() => ({
+      validators: [],
+      pagination: { total: '0' },
+    })),
+    getCosmosValidatorMapsDirect(profile, pageMaxHeight),
+  ]);
+  const blockMetas = [...(blockchainPayload.result?.block_metas ?? [])].sort(
+    (left, right) =>
+      Number(right.header?.height ?? 0) - Number(left.header?.height ?? 0),
+  );
+  const commitPayloads = await Promise.allSettled(
+    blockMetas.map((block) =>
+      block.header?.height
+        ? getCommitDirect(profile, block.header.height)
+        : Promise.reject(new Error('Missing block height.')),
+    ),
+  );
+  const blocks = blockMetas.map((block, index) => {
+    const commitResult = commitPayloads[index];
+    const signatures =
+      commitResult?.status === 'fulfilled'
+        ? commitResult.value.result?.signed_header?.commit?.signatures
+        : undefined;
+
+    return formatCosmosBlocksPageItem({
+      block,
+      signatures,
+      proposerMonikerByAddress: validatorMaps.proposerMonikerByAddress,
+    });
+  });
+  const averageBlockTime = calculateAverageBlockTime(blocks);
+  const topBlock = blocks[0]?.height ?? String(pageMaxHeight);
+  const bottomBlock =
+    blocks[blocks.length - 1]?.height ?? String(pageMinHeight);
+
+  return {
+    page,
+    pageSize,
+    totalBlocks,
+    totalPages,
+    hasPreviousPage: page > 1,
+    hasNextPage: page < totalPages,
+    totalLabel: `${formatInteger(totalBlocks)} blocks`,
+    summary: [
+      {
+        label: 'Latest Block',
+        value: formatInteger(latestHeight),
+        note: `Current head reported by ${profile.name}.`,
+      },
+      {
+        label: 'Average Block Time',
+        value: formatDurationSeconds(averageBlockTime),
+        note: `Computed from the ${blocks.length.toLocaleString('en-US')} blocks on this page.`,
+      },
+      {
+        label: 'Validator Count',
+        value: formatInteger(restValidatorsPayload.pagination?.total ?? '0'),
+        note: 'Count returned by the selected Cosmos REST endpoint.',
+      },
+      {
+        label: 'Current Range',
+        value: `#${topBlock} - #${bottomBlock}`,
+        note: `Showing page ${page} of ${totalPages}.`,
+      },
+    ],
+    blocks,
+  };
+}
+
+export async function getCosmosLatestBlockFeedDirect(height: number | string) {
+  const profile = getActiveCosmosProvider();
+  const normalizedHeight =
+    typeof height === 'number' ? height : Number.parseInt(height, 10);
+
+  if (!Number.isFinite(normalizedHeight) || normalizedHeight < 0) {
+    throw new Error('Invalid Cosmos block height.');
+  }
+
+  const [blockchainPayload, commitPayload, validatorMaps] = await Promise.all([
+    getBlockchainRangeDirect(profile, normalizedHeight, normalizedHeight),
+    getCommitDirect(profile, String(normalizedHeight)).catch(() => ({
+      result: { signed_header: { commit: { signatures: [] } } },
+    })),
+    getCosmosValidatorMapsDirect(profile, normalizedHeight),
+  ]);
+  const blockMeta = blockchainPayload.result?.block_metas?.[0];
+
+  if (!blockMeta?.header?.height || !blockMeta.block_id?.hash) {
+    throw new Error('Failed to load the latest Cosmos block details.');
+  }
+
+  const blockPageItem = formatCosmosBlocksPageItem({
+    block: blockMeta,
+    signatures: commitPayload.result?.signed_header?.commit?.signatures,
+    proposerMonikerByAddress: validatorMaps.proposerMonikerByAddress,
+  });
+
+  return {
+    latestBlock: blockPageItem.height,
+    latestBlockNumber: Number.parseInt(blockPageItem.height, 10) || 0,
+    latestBlockTime: blockPageItem.timeLabel,
+    latestBlockTimestampMs: blockPageItem.timestampMs,
+    blockPageItem,
+  } satisfies CosmosLatestBlockFeed;
 }
 
 export async function getCosmosBlockByHeightDirect(height: number) {

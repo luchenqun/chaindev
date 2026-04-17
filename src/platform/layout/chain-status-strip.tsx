@@ -2,13 +2,12 @@
 
 import { usePathname } from 'next/navigation';
 import { IconClockHour4, IconStack2 } from '@tabler/icons-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { getCosmosOverviewDirect } from '@/domains/cosmos/client/queries';
+import { useMemo } from 'react';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { type PlatformMode } from '@/config/chains';
 import {
-  isCosmosHomeRouteActive,
+  isCosmosRouteActive,
   type ActivePlatformMode,
 } from '@/platform/workbench/home-route-state';
 
@@ -30,11 +29,8 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
   const pathname = usePathname();
   const activeMode = mode as ActivePlatformMode;
   const { status, pollIntervalMs } = useEvmHomeData();
-  const { snapshot: cosmosSnapshot } = useCosmosHomeData();
-  const [item, setItem] = useState<StatusItem>(() =>
-    buildFallbackItem('Unavailable'),
-  );
-  const timeoutRef = useRef<number | null>(null);
+  const { snapshot: cosmosSnapshot, latestFeed: cosmosLatestFeed } =
+    useCosmosHomeData();
   const displayItem = useMemo<StatusItem>(() => {
     if (mode === 'evm') {
       return status
@@ -46,7 +42,15 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
         : buildFallbackItem('Unavailable');
     }
 
-    if (isCosmosHomeRouteActive(pathname, activeMode)) {
+    if (isCosmosRouteActive(pathname, activeMode)) {
+      if (cosmosLatestFeed) {
+        return {
+          label: 'Latest Block',
+          value: cosmosLatestFeed.latestBlock,
+          toneClassName: 'text-sky-600',
+        };
+      }
+
       return cosmosSnapshot
         ? {
             label: 'Latest Block',
@@ -56,72 +60,8 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
         : buildFallbackItem('Unavailable');
     }
 
-    return item;
-  }, [activeMode, cosmosSnapshot, item, mode, pathname, status]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const shouldUseSharedCosmosHomeData =
-      mode === 'cosmos' && isCosmosHomeRouteActive(pathname, activeMode);
-
-    if (mode === 'evm' || shouldUseSharedCosmosHomeData) {
-      return;
-    }
-
-    function clearPoll() {
-      if (timeoutRef.current != null) {
-        window.clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    }
-
-    function scheduleNextPoll(delayMs: number) {
-      clearPoll();
-      timeoutRef.current = window.setTimeout(() => {
-        void load();
-      }, delayMs);
-    }
-
-    async function load() {
-      try {
-        if (mode === 'cosmos') {
-          const overview = await getCosmosOverviewDirect();
-
-          if (cancelled) {
-            return;
-          }
-
-          setItem({
-            label: 'Latest Block',
-            value: overview.latestHeight,
-            toneClassName: 'text-sky-600',
-          });
-          scheduleNextPoll(6_000);
-          return;
-        }
-      } catch {
-        if (!cancelled) {
-          setItem(buildFallbackItem('Unavailable'));
-        }
-
-        scheduleNextPoll(12_000);
-      }
-    }
-
-    void load();
-
-    const reload = () => {
-      void load();
-    };
-
-    window.addEventListener('chaindev:active-rpc-profile-changed', reload);
-
-    return () => {
-      cancelled = true;
-      clearPoll();
-      window.removeEventListener('chaindev:active-rpc-profile-changed', reload);
-    };
-  }, [activeMode, cosmosSnapshot, mode, pathname]);
+    return buildFallbackItem('Unavailable');
+  }, [activeMode, cosmosLatestFeed, cosmosSnapshot, mode, pathname, status]);
 
   return (
     <div className="flex flex-wrap items-center gap-5">
