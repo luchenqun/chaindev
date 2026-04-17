@@ -26,6 +26,20 @@ export function isCosmosRouteActive(
   return pathname === '/' && activeMode === 'cosmos';
 }
 
+export function isCosmosBlocksRouteActive(pathname: string) {
+  return pathname === '/cosmos/blocks';
+}
+
+export function isCosmosLiveBlockRouteActive(
+  pathname: string,
+  activeMode: ActivePlatformMode,
+) {
+  return (
+    isCosmosHomeRouteActive(pathname, activeMode) ||
+    isCosmosBlocksRouteActive(pathname)
+  );
+}
+
 export function isEvmRouteActive(
   pathname: string,
   activeMode: ActivePlatformMode,

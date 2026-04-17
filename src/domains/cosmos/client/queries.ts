@@ -180,6 +180,7 @@ export type CosmosHomeBlockItem = {
   proposer: string;
   proposerLabel: string;
   txCount: string;
+  blockSizeLabel: string;
   timeLabel: string;
   timestampMs: number | null;
 };
@@ -1271,6 +1272,7 @@ export async function getCosmosHomeSnapshotDirect(
             ? proposerMoniker
             : formatCompactHash(proposer, 10, 6),
         txCount: formatInteger(block.num_txs ?? '0', '0'),
+        blockSizeLabel: formatBytes(block.block_size),
         timeLabel: formatLocalTimestamp(timestamp),
         timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
       };

@@ -21,6 +21,7 @@ import { decodeCosmosHomeTransactionsByHashes } from '@/domains/cosmos/client/ho
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
 import {
   isCosmosHomeRouteActive,
+  isCosmosLiveBlockRouteActive,
   isCosmosRouteActive,
 } from '@/platform/workbench/home-route-state';
 
@@ -193,6 +194,10 @@ export function CosmosHomeDataProvider({
     let disposed = false;
     const isHomeRoute = isCosmosHomeRouteActive(pathname, activeMode);
     const isCosmosRoute = isCosmosRouteActive(pathname, activeMode);
+    const shouldSubscribeToLiveBlocks = isCosmosLiveBlockRouteActive(
+      pathname,
+      activeMode,
+    );
 
     function clearTimers() {
       if (pollTimeoutRef.current != null) {
@@ -419,6 +424,7 @@ export function CosmosHomeDataProvider({
                 proposer: nextFeed.blockPageItem.proposer,
                 proposerLabel: nextFeed.blockPageItem.proposerLabel,
                 txCount: nextFeed.blockPageItem.txCountLabel,
+                blockSizeLabel: nextFeed.blockPageItem.blockSizeLabel,
                 timeLabel: nextFeed.blockPageItem.timeLabel,
                 timestampMs: nextFeed.blockPageItem.timestampMs,
               }),
@@ -452,6 +458,12 @@ export function CosmosHomeDataProvider({
     }
 
     function setupWebSocket() {
+      if (!shouldSubscribeToLiveBlocks) {
+        closeSocket();
+        setConnectionMode('poll');
+        return;
+      }
+
       try {
         const profile = getActiveCosmosProvider();
 
@@ -480,16 +492,19 @@ export function CosmosHomeDataProvider({
               },
             }),
           );
-          socket.send(
-            JSON.stringify({
-              jsonrpc: '2.0',
-              method: 'subscribe',
-              id: 'cosmos-home-tx',
-              params: {
-                query: "tm.event='Tx'",
-              },
-            }),
-          );
+
+          if (isHomeRoute) {
+            socket.send(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                method: 'subscribe',
+                id: 'cosmos-home-tx',
+                params: {
+                  query: "tm.event='Tx'",
+                },
+              }),
+            );
+          }
         };
         socket.onmessage = async (event) => {
           try {
@@ -559,15 +574,29 @@ export function CosmosHomeDataProvider({
 
     if (isHomeRoute) {
       void loadSnapshot();
+    } else {
+      setSnapshot(null);
     }
-    setupWebSocket();
+
+    if (shouldSubscribeToLiveBlocks) {
+      setupWebSocket();
+    } else {
+      closeSocket();
+      setLatestFeed(null);
+      setConnectionMode('poll');
+    }
 
     const handleProfileChanged = () => {
       resetState();
       if (isCosmosHomeRouteActive(pathname, readActivePlatformModeCookie())) {
         void loadSnapshot();
       }
-      setupWebSocket();
+
+      if (
+        isCosmosLiveBlockRouteActive(pathname, readActivePlatformModeCookie())
+      ) {
+        setupWebSocket();
+      }
     };
 
     window.addEventListener(

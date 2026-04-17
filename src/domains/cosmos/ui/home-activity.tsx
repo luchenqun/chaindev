@@ -87,7 +87,7 @@ export function CosmosHomeActivity() {
                       #{block.height}
                     </Link>
                     <p className="mt-1 text-sm text-slate-500">
-                      {block.timeLabel}
+                      {formatRelativeAge(block.timestampMs, nowMs)}
                     </p>
                   </div>
                   <div className="min-w-0">
@@ -95,12 +95,11 @@ export function CosmosHomeActivity() {
                       {block.proposerLabel}
                     </p>
                     <p className="mt-1 truncate text-sm text-slate-500">
-                      {block.hashLabel} ·{' '}
-                      {formatRelativeAge(block.timestampMs, nowMs)}
+                      {block.txCount} txs
                     </p>
                   </div>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
-                    {block.txCount} txs
+                    {block.blockSizeLabel}
                   </div>
                 </div>
               ))
