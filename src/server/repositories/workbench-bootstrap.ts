@@ -1,5 +1,6 @@
 import {
   DEFAULT_COSMOS_RPC_PROFILE,
+  DEFAULT_EVM_PRIVATE_KEY_NAME,
   DEFAULT_EVM_PRIVATE_KEY_VALUE,
   DEFAULT_EVM_RPC_PROFILE,
 } from '@/platform/workbench/defaults';
@@ -52,7 +53,7 @@ export async function seedDefaultWorkbenchForUser(userId: string) {
   if (privateKeyCount === 0) {
     await createServerEvmPrivateKey({
       userId,
-      name: 'Alice',
+      name: DEFAULT_EVM_PRIVATE_KEY_NAME,
       privateKey: DEFAULT_EVM_PRIVATE_KEY_VALUE,
       securityMode: 'plain',
     });

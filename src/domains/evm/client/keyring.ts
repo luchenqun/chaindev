@@ -4,6 +4,7 @@ import { type Hex } from 'viem';
 import { z } from 'zod';
 import {
   DEFAULT_EVM_PRIVATE_KEY_ID,
+  DEFAULT_EVM_PRIVATE_KEY_NAME,
   DEFAULT_EVM_PRIVATE_KEY_VALUE,
   getDefaultAliceAddress,
 } from '@/platform/workbench/defaults';
@@ -85,7 +86,7 @@ function getGuestDefaultKey(): EvmStoredPrivateKey {
 
   return {
     id: DEFAULT_EVM_PRIVATE_KEY_ID,
-    name: 'Alice',
+    name: DEFAULT_EVM_PRIVATE_KEY_NAME,
     address,
     addressLower: address.toLowerCase(),
     securityMode: 'plain',

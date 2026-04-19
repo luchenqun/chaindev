@@ -21,6 +21,7 @@ import {
 } from '@/domains/evm/client/keyring';
 import {
   DEFAULT_EVM_PRIVATE_KEY_ID,
+  DEFAULT_EVM_PRIVATE_KEY_NAME,
   DEFAULT_EVM_PRIVATE_KEY_VALUE,
   getDefaultAliceAddress,
 } from '@/platform/workbench/defaults';
@@ -38,7 +39,7 @@ function getTopbarFallbackKey(): EvmStoredPrivateKey {
 
   return {
     id: DEFAULT_EVM_PRIVATE_KEY_ID,
-    name: 'Alice',
+    name: DEFAULT_EVM_PRIVATE_KEY_NAME,
     address,
     addressLower: address.toLowerCase(),
     securityMode: 'plain',
@@ -122,7 +123,7 @@ export function ActiveEvmKeySelector({
                 <span className="truncate">
                   {status === 'loading' || isAuthenticated
                     ? (topbarActiveItem?.name ?? 'Loading keys...')
-                    : (topbarActiveItem?.name ?? 'Alice')}
+                    : (topbarActiveItem?.name ?? DEFAULT_EVM_PRIVATE_KEY_NAME)}
                 </span>
               </div>
             </SelectTrigger>
@@ -181,7 +182,7 @@ export function ActiveEvmKeySelector({
                 stroke={2}
               />
               <span className="truncate">
-                {topbarActiveItem?.name ?? 'Alice'}
+                {topbarActiveItem?.name ?? DEFAULT_EVM_PRIVATE_KEY_NAME}
               </span>
             </div>
           </SelectTrigger>

@@ -1,21 +1,29 @@
 import { privateKeyToAccount } from 'viem/accounts';
 import type { RpcProfile } from '@/platform/workbench/rpc-profile';
+import {
+  readBootstrapCosmosProvider,
+  readBootstrapEvmProvider,
+  readBootstrapPrivateKey,
+  readBootstrapPrivateKeyName,
+} from '@/platform/workbench/bootstrap-config';
 
 const DEFAULT_TIMESTAMP = 1;
+const bootstrapEvmProvider = readBootstrapEvmProvider();
+const bootstrapCosmosProvider = readBootstrapCosmosProvider();
 
 export const DEFAULT_EVM_PROVIDER_ID = 'default-evm-localnode0';
 export const DEFAULT_EVM_PRIVATE_KEY_ID = 'default-evm-alice';
-export const DEFAULT_EVM_PRIVATE_KEY_VALUE =
-  '0xf78a036930ce63791ea6ea20072986d8c3f16a6811f6a2583b0787c45086f769';
+export const DEFAULT_EVM_PRIVATE_KEY_NAME = readBootstrapPrivateKeyName();
+export const DEFAULT_EVM_PRIVATE_KEY_VALUE = readBootstrapPrivateKey();
 
 export const DEFAULT_EVM_RPC_PROFILE: RpcProfile = {
   id: DEFAULT_EVM_PROVIDER_ID,
   mode: 'evm',
-  name: 'LocalNode0',
-  nativeCurrencySymbol: 'QARE',
-  rpcUrl: 'http://127.0.0.1:8545',
-  restUrl: null,
-  wsUrl: null,
+  name: bootstrapEvmProvider.name,
+  nativeCurrencySymbol: bootstrapEvmProvider.nativeCurrencySymbol ?? 'QARE',
+  rpcUrl: bootstrapEvmProvider.rpcUrl,
+  restUrl: bootstrapEvmProvider.restUrl ?? null,
+  wsUrl: bootstrapEvmProvider.wsUrl ?? null,
   createdAt: DEFAULT_TIMESTAMP,
   updatedAt: DEFAULT_TIMESTAMP,
 };
@@ -24,11 +32,11 @@ export const DEFAULT_COSMOS_PROVIDER_ID = 'default-cosmos-localnode0';
 export const DEFAULT_COSMOS_RPC_PROFILE: RpcProfile = {
   id: DEFAULT_COSMOS_PROVIDER_ID,
   mode: 'cosmos',
-  name: 'LocalNode0',
-  nativeCurrencySymbol: null,
-  rpcUrl: 'http://127.0.0.1:26657',
-  restUrl: 'http://127.0.0.1:1317',
-  wsUrl: 'ws://127.0.0.1:26657/websocket',
+  name: bootstrapCosmosProvider.name,
+  nativeCurrencySymbol: bootstrapCosmosProvider.nativeCurrencySymbol ?? null,
+  rpcUrl: bootstrapCosmosProvider.rpcUrl,
+  restUrl: bootstrapCosmosProvider.restUrl,
+  wsUrl: bootstrapCosmosProvider.wsUrl ?? null,
   createdAt: DEFAULT_TIMESTAMP,
   updatedAt: DEFAULT_TIMESTAMP,
 };
@@ -45,5 +53,7 @@ export function getDefaultGuestSelectedRpcProfiles() {
 }
 
 export function getDefaultAliceAddress() {
-  return privateKeyToAccount(DEFAULT_EVM_PRIVATE_KEY_VALUE).address;
+  return privateKeyToAccount(
+    DEFAULT_EVM_PRIVATE_KEY_VALUE as `0x${string}`,
+  ).address;
 }

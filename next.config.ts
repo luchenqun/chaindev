@@ -2,6 +2,12 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  env: {
+    BOOTSTRAP_EVM_PROVIDER: process.env.BOOTSTRAP_EVM_PROVIDER,
+    BOOTSTRAP_COSMOS_PROVIDER: process.env.BOOTSTRAP_COSMOS_PROVIDER,
+    BOOTSTRAP_PRIVATE_KEY: process.env.BOOTSTRAP_PRIVATE_KEY,
+    BOOTSTRAP_PRIVATE_KEY_NAME: process.env.BOOTSTRAP_PRIVATE_KEY_NAME,
+  },
 };
 
 export default nextConfig;
