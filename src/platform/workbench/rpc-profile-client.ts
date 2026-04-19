@@ -23,6 +23,44 @@ type RpcProfilesResponse = {
   data: RpcProfile[];
 };
 
+function getRpcProfileDedupKey(profile: RpcProfile) {
+  return JSON.stringify({
+    mode: profile.mode,
+    name: profile.name,
+    nativeCurrencySymbol: profile.nativeCurrencySymbol ?? null,
+    rpcUrl: profile.rpcUrl,
+    restUrl: profile.restUrl ?? null,
+    wsUrl: profile.wsUrl ?? null,
+  });
+}
+
+function dedupeRpcProfiles(profiles: RpcProfile[]) {
+  const deduped = new Map<string, RpcProfile>();
+
+  for (const profile of profiles) {
+    const key = getRpcProfileDedupKey(profile);
+
+    if (!deduped.has(key)) {
+      deduped.set(key, profile);
+    }
+  }
+
+  return [...deduped.values()];
+}
+
+function filterSelectedRpcProfiles(
+  profiles: RpcProfile[],
+  selected: SelectedRpcProfileMap,
+) {
+  const profileIds = new Set(profiles.map((profile) => profile.id));
+
+  return Object.fromEntries(
+    Object.entries(selected).filter(
+      ([, profileId]) => profileId && profileIds.has(profileId),
+    ),
+  ) as SelectedRpcProfileMap;
+}
+
 function readJsonStorage<T>(key: string, fallback: T) {
   if (typeof window === 'undefined') {
     return fallback;
@@ -220,17 +258,28 @@ export async function fetchRpcProfiles() {
   const body = (await response.json()) as RpcProfilesResponse;
 
   if (!body.data.length) {
+    const selected = filterSelectedRpcProfiles(
+      [],
+      getLocalSelectedRpcProfiles(),
+    );
+
     return {
       source: 'server' as const,
       profiles: [],
-      selected: getLocalSelectedRpcProfiles(),
+      selected,
     };
   }
 
+  const profiles = dedupeRpcProfiles(body.data);
+  const selected = filterSelectedRpcProfiles(
+    profiles,
+    getLocalSelectedRpcProfiles(),
+  );
+
   return {
     source: 'server' as const,
-    profiles: body.data,
-    selected: getLocalSelectedRpcProfiles(),
+    profiles,
+    selected,
   };
 }
 

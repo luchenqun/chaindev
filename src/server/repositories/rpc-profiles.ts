@@ -15,7 +15,52 @@ type RpcProfileInput = {
   wsUrl?: string | null;
 };
 
+type RpcProfileRow = typeof rpcProfiles.$inferSelect;
+
+function getRpcProfileDedupKey(
+  input: {
+    mode: string;
+    name: string;
+    nativeCurrencySymbol?: string | null;
+    rpcUrl: string;
+    restUrl?: string | null;
+    wsUrl?: string | null;
+  },
+) {
+  return JSON.stringify({
+    mode: input.mode,
+    name: input.name.trim(),
+    nativeCurrencySymbol: input.nativeCurrencySymbol ?? null,
+    rpcUrl: input.rpcUrl.trim(),
+    restUrl: input.restUrl?.trim() || null,
+    wsUrl: input.wsUrl?.trim() || null,
+  });
+}
+
+function dedupeRpcProfileRows(rows: RpcProfileRow[]) {
+  const deduped = new Map<string, RpcProfileRow>();
+
+  for (const row of rows) {
+    const key = getRpcProfileDedupKey(row);
+
+    if (!deduped.has(key)) {
+      deduped.set(key, row);
+    }
+  }
+
+  return [...deduped.values()];
+}
+
 export async function addRpcProfile(input: RpcProfileInput) {
+  const existingProfiles = await listRpcProfiles(input.userId);
+  const duplicate = existingProfiles.find(
+    (profile) => getRpcProfileDedupKey(profile) === getRpcProfileDedupKey(input),
+  );
+
+  if (duplicate) {
+    return duplicate;
+  }
+
   const row = {
     id: randomUUID(),
     userId: input.userId,
@@ -59,12 +104,14 @@ export async function importRpcProfiles(
 }
 
 export async function listRpcProfiles(userId: string) {
-  return db
+  const rows = db
     .select()
     .from(rpcProfiles)
     .where(eq(rpcProfiles.userId, userId))
     .orderBy(desc(rpcProfiles.updatedAt))
     .all();
+
+  return dedupeRpcProfileRows(rows);
 }
 
 export async function getLatestRpcProfileByMode(
@@ -106,6 +153,25 @@ export async function updateRpcProfile(
   id: string,
   input: RpcProfileInput,
 ) {
+  const existingProfiles = db
+    .select()
+    .from(rpcProfiles)
+    .where(eq(rpcProfiles.userId, userId))
+    .orderBy(desc(rpcProfiles.updatedAt))
+    .all();
+  const duplicate = existingProfiles.find(
+    (profile) =>
+      profile.id !== id &&
+      getRpcProfileDedupKey(profile) === getRpcProfileDedupKey(input),
+  );
+
+  if (duplicate) {
+    db.delete(rpcProfiles)
+      .where(and(eq(rpcProfiles.userId, userId), eq(rpcProfiles.id, id)))
+      .run();
+    return duplicate;
+  }
+
   const updatedAt = Date.now();
 
   db.update(rpcProfiles)
