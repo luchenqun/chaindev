@@ -3,7 +3,6 @@
 import {
   IconListDetails,
   IconEdit,
-  IconLink,
   IconLinkPlus,
   IconLoader2,
   IconPlugConnected,
@@ -40,6 +39,7 @@ import {
   createEvmContractBinding,
   deleteEvmContractArtifact,
   deleteEvmContractBinding,
+  isGeneratedDefaultEvmContractBinding,
   listEvmContractArtifacts,
   listEvmContractBindingsByScope,
   parseEvmContractArtifactImportPayload,
@@ -354,14 +354,6 @@ export default function EvmContractsRegistryPage() {
   });
   const [artifactDetailsTarget, setArtifactDetailsTarget] =
     useState<EvmContractArtifact | null>(null);
-  const [defaultBindingDialogOpen, setDefaultBindingDialogOpen] =
-    useState(false);
-  const [
-    selectedDefaultBindingArtifactIds,
-    setSelectedDefaultBindingArtifactIds,
-  ] = useState<string[]>([]);
-  const [importSystemBindingsLoading, setImportSystemBindingsLoading] =
-    useState(false);
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false);
   const [deployArtifactId, setDeployArtifactId] = useState<string | null>(null);
   const [deployArgumentValues, setDeployArgumentValues] = useState<string[]>(
@@ -441,6 +433,7 @@ export default function EvmContractsRegistryPage() {
         listEvmContractBindingsByScope(
           nextEnvironment.chainId,
           nextEnvironment.providerProfileId,
+          nextEnvironment.providerName,
         ),
       );
     }
@@ -455,6 +448,7 @@ export default function EvmContractsRegistryPage() {
           listEvmContractBindingsByScope(
             environmentRef.current.chainId,
             environmentRef.current.providerProfileId,
+            environmentRef.current.providerName,
           ),
         );
       }
@@ -515,13 +509,6 @@ export default function EvmContractsRegistryPage() {
   const systemArtifacts = useMemo(
     () => artifacts.filter((artifact) => artifact.scope === 'system'),
     [artifacts],
-  );
-  const importableSystemArtifacts = useMemo(
-    () =>
-      systemArtifacts.filter(
-        (artifact) => getArtifactDefaultAddressByName(artifact.name) !== null,
-      ),
-    [systemArtifacts],
   );
   const deployArtifact = useMemo(
     () =>
@@ -678,111 +665,6 @@ export default function EvmContractsRegistryPage() {
     });
     setBindingError(null);
     setBindingDialogOpen(true);
-  }
-
-  function openDefaultBindingDialog() {
-    if (status !== 'authenticated') {
-      goToLogin();
-      return;
-    }
-
-    if (!environment) {
-      showToast({
-        title: 'Import failed',
-        description: 'No active EVM provider selected.',
-      });
-      return;
-    }
-
-    if (!importableSystemArtifacts.length) {
-      showToast({
-        title: 'No default contracts',
-        description:
-          'No system artifacts with default contract addresses were found.',
-      });
-      return;
-    }
-
-    setSelectedDefaultBindingArtifactIds(
-      importableSystemArtifacts.map((artifact) => artifact.id),
-    );
-    setDefaultBindingDialogOpen(true);
-  }
-
-  async function handleImportSystemBindings() {
-    if (status !== 'authenticated') {
-      goToLogin();
-      return;
-    }
-
-    if (!environment) {
-      showToast({
-        title: 'Import failed',
-        description: 'No active EVM provider selected.',
-      });
-      return;
-    }
-
-    setImportSystemBindingsLoading(true);
-
-    try {
-      const importableArtifacts = importableSystemArtifacts.filter((artifact) =>
-        selectedDefaultBindingArtifactIds.includes(artifact.id),
-      );
-      const boundAddressSet = new Set(
-        bindings.map((binding) => binding.addressLower),
-      );
-
-      let createdCount = 0;
-      let skippedCount = 0;
-      let failedCount = 0;
-
-      for (const artifact of importableArtifacts) {
-        const defaultAddress = getArtifactDefaultAddressByName(artifact.name);
-
-        if (!defaultAddress) {
-          continue;
-        }
-
-        const addressLower = defaultAddress.toLowerCase();
-
-        if (boundAddressSet.has(addressLower)) {
-          skippedCount += 1;
-          continue;
-        }
-
-        try {
-          await createEvmContractBinding({
-            artifactId: artifact.id,
-            address: defaultAddress,
-            label: artifact.name,
-            chainId: environment.chainId,
-            providerProfileId: environment.providerProfileId,
-            providerName: environment.providerName,
-          });
-          boundAddressSet.add(addressLower);
-          createdCount += 1;
-        } catch (error) {
-          if (error instanceof Error && error.name === 'AuthRequiredError') {
-            goToLogin();
-            return;
-          }
-
-          failedCount += 1;
-        }
-      }
-
-      showToast({
-        title: 'System bindings imported',
-        description:
-          createdCount || skippedCount || failedCount
-            ? `${createdCount} added, ${skippedCount} skipped, ${failedCount} failed.`
-            : 'No importable system artifacts were found.',
-      });
-      setDefaultBindingDialogOpen(false);
-    } finally {
-      setImportSystemBindingsLoading(false);
-    }
   }
 
   function startDeployArtifact(artifact: EvmContractArtifact) {
@@ -1416,29 +1298,33 @@ export default function EvmContractsRegistryPage() {
                               Interact with contract
                             </span>
                           </span>
-                          <ActionIconButton
-                            className="text-slate-400 hover:text-slate-700"
-                            tooltip="Edit binding"
-                            aria-label="Edit binding"
-                            onClick={() => startBindingEdit(binding)}
-                          >
-                            <IconEdit className="size-4" stroke={1.8} />
-                          </ActionIconButton>
-                          <ActionIconButton
-                            className="text-slate-400 hover:text-rose-600"
-                            tooltip="Delete binding"
-                            aria-label="Delete binding"
-                            onClick={() =>
-                              setDeleteTarget({
-                                type: 'binding',
-                                id: binding.id,
-                                title: 'Delete Bound Contract',
-                                description: `Delete the contract binding "${binding.label}"?`,
-                              })
-                            }
-                          >
-                            <IconTrash className="size-4" stroke={1.8} />
-                          </ActionIconButton>
+                          {isGeneratedDefaultEvmContractBinding(binding) ? null : (
+                            <>
+                              <ActionIconButton
+                                className="text-slate-400 hover:text-slate-700"
+                                tooltip="Edit binding"
+                                aria-label="Edit binding"
+                                onClick={() => startBindingEdit(binding)}
+                              >
+                                <IconEdit className="size-4" stroke={1.8} />
+                              </ActionIconButton>
+                              <ActionIconButton
+                                className="text-slate-400 hover:text-rose-600"
+                                tooltip="Delete binding"
+                                aria-label="Delete binding"
+                                onClick={() =>
+                                  setDeleteTarget({
+                                    type: 'binding',
+                                    id: binding.id,
+                                    title: 'Delete Bound Contract',
+                                    description: `Delete the contract binding "${binding.label}"?`,
+                                  })
+                                }
+                              >
+                                <IconTrash className="size-4" stroke={1.8} />
+                              </ActionIconButton>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1465,7 +1351,6 @@ export default function EvmContractsRegistryPage() {
               'Shared ABI and bytecode definitions published by administrators for all users.',
             items: systemArtifacts,
             showAdd: isAdmin,
-            showImport: true,
             showDefaultContract: true,
             addScope: 'system' as const,
             emptyText: 'No system artifacts yet.',
@@ -1476,7 +1361,6 @@ export default function EvmContractsRegistryPage() {
               'Your reusable ABI and bytecode definitions for the current account.',
             items: myArtifacts,
             showAdd: true,
-            showImport: false,
             showDefaultContract: false,
             addScope: 'user' as const,
             emptyText: 'No personal artifacts yet.',
@@ -1495,20 +1379,8 @@ export default function EvmContractsRegistryPage() {
                   {group.description}
                 </p>
               </div>
-              {group.showAdd || group.showImport ? (
+              {group.showAdd ? (
                 <div className="flex justify-end gap-2">
-                  {group.showImport ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openDefaultBindingDialog()}
-                      disabled={importSystemBindingsLoading}
-                    >
-                      <IconLink className="mr-1.5 size-4" stroke={1.8} />
-                      Bind Defaults
-                    </Button>
-                  ) : null}
                   {group.showAdd ? (
                     <Button
                       type="button"
@@ -1694,96 +1566,6 @@ export default function EvmContractsRegistryPage() {
             void handleConfirmDelete();
           }}
         />
-
-        <ModalDialog
-          open={defaultBindingDialogOpen}
-          onOpenChange={(open) => {
-            setDefaultBindingDialogOpen(open);
-
-            if (!open) {
-              setSelectedDefaultBindingArtifactIds([]);
-            }
-          }}
-          title="Bind Default Contracts"
-          description="Choose which system artifacts should be bound to their default contract addresses for the active provider and chain."
-          footer={
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setDefaultBindingDialogOpen(false);
-                  setSelectedDefaultBindingArtifactIds([]);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void handleImportSystemBindings()}
-                disabled={
-                  !selectedDefaultBindingArtifactIds.length ||
-                  importSystemBindingsLoading
-                }
-              >
-                {importSystemBindingsLoading ? (
-                  <IconLoader2 className="mr-1.5 size-4 animate-spin" />
-                ) : null}
-                Bind Selected
-              </Button>
-            </>
-          }
-          maxWidthClassName="max-w-2xl"
-        >
-          <div className="grid gap-3">
-            {importableSystemArtifacts.length ? (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <ul className="divide-y divide-slate-200">
-                  {importableSystemArtifacts.map((artifact) => {
-                    const defaultAddress =
-                      getArtifactDefaultAddressByName(artifact.name) ?? '';
-                    const checked = selectedDefaultBindingArtifactIds.includes(
-                      artifact.id,
-                    );
-
-                    return (
-                      <li key={artifact.id} className="px-4 py-3">
-                        <label className="flex cursor-pointer items-start gap-3">
-                          <input
-                            type="checkbox"
-                            className="mt-1 size-4 rounded border-slate-300 text-sky-600 focus-visible:ring-2 focus-visible:ring-sky-400"
-                            checked={checked}
-                            onChange={(event) => {
-                              setSelectedDefaultBindingArtifactIds((current) =>
-                                event.target.checked
-                                  ? [...current, artifact.id]
-                                  : current.filter((id) => id !== artifact.id),
-                              );
-                            }}
-                          />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-slate-900">
-                                {artifact.name}
-                              </span>
-                              <span className="font-mono text-xs text-slate-500">
-                                {defaultAddress}
-                              </span>
-                            </div>
-                          </div>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
-                No system artifacts with default contract addresses were found.
-              </div>
-            )}
-          </div>
-        </ModalDialog>
 
         <ModalDialog
           open={artifactDetailsTarget !== null}

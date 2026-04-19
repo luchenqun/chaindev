@@ -407,6 +407,7 @@ export default function EvmAddressPage() {
         listEvmContractBindingsByScope(
           nextEnvironment.chainId,
           nextEnvironment.providerProfileId,
+          nextEnvironment.providerName,
         ).find((binding) => binding.addressLower === address.toLowerCase()) ??
         null;
 

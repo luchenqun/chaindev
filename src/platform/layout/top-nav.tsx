@@ -12,6 +12,7 @@ import { getMessages } from '@/i18n';
 import { getAccountMenuSections } from '@/platform/layout/account-menu-config';
 import { ChainStatusStrip } from '@/platform/layout/chain-status-strip';
 import { ActiveEvmKeySelector } from '@/platform/layout/active-evm-key-selector';
+import { resolveAbsoluteCallbackUrl } from '@/platform/auth/callback-url';
 import { GlobalSearch } from '@/platform/search/global-search';
 import { RpcProviderManager } from '@/platform/workbench/rpc-provider-manager';
 
@@ -267,7 +268,11 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                         <Button
                           variant="outline"
                           className="h-11 w-full gap-2 rounded-xl border-sky-300 text-[15px] font-semibold text-[#1697ea] hover:border-sky-400 hover:bg-sky-50 hover:text-[#1697ea]"
-                          onClick={() => void signOut({ callbackUrl: '/' })}
+                          onClick={() =>
+                            void signOut({
+                              callbackUrl: resolveAbsoluteCallbackUrl('/'),
+                            })
+                          }
                         >
                           <IconLogout className="size-4" stroke={2} />
                           Sign Out

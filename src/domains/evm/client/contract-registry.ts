@@ -6,6 +6,9 @@ import {
   analyzeContractArtifactAbi,
   parseContractAbiJson,
 } from '@/domains/evm/client/abi-utils';
+import { getArtifactDefaultAddressByName } from '@/domains/evm/lib/precompile-artifact-default-addresses';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
+import { SYSTEM_CONTRACT_ARTIFACTS } from '@/server/system/artifacts/system-contract-artifacts';
 
 const artifactSchema = z.object({
   id: z.string().min(1),
@@ -47,6 +50,13 @@ let cache: z.infer<typeof registryStoreSchema> = {
 };
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
+const GENERATED_DEFAULT_BINDING_ID_PREFIX = 'generated-default-binding:';
+
+type BindingScope = {
+  chainId: string;
+  providerProfileId: string;
+  providerName: string;
+};
 
 function emitChange() {
   listeners.forEach((listener) => listener());
@@ -62,8 +72,65 @@ function readRegistryStore() {
   return cache;
 }
 
+function countAbiItems(
+  abi: unknown,
+  type: 'function' | 'event',
+) {
+  if (!Array.isArray(abi)) {
+    return 0;
+  }
+
+  return abi.reduce((count, item) => {
+    if (!item || typeof item !== 'object' || !('type' in item)) {
+      return count;
+    }
+
+    return (item as { type?: unknown }).type === type ? count + 1 : count;
+  }, 0);
+}
+
+const FALLBACK_SYSTEM_ARTIFACTS: EvmContractArtifact[] =
+  SYSTEM_CONTRACT_ARTIFACTS.map((artifact, index) => ({
+    id: `embedded-system-artifact:${artifact.contractName}`,
+    scope: 'system',
+    name: artifact.contractName,
+    abiJson: JSON.stringify(artifact.abi, null, 2),
+    bytecode: artifact.bytecode,
+    functionCount: countAbiItems(artifact.abi, 'function'),
+    eventCount: countAbiItems(artifact.abi, 'event'),
+    createdAt: index,
+    updatedAt: index,
+  }));
+
+cache = {
+  artifacts: FALLBACK_SYSTEM_ARTIFACTS,
+  bindings: [],
+};
+
+function mergeArtifactsWithFallbackSystemArtifacts(
+  artifacts: EvmContractArtifact[],
+) {
+  const systemArtifactsByName = new Map<string, EvmContractArtifact>(
+    FALLBACK_SYSTEM_ARTIFACTS.map((artifact) => [artifact.name, artifact]),
+  );
+
+  for (const artifact of artifacts) {
+    if (artifact.scope === 'system') {
+      systemArtifactsByName.set(artifact.name, artifact);
+    }
+  }
+
+  return [
+    ...systemArtifactsByName.values(),
+    ...artifacts.filter((artifact) => artifact.scope !== 'system'),
+  ];
+}
+
 function writeRegistryStore(value: z.infer<typeof registryStoreSchema>) {
-  cache = registryStoreSchema.parse(value);
+  cache = registryStoreSchema.parse({
+    ...value,
+    artifacts: mergeArtifactsWithFallbackSystemArtifacts(value.artifacts),
+  });
   loaded = true;
 }
 
@@ -82,6 +149,75 @@ function ensureLoaded() {
   loadingPromise = syncEvmContractRegistryFromServer().finally(() => {
     loadingPromise = null;
   });
+}
+
+function sortBindings(bindings: EvmContractBinding[]) {
+  return [...bindings].sort(
+    (left, right) =>
+      right.updatedAt - left.updatedAt || left.label.localeCompare(right.label),
+  );
+}
+
+function buildGeneratedDefaultBindings(
+  artifacts: EvmContractArtifact[],
+  scope: BindingScope,
+) {
+  return artifacts.flatMap((artifact) => {
+    if (artifact.scope !== 'system') {
+      return [];
+    }
+
+    const address = getArtifactDefaultAddressByName(artifact.name);
+
+    if (!address) {
+      return [];
+    }
+
+    return [
+      {
+        id: `${GENERATED_DEFAULT_BINDING_ID_PREFIX}${scope.providerProfileId}:${scope.chainId}:${artifact.id}`,
+        artifactId: artifact.id,
+        address,
+        addressLower: address.toLowerCase(),
+        label: artifact.name,
+        chainId: scope.chainId,
+        providerProfileId: scope.providerProfileId,
+        providerName: scope.providerName,
+        createdAt: artifact.createdAt,
+        updatedAt: artifact.updatedAt,
+      } satisfies EvmContractBinding,
+    ];
+  });
+}
+
+function mergeBindingsWithGeneratedDefaults(
+  input: {
+    artifacts: EvmContractArtifact[];
+    bindings: EvmContractBinding[];
+  },
+  scope: BindingScope,
+) {
+  const scopedBindings = input.bindings.filter(
+    (binding) =>
+      binding.chainId === scope.chainId &&
+      binding.providerProfileId === scope.providerProfileId,
+  );
+  const boundAddresses = new Set(
+    scopedBindings.map((binding) => binding.addressLower),
+  );
+  const generatedDefaults = buildGeneratedDefaultBindings(
+    input.artifacts,
+    scope,
+  ).filter((binding) => !boundAddresses.has(binding.addressLower));
+
+  return sortBindings([...scopedBindings, ...generatedDefaults]);
+}
+
+export function isGeneratedDefaultEvmContractBinding(
+  binding: Pick<EvmContractBinding, 'id'> | string,
+) {
+  const id = typeof binding === 'string' ? binding : binding.id;
+  return id.startsWith(GENERATED_DEFAULT_BINDING_ID_PREFIX);
 }
 
 export function replaceEvmContractRegistryStore(value: {
@@ -476,21 +612,49 @@ export async function deleteEvmContractArtifact(artifactId: string) {
 
 export function listEvmContractBindings() {
   ensureLoaded();
-  return readRegistryStore().bindings.sort(
-    (left, right) =>
-      right.updatedAt - left.updatedAt || left.label.localeCompare(right.label),
+  const store = readRegistryStore();
+  const activeProfile = readActiveRpcProfileCookie('evm');
+
+  if (!activeProfile) {
+    return sortBindings(store.bindings);
+  }
+
+  const activeProfileBindings = store.bindings.filter(
+    (binding) => binding.providerProfileId === activeProfile.id,
   );
+  const boundAddresses = new Set(
+    activeProfileBindings.map((binding) => binding.addressLower),
+  );
+  const generatedDefaults = buildGeneratedDefaultBindings(store.artifacts, {
+    chainId: '*',
+    providerProfileId: activeProfile.id,
+    providerName: activeProfile.name,
+  }).filter((binding) => !boundAddresses.has(binding.addressLower));
+
+  return sortBindings([...store.bindings, ...generatedDefaults]);
 }
 
 export function listEvmContractBindingsByScope(
   chainId: string,
   providerProfileId: string,
+  providerName?: string,
 ) {
-  return listEvmContractBindings().filter(
-    (binding) =>
-      binding.chainId === chainId &&
-      binding.providerProfileId === providerProfileId,
-  );
+  ensureLoaded();
+  const store = readRegistryStore();
+  const activeProfile = readActiveRpcProfileCookie('evm');
+  const resolvedProviderName =
+    providerName ??
+    (activeProfile?.id === providerProfileId ? activeProfile.name : null) ??
+    store.bindings.find(
+      (binding) => binding.providerProfileId === providerProfileId,
+    )?.providerName ??
+    'Unknown Provider';
+
+  return mergeBindingsWithGeneratedDefaults(store, {
+    chainId,
+    providerProfileId,
+    providerName: resolvedProviderName,
+  });
 }
 
 export function getEvmContractBinding(bindingId: string) {
@@ -524,6 +688,11 @@ export async function createEvmContractBinding(input: {
   }
 
   const addressLower = input.address.toLowerCase();
+  const generatedDefaults = buildGeneratedDefaultBindings(store.artifacts, {
+    chainId: input.chainId,
+    providerProfileId: input.providerProfileId,
+    providerName: input.providerName,
+  });
 
   if (
     store.bindings.some(
@@ -531,6 +700,9 @@ export async function createEvmContractBinding(input: {
         binding.addressLower === addressLower &&
         binding.chainId === input.chainId &&
         binding.providerProfileId === input.providerProfileId,
+    )
+    || generatedDefaults.some(
+      (binding) => binding.addressLower === addressLower,
     )
   ) {
     throw new Error(
@@ -591,6 +763,12 @@ export async function updateEvmContractBinding(
   const previous = store.bindings.find((binding) => binding.id === bindingId);
 
   if (!previous) {
+    if (isGeneratedDefaultEvmContractBinding(bindingId)) {
+      throw new Error(
+        'Default system bindings are managed in code and cannot be edited.',
+      );
+    }
+
     throw new Error('Bound contract not found.');
   }
 
@@ -607,6 +785,11 @@ export async function updateEvmContractBinding(
   }
 
   const addressLower = input.address.toLowerCase();
+  const generatedDefaults = buildGeneratedDefaultBindings(store.artifacts, {
+    chainId: input.chainId,
+    providerProfileId: input.providerProfileId,
+    providerName: input.providerName,
+  });
 
   if (
     store.bindings.some(
@@ -615,6 +798,9 @@ export async function updateEvmContractBinding(
         binding.addressLower === addressLower &&
         binding.chainId === input.chainId &&
         binding.providerProfileId === input.providerProfileId,
+    )
+    || generatedDefaults.some(
+      (binding) => binding.addressLower === addressLower,
     )
   ) {
     throw new Error(
@@ -664,6 +850,12 @@ export async function updateEvmContractBinding(
 }
 
 export async function deleteEvmContractBinding(bindingId: string) {
+  if (isGeneratedDefaultEvmContractBinding(bindingId)) {
+    throw new Error(
+      'Default system bindings are managed in code and cannot be deleted.',
+    );
+  }
+
   const store = readRegistryStore();
 
   const response = await fetch(
