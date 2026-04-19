@@ -43,8 +43,27 @@ function hasTupleComponents(
   return 'components' in parameter && Array.isArray(parameter.components);
 }
 
+function getCanonicalAbiParameterType(parameter: AbiParameter): string {
+  if (!parameter.type.endsWith(']')) {
+    if (parameter.type !== 'tuple') {
+      return parameter.type;
+    }
+
+    const components = hasTupleComponents(parameter) ? parameter.components : [];
+    return `(${components.map(getCanonicalAbiParameterType).join(',')})`;
+  }
+
+  const arraySuffix = parameter.type.slice(parameter.type.indexOf('['));
+  const baseParameter = {
+    ...parameter,
+    type: parameter.type.slice(0, parameter.type.indexOf('[')),
+  } satisfies AbiParameter;
+
+  return `${getCanonicalAbiParameterType(baseParameter)}${arraySuffix}`;
+}
+
 function getFunctionSignature(fn: AbiFunction) {
-  return `${fn.name}(${fn.inputs.map((input) => input.type).join(',')})`;
+  return `${fn.name}(${fn.inputs.map(getCanonicalAbiParameterType).join(',')})`;
 }
 
 function parseJsonValue(rawValue: string, label: string) {
