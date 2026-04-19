@@ -1062,6 +1062,26 @@ function formatReadableDenomCollection(
   return visible.join(', ');
 }
 
+function formatReadableDecCoinCollection(
+  items: Array<{ denom: string; amount: string }> | undefined,
+) {
+  if (!items?.length) {
+    return '0';
+  }
+
+  const visible = items.slice(0, 2).map((item) => {
+    const integerAmount = item.amount.split('.')[0] ?? item.amount;
+
+    return `${formatReadableTokenAmount(integerAmount)} ${formatReadableDenom(item.denom)}`;
+  });
+
+  if (items.length > 2) {
+    visible.push(`+${items.length - 2} more`);
+  }
+
+  return visible.join(', ');
+}
+
 function formatBytes(
   value: string | number | null | undefined,
   fallback = 'Unavailable',
@@ -3766,7 +3786,7 @@ export async function getCosmosHomeSnapshotDirect(
       },
       {
         label: 'Community Pool',
-        value: formatDenomCollection(communityPoolPayload.pool),
+        value: formatReadableDecCoinCollection(communityPoolPayload.pool),
       },
       {
         label: 'Bank Supply',
