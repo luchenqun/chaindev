@@ -31,6 +31,7 @@ import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transacti
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { syncLatestEvmTransactionsDirect } from '@/domains/evm/client/queries';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { PendingTransactionsPanel } from '@/domains/evm/ui/pending-transactions-panel';
 import {
   TransactionHashCell,
   TransactionPreviewButton,
@@ -366,6 +367,7 @@ function EvmTransactionsPageContent() {
   const searchParams = useSearchParams();
   const searchParamsText = searchParams.toString();
   const currentPage = parsePageParam(searchParams.get('page'));
+  const [activeTab, setActiveTab] = useState<'history' | 'pending'>('history');
   const [data, setData] = useState<TransactionsPageData | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchForm, setSearchForm] = useState<TransactionSearchFormState>(
@@ -717,7 +719,7 @@ function EvmTransactionsPageContent() {
 
   return (
     <AppShell>
-      {autoRefreshEnabled && !activeSearchFilters.hasFilters ? (
+      {activeTab === 'history' && autoRefreshEnabled && !activeSearchFilters.hasFilters ? (
         <TransactionsAutoRefreshBridge
           enabled={currentPage === 1}
           onLatestFeed={handleAutoRefreshFeed}
@@ -728,209 +730,243 @@ function EvmTransactionsPageContent() {
           <h1 className="text-[1.171875rem] font-semibold text-slate-900">
             Transactions
           </h1>
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className={
+                activeTab === 'history'
+                  ? 'inline-flex rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white'
+                  : 'inline-flex rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500'
+              }
+              onClick={() => {
+                setActiveTab('history');
+                setSearchDialogOpen(false);
+              }}
+            >
+              Historical Transactions
+            </button>
+            <button
+              type="button"
+              className={
+                activeTab === 'pending'
+                  ? 'inline-flex rounded-md bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white'
+                  : 'inline-flex rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-500'
+              }
+              onClick={() => {
+                setActiveTab('pending');
+                setSearchDialogOpen(false);
+              }}
+            >
+              Pending Transactions
+            </button>
+          </div>
         </div>
 
-        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-          <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-lg font-semibold text-slate-900">
-                {data.title}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">{data.subtitle}</p>
-              {syncingLatest || syncStatusMessage ? (
-                <p className="mt-2 text-xs text-sky-600">
-                  {syncingLatest
-                    ? 'Loading latest on-chain transactions...'
-                    : syncStatusMessage}
+        {activeTab === 'history' ? (
+          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+            <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-lg font-semibold text-slate-900">
+                  {data.title}
                 </p>
-              ) : null}
+                <p className="mt-1 text-sm text-slate-500">{data.subtitle}</p>
+                {syncingLatest || syncStatusMessage ? (
+                  <p className="mt-2 text-xs text-sky-600">
+                    {syncingLatest
+                      ? 'Loading latest on-chain transactions...'
+                      : syncStatusMessage}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex items-center gap-2 lg:justify-end">
+                <PaginationControls
+                  page={data.page}
+                  totalPages={data.totalPages}
+                  hasPreviousPage={data.hasPreviousPage}
+                  hasNextPage={data.hasNextPage}
+                  disabled={loading}
+                  onPageChange={handlePageChange}
+                />
+                <button
+                  type="button"
+                  aria-label={
+                    activeSearchFilters.hasFilters
+                      ? 'Edit cache search filters'
+                      : 'Search cached transactions'
+                  }
+                  aria-pressed={activeSearchFilters.hasFilters}
+                  title={
+                    activeSearchFilters.hasFilters
+                      ? 'Cache search filters active'
+                      : 'Search cached transactions'
+                  }
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
+                    activeSearchFilters.hasFilters
+                      ? 'border-sky-200 bg-sky-50 text-sky-600'
+                      : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
+                  }`}
+                  onClick={() => setSearchDialogOpen(true)}
+                >
+                  <IconSearch className="size-4" stroke={1.8} />
+                </button>
+                <button
+                  type="button"
+                  aria-label={
+                    autoRefreshEnabled
+                      ? 'Disable auto refresh'
+                      : 'Enable auto refresh'
+                  }
+                  aria-pressed={autoRefreshEnabled}
+                  title={
+                    activeSearchFilters.hasFilters
+                      ? 'Auto refresh is unavailable while cache search filters are active.'
+                      : autoRefreshEnabled
+                        ? 'Auto refresh enabled'
+                        : 'Auto refresh disabled'
+                  }
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
+                    autoRefreshEnabled
+                      ? 'border-sky-200 bg-sky-50 text-sky-600'
+                      : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
+                  } ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
+                  disabled={activeSearchFilters.hasFilters}
+                  onClick={() => setAutoRefreshEnabled((current) => !current)}
+                >
+                  <IconRefresh className="size-4" stroke={1.8} />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 lg:justify-end">
-              <PaginationControls
-                page={data.page}
-                totalPages={data.totalPages}
-                hasPreviousPage={data.hasPreviousPage}
-                hasNextPage={data.hasNextPage}
-                disabled={loading}
-                onPageChange={handlePageChange}
-              />
-              <button
-                type="button"
-                aria-label={
-                  activeSearchFilters.hasFilters
-                    ? 'Edit cache search filters'
-                    : 'Search cached transactions'
-                }
-                aria-pressed={activeSearchFilters.hasFilters}
-                title={
-                  activeSearchFilters.hasFilters
-                    ? 'Cache search filters active'
-                    : 'Search cached transactions'
-                }
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  activeSearchFilters.hasFilters
-                    ? 'border-sky-200 bg-sky-50 text-sky-600'
-                    : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
-                }`}
-                onClick={() => setSearchDialogOpen(true)}
-              >
-                <IconSearch className="size-4" stroke={1.8} />
-              </button>
-              <button
-                type="button"
-                aria-label={
-                  autoRefreshEnabled
-                    ? 'Disable auto refresh'
-                    : 'Enable auto refresh'
-                }
-                aria-pressed={autoRefreshEnabled}
-                title={
-                  activeSearchFilters.hasFilters
-                    ? 'Auto refresh is unavailable while cache search filters are active.'
-                    : autoRefreshEnabled
-                      ? 'Auto refresh enabled'
-                      : 'Auto refresh disabled'
-                }
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  autoRefreshEnabled
-                    ? 'border-sky-200 bg-sky-50 text-sky-600'
-                    : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
-                } ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
-                disabled={activeSearchFilters.hasFilters}
-                onClick={() => setAutoRefreshEnabled((current) => !current)}
-              >
-                <IconRefresh className="size-4" stroke={1.8} />
-              </button>
-            </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Transaction Hash
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Method
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Block
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Age
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    From
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    To
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Amount
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Txn Fee
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.transactions.length ? (
-                  data.transactions.map((transaction) => {
-                    const decodedMethodLabel =
-                      decodedMethodLabelByHash[transaction.hash] ??
-                      transaction.methodLabel;
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Transaction Hash
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Method
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Block
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Age
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      From
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      To
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Amount
+                    </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Txn Fee
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.transactions.length ? (
+                    data.transactions.map((transaction) => {
+                      const decodedMethodLabel =
+                        decodedMethodLabelByHash[transaction.hash] ??
+                        transaction.methodLabel;
 
-                    return (
-                      <tr
-                        key={transaction.hash}
-                        className="border-t border-slate-200"
-                      >
-                        <td className="px-5 py-3 text-sm">
-                          <div className="flex items-center gap-3">
-                            <TransactionPreviewButton
-                              transaction={transaction}
-                              methodLabel={decodedMethodLabel}
-                            />
-                            <TransactionHashCell
-                              hash={transaction.hash}
-                              hashLabel={transaction.hashLabel}
-                              receiptStatus={transaction.receiptStatus}
-                            />
-                          </div>
-                        </td>
-                        <td className="px-5 py-3 text-sm">
-                          <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                            {decodedMethodLabel}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3 text-sm tabular-nums">
-                          <Link
-                            className="font-medium text-sky-600 hover:text-sky-700"
-                            href={`/evm/block/${transaction.blockNumber}`}
-                          >
-                            {transaction.blockNumber}
-                          </Link>
-                        </td>
-                        <td className="px-5 py-3 text-sm text-slate-700">
-                          <RelativeTime timestampMs={transaction.timestampMs} />
-                        </td>
-                        <td className="px-5 py-3 text-sm">
-                          <AddressLink
-                            address={transaction.from}
-                            href={`/evm/address/${transaction.from}`}
-                            label={
-                              nameTagsByAddress[transaction.from] ??
-                              transaction.fromLabel
-                            }
-                            className="font-medium text-sky-600 hover:text-sky-700"
-                          />
-                        </td>
-                        <td className="px-5 py-3 text-sm">
-                          {transaction.to ? (
+                      return (
+                        <tr
+                          key={transaction.hash}
+                          className="border-t border-slate-200"
+                        >
+                          <td className="px-5 py-3 text-sm">
+                            <div className="flex items-center gap-3">
+                              <TransactionPreviewButton
+                                transaction={transaction}
+                                methodLabel={decodedMethodLabel}
+                              />
+                              <TransactionHashCell
+                                hash={transaction.hash}
+                                hashLabel={transaction.hashLabel}
+                                receiptStatus={transaction.receiptStatus}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-5 py-3 text-sm">
+                            <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                              {decodedMethodLabel}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-sm tabular-nums">
+                            <Link
+                              className="font-medium text-sky-600 hover:text-sky-700"
+                              href={`/evm/block/${transaction.blockNumber}`}
+                            >
+                              {transaction.blockNumber}
+                            </Link>
+                          </td>
+                          <td className="px-5 py-3 text-sm text-slate-700">
+                            <RelativeTime timestampMs={transaction.timestampMs} />
+                          </td>
+                          <td className="px-5 py-3 text-sm">
                             <AddressLink
-                              address={transaction.to}
-                              href={`/evm/address/${transaction.to}`}
-                              label={resolvePreferredToAddressLabel(
-                                transaction.to,
-                                {
-                                  nameTagsByAddress,
-                                  fallbackLabel: transaction.toLabel,
-                                },
-                              )}
+                              address={transaction.from}
+                              href={`/evm/address/${transaction.from}`}
+                              label={
+                                nameTagsByAddress[transaction.from] ??
+                                transaction.fromLabel
+                              }
                               className="font-medium text-sky-600 hover:text-sky-700"
                             />
-                          ) : (
-                            <span className="text-slate-500">
-                              Contract Creation
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
-                          {transaction.amountLabel}
-                        </td>
-                        <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
-                          {transaction.feeLabel ?? (
-                            <span className="text-slate-400">--</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-5 py-10 text-center text-sm text-slate-500"
-                    >
-                      No cached transactions available yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                          </td>
+                          <td className="px-5 py-3 text-sm">
+                            {transaction.to ? (
+                              <AddressLink
+                                address={transaction.to}
+                                href={`/evm/address/${transaction.to}`}
+                                label={resolvePreferredToAddressLabel(
+                                  transaction.to,
+                                  {
+                                    nameTagsByAddress,
+                                    fallbackLabel: transaction.toLabel,
+                                  },
+                                )}
+                                className="font-medium text-sky-600 hover:text-sky-700"
+                              />
+                            ) : (
+                              <span className="text-slate-500">
+                                Contract Creation
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
+                            {transaction.amountLabel}
+                          </td>
+                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
+                            {transaction.feeLabel ?? (
+                              <span className="text-slate-400">--</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-5 py-10 text-center text-sm text-slate-500"
+                      >
+                        No cached transactions available yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ) : (
+          <PendingTransactionsPanel />
+        )}
       </main>
       <ModalDialog
         open={searchDialogOpen}

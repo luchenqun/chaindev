@@ -7,6 +7,7 @@ type BlockTableProps = {
     hash: string;
     hashLabel: string;
     proposer: string;
+    proposerOperatorAddress: string | null;
     proposerLabel: string;
     proposerAddressLabel: string;
     txCountLabel: string;
@@ -80,7 +81,16 @@ export function CosmosBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
                 {block.txCountLabel}
               </td>
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">
-                {block.proposerLabel}
+                <Link
+                  className="font-medium text-sky-600 hover:text-sky-700"
+                  href={
+                    block.proposerOperatorAddress
+                      ? `/cosmos/validator/${block.proposerOperatorAddress}`
+                      : '/cosmos/validators'
+                  }
+                >
+                  {block.proposerLabel}
+                </Link>
               </td>
               <td
                 className="px-4 py-2.5 text-[14px] leading-6 font-mono text-slate-600"

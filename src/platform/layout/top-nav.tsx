@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  IconChevronDown,
-  IconLogout,
-  IconUserCircle,
-} from '@tabler/icons-react';
+import { IconChevronDown, IconLogout, IconUserCircle } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -22,12 +18,6 @@ import { RpcProviderManager } from '@/platform/workbench/rpc-provider-manager';
 type NavItem = {
   href: string;
   label: string;
-};
-
-type NavGroup = {
-  id: string;
-  label: string;
-  items: NavItem[];
 };
 
 function inferMode(pathname: string): PlatformMode {
@@ -51,47 +41,26 @@ function matchesNavItem(pathname: string, href: string) {
     return pathname.startsWith('/cosmos/tx/');
   }
 
+  if (href.startsWith('/cosmos/txs')) {
+    return pathname.startsWith('/cosmos/txs');
+  }
+
+  if (href.startsWith('/cosmos/accounts')) {
+    return (
+      pathname.startsWith('/cosmos/accounts') ||
+      pathname.startsWith('/cosmos/account/')
+    );
+  }
+
+  if (href.startsWith('/cosmos/validators')) {
+    return (
+      pathname.startsWith('/cosmos/validators') ||
+      pathname.startsWith('/cosmos/validator/')
+    );
+  }
+
   if (href.startsWith('/cosmos/account/')) {
     return pathname.startsWith('/cosmos/account/');
-  }
-
-  return false;
-}
-
-function matchesNavGroup(pathname: string, groupId: string) {
-  if (groupId === 'tools') {
-    return (
-      pathname.startsWith('/evm/tools') || pathname.startsWith('/cosmos/tools')
-    );
-  }
-
-  if (groupId === 'contracts') {
-    return pathname.startsWith('/evm/contracts');
-  }
-
-  if (groupId === 'settings') {
-    return (
-      pathname.startsWith('/evm/settings') ||
-      pathname.startsWith('/cosmos/settings')
-    );
-  }
-
-  if (groupId === 'browser') {
-    return [
-      '/evm/blocks',
-      '/evm/pending-txs',
-      '/evm/block/',
-      '/evm/accounts',
-      '/evm/txs',
-      '/evm/tx/',
-      '/evm/address/',
-      '/cosmos/blocks',
-      '/cosmos/block/',
-      '/cosmos/tx/',
-      '/cosmos/account/',
-      '/cosmos/validators',
-      '/cosmos/proposals',
-    ].some((prefix) => pathname === prefix || pathname.startsWith(prefix));
   }
 
   return false;
@@ -108,10 +77,12 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
     session?.user?.name ??
     session?.user?.email ??
     'Account';
-  const blockchainItems: NavItem[] =
+  const primaryNavItems: NavItem[] =
     mode === 'cosmos'
       ? [
           { href: '/cosmos/blocks', label: 'Blocks' },
+          { href: '/cosmos/accounts', label: 'Accounts' },
+          { href: '/cosmos/txs', label: 'Transactions' },
           { href: '/cosmos/validators', label: 'Validators' },
           { href: '/cosmos/proposals', label: 'Proposals' },
         ]
@@ -119,25 +90,9 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           { href: '/evm/blocks', label: 'Blocks' },
           { href: '/evm/accounts', label: 'Accounts' },
           { href: '/evm/txs', label: 'Transactions' },
-          {
-            href: '/evm/pending-txs',
-            label: messages.navigation.pendingTransactions,
-          },
-        ];
-  const directNavItems: NavItem[] =
-    mode === 'evm'
-      ? [
           { href: '/evm/contracts', label: messages.navigation.contracts },
           { href: '/evm/settings/cache', label: messages.navigation.cache },
-        ]
-      : [];
-  const activeNavGroups: NavGroup[] = [
-    {
-      id: 'browser',
-      label: messages.navigation.blockchain,
-      items: blockchainItems,
-    },
-  ];
+        ];
   const userMenuSections = getAccountMenuSections(mode);
   const userMenuActive = userMenuSections.some((section) =>
     section.items.some((item) => matchesNavItem(pathname, item.href)),
@@ -193,79 +148,21 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             >
               {messages.navigation.home}
             </Link>
-            {activeNavGroups.map((group, index) => {
-              const active = matchesNavGroup(pathname, group.id);
+            {primaryNavItems.map((item) => {
+              const itemActive = matchesNavItem(pathname, item.href);
 
               return (
-                <div key={group.id} className="contents">
-                  <div
-                    className="relative"
-                    onMouseEnter={() => setOpenGroup(group.id)}
-                    onMouseLeave={() =>
-                      setOpenGroup((current) =>
-                        current === group.id ? null : current,
-                      )
-                    }
-                  >
-                    <button
-                      type="button"
-                      className={
-                        active || openGroup === group.id
-                          ? 'inline-flex items-center gap-1 py-2.5 font-[450] text-[#1697ea]'
-                          : 'inline-flex items-center gap-1 py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'
-                      }
-                    >
-                      {group.label}
-                      <IconChevronDown className="size-3.5" stroke={2.2} />
-                    </button>
-                    {openGroup === group.id ? (
-                      <div className="absolute left-0 top-full z-20 min-w-[220px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
-                        <div className="border-t-[3px] border-[#19a7f2]" />
-                        <div className="py-2">
-                          {group.items.map((item) => {
-                            const itemActive = matchesNavItem(
-                              pathname,
-                              item.href,
-                            );
-
-                            return (
-                              <Link
-                                key={item.href}
-                                href={item.href}
-                                className={
-                                  itemActive
-                                    ? 'block rounded-lg px-6 py-2 text-[15px] font-[450] text-[#1697ea]'
-                                    : 'block rounded-lg px-6 py-2 text-[15px] font-[450] text-slate-950 hover:bg-slate-100 hover:text-black'
-                                }
-                              >
-                                {item.label}
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                  {index === 0
-                    ? directNavItems.map((item) => {
-                        const itemActive = matchesNavItem(pathname, item.href);
-
-                        return (
-                          <Link
-                            key={item.href}
-                            href={item.href}
-                            className={
-                              itemActive
-                                ? 'py-2.5 font-[450] text-[#1697ea]'
-                                : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'
-                            }
-                          >
-                            {item.label}
-                          </Link>
-                        );
-                      })
-                    : null}
-                </div>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={
+                    itemActive
+                      ? 'py-2.5 font-[450] text-[#1697ea]'
+                      : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'
+                  }
+                >
+                  {item.label}
+                </Link>
               );
             })}
           </nav>

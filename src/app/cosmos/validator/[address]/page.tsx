@@ -1,10 +1,6 @@
 'use client';
 
 import JsonView from '@uiw/react-json-view';
-import {
-  IconAdjustmentsHorizontal,
-  IconCode,
-} from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -16,7 +12,7 @@ import {
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { RelativeTime } from '@/components/relative-time';
-import { getCosmosAccountDetailDirect } from '@/domains/cosmos/client/queries';
+import { getCosmosValidatorDetailDirect } from '@/domains/cosmos/client/queries';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const JSON_VIEW_STYLE = {
@@ -40,6 +36,27 @@ const JSON_VIEW_STYLE = {
   '--w-rjv-type-null-color': '#b91c1c',
   '--w-rjv-type-undefined-color': '#b91c1c',
 } as CSSProperties;
+
+function formatTimestampWithSeconds(value: string | null) {
+  if (!value) {
+    return '-';
+  }
+
+  const timestamp = new Date(value);
+
+  if (Number.isNaN(timestamp.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(timestamp);
+}
 
 function DetailRow({
   label,
@@ -79,30 +96,29 @@ function DetailTag({
   tone = 'neutral',
 }: {
   children: React.ReactNode;
-  tone?: 'neutral' | 'success' | 'danger';
+  tone?: 'neutral' | 'success' | 'danger' | 'warning';
 }) {
   const className =
     tone === 'success'
       ? 'inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700'
       : tone === 'danger'
         ? 'inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700'
-      : 'inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600';
+        : tone === 'warning'
+          ? 'inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700'
+          : 'inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600';
 
   return <span className={className}>{children}</span>;
 }
 
-export default function CosmosAccountPage() {
+export default function CosmosValidatorPage() {
   const params = useParams<{ address: string }>();
   const address = params.address;
   const [currentTxPage, setCurrentTxPage] = useState(1);
   const [activeTab, setActiveTab] = useState<
     'overview' | 'transactions' | 'delegations' | 'json'
   >('overview');
-  const [balanceDisplayMode, setBalanceDisplayMode] = useState<
-    'readable' | 'accurate'
-  >('readable');
-  const [account, setAccount] = useState<Awaited<
-    ReturnType<typeof getCosmosAccountDetailDirect>
+  const [validator, setValidator] = useState<Awaited<
+    ReturnType<typeof getCosmosValidatorDetailDirect>
   > | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isLikelyAddress = useMemo(() => Boolean(address?.trim()), [address]);
@@ -116,14 +132,14 @@ export default function CosmosAccountPage() {
 
     async function load() {
       try {
-        const next = await getCosmosAccountDetailDirect({
+        const next = await getCosmosValidatorDetailDirect({
           address,
           txPage: currentTxPage,
           txPageSize: 10,
         });
 
         if (!cancelled) {
-          setAccount(next);
+          setValidator(next);
           setErrorMessage(null);
 
           if (next.transactionsPage.page !== currentTxPage) {
@@ -132,11 +148,11 @@ export default function CosmosAccountPage() {
         }
       } catch (error) {
         if (!cancelled) {
-          setAccount(null);
+          setValidator(null);
           setErrorMessage(
             error instanceof Error
               ? error.message
-              : 'Failed to load Cosmos account.',
+              : 'Failed to load Cosmos validator.',
           );
         }
       }
@@ -155,19 +171,19 @@ export default function CosmosAccountPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Invalid account address</h1>
-          <p>The account address is required.</p>
+          <h1>Invalid validator address</h1>
+          <p>The validator address is required.</p>
         </main>
       </AppShell>
     );
   }
 
-  if (!account) {
+  if (!validator) {
     if (!errorMessage) {
       return (
         <AppShell>
           <DetailPageSkeleton
-            titleWidth="w-28"
+            titleWidth="w-32"
             groups={3}
             rowsPerGroup={4}
             secondaryCard={true}
@@ -179,21 +195,27 @@ export default function CosmosAccountPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Failed to load account</h1>
+          <h1>Failed to load validator</h1>
           <p>{errorMessage}</p>
         </main>
       </AppShell>
     );
   }
 
-  const hasTransactions = account.transactionsPage.totalCount > 0;
-  const hasDelegations = account.delegationsCount > 0;
+  const hasTransactions = validator.transactionsPage.totalCount > 0;
+  const hasDelegations = validator.delegationsCount > 0;
   const resolvedActiveTab =
     activeTab === 'transactions' && !hasTransactions
       ? 'overview'
       : activeTab === 'delegations' && !hasDelegations
         ? 'overview'
         : activeTab;
+  const statusTone =
+    validator.status === 'BOND_STATUS_BONDED'
+      ? 'success'
+      : validator.status === 'BOND_STATUS_UNBONDING'
+        ? 'warning'
+        : 'neutral';
 
   return (
     <AppShell>
@@ -225,7 +247,7 @@ export default function CosmosAccountPage() {
             }}
           >
             {hasTransactions
-              ? `Transactions (${account.transactionsPage.totalCount})`
+              ? `Transactions (${validator.transactionsPage.totalCount})`
               : 'Transactions'}
           </button>
           <button
@@ -243,7 +265,7 @@ export default function CosmosAccountPage() {
             }}
           >
             {hasDelegations
-              ? `Delegations (${account.delegationsCount})`
+              ? `Delegations (${validator.delegationsCount})`
               : 'Delegations'}
           </button>
           <button
@@ -261,119 +283,136 @@ export default function CosmosAccountPage() {
 
         {resolvedActiveTab === 'overview' ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="mb-3">
               <p className="text-base font-semibold text-slate-900">
-                Account Overview
+                Validator Overview
               </p>
-              <button
-                type="button"
-                aria-label={
-                  balanceDisplayMode === 'readable'
-                    ? 'Switch to accurate balances'
-                    : 'Switch to readable balances'
-                }
-                title={
-                  balanceDisplayMode === 'readable'
-                    ? 'Readable balances'
-                    : 'Accurate balances'
-                }
-                className="inline-flex h-8 w-8 items-center justify-center text-slate-400 transition hover:text-slate-600"
-                onClick={() =>
-                  setBalanceDisplayMode((current) =>
-                    current === 'readable' ? 'accurate' : 'readable',
-                  )
-                }
-              >
-                {balanceDisplayMode === 'readable' ? (
-                  <IconAdjustmentsHorizontal className="size-4" stroke={1.8} />
-                ) : (
-                  <IconCode className="size-4" stroke={1.8} />
-                )}
-              </button>
+              <p className="mt-1 text-sm text-slate-500">
+                Validator profile, rewards, and staking state returned by the
+                active Cosmos REST endpoint.
+              </p>
             </div>
 
             <dl>
               <DetailGroup>
-                <DetailRow label="Address" value={account.address} mono />
+                <DetailRow label="Moniker" value={validator.moniker} />
                 <DetailRow
-                  label="Type"
-                  value={<DetailTag>{account.type}</DetailTag>}
+                  label="Status"
+                  value={
+                    <DetailTag tone={statusTone}>{validator.statusLabel}</DetailTag>
+                  }
                 />
                 <DetailRow
-                  label="Balance Summary"
+                  label="Jailed"
                   value={
-                    balanceDisplayMode === 'readable'
-                      ? account.readableBalancesLabel
-                      : account.balancesLabel
+                    <DetailTag tone={validator.jailed ? 'danger' : 'neutral'}>
+                      {validator.jailedLabel}
+                    </DetailTag>
                   }
+                />
+              </DetailGroup>
+              <DetailGroup>
+                <DetailRow
+                  label="Operator Address"
+                  value={validator.operatorAddress}
+                  mono
+                />
+                <DetailRow
+                  label="Account Address"
+                  value={
+                    validator.accountAddress ? (
+                      <Link
+                        className="text-sky-600 hover:text-sky-700"
+                        href={`/cosmos/account/${validator.accountAddress}`}
+                      >
+                        {validator.accountAddress}
+                      </Link>
+                    ) : (
+                      '-'
+                    )
+                  }
+                  mono
+                />
+                <DetailRow
+                  label="Consensus Pubkey"
+                  value={validator.consensusPubkey ?? '-'}
                   mono
                 />
               </DetailGroup>
               <DetailGroup>
                 <DetailRow
-                  label="Account Number"
-                  value={account.accountNumberLabel}
+                  label="Voting Power"
+                  value={validator.votingPowerPercentLabel}
                 />
-                <DetailRow label="Sequence" value={account.sequenceLabel} />
+                <DetailRow label="Tokens" value={validator.tokensLabel} />
+                <DetailRow
+                  label="Delegator Shares"
+                  value={validator.delegatorSharesLabel}
+                  mono
+                />
+                <DetailRow
+                  label="Commission Rate"
+                  value={validator.commissionRateLabel}
+                />
+                <DetailRow
+                  label="Min Self Delegation"
+                  value={validator.minSelfDelegationLabel}
+                  mono
+                />
+                <DetailRow label="Self Bond" value={validator.selfBondLabel} />
               </DetailGroup>
               <DetailGroup>
                 <DetailRow
-                  label="Transactions"
-                  value={account.transactionsPage.totalCount.toLocaleString(
-                    'en-US',
-                  )}
+                  label="Stake Rewards"
+                  value={validator.stakeRewardsLabel}
                 />
                 <DetailRow
-                  label="Delegations"
-                  value={account.delegationsCount.toLocaleString('en-US')}
+                  label="Commission Rewards"
+                  value={validator.commissionRewardsLabel}
+                />
+                <DetailRow
+                  label="Outstanding Rewards"
+                  value={validator.outstandingRewardsLabel}
                 />
               </DetailGroup>
+              <DetailGroup>
+                <DetailRow label="Identity" value={validator.identity ?? '-'} />
+                <DetailRow
+                  label="Website"
+                  value={
+                    validator.website ? (
+                      <a
+                        className="text-sky-600 hover:text-sky-700"
+                        href={validator.website}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {validator.website}
+                      </a>
+                    ) : (
+                      '-'
+                    )
+                  }
+                />
+                <DetailRow
+                  label="Security Contact"
+                  value={validator.securityContact ?? '-'}
+                />
+                <DetailRow label="Details" value={validator.details ?? '-'} />
+              </DetailGroup>
+              {validator.unbondingHeightLabel || validator.unbondingTime ? (
+                <DetailGroup>
+                  <DetailRow
+                    label="Unbonding Height"
+                    value={validator.unbondingHeightLabel ?? '-'}
+                  />
+                  <DetailRow
+                    label="Unbonding Time"
+                    value={formatTimestampWithSeconds(validator.unbondingTime)}
+                  />
+                </DetailGroup>
+              ) : null}
             </dl>
-
-            <div className="mt-4 border-t border-slate-200 pt-4">
-              <div className="mb-4">
-                <p className="text-base font-semibold text-slate-900">
-                  Balances
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  All balances returned by the active Cosmos REST endpoint.
-                </p>
-              </div>
-
-              {account.balances.length ? (
-                <div className="overflow-x-auto">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">
-                          Denom
-                        </th>
-                        <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">
-                          Amount
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {account.balances.map((balance, index) => (
-                        <tr
-                          key={`${balance.denom}-${index}`}
-                          className="border-t border-slate-200"
-                        >
-                          <td className="px-4 py-3 text-sm text-slate-700 mono">
-                            {balance.denom}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-900 mono">
-                            {balance.amount}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="empty-state">No balances returned.</div>
-              )}
-            </div>
           </section>
         ) : null}
 
@@ -385,14 +424,15 @@ export default function CosmosAccountPage() {
                   Transactions
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Transactions where this address appears as `message.sender`.
+                  Transactions where this validator account appears as
+                  `message.sender`.
                 </p>
               </div>
               <PaginationControls
-                page={account.transactionsPage.page}
-                totalPages={account.transactionsPage.totalPages}
-                hasPreviousPage={account.transactionsPage.hasPreviousPage}
-                hasNextPage={account.transactionsPage.hasNextPage}
+                page={validator.transactionsPage.page}
+                totalPages={validator.transactionsPage.totalPages}
+                hasPreviousPage={validator.transactionsPage.hasPreviousPage}
+                hasNextPage={validator.transactionsPage.hasNextPage}
                 onPageChange={setCurrentTxPage}
               />
             </div>
@@ -422,7 +462,7 @@ export default function CosmosAccountPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {account.transactionsPage.items.map((transaction) => (
+                  {validator.transactionsPage.items.map((transaction) => (
                     <tr
                       key={transaction.hash}
                       className="border-t border-slate-200"
@@ -483,8 +523,7 @@ export default function CosmosAccountPage() {
                 Delegations
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Active staking delegations returned by the selected Cosmos REST
-                endpoint.
+                Delegators currently bonded to this validator.
               </p>
             </div>
 
@@ -493,10 +532,7 @@ export default function CosmosAccountPage() {
                 <thead>
                   <tr>
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Validator
-                    </th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Validator Address
+                      Delegator
                     </th>
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
                       Amount
@@ -504,28 +540,23 @@ export default function CosmosAccountPage() {
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
                       Shares
                     </th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
+                      Kind
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {account.delegations.map((delegation) => (
+                  {validator.delegations.map((delegation) => (
                     <tr
-                      key={delegation.validatorAddress}
+                      key={`${delegation.delegatorAddress}-${delegation.sharesLabel}`}
                       className="border-t border-slate-200"
                     >
-                      <td className="px-5 py-3 text-sm text-slate-700">
+                      <td className="px-5 py-3 text-sm">
                         <Link
-                          className="text-sky-600 hover:text-sky-700"
-                          href={`/cosmos/validator/${delegation.validatorAddress}`}
+                          className="font-medium text-sky-600 hover:text-sky-700"
+                          href={`/cosmos/account/${delegation.delegatorAddress}`}
                         >
-                          {delegation.validatorMoniker ?? 'Unknown'}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-3 text-sm text-slate-700 mono">
-                        <Link
-                          className="text-sky-600 hover:text-sky-700"
-                          href={`/cosmos/validator/${delegation.validatorAddress}`}
-                        >
-                          {delegation.validatorAddressLabel}
+                          {delegation.delegatorAddressLabel}
                         </Link>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">
@@ -533,6 +564,9 @@ export default function CosmosAccountPage() {
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-900 mono">
                         {delegation.sharesLabel}
+                      </td>
+                      <td className="px-5 py-3 text-sm">
+                        <DetailTag>{delegation.kindLabel}</DetailTag>
                       </td>
                     </tr>
                   ))}
@@ -545,7 +579,7 @@ export default function CosmosAccountPage() {
         {resolvedActiveTab === 'json' ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <JsonView
-              value={account.rawJson}
+              value={validator.rawJson}
               style={JSON_VIEW_STYLE}
               displayDataTypes={false}
               displayObjectSize={false}

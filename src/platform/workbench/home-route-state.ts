@@ -34,10 +34,7 @@ export function isCosmosLiveBlockRouteActive(
   pathname: string,
   activeMode: ActivePlatformMode,
 ) {
-  return (
-    isCosmosHomeRouteActive(pathname, activeMode) ||
-    isCosmosBlocksRouteActive(pathname)
-  );
+  return isCosmosRouteActive(pathname, activeMode);
 }
 
 export function isEvmRouteActive(

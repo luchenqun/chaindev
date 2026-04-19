@@ -91,9 +91,16 @@ export function CosmosHomeActivity() {
                     </p>
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-sm text-slate-600">
+                    <Link
+                      className="block truncate text-sm text-sky-600 hover:text-sky-700"
+                      href={
+                        block.proposerOperatorAddress
+                          ? `/cosmos/validator/${block.proposerOperatorAddress}`
+                          : '/cosmos/validators'
+                      }
+                    >
                       {block.proposerLabel}
-                    </p>
+                    </Link>
                     <p className="mt-1 truncate text-sm text-slate-500">
                       {block.txCount} txs
                     </p>
@@ -122,6 +129,12 @@ export function CosmosHomeActivity() {
             <h2 className="text-lg font-semibold text-slate-900">
               Latest Transactions
             </h2>
+            <Link
+              className="text-sm font-medium text-sky-600"
+              href="/cosmos/txs"
+            >
+              VIEW ALL TRANSACTIONS
+            </Link>
           </div>
           <div className="grid border-t border-slate-200 pt-1">
             {snapshot?.activity.transactions.length ? (
@@ -159,7 +172,13 @@ export function CosmosHomeActivity() {
                       {transaction.type}
                     </p>
                     <p className="mt-1 truncate text-sm text-slate-500">
-                      {transaction.senderLabel} ·{' '}
+                      <Link
+                        className="text-sky-600 hover:text-sky-700"
+                        href={`/cosmos/account/${transaction.sender}`}
+                      >
+                        {transaction.senderLabel}
+                      </Link>{' '}
+                      ·{' '}
                       {formatRelativeAge(transaction.timestampMs, nowMs)}
                     </p>
                   </div>

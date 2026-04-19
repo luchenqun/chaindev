@@ -14,6 +14,7 @@ import {
   getActiveCosmosProvider,
   getCosmosHomeSnapshotDirect,
   getCosmosLatestBlockFeedDirect,
+  getCosmosOverviewDirect,
   type CosmosLatestBlockFeed,
   type CosmosHomeSnapshot,
 } from '@/domains/cosmos/client/queries';
@@ -261,6 +262,42 @@ export function CosmosHomeDataProvider({
       }
     }
 
+    async function loadLatestFeed() {
+      try {
+        const overview = await getCosmosOverviewDirect();
+        const latestHeight = Number.parseInt(
+          String(overview.latestHeight ?? '0'),
+          10,
+        );
+
+        if (!Number.isFinite(latestHeight) || latestHeight < 1) {
+          if (!disposed) {
+            setLatestFeed(null);
+          }
+          return;
+        }
+
+        const nextFeed = await getCosmosLatestBlockFeedDirect(latestHeight);
+
+        if (disposed) {
+          return;
+        }
+
+        setLatestFeed(nextFeed);
+        setErrorMessage(null);
+      } catch (error) {
+        if (disposed) {
+          return;
+        }
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : 'Failed to load the latest Cosmos block.',
+        );
+      }
+    }
+
     function queueRefresh() {
       if (!autoRefreshEnabled) {
         return;
@@ -422,6 +459,8 @@ export function CosmosHomeDataProvider({
                 hash: nextFeed.blockPageItem.hash,
                 hashLabel: nextFeed.blockPageItem.hashLabel,
                 proposer: nextFeed.blockPageItem.proposer,
+                proposerOperatorAddress:
+                  nextFeed.blockPageItem.proposerOperatorAddress,
                 proposerLabel: nextFeed.blockPageItem.proposerLabel,
                 txCount: nextFeed.blockPageItem.txCountLabel,
                 blockSizeLabel: nextFeed.blockPageItem.blockSizeLabel,
@@ -582,8 +621,8 @@ export function CosmosHomeDataProvider({
       setupWebSocket();
     } else {
       closeSocket();
-      setLatestFeed(null);
       setConnectionMode('poll');
+      void loadLatestFeed();
     }
 
     const handleProfileChanged = () => {
@@ -596,6 +635,8 @@ export function CosmosHomeDataProvider({
         isCosmosLiveBlockRouteActive(pathname, readActivePlatformModeCookie())
       ) {
         setupWebSocket();
+      } else if (isCosmosRouteActive(pathname, readActivePlatformModeCookie())) {
+        void loadLatestFeed();
       }
     };
 
