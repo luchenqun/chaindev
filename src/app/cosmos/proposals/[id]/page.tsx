@@ -7,107 +7,18 @@ import {
   useEffect,
   useMemo,
   useState,
-  type CSSProperties,
 } from 'react';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosProposalByIdDirect } from '@/domains/cosmos/client/queries';
+import {
+  CosmosDetailGroup as DetailGroup,
+  CosmosDetailRow as DetailRow,
+  CosmosDetailTag as DetailTag,
+  COSMOS_JSON_VIEW_STYLE as JSON_VIEW_STYLE,
+  formatTimestampWithSeconds,
+} from '@/domains/cosmos/ui/detail-primitives';
 import { AppShell } from '@/platform/layout/app-shell';
-
-const JSON_VIEW_STYLE = {
-  '--w-rjv-background-color': 'transparent',
-  '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
-  '--w-rjv-font-family':
-    '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-  '--w-rjv-color': '#0f172a',
-  '--w-rjv-arrow-color': '#64748b',
-  '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
-  '--w-rjv-curlybraces-color': '#475569',
-  '--w-rjv-brackets-color': '#475569',
-  '--w-rjv-colon-color': '#94a3b8',
-  '--w-rjv-key-string': '#0369a1',
-  '--w-rjv-key-number': '#0369a1',
-  '--w-rjv-type-string-color': '#b45309',
-  '--w-rjv-type-int-color': '#7c3aed',
-  '--w-rjv-type-float-color': '#7c3aed',
-  '--w-rjv-type-bigint-color': '#7c3aed',
-  '--w-rjv-type-boolean-color': '#15803d',
-  '--w-rjv-type-null-color': '#b91c1c',
-  '--w-rjv-type-undefined-color': '#b91c1c',
-} as CSSProperties;
-
-function formatTimestampWithSeconds(value: string | null) {
-  if (!value) {
-    return '-';
-  }
-
-  const timestamp = new Date(value);
-
-  if (Number.isNaN(timestamp.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(timestamp);
-}
-
-function DetailRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
-  return (
-    <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
-      <dt className="text-sm font-medium text-slate-500">{label}</dt>
-      <dd
-        className={
-          mono
-            ? 'self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono'
-            : 'self-start text-sm text-slate-900'
-        }
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function DetailGroup({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="border-t border-slate-200 py-2.5 first:border-t-0">
-      {children}
-    </div>
-  );
-}
-
-function DetailTag({
-  children,
-  tone = 'neutral',
-}: {
-  children: React.ReactNode;
-  tone?: 'neutral' | 'success' | 'danger' | 'warning';
-}) {
-  const className =
-    tone === 'success'
-      ? 'inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700'
-      : tone === 'danger'
-        ? 'inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700'
-        : tone === 'warning'
-          ? 'inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700'
-          : 'inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600';
-
-  return <span className={className}>{children}</span>;
-}
 
 export default function CosmosProposalPage() {
   const params = useParams<{ id: string }>();

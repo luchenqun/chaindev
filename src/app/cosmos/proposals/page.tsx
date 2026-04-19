@@ -7,57 +7,14 @@ import { Suspense, useEffect, useState } from 'react';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosProposalsDirect } from '@/domains/cosmos/client/queries';
+import {
+  buildPageHref,
+  parsePageParam,
+} from '@/domains/cosmos/ui/page-query';
+import { formatTimestampWithSeconds } from '@/domains/cosmos/ui/detail-primitives';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 15;
-
-function parsePageParam(rawPage: string | null) {
-  const parsed = Number.parseInt(rawPage ?? '1', 10);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return 1;
-  }
-
-  return parsed;
-}
-
-function buildPageHref(
-  pathname: string,
-  searchParams: URLSearchParams,
-  page: number,
-) {
-  const params = new URLSearchParams(searchParams.toString());
-
-  if (page <= 1) {
-    params.delete('page');
-  } else {
-    params.set('page', String(page));
-  }
-
-  const nextQuery = params.toString();
-  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
-}
-
-function formatTimestampWithSeconds(value: string | null) {
-  if (!value) {
-    return '-';
-  }
-
-  const timestamp = new Date(value);
-
-  if (Number.isNaN(timestamp.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(timestamp);
-}
 
 function StatusBadge({
   status,

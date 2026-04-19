@@ -14,36 +14,10 @@ import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosAccountsPageDirect } from '@/domains/cosmos/client/queries';
+import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 20;
-
-function parsePageParam(rawPage: string | null) {
-  const parsed = Number.parseInt(rawPage ?? '1', 10);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return 1;
-  }
-
-  return parsed;
-}
-
-function buildPageHref(
-  pathname: string,
-  searchParams: URLSearchParams,
-  page: number,
-) {
-  const params = new URLSearchParams(searchParams.toString());
-
-  if (page <= 1) {
-    params.delete('page');
-  } else {
-    params.set('page', String(page));
-  }
-
-  const nextQuery = params.toString();
-  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
-}
 
 function formatCompactValue(value: string, start = 14, end = 10) {
   if (value.length <= start + end + 3) {

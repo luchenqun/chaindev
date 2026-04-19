@@ -24,6 +24,7 @@ import Link from 'next/link';
 import { toFunctionSelector, type AbiParameter } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
+import { copyText } from '@/components/ui/copy-text';
 import { Input } from '@/components/ui/input';
 import { JsonInput } from '@/components/ui/json-input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
@@ -406,10 +407,6 @@ function persistArgumentValues(signature: string, values: string[]) {
     ...currentCache,
     [signature]: values,
   });
-}
-
-function copyText(value: string) {
-  return navigator.clipboard.writeText(value);
 }
 
 function getFunctionSelector(signature: string) {
@@ -1674,7 +1671,7 @@ export function AddressContractPanel({
                     tooltip="Copy ABI"
                     aria-label="Copy ABI"
                     onClick={() => {
-                      void navigator.clipboard.writeText(artifact.abiJson);
+                      void copyText(artifact.abiJson);
                       showToast({
                         title: 'ABI copied',
                         description: 'Contract ABI was copied successfully.',

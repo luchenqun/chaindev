@@ -8,36 +8,10 @@ import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosBlocksPageDirect } from '@/domains/cosmos/client/queries';
 import { CosmosBlockTable } from '@/domains/cosmos/ui/block-table';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
+import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 20;
-
-function parsePageParam(rawPage: string | null) {
-  const parsed = Number.parseInt(rawPage ?? '1', 10);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return 1;
-  }
-
-  return parsed;
-}
-
-function buildPageHref(
-  pathname: string,
-  searchParams: URLSearchParams,
-  page: number,
-) {
-  const params = new URLSearchParams(searchParams.toString());
-
-  if (page <= 1) {
-    params.delete('page');
-  } else {
-    params.set('page', String(page));
-  }
-
-  const nextQuery = params.toString();
-  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
-}
 
 function CosmosBlocksPageContent() {
   const pathname = usePathname();

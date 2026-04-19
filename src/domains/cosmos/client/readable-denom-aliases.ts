@@ -1,0 +1,18 @@
+export const READABLE_DENOM_ALIASES: Record<string, string> = {
+  aevmos: 'evmos',
+  aethos: 'ethos',
+  aqare: 'qare',
+  aqrx: 'qrx',
+  atest: 'test',
+  avoucher: 'voucher',
+  aqvoucher: 'qvoucher',
+  athbs: 'thbs',
+  acbo: 'cbo',
+  azkme: 'zkme',
+  azeta: 'zeta',
+  aabtc: 'abtc',
+  aakk: 'akk',
+  apepe: 'pepe',
+  ahopp: 'hopp',
+  amoca: 'moca',
+};

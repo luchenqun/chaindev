@@ -9,6 +9,19 @@ import {
   rememberCosmosTransactionCache,
   type CosmosCachedTransactionItem,
 } from '@/domains/cosmos/client/transaction-cache';
+import {
+  decodeCosmosTransactionSummary,
+  extractSender,
+  extractTypeLabel,
+  findEventAttribute,
+  formatCompactHash,
+  formatDenomAmount,
+  formatReadableDecCoinCollection,
+  formatReadableDenomCollection,
+  formatReadableTokenAmount,
+  getFirstMessage,
+  type CosmosRestTxResponse,
+} from '@/domains/cosmos/client/tx-helpers';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 type CosmosProvider = NonNullable<ReturnType<typeof readActiveRpcProfileCookie>>;
@@ -162,47 +175,6 @@ type TendermintValidatorsResponse = {
     validators?: Array<{
       address?: string;
       pub_key?: { value?: string };
-    }>;
-  };
-};
-
-type CosmosRestTxResponse = {
-  tx?: {
-    memo?: string;
-    auth_info?: {
-      signer_infos?: Array<{
-        public_key?: {
-          '@type'?: string;
-          key?: string;
-        };
-      }>;
-      fee?: {
-        amount?: Array<{
-          denom: string;
-          amount: string;
-        }>;
-      };
-    };
-    body?: {
-      messages?: Array<Record<string, unknown>>;
-    };
-  };
-  tx_response?: {
-    txhash?: string;
-    height?: string;
-    code?: number;
-    gas_used?: string;
-    gas_wanted?: string;
-    timestamp?: string;
-    raw_log?: string;
-    logs?: Array<{
-      msg_index?: number;
-      log?: string;
-      events?: TendermintEvent[];
-    }>;
-    events?: Array<{
-      type?: string;
-      attributes?: Array<{ key?: string; value?: string }>;
     }>;
   };
 };
@@ -877,14 +849,6 @@ function formatInteger(
   return `${negative ? '-' : ''}${grouped}`;
 }
 
-function formatCompactHash(value: string, start = 8, end = 6) {
-  if (value.length <= start + end + 3) {
-    return value;
-  }
-
-  return `${value.slice(0, start)}...${value.slice(-end)}`;
-}
-
 function formatLocalTimestamp(value: string | undefined) {
   if (!value) {
     return 'Unavailable';
@@ -963,123 +927,6 @@ function formatDurationSeconds(seconds: number | null) {
   }
 
   return `${Math.round(seconds)}s`;
-}
-
-function formatDenomAmount(amount: string) {
-  const normalized = amount.trim();
-
-  if (!normalized) {
-    return '0';
-  }
-
-  const negative = normalized.startsWith('-');
-  const value = negative ? normalized.slice(1) : normalized;
-  const [integerPart = '0', decimalPart = ''] = value.split('.');
-  const integer = integerPart.replace(/^0+(?=\d)/, '') || '0';
-  const formattedInteger = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  const trimmedDecimal = decimalPart.replace(/0+$/, '').slice(0, 6);
-
-  return `${negative ? '-' : ''}${formattedInteger}${
-    trimmedDecimal ? `.${trimmedDecimal}` : ''
-  }`;
-}
-
-const READABLE_DENOM_ALIASES: Record<string, string> = {
-  aevmos: 'evmos',
-  aethos: 'ethos',
-  aqare: 'qare',
-  aqrx: 'qrx',
-  avoucher: 'voucher',
-  aqvoucher: 'qvoucher',
-  athbs: 'thbs',
-  acbo: 'cbo',
-  azkme: 'zkme',
-  azeta: 'zeta',
-  aabtc: 'abtc',
-  aakk: 'akk',
-  apepe: 'pepe',
-  ahopp: 'hopp',
-  amoca: 'moca',
-};
-
-function shortenDenom(denom: string) {
-  return denom.length > 12
-    ? `${denom.slice(0, 8)}...${denom.slice(-4)}`
-    : denom;
-}
-
-function formatReadableTokenAmount(amount: string, decimals = 18) {
-  const normalized = amount.trim();
-
-  if (!normalized) {
-    return '0';
-  }
-
-  if (normalized.includes('.')) {
-    return formatDenomAmount(normalized);
-  }
-
-  const negative = normalized.startsWith('-');
-  const digits = (negative ? normalized.slice(1) : normalized).replace(
-    /^0+(?=\d)/,
-    '',
-  ) || '0';
-
-  if (decimals <= 0) {
-    return formatDenomAmount(`${negative ? '-' : ''}${digits}`);
-  }
-
-  const padded = digits.padStart(decimals + 1, '0');
-  const integerPart = padded.slice(0, -decimals) || '0';
-  const fractionPart = padded.slice(-decimals).replace(/0+$/, '');
-  const value = fractionPart
-    ? `${integerPart}.${fractionPart}`
-    : integerPart;
-
-  return formatDenomAmount(`${negative ? '-' : ''}${value}`);
-}
-
-function formatReadableDenom(denom: string) {
-  const shortened = shortenDenom(denom);
-  return READABLE_DENOM_ALIASES[shortened] ?? READABLE_DENOM_ALIASES[denom] ?? shortened;
-}
-
-function formatReadableDenomCollection(
-  items: Array<{ denom: string; amount: string }> | undefined,
-) {
-  if (!items?.length) {
-    return '0';
-  }
-
-  const visible = items.slice(0, 2).map((item) => {
-    return `${formatReadableTokenAmount(item.amount)} ${formatReadableDenom(item.denom)}`;
-  });
-
-  if (items.length > 2) {
-    visible.push(`+${items.length - 2} more`);
-  }
-
-  return visible.join(', ');
-}
-
-function formatReadableDecCoinCollection(
-  items: Array<{ denom: string; amount: string }> | undefined,
-) {
-  if (!items?.length) {
-    return '0';
-  }
-
-  const visible = items.slice(0, 2).map((item) => {
-    const integerAmount = item.amount.split('.')[0] ?? item.amount;
-
-    return `${formatReadableTokenAmount(integerAmount)} ${formatReadableDenom(item.denom)}`;
-  });
-
-  if (items.length > 2) {
-    visible.push(`+${items.length - 2} more`);
-  }
-
-  return visible.join(', ');
 }
 
 function formatBytes(
@@ -1195,16 +1042,6 @@ function deriveCosmosAccountAddressFromValidator(address: string) {
   } catch {
     return null;
   }
-}
-
-function extractTypeLabel(rawType: string | null | undefined) {
-  if (!rawType) {
-    return 'Unknown';
-  }
-
-  const lastSegment = rawType.split('.').pop()?.replace(/^\//, '') ?? rawType;
-  const trimmed = lastSegment.replace(/^Msg/, '');
-  return trimmed.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
 }
 
 function safeJsonParse(value: string | undefined) {
@@ -1371,72 +1208,6 @@ function formatCosmosProposalVoteOptionLabel(option: string | undefined) {
       String(first ?? next).toUpperCase(),
     )
     .replace(/_/g, ' ');
-}
-
-function getFirstMessage(
-  payload: CosmosRestTxResponse,
-): Record<string, unknown> | null {
-  const message = payload.tx?.body?.messages?.[0];
-  return message && typeof message === 'object' ? message : null;
-}
-
-function findEventAttribute(
-  events: NonNullable<CosmosRestTxResponse['tx_response']>['events'],
-  type: string,
-  key: string,
-) {
-  return (
-    events
-      ?.find((event) => event.type === type)
-      ?.attributes?.find((attribute) => attribute.key === key)?.value ?? null
-  );
-}
-
-function extractSender(payload: CosmosRestTxResponse) {
-  const eventSender =
-    findEventAttribute(payload.tx_response?.events, 'message', 'sender') ??
-    findEventAttribute(payload.tx_response?.events, 'transfer', 'sender') ??
-    findEventAttribute(payload.tx_response?.events, 'coin_spent', 'spender') ??
-    findEventAttribute(payload.tx_response?.events, 'proposal_vote', 'voter');
-
-  if (eventSender) {
-    return eventSender;
-  }
-
-  const message = getFirstMessage(payload);
-
-  if (!message) {
-    return 'Unknown';
-  }
-
-  const candidateKeys = [
-    'sender',
-    'from_address',
-    'delegator_address',
-    'voter',
-    'proposer',
-    'granter',
-    'grantee',
-    'validator_address',
-  ] as const;
-
-  for (const key of candidateKeys) {
-    const value = message[key];
-
-    if (typeof value === 'string' && value.trim()) {
-      return value;
-    }
-  }
-
-  return 'Unknown';
-}
-
-function formatSenderLabel(sender: string) {
-  if (sender === 'Unknown') {
-    return sender;
-  }
-
-  return formatCompactHash(sender, 12, 6);
 }
 
 function calculateAverageBlockTime(
@@ -1673,35 +1444,26 @@ async function getDecodedLatestTransactions(input: {
               events: [],
             },
           } satisfies CosmosRestTxResponse);
-    const firstMessage = getFirstMessage(detail);
-    const rawType =
-      typeof firstMessage?.['@type'] === 'string'
-        ? (firstMessage['@type'] as string)
-        : null;
-    const sender = extractSender(detail);
-    const timestamp = input.blockTimeByHeight.get(tx.height) ?? null;
-    const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
-    const status =
-      (detail.tx_response?.code ?? tx.tx_result?.code ?? 1) === 0
-        ? 'success'
-        : 'failed';
-    const gasUsed = detail.tx_response?.gas_used ?? tx.tx_result?.gas_used ?? '0';
-    const gasWanted =
-      detail.tx_response?.gas_wanted ?? tx.tx_result?.gas_wanted ?? '0';
-    const feeLabel = formatReadableDenomCollection(
-      detail.tx?.auth_info?.fee?.amount,
-    );
-    const item: CosmosHomeTransactionItem = {
+    const decoded = decodeCosmosTransactionSummary({
       hash: tx.hash,
-      hashLabel: formatCompactHash(tx.hash),
-      height: tx.height,
-      type: extractTypeLabel(rawType),
-      sender,
-      senderLabel: formatSenderLabel(sender),
-      feeLabel,
-      status,
-      statusLabel: status === 'success' ? 'Success' : 'Failed',
-      timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
+      payload: detail,
+      fallbackHeight: tx.height,
+      fallbackCode: tx.tx_result?.code,
+      fallbackGasUsed: tx.tx_result?.gas_used,
+      fallbackGasWanted: tx.tx_result?.gas_wanted,
+      timestamp: input.blockTimeByHeight.get(tx.height) ?? null,
+    });
+    const item: CosmosHomeTransactionItem = {
+      hash: decoded.hash,
+      hashLabel: decoded.hashLabel,
+      height: decoded.height,
+      type: decoded.type,
+      sender: decoded.sender,
+      senderLabel: decoded.senderLabel,
+      feeLabel: decoded.feeLabel,
+      status: decoded.status,
+      statusLabel: decoded.statusLabel,
+      timestampMs: decoded.timestampMs,
     };
 
     nextTransactions.push(item);
@@ -1714,8 +1476,8 @@ async function getDecodedLatestTransactions(input: {
       sender: item.sender,
       senderLabel: item.senderLabel,
       feeLabel: item.feeLabel,
-      gasUsed,
-      gasWanted,
+      gasUsed: decoded.gasUsed,
+      gasWanted: decoded.gasWanted,
       status: item.status,
       statusLabel: item.statusLabel,
     });
@@ -2048,37 +1810,27 @@ function formatCosmosBlockDetailTransaction(input: {
         events: [],
       },
     } satisfies CosmosRestTxResponse);
-  const firstMessage = getFirstMessage(fallbackDetail);
-  const rawType =
-    typeof firstMessage?.['@type'] === 'string'
-      ? (firstMessage['@type'] as string)
-      : null;
-  const sender = extractSender(fallbackDetail);
-  const status =
-    (fallbackDetail.tx_response?.code ?? input.tx.tx_result?.code ?? 1) === 0
-      ? 'success'
-      : 'failed';
-  const gasUsed =
-    fallbackDetail.tx_response?.gas_used ?? input.tx.tx_result?.gas_used ?? '0';
-  const gasWanted =
-    fallbackDetail.tx_response?.gas_wanted ??
-    input.tx.tx_result?.gas_wanted ??
-    '0';
+  const decoded = decodeCosmosTransactionSummary({
+    hash: input.tx.hash ?? 'Unavailable',
+    payload: fallbackDetail,
+    fallbackHeight: input.tx.height ?? null,
+    fallbackCode: input.tx.tx_result?.code,
+    fallbackGasUsed: input.tx.tx_result?.gas_used,
+    fallbackGasWanted: input.tx.tx_result?.gas_wanted,
+  });
 
   return {
-    hash: input.tx.hash ?? 'Unavailable',
-    hashLabel: formatCompactHash(input.tx.hash ?? 'Unavailable'),
-    height: input.tx.height ?? '0',
-    type: extractTypeLabel(rawType),
-    sender,
-    senderLabel: formatSenderLabel(sender),
-    feeLabel: formatReadableDenomCollection(
-      fallbackDetail.tx?.auth_info?.fee?.amount,
-    ),
-    gasUsedLabel: formatInteger(gasUsed, '0'),
-    gasWantedLabel: formatInteger(gasWanted, '0'),
-    status,
-    statusLabel: status === 'success' ? 'Success' : 'Failed',
+    hash: decoded.hash,
+    hashLabel: decoded.hashLabel,
+    height: decoded.height,
+    type: decoded.type,
+    sender: decoded.sender,
+    senderLabel: decoded.senderLabel,
+    feeLabel: decoded.feeLabel,
+    gasUsedLabel: formatInteger(decoded.gasUsed, '0'),
+    gasWantedLabel: formatInteger(decoded.gasWanted, '0'),
+    status: decoded.status,
+    statusLabel: decoded.statusLabel,
     rawLog: fallbackDetail.tx_response?.raw_log ?? '',
     messageCount: fallbackDetail.tx?.body?.messages?.length ?? 0,
     rawJson: {
@@ -2106,34 +1858,26 @@ function formatCosmosTransactionsPageItem(input: {
         events: [],
       },
     } satisfies CosmosRestTxResponse);
-  const firstMessage = getFirstMessage(fallbackDetail);
-  const rawType =
-    typeof firstMessage?.['@type'] === 'string'
-      ? (firstMessage['@type'] as string)
-      : null;
-  const sender = extractSender(fallbackDetail);
-  const status =
-    (fallbackDetail.tx_response?.code ?? input.tx.tx_result?.code ?? 1) === 0
-      ? 'success'
-      : 'failed';
-  const gasUsed =
-    fallbackDetail.tx_response?.gas_used ?? input.tx.tx_result?.gas_used ?? '0';
-  const gasWanted =
-    fallbackDetail.tx_response?.gas_wanted ??
-    input.tx.tx_result?.gas_wanted ??
-    '0';
   const timestamp =
     fallbackDetail.tx_response?.timestamp ?? input.timestamp ?? null;
-  const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
+  const decoded = decodeCosmosTransactionSummary({
+    hash: input.tx.hash ?? 'Unavailable',
+    payload: fallbackDetail,
+    fallbackHeight: input.tx.height ?? null,
+    fallbackCode: input.tx.tx_result?.code,
+    fallbackGasUsed: input.tx.tx_result?.gas_used,
+    fallbackGasWanted: input.tx.tx_result?.gas_wanted,
+    timestamp,
+  });
   const target = extractCosmosTxTarget(fallbackDetail);
 
   return {
-    hash: input.tx.hash ?? 'Unavailable',
-    hashLabel: formatCompactHash(input.tx.hash ?? 'Unavailable'),
-    height: input.tx.height ?? '0',
-    type: extractTypeLabel(rawType),
-    sender,
-    senderLabel: formatSenderLabel(sender),
+    hash: decoded.hash,
+    hashLabel: decoded.hashLabel,
+    height: decoded.height,
+    type: decoded.type,
+    sender: decoded.sender,
+    senderLabel: decoded.senderLabel,
     target,
     targetLabel:
       target && target !== 'Unknown'
@@ -2141,15 +1885,13 @@ function formatCosmosTransactionsPageItem(input: {
           ? formatCompactHash(target, 14, 8)
           : target
         : null,
-    feeLabel: formatReadableDenomCollection(
-      fallbackDetail.tx?.auth_info?.fee?.amount,
-    ),
-    gasUsedLabel: formatInteger(gasUsed, '0'),
-    gasWantedLabel: formatInteger(gasWanted, '0'),
-    status,
-    statusLabel: status === 'success' ? 'Success' : 'Failed',
+    feeLabel: decoded.feeLabel,
+    gasUsedLabel: formatInteger(decoded.gasUsed, '0'),
+    gasWantedLabel: formatInteger(decoded.gasWanted, '0'),
+    status: decoded.status,
+    statusLabel: decoded.statusLabel,
     timeLabel: formatLocalTimestamp(timestamp ?? undefined),
-    timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
+    timestampMs: decoded.timestampMs,
   } satisfies CosmosTransactionsPageItem;
 }
 
@@ -2704,27 +2446,28 @@ export async function getCosmosTxByHashDirect(hash: string) {
   const blockTimestamps = await getBlockTimestampsByHeights(profile, [tx.height]);
   const blockTimestamp = blockTimestamps.get(tx.height) ?? null;
   const timestamp = tx.timestamp ?? blockTimestamp;
-  const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
-  const firstMessage = getFirstMessage(payload);
-  const rawType =
-    typeof firstMessage?.['@type'] === 'string'
-      ? (firstMessage['@type'] as string)
-      : null;
-  const sender = extractSender(payload);
+  const decoded = decodeCosmosTransactionSummary({
+    hash: tx.txhash,
+    payload,
+    fallbackHeight: tx.height,
+    fallbackCode: tx.code,
+    fallbackGasUsed: tx.gas_used,
+    fallbackGasWanted: tx.gas_wanted,
+    timestamp,
+  });
   const target = extractCosmosTxTarget(payload);
   const events = formatCosmosDetailedEvents(tx.events);
   const code = tx.code ?? 0;
-  const status = code === 0 ? 'success' : 'failed';
 
   return {
-    hash: tx.txhash,
-    height: tx.height,
+    hash: decoded.hash,
+    height: decoded.height,
     code,
-    status,
-    statusLabel: status === 'success' ? 'Success' : 'Failed',
-    type: extractTypeLabel(rawType),
-    sender,
-    senderLabel: formatSenderLabel(sender),
+    status: decoded.status,
+    statusLabel: decoded.statusLabel,
+    type: decoded.type,
+    sender: decoded.sender,
+    senderLabel: decoded.senderLabel,
     target,
     targetLabel:
       target && target !== 'Unknown'
@@ -2734,11 +2477,11 @@ export async function getCosmosTxByHashDirect(hash: string) {
         : null,
     timestamp: timestamp ?? null,
     timestampLabel: formatLocalTimestamp(timestamp ?? undefined),
-    timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
-    feeLabel: formatReadableDenomCollection(payload.tx?.auth_info?.fee?.amount),
+    timestampMs: decoded.timestampMs,
+    feeLabel: decoded.feeLabel,
     memo: payload.tx?.memo ?? '',
-    gasUsedLabel: formatInteger(tx.gas_used ?? '0', '0'),
-    gasWantedLabel: formatInteger(tx.gas_wanted ?? '0', '0'),
+    gasUsedLabel: formatInteger(decoded.gasUsed, '0'),
+    gasWantedLabel: formatInteger(decoded.gasWanted, '0'),
     rawLog: tx.raw_log ?? '',
     messageCount: payload.tx?.body?.messages?.length ?? 0,
     messages: formatCosmosTxMessages(payload.tx?.body?.messages),

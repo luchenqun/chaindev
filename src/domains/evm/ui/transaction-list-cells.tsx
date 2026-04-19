@@ -9,6 +9,7 @@ import {
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
+import { copyText } from '@/components/ui/copy-text';
 
 export type TransactionPreviewData = {
   hash: string;
@@ -48,20 +49,7 @@ export function TransactionHashCell(props: TransactionPreviewData) {
   }, []);
 
   async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(hash);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = hash;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'absolute';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
-
+    await copyText(hash);
     setCopied(true);
 
     if (timeoutRef.current != null) {

@@ -9,100 +9,18 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
 } from 'react';
+import { copyText } from '@/components/ui/copy-text';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { RelativeTime } from '@/components/relative-time';
 import { getCosmosTxByHashDirect } from '@/domains/cosmos/client/queries';
+import {
+  CosmosDetailGroup as DetailGroup,
+  CosmosDetailRow as DetailRow,
+  COSMOS_JSON_VIEW_STYLE as JSON_VIEW_STYLE,
+  formatTimestampWithSeconds,
+} from '@/domains/cosmos/ui/detail-primitives';
 import { AppShell } from '@/platform/layout/app-shell';
-
-const JSON_VIEW_STYLE = {
-  '--w-rjv-background-color': 'transparent',
-  '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
-  '--w-rjv-font-family':
-    '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-  '--w-rjv-color': '#0f172a',
-  '--w-rjv-arrow-color': '#64748b',
-  '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
-  '--w-rjv-curlybraces-color': '#475569',
-  '--w-rjv-brackets-color': '#475569',
-  '--w-rjv-colon-color': '#94a3b8',
-  '--w-rjv-key-string': '#0369a1',
-  '--w-rjv-key-number': '#0369a1',
-  '--w-rjv-type-string-color': '#b45309',
-  '--w-rjv-type-int-color': '#7c3aed',
-  '--w-rjv-type-float-color': '#7c3aed',
-  '--w-rjv-type-bigint-color': '#7c3aed',
-  '--w-rjv-type-boolean-color': '#15803d',
-  '--w-rjv-type-null-color': '#b91c1c',
-  '--w-rjv-type-undefined-color': '#b91c1c',
-} as CSSProperties;
-
-function formatTimestampWithSeconds(value: string | null) {
-  if (!value) {
-    return 'Unavailable';
-  }
-
-  const timestamp = new Date(value);
-
-  if (Number.isNaN(timestamp.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  }).format(timestamp);
-}
-
-function DetailRow({
-  label,
-  value,
-  mono = false,
-}: {
-  label: string;
-  value: React.ReactNode;
-  mono?: boolean;
-}) {
-  return (
-    <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
-      <dt className="text-sm font-medium text-slate-500">{label}</dt>
-      <dd
-        className={
-          mono
-            ? 'self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono'
-            : 'self-start text-sm text-slate-900'
-        }
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function DetailGroup({
-  children,
-  separated = false,
-}: {
-  children: React.ReactNode;
-  separated?: boolean;
-}) {
-  return (
-    <div
-      className={
-        separated
-          ? 'border-t border-slate-200 pt-2.5 pb-2.5 last:pb-0'
-          : 'pb-2.5 last:pb-0'
-      }
-    >
-      {children}
-    </div>
-  );
-}
 
 function StatusBadge({
   status,
@@ -148,20 +66,7 @@ function TxEventsSection({
   }, []);
 
   async function handleCopy(value: string, copyId: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = value;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'absolute';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
-
+    await copyText(value);
     setCopiedKey(copyId);
 
     if (timeoutRef.current != null) {
@@ -463,20 +368,7 @@ export default function CosmosTxPage() {
   const transactionHash = transaction.hash;
 
   async function handleCopyHash() {
-    try {
-      await navigator.clipboard.writeText(transactionHash);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = transactionHash;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'absolute';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
-
+    await copyText(transactionHash);
     setCopiedHash(true);
 
     if (copyTimeoutRef.current != null) {
@@ -540,7 +432,7 @@ export default function CosmosTxPage() {
           <>
             <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="p-5">
-                <DetailGroup>
+                <DetailGroup plain>
                   <dl>
                     <DetailRow
                       label="Transaction Hash"
@@ -604,6 +496,7 @@ export default function CosmosTxPage() {
                             <span className="text-slate-500">
                               ({formatTimestampWithSeconds(
                                 transaction.timestamp,
+                                'Unavailable',
                               )})
                             </span>
                           </span>

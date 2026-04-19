@@ -3,6 +3,7 @@
 import { IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { copyText } from '@/components/ui/copy-text';
 import { cn } from '@/lib/utils';
 
 type AddressLinkProps = {
@@ -35,20 +36,7 @@ export function AddressLink({
   }, []);
 
   async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(address);
-    } catch {
-      const textarea = document.createElement('textarea');
-      textarea.value = address;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'absolute';
-      textarea.style.left = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-    }
-
+    await copyText(address);
     setCopied(true);
 
     if (timeoutRef.current != null) {

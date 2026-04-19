@@ -7,36 +7,10 @@ import { Suspense, useEffect, useState } from 'react';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosValidatorsDirect } from '@/domains/cosmos/client/queries';
+import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 50;
-
-function parsePageParam(rawPage: string | null) {
-  const parsed = Number.parseInt(rawPage ?? '1', 10);
-
-  if (!Number.isFinite(parsed) || parsed < 1) {
-    return 1;
-  }
-
-  return parsed;
-}
-
-function buildPageHref(
-  pathname: string,
-  searchParams: URLSearchParams,
-  page: number,
-) {
-  const params = new URLSearchParams(searchParams.toString());
-
-  if (page <= 1) {
-    params.delete('page');
-  } else {
-    params.set('page', String(page));
-  }
-
-  const nextQuery = params.toString();
-  return nextQuery ? `${pathname}?${nextQuery}` : pathname;
-}
 
 function CosmosValidatorsPageContent() {
   const pathname = usePathname();

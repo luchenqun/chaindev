@@ -37,18 +37,53 @@ function matchesNavItem(pathname: string, href: string) {
     return pathname.startsWith('/evm/address/');
   }
 
+  if (href.startsWith('/evm/blocks')) {
+    return (
+      pathname.startsWith('/evm/blocks') ||
+      pathname.startsWith('/evm/block/')
+    );
+  }
+
+  if (href.startsWith('/evm/accounts')) {
+    return (
+      pathname.startsWith('/evm/accounts') ||
+      pathname.startsWith('/evm/address/')
+    );
+  }
+
+  if (href.startsWith('/evm/txs')) {
+    return pathname.startsWith('/evm/txs') || pathname.startsWith('/evm/tx/');
+  }
+
   if (href.startsWith('/cosmos/tx/')) {
     return pathname.startsWith('/cosmos/tx/');
   }
 
+  if (href.startsWith('/cosmos/blocks')) {
+    return (
+      pathname.startsWith('/cosmos/blocks') ||
+      pathname.startsWith('/cosmos/block/')
+    );
+  }
+
   if (href.startsWith('/cosmos/txs')) {
-    return pathname.startsWith('/cosmos/txs');
+    return (
+      pathname.startsWith('/cosmos/txs') ||
+      pathname.startsWith('/cosmos/tx/')
+    );
   }
 
   if (href.startsWith('/cosmos/accounts')) {
     return (
       pathname.startsWith('/cosmos/accounts') ||
       pathname.startsWith('/cosmos/account/')
+    );
+  }
+
+  if (href.startsWith('/cosmos/proposals')) {
+    return (
+      pathname.startsWith('/cosmos/proposals') ||
+      pathname.startsWith('/cosmos/proposals/')
     );
   }
 
