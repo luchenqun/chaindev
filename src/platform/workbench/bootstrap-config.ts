@@ -23,13 +23,12 @@ const bootstrapPrivateKeySchema = z
 
 const bootstrapPrivateKeyNameSchema = z.string().trim().min(1);
 
-function parseBootstrapJsonEnv<T>(
+function parseBootstrapJsonValue<T>(
+  raw: string | undefined,
   key: string,
   schema: z.ZodSchema<T>,
   fallback: T,
 ) {
-  const raw = process.env[key]?.trim();
-
   if (!raw) {
     return fallback;
   }
@@ -46,17 +45,25 @@ function parseBootstrapJsonEnv<T>(
 }
 
 export function readBootstrapEvmProvider() {
-  return parseBootstrapJsonEnv('BOOTSTRAP_EVM_PROVIDER', bootstrapEvmProviderSchema, {
-    name: 'LocalNode0',
-    nativeCurrencySymbol: 'QARE',
-    rpcUrl: 'http://127.0.0.1:8545',
-    restUrl: null,
-    wsUrl: null,
-  });
+  return parseBootstrapJsonValue(
+    process.env.BOOTSTRAP_EVM_PROVIDER?.trim() ??
+      process.env.NEXT_PUBLIC_BOOTSTRAP_EVM_PROVIDER?.trim(),
+    'BOOTSTRAP_EVM_PROVIDER',
+    bootstrapEvmProviderSchema,
+    {
+      name: 'LocalNode0',
+      nativeCurrencySymbol: 'QARE',
+      rpcUrl: 'http://127.0.0.1:8545',
+      restUrl: null,
+      wsUrl: null,
+    },
+  );
 }
 
 export function readBootstrapCosmosProvider() {
-  return parseBootstrapJsonEnv(
+  return parseBootstrapJsonValue(
+    process.env.BOOTSTRAP_COSMOS_PROVIDER?.trim() ??
+      process.env.NEXT_PUBLIC_BOOTSTRAP_COSMOS_PROVIDER?.trim(),
     'BOOTSTRAP_COSMOS_PROVIDER',
     bootstrapCosmosProviderSchema,
     {
@@ -70,7 +77,9 @@ export function readBootstrapCosmosProvider() {
 }
 
 export function readBootstrapPrivateKey() {
-  const raw = process.env.BOOTSTRAP_PRIVATE_KEY?.trim();
+  const raw =
+    process.env.BOOTSTRAP_PRIVATE_KEY?.trim() ??
+    process.env.NEXT_PUBLIC_BOOTSTRAP_PRIVATE_KEY?.trim();
 
   if (!raw) {
     return '0xf78a036930ce63791ea6ea20072986d8c3f16a6811f6a2583b0787c45086f769';
@@ -80,7 +89,9 @@ export function readBootstrapPrivateKey() {
 }
 
 export function readBootstrapPrivateKeyName() {
-  const raw = process.env.BOOTSTRAP_PRIVATE_KEY_NAME?.trim();
+  const raw =
+    process.env.BOOTSTRAP_PRIVATE_KEY_NAME?.trim() ??
+    process.env.NEXT_PUBLIC_BOOTSTRAP_PRIVATE_KEY_NAME?.trim();
 
   if (!raw) {
     return 'Alice';

@@ -88,6 +88,28 @@ export function replaceLocalSelectedRpcProfiles(
   writeJsonStorage(LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY, selected);
 }
 
+export function syncGuestRpcDefaults() {
+  const profiles = getDefaultGuestRpcProfiles();
+  const selected = getDefaultGuestSelectedRpcProfiles();
+
+  replaceLocalRpcProfiles(profiles);
+  replaceLocalSelectedRpcProfiles(selected);
+
+  writeActiveRpcProfileCookie(
+    profiles.find((profile) => profile.id === selected.evm) ??
+      getGuestFallbackRpcProfile('evm'),
+  );
+  writeActiveRpcProfileCookie(
+    profiles.find((profile) => profile.id === selected.cosmos) ??
+      getGuestFallbackRpcProfile('cosmos'),
+  );
+
+  return {
+    profiles,
+    selected,
+  };
+}
+
 export function setLocalSelectedRpcProfile(
   mode: PlatformMode,
   profileId: string | null,
@@ -182,10 +204,12 @@ export async function fetchRpcProfiles() {
   });
 
   if (response.status === 401) {
+    const guestDefaults = syncGuestRpcDefaults();
+
     return {
       source: 'guest' as const,
-      profiles: getDefaultGuestRpcProfiles(),
-      selected: getDefaultGuestSelectedRpcProfiles(),
+      profiles: guestDefaults.profiles,
+      selected: guestDefaults.selected,
     };
   }
 
