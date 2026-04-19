@@ -8,7 +8,10 @@ import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthFormShell } from '@/platform/auth/auth-form-shell';
-import { resolveAbsoluteCallbackUrl } from '@/platform/auth/callback-url';
+import {
+  resolveAbsoluteCallbackUrl,
+  resolveClientRedirectUrl,
+} from '@/platform/auth/callback-url';
 
 export function SignInForm() {
   const router = useRouter();
@@ -43,7 +46,7 @@ export function SignInForm() {
       return;
     }
 
-    router.push(result.url ?? absoluteCallbackUrl);
+    router.push(resolveClientRedirectUrl(result.url, absoluteCallbackUrl));
     router.refresh();
   }
 

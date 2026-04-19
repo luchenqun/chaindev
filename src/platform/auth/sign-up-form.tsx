@@ -8,7 +8,10 @@ import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthFormShell } from '@/platform/auth/auth-form-shell';
-import { resolveAbsoluteCallbackUrl } from '@/platform/auth/callback-url';
+import {
+  resolveAbsoluteCallbackUrl,
+  resolveClientRedirectUrl,
+} from '@/platform/auth/callback-url';
 
 type RegisterResponse =
   | { ok: true; data: { userId: string } }
@@ -69,7 +72,9 @@ export function SignUpForm() {
       return;
     }
 
-    router.push(signInResult.url ?? resolveAbsoluteCallbackUrl('/'));
+    router.push(
+      resolveClientRedirectUrl(signInResult.url, resolveAbsoluteCallbackUrl('/')),
+    );
     router.refresh();
   }
 

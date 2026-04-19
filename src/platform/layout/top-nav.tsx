@@ -3,16 +3,19 @@
 import { IconChevronDown, IconLogout, IconUserCircle } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { type PlatformMode } from '@/config/chains';
 import { getMessages } from '@/i18n';
+import {
+  resolveAbsoluteCallbackUrl,
+  resolveClientRedirectUrl,
+} from '@/platform/auth/callback-url';
 import { getAccountMenuSections } from '@/platform/layout/account-menu-config';
 import { ChainStatusStrip } from '@/platform/layout/chain-status-strip';
 import { ActiveEvmKeySelector } from '@/platform/layout/active-evm-key-selector';
-import { resolveAbsoluteCallbackUrl } from '@/platform/auth/callback-url';
 import { GlobalSearch } from '@/platform/search/global-search';
 import { RpcProviderManager } from '@/platform/workbench/rpc-provider-manager';
 
@@ -105,6 +108,7 @@ function matchesNavItem(pathname: string, href: string) {
 export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const messages = getMessages();
   const pathname = usePathname();
+  const router = useRouter();
   const mode = modeOverride ?? inferMode(pathname);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { data: session, status } = useSession();
@@ -269,9 +273,17 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                           variant="outline"
                           className="h-11 w-full gap-2 rounded-xl border-sky-300 text-[15px] font-semibold text-[#1697ea] hover:border-sky-400 hover:bg-sky-50 hover:text-[#1697ea]"
                           onClick={() =>
-                            void signOut({
-                              callbackUrl: resolveAbsoluteCallbackUrl('/'),
-                            })
+                            void (async () => {
+                              const callbackUrl = resolveAbsoluteCallbackUrl('/');
+                              const result = await signOut({
+                                redirect: false,
+                                callbackUrl,
+                              });
+                              router.push(
+                                resolveClientRedirectUrl(result.url, callbackUrl),
+                              );
+                              router.refresh();
+                            })()
                           }
                         >
                           <IconLogout className="size-4" stroke={2} />
