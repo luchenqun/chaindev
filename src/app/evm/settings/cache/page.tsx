@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import {
+  MAX_CACHED_EVM_TRANSACTIONS,
   clearEvmTransactionCache,
   subscribeEvmTransactionCache,
 } from '@/domains/evm/client/transaction-cache';
@@ -18,6 +19,7 @@ import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-dis
 import {
   getEvmCacheDashboardDirect,
   getEvmCacheSummaryDirect,
+  syncLatestEvmTransactionsDirect,
   validateActiveEvmCacheDirect,
 } from '@/domains/evm/client/queries';
 import { AddressLink } from '@/domains/evm/ui/address-link';
@@ -66,7 +68,7 @@ export default function EvmCacheSettingsPage() {
     null,
   );
   const [actionLoading, setActionLoading] = useState<
-    'validate' | 'clear' | null
+    'validate' | 'clear' | 'reload' | null
   >(null);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [nameTagsByAddress, setNameTagsByAddress] = useState<
@@ -264,6 +266,32 @@ export default function EvmCacheSettingsPage() {
     }
   }
 
+  async function handleReloadCache() {
+    setActionLoading('reload');
+
+    try {
+      await clearEvmTransactionCache();
+      const result = await syncLatestEvmTransactionsDirect({
+        maxBlocks: 500,
+        maxTransactions: MAX_CACHED_EVM_TRANSACTIONS,
+      });
+      setActionState({
+        status: 'valid',
+        label: `Reloaded ${result.syncedTransactions.toLocaleString('en-US')} transactions from ${result.scannedBlocks.toLocaleString('en-US')} recent blocks.`,
+      });
+      setClearDialogOpen(false);
+      await reloadCurrentPages();
+    } catch (error) {
+      setActionState({
+        status: 'failed',
+        label:
+          error instanceof Error ? error.message : 'Failed to reload cache.',
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   const validationToneClassName =
     actionState?.status === 'valid'
       ? 'text-emerald-600'
@@ -324,6 +352,20 @@ export default function EvmCacheSettingsPage() {
               {actionLoading === 'validate'
                 ? 'Validating...'
                 : 'Validate Cache'}
+            </button>
+            <button
+              type="button"
+              className={`inline-flex h-9 items-center justify-center rounded-md border px-3 text-sm font-medium transition ${
+                actionLoading === 'reload'
+                  ? 'cursor-wait border-sky-200 bg-sky-50 text-sky-600'
+                  : 'border-slate-200 bg-white text-slate-700 hover:text-slate-900'
+              }`}
+              disabled={actionLoading != null}
+              onClick={() => void handleReloadCache()}
+            >
+              {actionLoading === 'reload'
+                ? 'Reloading...'
+                : 'Reload Cache'}
             </button>
             <button
               type="button"

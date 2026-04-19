@@ -227,12 +227,14 @@ export function ListPageSkeleton({
   rows = 8,
   columns = 8,
   showToolbar = true,
+  toolbarIcons = 2,
 }: {
   titleWidth?: string;
   metricCards?: number;
   rows?: number;
   columns?: number;
   showToolbar?: boolean;
+  toolbarIcons?: number;
 }) {
   return (
     <main className="section-block">
@@ -264,8 +266,9 @@ export function ListPageSkeleton({
           {showToolbar ? (
             <div className="flex items-center gap-2 lg:justify-end">
               <Skeleton className="h-8 w-56 rounded-md" />
-              <Skeleton className="h-8 w-8 rounded-md" />
-              <Skeleton className="h-8 w-8 rounded-md" />
+              {Array.from({ length: toolbarIcons }).map((_, index) => (
+                <Skeleton key={index} className="h-8 w-8 rounded-md" />
+              ))}
             </div>
           ) : null}
         </div>

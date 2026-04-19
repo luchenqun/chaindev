@@ -1,9 +1,16 @@
 'use client';
 
-import { IconAdjustmentsHorizontal, IconCode, IconRefresh } from '@tabler/icons-react';
+import { fromBech32, toHex } from '@cosmjs/encoding';
+import {
+  IconAdjustmentsHorizontal,
+  IconArrowsExchange,
+  IconCode,
+  IconRefresh,
+} from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosAccountsPageDirect } from '@/domains/cosmos/client/queries';
@@ -38,6 +45,41 @@ function buildPageHref(
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
+function formatCompactValue(value: string, start = 14, end = 10) {
+  if (value.length <= start + end + 3) {
+    return value;
+  }
+
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
+}
+
+function formatAccountAddressForDisplay(
+  address: string,
+  mode: 'bech32' | 'hex',
+) {
+  if (mode === 'bech32') {
+    return {
+      full: address,
+      label: formatCompactValue(address, 14, 10),
+    };
+  }
+
+  try {
+    const { data } = fromBech32(address);
+    const hexAddress = `0x${toHex(data)}`;
+
+    return {
+      full: hexAddress,
+      label: hexAddress,
+    };
+  } catch {
+    return {
+      full: address,
+      label: formatCompactValue(address, 14, 10),
+    };
+  }
+}
+
 function CosmosAccountsPageContent() {
   const pathname = usePathname();
   const router = useRouter();
@@ -53,6 +95,9 @@ function CosmosAccountsPageContent() {
   const [balanceDisplayMode, setBalanceDisplayMode] = useState<
     'readable' | 'accurate'
   >('readable');
+  const [addressDisplayMode, setAddressDisplayMode] = useState<
+    'bech32' | 'hex'
+  >('bech32');
 
   function handlePageChange(page: number) {
     router.push(
@@ -124,9 +169,10 @@ function CosmosAccountsPageContent() {
       <AppShell>
         <ListPageSkeleton
           titleWidth="w-24"
-          metricCards={4}
+          metricCards={0}
           rows={8}
-          columns={5}
+          columns={4}
+          toolbarIcons={3}
         />
       </AppShell>
     );
@@ -172,19 +218,14 @@ function CosmosAccountsPageContent() {
                   disabled={loading}
                   onPageChange={handlePageChange}
                 />
-                <button
-                  type="button"
-                  aria-label={
+                <ActionIconButton
+                  tooltip={
                     balanceDisplayMode === 'readable'
                       ? 'Switch to accurate balances'
                       : 'Switch to readable balances'
                   }
-                  title={
-                    balanceDisplayMode === 'readable'
-                      ? 'Readable balances'
-                      : 'Accurate balances'
-                  }
-                  className="inline-flex h-8 w-8 items-center justify-center text-slate-400 transition hover:text-slate-600"
+                  tooltipPlacement="bottom"
+                  className="h-8 w-8 text-slate-400 hover:text-slate-600"
                   onClick={() =>
                     setBalanceDisplayMode((current) =>
                       current === 'readable' ? 'accurate' : 'readable',
@@ -196,17 +237,33 @@ function CosmosAccountsPageContent() {
                   ) : (
                     <IconCode className="size-4" stroke={1.8} />
                   )}
-                </button>
-                <button
-                  type="button"
-                  aria-label="Refresh accounts"
-                  className="inline-flex h-8 w-8 items-center justify-center text-slate-400 transition hover:text-slate-600"
+                </ActionIconButton>
+                <ActionIconButton
+                  tooltip={
+                    addressDisplayMode === 'bech32'
+                      ? 'Switch to hex addresses'
+                      : 'Switch to bech32 addresses'
+                  }
+                  tooltipPlacement="bottom"
+                  className="h-8 w-8 text-slate-400 hover:text-slate-600"
+                  onClick={() =>
+                    setAddressDisplayMode((current) =>
+                      current === 'bech32' ? 'hex' : 'bech32',
+                    )
+                  }
+                >
+                  <IconArrowsExchange className="size-4" stroke={1.8} />
+                </ActionIconButton>
+                <ActionIconButton
+                  tooltip="Refresh accounts"
+                  tooltipPlacement="bottom"
+                  className="h-8 w-8 text-slate-400 hover:text-slate-600"
                   onClick={() =>
                     setRefreshVersion((current) => current + 1)
                   }
                 >
                   <IconRefresh className="size-4" stroke={1.8} />
-                </button>
+                </ActionIconButton>
               </div>
             </div>
           </div>
@@ -222,9 +279,6 @@ function CosmosAccountsPageContent() {
                     Balances
                   </th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Num
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
                     Seq
                   </th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
@@ -234,17 +288,26 @@ function CosmosAccountsPageContent() {
               </thead>
               <tbody>
                 {data.accounts.length ? (
-                  data.accounts.map((account) => (
+                  data.accounts.map((account) => {
+                    const displayAddress = formatAccountAddressForDisplay(
+                      account.address,
+                      addressDisplayMode,
+                    );
+
+                    return (
                     <tr
                       key={account.address}
                       className="border-t border-slate-200"
                     >
-                      <td className="px-5 py-3 text-sm">
+                      <td
+                        className="px-5 py-3 text-sm"
+                        title={displayAddress.full}
+                      >
                         <Link
                           className="font-medium text-sky-600 hover:text-sky-700"
                           href={`/cosmos/account/${account.address}`}
                         >
-                          {account.addressLabel}
+                          {displayAddress.label}
                         </Link>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">
@@ -253,20 +316,17 @@ function CosmosAccountsPageContent() {
                           : account.balancesLabel}
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
-                        {account.accountNumberLabel}
-                      </td>
-                      <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
                         {account.sequenceLabel}
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">
                         {account.type}
                       </td>
                     </tr>
-                  ))
+                  )})
                 ) : (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={4}
                       className="px-5 py-10 text-center text-sm text-slate-500"
                     >
                       No accounts were returned by the current provider.
@@ -289,9 +349,10 @@ export default function CosmosAccountsPage() {
         <AppShell>
           <ListPageSkeleton
             titleWidth="w-24"
-            metricCards={4}
+            metricCards={0}
             rows={8}
-            columns={5}
+            columns={4}
+            toolbarIcons={3}
           />
         </AppShell>
       }
