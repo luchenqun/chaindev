@@ -3340,13 +3340,13 @@ export async function getCosmosValidatorDetailDirect(input: {
       validator.min_self_delegation ?? '0',
     ),
     selfBondLabel: selfBondAmount,
-    stakeRewardsLabel: formatReadableDenomCollection(
+    stakeRewardsLabel: formatReadableDecCoinCollection(
       stakeRewardsPayload?.rewards,
     ),
-    commissionRewardsLabel: formatReadableDenomCollection(
+    commissionRewardsLabel: formatReadableDecCoinCollection(
       commissionRewardsPayload?.commission?.commission,
     ),
-    outstandingRewardsLabel: formatReadableDenomCollection(
+    outstandingRewardsLabel: formatReadableDecCoinCollection(
       outstandingRewardsPayload?.rewards?.rewards,
     ),
     identity: validator.description?.identity ?? null,

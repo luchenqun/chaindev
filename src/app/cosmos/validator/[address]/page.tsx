@@ -487,12 +487,7 @@ export default function CosmosValidatorPage() {
                         </Link>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">
-                        <div>
-                          <RelativeTime timestampMs={transaction.timestampMs} />
-                        </div>
-                        <div className="text-[13px] leading-5 text-slate-500">
-                          {transaction.timeLabel}
-                        </div>
+                        <RelativeTime timestampMs={transaction.timestampMs} />
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
                         {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
