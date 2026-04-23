@@ -9,6 +9,7 @@ import { getEvmPendingTransactionsDirect } from '@/domains/evm/client/queries';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { TransactionMethodBadge } from '@/domains/evm/ui/transaction-list-cells';
 
 function PendingTransactionsPanelSkeleton({ className = '' }: { className?: string }) {
   return (
@@ -219,7 +220,9 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
                       {transaction.hashLabel}
                     </Link>
                   </td>
-                  <td className="px-5 py-3 text-sm text-slate-700">{decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel}</td>
+                  <td className="px-5 py-3 text-sm">
+                    <TransactionMethodBadge methodLabel={decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel} />
+                  </td>
                   <td className="px-5 py-3 text-sm">
                     <AddressLink
                       address={transaction.from}

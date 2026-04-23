@@ -19,7 +19,7 @@ import { AddressLink } from '@/domains/evm/ui/address-link';
 import { syncLatestEvmTransactionsDirect } from '@/domains/evm/client/queries';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { PendingTransactionsPanel } from '@/domains/evm/ui/pending-transactions-panel';
-import { TransactionHashCell, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
+import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 20;
@@ -681,9 +681,7 @@ function EvmTransactionsPageContent() {
                             </div>
                           </td>
                           <td className="px-5 py-3 text-sm">
-                            <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                              {decodedMethodLabel}
-                            </span>
+                            <TransactionMethodBadge methodLabel={decodedMethodLabel} />
                           </td>
                           <td className="px-5 py-3 text-sm tabular-nums">
                             <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>

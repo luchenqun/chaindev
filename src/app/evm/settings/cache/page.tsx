@@ -12,7 +12,7 @@ import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-dis
 import { getEvmCacheDashboardDirect, getEvmCacheSummaryDirect, syncLatestEvmTransactionsDirect, validateActiveEvmCacheDirect } from '@/domains/evm/client/queries';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { AppShell } from '@/platform/layout/app-shell';
-import { TransactionHashCell, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
+import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
 
 type CacheDashboard = Awaited<ReturnType<typeof getEvmCacheDashboardDirect>>;
 type CacheValidationResult = Awaited<ReturnType<typeof validateActiveEvmCacheDirect>>;
@@ -401,7 +401,7 @@ export default function EvmCacheSettingsPage() {
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-700">
                           <div className="flex flex-col gap-0.5">
-                            <span>{transaction.methodLabel}</span>
+                            <TransactionMethodBadge methodLabel={transaction.methodLabel} />
                             <span className="text-xs text-slate-400">{transaction.amountLabel}</span>
                           </div>
                         </td>
