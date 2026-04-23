@@ -1,4 +1,4 @@
-import type { SystemContractArtifact } from '@/server/system/artifacts/quarix-system-artifacts';
+import type { SystemContractArtifact } from '@/server/system/artifacts/evm-system-artifacts';
 
 export const MOCA_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
   {

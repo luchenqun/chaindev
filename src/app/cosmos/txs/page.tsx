@@ -631,7 +631,7 @@ function CosmosTransactionsPageContent() {
               onChange={(event) =>
                 handleSearchInputChange('sender', event.target.value)
               }
-              placeholder="quarix1..."
+              placeholder="evm1..."
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
@@ -644,7 +644,7 @@ function CosmosTransactionsPageContent() {
               onChange={(event) =>
                 handleSearchInputChange('recipient', event.target.value)
               }
-              placeholder="quarix1..."
+              placeholder="evm1..."
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>

@@ -4,9 +4,9 @@ export type SystemContractArtifact = {
   bytecode: string | null;
 };
 
-export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
+export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
   {
-    contractName: 'QuarixBank',
+    contractName: 'EvmBank',
     abi: [
       {
         inputs: [
@@ -15,15 +15,20 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             name: 'account',
             type: 'address',
           },
+          {
+            internalType: 'string',
+            name: 'denom',
+            type: 'string',
+          },
         ],
-        name: 'balances',
+        name: 'balance',
         outputs: [
           {
             components: [
               {
-                internalType: 'address',
-                name: 'contractAddress',
-                type: 'address',
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
               },
               {
                 internalType: 'uint256',
@@ -31,7 +36,118 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
                 type: 'uint256',
               },
             ],
-            internalType: 'struct Balance[]',
+            internalType: 'struct Coin',
+            name: 'balance',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'key',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'offset',
+                type: 'uint64',
+              },
+              {
+                internalType: 'uint64',
+                name: 'limit',
+                type: 'uint64',
+              },
+              {
+                internalType: 'bool',
+                name: 'countTotal',
+                type: 'bool',
+              },
+              {
+                internalType: 'bool',
+                name: 'reverse',
+                type: 'bool',
+              },
+            ],
+            internalType: 'struct PageRequest',
+            name: 'pagination',
+            type: 'tuple',
+          },
+        ],
+        name: 'spendableBalances',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'uint256',
+                name: 'amount',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct Coin[]',
+            name: 'balances',
+            type: 'tuple[]',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'nextKey',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'total',
+                type: 'uint64',
+              },
+            ],
+            internalType: 'struct PageResponse',
+            name: 'pageResponse',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'address',
+            name: 'account',
+            type: 'address',
+          },
+        ],
+        name: 'allBalances',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'uint256',
+                name: 'amount',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct Coin[]',
             name: 'balances',
             type: 'tuple[]',
           },
@@ -43,16 +159,33 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         inputs: [
           {
             internalType: 'address',
-            name: 'erc20Address',
+            name: 'account',
             type: 'address',
           },
+          {
+            internalType: 'string',
+            name: 'denom',
+            type: 'string',
+          },
         ],
-        name: 'supplyOf',
+        name: 'spendableBalanceByDenom',
         outputs: [
           {
-            internalType: 'uint256',
-            name: 'totalSupply',
-            type: 'uint256',
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'uint256',
+                name: 'amount',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct Coin',
+            name: 'balance',
+            type: 'tuple',
           },
         ],
         stateMutability: 'view',
@@ -65,9 +198,9 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'address',
-                name: 'contractAddress',
-                type: 'address',
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
               },
               {
                 internalType: 'uint256',
@@ -75,19 +208,831 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
                 type: 'uint256',
               },
             ],
-            internalType: 'struct Balance[]',
-            name: 'totalSupply',
+            internalType: 'struct Coin[]',
+            name: 'supply',
             type: 'tuple[]',
           },
         ],
         stateMutability: 'view',
         type: 'function',
       },
+      {
+        inputs: [
+          {
+            internalType: 'string',
+            name: 'denom',
+            type: 'string',
+          },
+        ],
+        name: 'supplyOf',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'uint256',
+                name: 'amount',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct Coin',
+            name: 'amount',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [],
+        name: 'params',
+        outputs: [
+          {
+            components: [
+              {
+                components: [
+                  {
+                    internalType: 'string',
+                    name: 'denom',
+                    type: 'string',
+                  },
+                  {
+                    internalType: 'bool',
+                    name: 'enabled',
+                    type: 'bool',
+                  },
+                ],
+                internalType: 'struct SendEnabled[]',
+                name: 'sendEnabled',
+                type: 'tuple[]',
+              },
+              {
+                internalType: 'bool',
+                name: 'defaultSendEnabled',
+                type: 'bool',
+              },
+            ],
+            internalType: 'struct BankParams',
+            name: 'params_',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'key',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'offset',
+                type: 'uint64',
+              },
+              {
+                internalType: 'uint64',
+                name: 'limit',
+                type: 'uint64',
+              },
+              {
+                internalType: 'bool',
+                name: 'countTotal',
+                type: 'bool',
+              },
+              {
+                internalType: 'bool',
+                name: 'reverse',
+                type: 'bool',
+              },
+            ],
+            internalType: 'struct PageRequest',
+            name: 'pagination',
+            type: 'tuple',
+          },
+        ],
+        name: 'denomsMetadata',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'description',
+                type: 'string',
+              },
+              {
+                components: [
+                  {
+                    internalType: 'string',
+                    name: 'denom',
+                    type: 'string',
+                  },
+                  {
+                    internalType: 'uint32',
+                    name: 'exponent',
+                    type: 'uint32',
+                  },
+                  {
+                    internalType: 'string[]',
+                    name: 'aliases',
+                    type: 'string[]',
+                  },
+                ],
+                internalType: 'struct DenomUnit[]',
+                name: 'denomUnits',
+                type: 'tuple[]',
+              },
+              {
+                internalType: 'string',
+                name: 'base',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'display',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'name',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'symbol',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'uri',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'uriHash',
+                type: 'string',
+              },
+            ],
+            internalType: 'struct Metadata[]',
+            name: 'metadatas',
+            type: 'tuple[]',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'nextKey',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'total',
+                type: 'uint64',
+              },
+            ],
+            internalType: 'struct PageResponse',
+            name: 'pageResponse',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'string',
+            name: 'denom',
+            type: 'string',
+          },
+        ],
+        name: 'denomMetadata',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'description',
+                type: 'string',
+              },
+              {
+                components: [
+                  {
+                    internalType: 'string',
+                    name: 'denom',
+                    type: 'string',
+                  },
+                  {
+                    internalType: 'uint32',
+                    name: 'exponent',
+                    type: 'uint32',
+                  },
+                  {
+                    internalType: 'string[]',
+                    name: 'aliases',
+                    type: 'string[]',
+                  },
+                ],
+                internalType: 'struct DenomUnit[]',
+                name: 'denomUnits',
+                type: 'tuple[]',
+              },
+              {
+                internalType: 'string',
+                name: 'base',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'display',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'name',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'symbol',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'uri',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'uriHash',
+                type: 'string',
+              },
+            ],
+            internalType: 'struct Metadata',
+            name: 'metadata_',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'string',
+            name: 'denom',
+            type: 'string',
+          },
+        ],
+        name: 'denomMetadataByQueryString',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'description',
+                type: 'string',
+              },
+              {
+                components: [
+                  {
+                    internalType: 'string',
+                    name: 'denom',
+                    type: 'string',
+                  },
+                  {
+                    internalType: 'uint32',
+                    name: 'exponent',
+                    type: 'uint32',
+                  },
+                  {
+                    internalType: 'string[]',
+                    name: 'aliases',
+                    type: 'string[]',
+                  },
+                ],
+                internalType: 'struct DenomUnit[]',
+                name: 'denomUnits',
+                type: 'tuple[]',
+              },
+              {
+                internalType: 'string',
+                name: 'base',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'display',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'name',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'symbol',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'uri',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'uriHash',
+                type: 'string',
+              },
+            ],
+            internalType: 'struct Metadata',
+            name: 'metadata_',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'string',
+            name: 'denom',
+            type: 'string',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'key',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'offset',
+                type: 'uint64',
+              },
+              {
+                internalType: 'uint64',
+                name: 'limit',
+                type: 'uint64',
+              },
+              {
+                internalType: 'bool',
+                name: 'countTotal',
+                type: 'bool',
+              },
+              {
+                internalType: 'bool',
+                name: 'reverse',
+                type: 'bool',
+              },
+            ],
+            internalType: 'struct PageRequest',
+            name: 'pagination',
+            type: 'tuple',
+          },
+        ],
+        name: 'denomOwners',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'address',
+                type: 'string',
+              },
+              {
+                components: [
+                  {
+                    internalType: 'string',
+                    name: 'denom',
+                    type: 'string',
+                  },
+                  {
+                    internalType: 'uint256',
+                    name: 'amount',
+                    type: 'uint256',
+                  },
+                ],
+                internalType: 'struct Coin',
+                name: 'balance',
+                type: 'tuple',
+              },
+            ],
+            internalType: 'struct DenomOwner[]',
+            name: 'denomOwners_',
+            type: 'tuple[]',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'nextKey',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'total',
+                type: 'uint64',
+              },
+            ],
+            internalType: 'struct PageResponse',
+            name: 'pageResponse',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'string',
+            name: 'denom',
+            type: 'string',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'key',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'offset',
+                type: 'uint64',
+              },
+              {
+                internalType: 'uint64',
+                name: 'limit',
+                type: 'uint64',
+              },
+              {
+                internalType: 'bool',
+                name: 'countTotal',
+                type: 'bool',
+              },
+              {
+                internalType: 'bool',
+                name: 'reverse',
+                type: 'bool',
+              },
+            ],
+            internalType: 'struct PageRequest',
+            name: 'pagination',
+            type: 'tuple',
+          },
+        ],
+        name: 'denomOwnersByQuery',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'address',
+                type: 'string',
+              },
+              {
+                components: [
+                  {
+                    internalType: 'string',
+                    name: 'denom',
+                    type: 'string',
+                  },
+                  {
+                    internalType: 'uint256',
+                    name: 'amount',
+                    type: 'uint256',
+                  },
+                ],
+                internalType: 'struct Coin',
+                name: 'balance',
+                type: 'tuple',
+              },
+            ],
+            internalType: 'struct DenomOwner[]',
+            name: 'denomOwners_',
+            type: 'tuple[]',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'nextKey',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'total',
+                type: 'uint64',
+              },
+            ],
+            internalType: 'struct PageResponse',
+            name: 'pageResponse',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'string[]',
+            name: 'denoms',
+            type: 'string[]',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'key',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'offset',
+                type: 'uint64',
+              },
+              {
+                internalType: 'uint64',
+                name: 'limit',
+                type: 'uint64',
+              },
+              {
+                internalType: 'bool',
+                name: 'countTotal',
+                type: 'bool',
+              },
+              {
+                internalType: 'bool',
+                name: 'reverse',
+                type: 'bool',
+              },
+            ],
+            internalType: 'struct PageRequest',
+            name: 'pagination',
+            type: 'tuple',
+          },
+        ],
+        name: 'sendEnabled',
+        outputs: [
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'bool',
+                name: 'enabled',
+                type: 'bool',
+              },
+            ],
+            internalType: 'struct SendEnabled[]',
+            name: 'sendEnabled_',
+            type: 'tuple[]',
+          },
+          {
+            components: [
+              {
+                internalType: 'bytes',
+                name: 'nextKey',
+                type: 'bytes',
+              },
+              {
+                internalType: 'uint64',
+                name: 'total',
+                type: 'uint64',
+              },
+            ],
+            internalType: 'struct PageResponse',
+            name: 'pageResponse',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'address',
+            name: 'fromAddress',
+            type: 'address',
+          },
+          {
+            internalType: 'address',
+            name: 'toAddress',
+            type: 'address',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'uint256',
+                name: 'amount',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct Coin[]',
+            name: 'amount',
+            type: 'tuple[]',
+          },
+        ],
+        name: 'send',
+        outputs: [
+          {
+            internalType: 'bool',
+            name: 'success',
+            type: 'bool',
+          },
+        ],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'address',
+            name: 'fromAddress',
+            type: 'address',
+          },
+          {
+            components: [
+              {
+                internalType: 'address',
+                name: 'toAddress',
+                type: 'address',
+              },
+              {
+                components: [
+                  {
+                    internalType: 'string',
+                    name: 'denom',
+                    type: 'string',
+                  },
+                  {
+                    internalType: 'uint256',
+                    name: 'amount',
+                    type: 'uint256',
+                  },
+                ],
+                internalType: 'struct Coin[]',
+                name: 'amount',
+                type: 'tuple[]',
+              },
+            ],
+            internalType: 'struct Output[]',
+            name: 'outputs',
+            type: 'tuple[]',
+          },
+        ],
+        name: 'multiSend',
+        outputs: [
+          {
+            internalType: 'bool',
+            name: 'success',
+            type: 'bool',
+          },
+        ],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'uint256',
+                name: 'amount',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct Coin[]',
+            name: 'amount',
+            type: 'tuple[]',
+          },
+        ],
+        name: 'mintCoins',
+        outputs: [
+          {
+            internalType: 'bool',
+            name: 'success',
+            type: 'bool',
+          },
+        ],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            internalType: 'address',
+            name: 'toAddress',
+            type: 'address',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'uint256',
+                name: 'amount',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct Coin[]',
+            name: 'amount',
+            type: 'tuple[]',
+          },
+        ],
+        name: 'distributeCoins',
+        outputs: [
+          {
+            internalType: 'bool',
+            name: 'success',
+            type: 'bool',
+          },
+        ],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
+      {
+        inputs: [
+          {
+            internalType: 'address',
+            name: 'fromAddress',
+            type: 'address',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'denom',
+                type: 'string',
+              },
+              {
+                internalType: 'uint256',
+                name: 'amount',
+                type: 'uint256',
+              },
+            ],
+            internalType: 'struct Coin[]',
+            name: 'amount',
+            type: 'tuple[]',
+          },
+        ],
+        name: 'burnCoins',
+        outputs: [
+          {
+            internalType: 'bool',
+            name: 'success',
+            type: 'bool',
+          },
+        ],
+        stateMutability: 'nonpayable',
+        type: 'function',
+      },
     ],
     bytecode: null,
   },
   {
-    contractName: 'QuarixBlacklist',
+    contractName: 'EvmBlacklist',
     abi: [
       {
         anonymous: false,
@@ -251,7 +1196,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     bytecode: null,
   },
   {
-    contractName: 'QuarixDistribution',
+    contractName: 'EvmDistribution',
     abi: [
       {
         anonymous: false,
@@ -1345,7 +2290,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     bytecode: null,
   },
   {
-    contractName: 'QuarixGaswaiver',
+    contractName: 'EvmGaswaiver',
     abi: [
       {
         anonymous: false,
@@ -2624,7 +3569,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     bytecode: null,
   },
   {
-    contractName: 'QuarixGov',
+    contractName: 'EvmGov',
     abi: [
       {
         anonymous: false,
@@ -4043,7 +4988,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     bytecode: null,
   },
   {
-    contractName: 'QuarixNativebank',
+    contractName: 'EvmNativebank',
     abi: [
       {
         inputs: [
@@ -4410,7 +5355,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     bytecode: null,
   },
   {
-    contractName: 'QuarixQrx',
+    contractName: 'EvmQrx',
     abi: [
       {
         anonymous: false,
@@ -4555,7 +5500,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     bytecode: null,
   },
   {
-    contractName: 'QuarixSlashing',
+    contractName: 'EvmSlashing',
     abi: [
       {
         anonymous: false,
@@ -4815,7 +5760,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     bytecode: null,
   },
   {
-    contractName: 'QuarixStaking',
+    contractName: 'EvmStaking',
     abi: [
       {
         anonymous: false,
@@ -6882,7 +7827,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
     ],
-    contractName: 'QuarixServiceProvider',
+    contractName: 'EvmServiceProvider',
     bytecode: null,
   },
   {
@@ -7334,7 +8279,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
     ],
-    contractName: 'QuarixRole',
+    contractName: 'EvmRole',
     bytecode: null,
   },
   {
@@ -8019,7 +8964,7 @@ export const QUARIX_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
     ],
-    contractName: 'QuarixServiceWrapper',
+    contractName: 'EvmServiceWrapper',
     bytecode: null,
   },
 ] satisfies ReadonlyArray<SystemContractArtifact>;
