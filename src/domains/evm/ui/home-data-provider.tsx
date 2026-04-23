@@ -4,11 +4,13 @@ import { usePathname } from 'next/navigation';
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getEvmHomeBootstrapDirect,
+  getEvmHomeCachedTransactionsDirect,
   getEvmLatestFeedDirect,
   getEvmHomeMetricsSupplementDirect,
   getEvmHomeSnapshotDirect,
   validateActiveEvmCacheDirect,
 } from '@/domains/evm/client/queries';
+import { subscribeEvmTransactionCache } from '@/domains/evm/client/transaction-cache';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
 import { isEvmRouteActive } from '@/platform/workbench/home-route-state';
 
@@ -221,6 +223,31 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       }, delayMs);
     }
 
+    async function refreshCachedHomeTransactions() {
+      const cachedTransactions = await getEvmHomeCachedTransactionsDirect(HOME_TRANSACTION_LIST_LIMIT);
+
+      if (disposed) {
+        return;
+      }
+
+      if (!cachedTransactions.length) {
+        return;
+      }
+
+      recentHomeTransactionsRef.current = cachedTransactions;
+      setSnapshot((current) =>
+        current
+          ? {
+              ...current,
+              activity: {
+                ...current.activity,
+                transactions: cachedTransactions,
+              },
+            }
+          : current,
+      );
+    }
+
     async function refreshLatestFeed() {
       const next = await getEvmLatestFeedDirect(20, !hasResolvedPollIntervalRef.current);
       const resolvedPollIntervalMs = resolvePollInterval(next.pollIntervalMs);
@@ -327,6 +354,8 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
 
         if (needsHomeBootstrap) {
           await bootstrapHome();
+        } else if (isHomePage && recentHomeTransactionsRef.current.length === 0) {
+          await refreshCachedHomeTransactions();
         }
 
         const nextFeed = await refreshLatestFeed();
@@ -379,11 +408,17 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
 
     void load();
     window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
+    const unsubscribeTransactionCache = subscribeEvmTransactionCache(() => {
+      if (isHomePage) {
+        void refreshCachedHomeTransactions();
+      }
+    });
 
     return () => {
       disposed = true;
       clearPoll();
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
+      unsubscribeTransactionCache();
     };
   }, [activeMode, pathname]);
 

@@ -332,6 +332,11 @@ function formatCachedHomeTransactions(transactions: EvmCachedTransactionItem[], 
   }));
 }
 
+export async function getEvmHomeCachedTransactionsDirect(txLimit = 6) {
+  const cachedTransactionsPage = await getEvmCachedTransactionsPage(1, txLimit);
+  return formatCachedHomeTransactions(cachedTransactionsPage.transactions, txLimit);
+}
+
 type PageTransactionLike = {
   hash: string;
   from: string;

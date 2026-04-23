@@ -110,7 +110,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
 
   return (
     <header className="mb-4 border-b border-slate-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-3 px-5 py-2 text-xs text-slate-500 lg:grid-cols-[auto_minmax(320px,1fr)_auto] lg:items-center">
+      <div className="mx-auto grid max-w-[1400px] gap-3 px-3 py-2 text-xs text-slate-500 lg:grid-cols-[auto_minmax(320px,1fr)_auto] lg:items-center">
         <ChainStatusStrip mode={mode} />
         <div className="flex justify-end">
           <GlobalSearch mode={mode} variant="topbar" showLabel={false} placeholder="Search by Address / Txn Hash / Block" />
@@ -129,7 +129,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
       </div>
 
       <div className="border-t border-slate-100">
-        <div className="mx-auto grid max-w-7xl gap-5 px-5 py-0.5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
+        <div className="mx-auto grid max-w-[1400px] gap-5 px-3 py-0.5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3">
               <Image alt="Chaindev" className="h-[52px] w-auto" height={52} src="/brand-lockup.svg" width={223} />
