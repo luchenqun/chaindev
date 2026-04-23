@@ -101,12 +101,16 @@ cache = {
 };
 
 function mergeArtifactsWithFallbackSystemArtifacts(artifacts: EvmContractArtifact[]) {
-  const systemArtifactsByName = new Map<string, EvmContractArtifact>(FALLBACK_SYSTEM_ARTIFACTS.map((artifact) => [artifact.name, artifact]));
+  const systemArtifactsByName = new Map<string, EvmContractArtifact>();
 
   for (const artifact of artifacts) {
     if (artifact.scope === 'system') {
       systemArtifactsByName.set(artifact.name, artifact);
     }
+  }
+
+  for (const artifact of FALLBACK_SYSTEM_ARTIFACTS) {
+    systemArtifactsByName.set(artifact.name, artifact);
   }
 
   return [...systemArtifactsByName.values(), ...artifacts.filter((artifact) => artifact.scope !== 'system')];

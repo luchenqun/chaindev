@@ -86,19 +86,29 @@ async function ensureBootstrapAdminUser(config: BootstrapAdminConfig) {
 }
 
 async function ensureSystemArtifacts(adminUserId: string) {
-  const existingSystemArtifactNames = new Set(
+  const existingSystemArtifactsByName = new Map(
     db
-      .select({
-        name: evmContractArtifacts.name,
-      })
+      .select()
       .from(evmContractArtifacts)
       .where(eq(evmContractArtifacts.scope, 'system'))
       .all()
-      .map((artifact) => artifact.name),
+      .map((artifact) => [artifact.name, artifact]),
   );
 
   for (const artifact of SYSTEM_CONTRACT_ARTIFACTS) {
-    if (existingSystemArtifactNames.has(artifact.contractName)) {
+    const existingArtifact = existingSystemArtifactsByName.get(artifact.contractName);
+
+    if (existingArtifact) {
+      db.update(evmContractArtifacts)
+        .set({
+          abiJson: JSON.stringify(artifact.abi),
+          bytecode: artifact.bytecode,
+          functionCount: countArtifactAbiItems(artifact.abi, 'function'),
+          eventCount: countArtifactAbiItems(artifact.abi, 'event'),
+          updatedAt: Date.now(),
+        })
+        .where(eq(evmContractArtifacts.id, existingArtifact.id))
+        .run();
       continue;
     }
 
@@ -111,6 +121,20 @@ async function ensureSystemArtifacts(adminUserId: string) {
       bytecode: artifact.bytecode,
     });
   }
+}
+
+function countArtifactAbiItems(abi: unknown, type: 'function' | 'event') {
+  if (!Array.isArray(abi)) {
+    return 0;
+  }
+
+  return abi.reduce((count, item) => {
+    if (!item || typeof item !== 'object' || !('type' in item)) {
+      return count;
+    }
+
+    return (item as { type?: unknown }).type === type ? count + 1 : count;
+  }, 0);
 }
 
 export async function ensureSystemBootstrap() {

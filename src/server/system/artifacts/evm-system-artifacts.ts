@@ -340,6 +340,119 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     contractName: 'EvmBank',
     abi: [
       {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'fromAddress',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'toAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'coins',
+            type: 'string',
+          },
+        ],
+        name: 'Send',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'fromAddress',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'toAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'coins',
+            type: 'string',
+          },
+        ],
+        name: 'MultiSend',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'coins',
+            type: 'string',
+          },
+        ],
+        name: 'MintCoins',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'toAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'coins',
+            type: 'string',
+          },
+        ],
+        name: 'DistributeCoins',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'fromAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'coins',
+            type: 'string',
+          },
+        ],
+        name: 'BurnCoins',
+        type: 'event',
+      },
+      {
         inputs: [
           {
             internalType: 'address',
@@ -1665,6 +1778,50 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             indexed: true,
             internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'coins',
+            type: 'string',
+          },
+        ],
+        name: 'DividendRewards',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'toAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'coins',
+            type: 'string',
+          },
+        ],
+        name: 'WithdrawRoyaltyFee',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
             name: 'delegatorAddress',
             type: 'address',
           },
@@ -2751,6 +2908,87 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
     contractName: 'EvmErc20',
     abi: [
       {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'sender',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'contractAddress',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'receiver',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'amount',
+            type: 'uint256',
+          },
+        ],
+        name: 'ConvertERC20',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'sender',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'receiver',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'denom',
+            type: 'string',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'amount',
+            type: 'uint256',
+          },
+        ],
+        name: 'ConvertCoin',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'sender',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'erc20Address',
+            type: 'address',
+          },
+        ],
+        name: 'RegisterERC20',
+        type: 'event',
+      },
+      {
         inputs: [
           {
             internalType: 'address',
@@ -3212,6 +3450,31 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
   {
     contractName: 'EvmEvidence',
     abi: [
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'submitter',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'bytes',
+            name: 'hash',
+            type: 'bytes',
+          },
+          {
+            indexed: false,
+            internalType: 'string',
+            name: 'consensusAddress',
+            type: 'string',
+          },
+        ],
+        name: 'SubmitEquivocation',
+        type: 'event',
+      },
       {
         inputs: [
           {
@@ -4749,6 +5012,63 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
   {
     contractName: 'EvmGov',
     abi: [
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'voter',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint64',
+            name: 'proposalId',
+            type: 'uint64',
+          },
+        ],
+        name: 'Veto',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'voter',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint64',
+            name: 'proposalId',
+            type: 'uint64',
+          },
+        ],
+        name: 'SkipVeto',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'authority',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'penaltyPool',
+            type: 'address',
+          },
+        ],
+        name: 'SetPenaltyPool',
+        type: 'event',
+      },
       {
         anonymous: false,
         inputs: [
@@ -6994,6 +7314,88 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
   {
     contractName: 'EvmStaking',
     abi: [
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint64',
+            name: 'ippId',
+            type: 'uint64',
+          },
+        ],
+        name: 'CreateInvestmentProgramPool',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'validatorAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint64',
+            name: 'ippId',
+            type: 'uint64',
+          },
+        ],
+        name: 'AllocateInvestmentProgramPool',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint64',
+            name: 'ippId',
+            type: 'uint64',
+          },
+        ],
+        name: 'EditInvestmentProgramPool',
+        type: 'event',
+      },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'qoeAddress',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint32',
+            name: 'maxCommissionRateFrequency',
+            type: 'uint32',
+          },
+        ],
+        name: 'EditParamsMaxCommissionRateFrequency',
+        type: 'event',
+      },
       {
         anonymous: false,
         inputs: [
