@@ -24,7 +24,7 @@ Legacy reference projects exist in `ethereum-tool/` and `cosmos-tool/`; do not a
 - `npm run typecheck`: run TypeScript without emitting files
 - `npm run db:generate`: generate Drizzle migration artifacts
 
-Run `npm run typecheck` and `npm run build` before opening a PR.
+Run `npm run typecheck` and `npm run build` before pushing to `main`.
 
 ## Agent Workflow Notes
 
@@ -71,16 +71,13 @@ When tests are added, place them near the relevant module or under a dedicated t
 
 Do not treat database migrations as a blocker for routine feature work in this repository at the current stage. Update Drizzle schema files when needed, but do not spend time designing or validating migration workflows unless the task explicitly asks for it.
 
-## Commit & Pull Request Guidelines
+## Commit & Push Guidelines
 
 Follow Conventional Commits in English, for example:
 
 - `feat: add rpc provider selector`
 - `fix: remove default cosmos rpc fallback`
 
-Pull requests should be written in English and include:
+This project does not use pull requests. Push changes directly to `main`.
 
-- a short summary of user-visible changes
-- linked issue or task context when available
-- screenshots for UI changes
-- verification notes listing commands run
+Before pushing to `main`, include the key verification commands you ran in your handoff or task notes when relevant.
