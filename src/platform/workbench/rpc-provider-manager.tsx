@@ -1,6 +1,6 @@
 'use client';
 
-import { IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconCurrencyEthereum, IconPencil, IconTrash, IconWorld } from '@tabler/icons-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -62,6 +62,14 @@ function getModeLabel(mode: PlatformMode) {
   return mode.toUpperCase();
 }
 
+function renderModeIcon(mode: PlatformMode, className = 'size-3.5') {
+  if (mode === 'evm') {
+    return <IconCurrencyEthereum className={`${className} text-violet-500`} stroke={1.9} />;
+  }
+
+  return <IconWorld className={`${className} text-sky-600`} stroke={1.9} />;
+}
+
 function getDraftFromProfile(profile: RpcProfile): DraftState {
   return {
     mode: profile.mode,
@@ -81,6 +89,37 @@ function formatTimestamp(timestamp: number) {
     minute: '2-digit',
     hour12: false,
   }).format(new Date(timestamp));
+}
+
+function renderProviderOption(profile: RpcProfile) {
+  return (
+    <div className="min-w-0 py-0.5">
+      <div className="flex items-center gap-2">
+        <span className="shrink-0">{renderModeIcon(profile.mode)}</span>
+        <div className="truncate font-medium text-slate-900">
+          {getModeLabel(profile.mode)} · {profile.name}
+        </div>
+      </div>
+      <div className="mt-1 grid gap-0.5">
+        <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">RPC</span>
+          <span className="truncate font-mono text-[11px] text-slate-500">{profile.rpcUrl}</span>
+        </div>
+        {profile.mode === 'cosmos' ? (
+          <>
+            <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">REST</span>
+              <span className="truncate font-mono text-[11px] text-slate-400">{profile.restUrl ?? '-'}</span>
+            </div>
+            <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">WS</span>
+              <span className="truncate font-mono text-[11px] text-slate-400">{profile.wsUrl ?? '-'}</span>
+            </div>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderManagerProps) {
@@ -594,14 +633,19 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
           }}
         >
           <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] leading-none shadow-none focus:ring-0">
-            <span className="truncate">
-              {topbarActiveProfile ? `${getModeLabel(topbarActiveProfile.mode)} · ${topbarActiveProfile.name}` : loading ? 'Loading providers...' : 'No provider'}
-            </span>
+            {topbarActiveProfile ? (
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="shrink-0">{renderModeIcon(topbarActiveProfile.mode)}</span>
+                <span className="truncate">{`${getModeLabel(topbarActiveProfile.mode)} · ${topbarActiveProfile.name}`}</span>
+              </span>
+            ) : (
+              <span className="truncate">{loading ? 'Loading providers...' : 'No provider'}</span>
+            )}
           </SelectTrigger>
-          <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
+          <SelectContent className="min-w-[26rem] max-w-[min(40rem,calc(100vw-2rem))]">
             {topbarSortedProfiles.map((profile) => (
-              <SelectItem key={profile.id} value={profile.id}>
-                {getModeLabel(profile.mode)} · {profile.name}
+              <SelectItem key={profile.id} value={profile.id} className="items-start py-2.5">
+                {renderProviderOption(profile)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -621,12 +665,19 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
         }}
       >
         <SelectTrigger className="h-9 w-auto justify-start gap-1.5 rounded-xl border-slate-200 bg-white px-4 pr-2.5 text-[13px] shadow-sm">
-          <span className="truncate">{activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : loading ? 'Loading providers...' : 'No provider'}</span>
+          {activeProfile ? (
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0">{renderModeIcon(activeProfile.mode)}</span>
+              <span className="truncate">{`${getModeLabel(activeProfile.mode)} · ${activeProfile.name}`}</span>
+            </span>
+          ) : (
+            <span className="truncate">{loading ? 'Loading providers...' : 'No provider'}</span>
+          )}
         </SelectTrigger>
-        <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
+        <SelectContent className="min-w-[26rem] max-w-[min(40rem,calc(100vw-2rem))]">
           {sortedProfiles.map((profile) => (
-            <SelectItem key={profile.id} value={profile.id}>
-              {getModeLabel(profile.mode)} · {profile.name}
+            <SelectItem key={profile.id} value={profile.id} className="items-start py-2.5">
+              {renderProviderOption(profile)}
             </SelectItem>
           ))}
         </SelectContent>

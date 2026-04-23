@@ -73,6 +73,17 @@ export const evmAddressTags = sqliteTable('evm_address_tags', {
   updatedAt: integer('updated_at').notNull(),
 });
 
+export const cosmosAddressTags = sqliteTable('cosmos_address_tags', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  providerProfileId: text('provider_profile_id').notNull(),
+  providerName: text('provider_name'),
+  address: text('address').notNull(),
+  addressLower: text('address_lower').notNull(),
+  nameTag: text('name_tag').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
 export const evmContractArtifacts = sqliteTable('evm_contract_artifacts', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),

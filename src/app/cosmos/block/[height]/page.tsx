@@ -17,6 +17,7 @@ import {
   COSMOS_JSON_VIEW_STYLE as JSON_VIEW_STYLE,
   formatTimestampWithSeconds,
 } from '@/domains/cosmos/ui/detail-primitives';
+import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
 import { AppShell } from '@/platform/layout/app-shell';
 
 function DetailRowBlockHeight({
@@ -391,9 +392,6 @@ export default function CosmosBlockDetailPage() {
                   {block.transactionsPage.totalCount} transaction
                   {block.transactionsPage.totalCount === 1 ? '' : 's'}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Page {block.transactionsPage.page} of {block.transactionsPage.totalPages} for block #{block.height}.
-                </p>
               </div>
               {block.transactionsPage.totalPages > 1 ? (
                 <PaginationControls
@@ -411,24 +409,37 @@ export default function CosmosBlockDetailPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Transaction Hash</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Sender</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Messages</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Gas Used / Wanted</th>
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Fee</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {block.transactionsPage.items.map((transaction) => (
                     <tr key={transaction.hash} className="border-t border-slate-200">
                       <td className="px-5 py-3 text-sm">
-                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${transaction.hash}`}>
-                          {transaction.hashLabel}
+                        <div className="-ml-1 flex items-center gap-1.5">
+                          <CosmosTransactionPreviewButton transaction={transaction} />
+                          <CosmosTransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} status={transaction.status} />
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-sm">
+                        <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {transaction.type}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-sm tabular-nums">
+                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
+                          {transaction.height}
                         </Link>
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{transaction.type}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">
+                        <RelativeTime timestampMs={block.timestampMs} />
+                      </td>
                       <td className="px-5 py-3 text-sm">
                         {transaction.sender === 'Unknown' ? (
                           <span className="text-slate-500">Unknown</span>
@@ -438,14 +449,10 @@ export default function CosmosBlockDetailPage() {
                           </Link>
                         )}
                       </td>
-                      <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{transaction.messageCount}</td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
                         {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">{transaction.feeLabel}</td>
-                      <td className="px-5 py-3 text-sm">
-                        <DetailTag tone={transaction.status === 'success' ? 'success' : 'danger'}>{transaction.statusLabel}</DetailTag>
-                      </td>
                     </tr>
                   ))}
                 </tbody>

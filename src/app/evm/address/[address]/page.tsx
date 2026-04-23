@@ -709,7 +709,7 @@ export default function EvmAddressPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">Transaction Hash</th>
+                    <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
                     <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
                     <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
                     <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>

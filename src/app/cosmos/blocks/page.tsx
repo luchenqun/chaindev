@@ -163,9 +163,7 @@ function CosmosBlocksPageContent() {
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <p className="text-lg font-semibold text-slate-900">{data.totalLabel}</p>
-              <p className="mt-1 text-sm text-slate-500">
-                Page {data.page} of {data.totalPages}. Showing {data.blocks.length} blocks from the selected Cosmos provider.
-              </p>
+              <p className="mt-1 text-sm text-slate-500">Showing {data.blocks.length} blocks from the selected Cosmos provider.</p>
             </div>
             <div className="flex items-center gap-0.5 lg:justify-end">
               <PaginationControls

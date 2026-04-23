@@ -376,6 +376,7 @@ export type CosmosTransactionsPageItem = {
   type: string;
   sender: string;
   senderLabel: string;
+  messageCount: number;
   target: string | null;
   targetLabel: string | null;
   feeLabel: string;
@@ -892,6 +893,34 @@ function normalizeAccountAddress(account: unknown): string | null {
   const value = account as { address?: string };
 
   return typeof value.address === 'string' && value.address.trim() ? value.address : null;
+}
+
+function extractCosmosModuleAccountName(account: unknown): string | null {
+  if (!account || typeof account !== 'object') {
+    return null;
+  }
+
+  const value = account as {
+    name?: unknown;
+    module_name?: unknown;
+    base_account?: unknown;
+  };
+
+  const rawName = typeof value.name === 'string' && value.name.trim() ? value.name.trim() : typeof value.module_name === 'string' && value.module_name.trim() ? value.module_name.trim() : null;
+
+  if (rawName) {
+    return rawName.replace(/_tokens_pool$/, '');
+  }
+
+  if (value.base_account && typeof value.base_account === 'object') {
+    return extractCosmosModuleAccountName(value.base_account);
+  }
+
+  return null;
+}
+
+function formatCosmosAccountType(account: unknown, rawType: string | null | undefined) {
+  return extractCosmosModuleAccountName(account) ?? extractTypeLabel(rawType);
 }
 
 function formatDurationSeconds(seconds: number | null) {
@@ -1689,6 +1718,7 @@ function formatCosmosTransactionsPageItem(input: { tx: TendermintTxSearchItem; d
     type: decoded.type,
     sender: decoded.sender,
     senderLabel: decoded.senderLabel,
+    messageCount: fallbackDetail.tx?.body?.messages?.length ?? 0,
     target,
     targetLabel: target && target !== 'Unknown' ? (target.length > 20 ? formatCompactHash(target, 14, 8) : target) : null,
     feeLabel: decoded.feeLabel,
@@ -2205,7 +2235,7 @@ export async function getCosmosAccountsPageDirect(requestedPage = 1, pageSize = 
       sequenceLabel: formatInteger(baseAccount.sequence, '0'),
       accountNumber: baseAccount.accountNumber,
       accountNumberLabel: formatInteger(baseAccount.accountNumber, '0'),
-      type: extractTypeLabel(rawType),
+      type: formatCosmosAccountType(account, rawType),
       balances,
       balancesLabel: formatDenomCollection(balances),
       readableBalancesLabel: formatReadableDenomCollection(balances),
@@ -2337,7 +2367,7 @@ export async function getCosmosAccountDetailDirect(input: { address: string; txP
   return {
     address,
     addressLabel: formatCompactHash(address, 14, 10),
-    type: extractTypeLabel(rawType),
+    type: formatCosmosAccountType(accountPayload.account, rawType),
     sequence: baseAccount.sequence,
     sequenceLabel: formatInteger(baseAccount.sequence, '0'),
     accountNumber: baseAccount.accountNumber,

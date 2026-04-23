@@ -12,6 +12,7 @@ import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosTransactionsPageDirect } from '@/domains/cosmos/client/queries';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
+import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 20;
@@ -332,9 +333,6 @@ function CosmosTransactionsPageContent() {
                   ? `Searching direct Cosmos RPC transactions by ${activeFilterDescriptions.join(', ')}.`
                   : 'Querying the selected Cosmos RPC provider directly.'}
               </p>
-              <p className="mt-1 text-sm text-slate-500">
-                Page {data.page} of {data.totalPages}.
-              </p>
             </div>
             <div className="flex items-center gap-0.5 lg:justify-end">
               <PaginationControls
@@ -376,14 +374,13 @@ function CosmosTransactionsPageContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Transaction Hash</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Gas Used / Wanted</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Fee</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -391,9 +388,10 @@ function CosmosTransactionsPageContent() {
                   data.transactions.map((transaction) => (
                     <tr key={transaction.hash} className="border-t border-slate-200">
                       <td className="px-5 py-3 text-sm">
-                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${transaction.hash}`}>
-                          {transaction.hashLabel}
-                        </Link>
+                        <div className="-ml-1 flex items-center gap-1.5">
+                          <CosmosTransactionPreviewButton transaction={transaction} />
+                          <CosmosTransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} status={transaction.status} />
+                        </div>
                       </td>
                       <td className="px-5 py-3 text-sm">
                         <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
@@ -421,20 +419,11 @@ function CosmosTransactionsPageContent() {
                         {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">{transaction.feeLabel}</td>
-                      <td className="px-5 py-3 text-sm">
-                        <span
-                          className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                            transaction.status === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                          }`}
-                        >
-                          {transaction.statusLabel}
-                        </span>
-                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-5 py-10 text-center text-sm text-slate-500">
+                    <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">
                       {activeSearchFilters.hasFilters ? 'No transactions matched the current filters.' : 'No transactions returned by the selected Cosmos RPC provider.'}
                     </td>
                   </tr>
