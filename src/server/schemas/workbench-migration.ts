@@ -47,9 +47,5 @@ export const importedEvmContractBindingSchema = z.object({
 
 export type ImportedRpcProfile = z.infer<typeof importedRpcProfileSchema>;
 export type ImportedEvmAddressTag = z.infer<typeof importedEvmAddressTagSchema>;
-export type ImportedEvmContractArtifact = z.infer<
-  typeof importedEvmContractArtifactSchema
->;
-export type ImportedEvmContractBinding = z.infer<
-  typeof importedEvmContractBindingSchema
->;
+export type ImportedEvmContractArtifact = z.infer<typeof importedEvmContractArtifactSchema>;
+export type ImportedEvmContractBinding = z.infer<typeof importedEvmContractBindingSchema>;

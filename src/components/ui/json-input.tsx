@@ -9,8 +9,7 @@ import { AutoGrowTextarea } from '@/components/ui/auto-grow-textarea';
 const jsonViewStyle = {
   '--w-rjv-background-color': 'transparent',
   '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
-  '--w-rjv-font-family':
-    '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+  '--w-rjv-font-family': '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
   '--w-rjv-color': '#0f172a',
   '--w-rjv-arrow-color': '#64748b',
   '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
@@ -35,12 +34,7 @@ type JsonInputProps = {
   textareaClassName: string;
 };
 
-export function JsonInput({
-  value,
-  onChange,
-  placeholder,
-  textareaClassName,
-}: JsonInputProps) {
+export function JsonInput({ value, onChange, placeholder, textareaClassName }: JsonInputProps) {
   const [mode, setMode] = useState<'json' | 'raw'>('raw');
   const parsedValue = useMemo(() => {
     try {
@@ -61,11 +55,7 @@ export function JsonInput({
           tooltip="JSON view"
           aria-label="JSON view"
           className={
-            activeMode === 'json'
-              ? 'rounded-md text-sky-700'
-              : canRenderJson
-                ? 'rounded-md text-slate-400 hover:text-slate-700'
-                : 'cursor-not-allowed rounded-md text-slate-300'
+            activeMode === 'json' ? 'rounded-md text-sky-700' : canRenderJson ? 'rounded-md text-slate-400 hover:text-slate-700' : 'cursor-not-allowed rounded-md text-slate-300'
           }
           onClick={() => {
             if (canRenderJson) {
@@ -79,11 +69,7 @@ export function JsonInput({
         <ActionIconButton
           tooltip="Raw view"
           aria-label="Raw view"
-          className={
-            activeMode === 'raw'
-              ? 'rounded-md text-sky-700'
-              : 'rounded-md text-slate-400 hover:text-slate-700'
-          }
+          className={activeMode === 'raw' ? 'rounded-md text-sky-700' : 'rounded-md text-slate-400 hover:text-slate-700'}
           onClick={() => setMode('raw')}
         >
           <IconCode className="size-4" stroke={1.9} />
@@ -103,12 +89,7 @@ export function JsonInput({
           />
         </div>
       ) : (
-        <AutoGrowTextarea
-          className={`${textareaClassName} pr-16`}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-        />
+        <AutoGrowTextarea className={`${textareaClassName} pr-16`} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
       )}
     </div>
   );

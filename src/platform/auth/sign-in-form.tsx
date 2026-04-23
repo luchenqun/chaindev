@@ -8,18 +8,12 @@ import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthFormShell } from '@/platform/auth/auth-form-shell';
-import {
-  resolveAbsoluteCallbackUrl,
-  resolveClientRedirectUrl,
-} from '@/platform/auth/callback-url';
+import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 
 export function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = useMemo(
-    () => searchParams.get('callbackUrl') ?? '/',
-    [searchParams],
-  );
+  const callbackUrl = useMemo(() => searchParams.get('callbackUrl') ?? '/', [searchParams]);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -56,10 +50,7 @@ export function SignInForm() {
       subtitle={
         <>
           没有账号？
-          <Link
-            href="/signup"
-            className="ml-2 font-medium text-sky-600 hover:text-sky-700"
-          >
+          <Link href="/signup" className="ml-2 font-medium text-sky-600 hover:text-sky-700">
             Sign Up
           </Link>
         </>
@@ -67,9 +58,7 @@ export function SignInForm() {
     >
       <form className="grid gap-7" onSubmit={handleSubmit}>
         <label className="grid gap-3">
-          <span className="text-[15px] font-semibold text-slate-900">
-            Username or Email
-          </span>
+          <span className="text-[15px] font-semibold text-slate-900">Username or Email</span>
           <Input
             type="text"
             autoComplete="username"
@@ -83,9 +72,7 @@ export function SignInForm() {
 
         <label className="grid gap-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[15px] font-semibold text-slate-900">
-              Password
-            </span>
+            <span className="text-[15px] font-semibold text-slate-900">Password</span>
           </div>
           <div className="relative">
             <Input
@@ -103,26 +90,14 @@ export function SignInForm() {
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
               onClick={() => setShowPassword((current) => !current)}
             >
-              {showPassword ? (
-                <IconEyeOff className="size-6" stroke={1.8} />
-              ) : (
-                <IconEye className="size-6" stroke={1.8} />
-              )}
+              {showPassword ? <IconEyeOff className="size-6" stroke={1.8} /> : <IconEye className="size-6" stroke={1.8} />}
             </button>
           </div>
         </label>
 
-        {error ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
-            {error}
-          </div>
-        ) : null}
+        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
 
-        <Button
-          type="submit"
-          className="h-16 rounded-2xl text-[18px] font-semibold uppercase"
-          disabled={submitting}
-        >
+        <Button type="submit" className="h-16 rounded-2xl text-[18px] font-semibold uppercase" disabled={submitting}>
           {submitting ? 'Signing In...' : 'Login'}
         </Button>
       </form>

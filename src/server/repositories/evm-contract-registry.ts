@@ -2,14 +2,8 @@ import { and, desc, eq, or } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 import { isAddress } from 'viem';
 import { db } from '@/db/client';
-import {
-  evmContractArtifacts,
-  evmContractBindings,
-} from '@/db/schema/workbench';
-import type {
-  ImportedEvmContractArtifact,
-  ImportedEvmContractBinding,
-} from '@/server/schemas/workbench-migration';
+import { evmContractArtifacts, evmContractBindings } from '@/db/schema/workbench';
+import type { ImportedEvmContractArtifact, ImportedEvmContractBinding } from '@/server/schemas/workbench-migration';
 
 function getScopedImportId(userId: string, localId: string) {
   return `${userId}:${localId}`;
@@ -67,14 +61,8 @@ async function findAccessibleArtifact(input: { userId: string; id: string }) {
   return (
     (await db.query.evmContractArtifacts.findFirst({
       where: or(
-        and(
-          eq(evmContractArtifacts.id, input.id),
-          eq(evmContractArtifacts.scope, 'system'),
-        ),
-        and(
-          eq(evmContractArtifacts.id, input.id),
-          eq(evmContractArtifacts.userId, input.userId),
-        ),
+        and(eq(evmContractArtifacts.id, input.id), eq(evmContractArtifacts.scope, 'system')),
+        and(eq(evmContractArtifacts.id, input.id), eq(evmContractArtifacts.userId, input.userId)),
       ),
     })) ?? null
   );
@@ -84,25 +72,13 @@ export async function listServerEvmContractArtifacts(userId: string) {
   return db
     .select()
     .from(evmContractArtifacts)
-    .where(
-      or(
-        eq(evmContractArtifacts.scope, 'system'),
-        and(
-          eq(evmContractArtifacts.scope, 'user'),
-          eq(evmContractArtifacts.userId, userId),
-        ),
-      ),
-    )
+    .where(or(eq(evmContractArtifacts.scope, 'system'), and(eq(evmContractArtifacts.scope, 'user'), eq(evmContractArtifacts.userId, userId))))
     .orderBy(desc(evmContractArtifacts.updatedAt))
     .all();
 }
 
 export async function listServerEvmContractBindings(userId: string) {
-  return db
-    .select()
-    .from(evmContractBindings)
-    .where(eq(evmContractBindings.userId, userId))
-    .orderBy(desc(evmContractBindings.updatedAt));
+  return db.select().from(evmContractBindings).where(eq(evmContractBindings.userId, userId)).orderBy(desc(evmContractBindings.updatedAt));
 }
 
 export async function createServerEvmContractArtifact(input: {
@@ -183,11 +159,7 @@ export async function updateServerEvmContractArtifact(input: {
   );
 }
 
-export async function deleteServerEvmContractArtifact(
-  userId: string,
-  id: string,
-  isAdmin: boolean,
-) {
+export async function deleteServerEvmContractArtifact(userId: string, id: string, isAdmin: boolean) {
   const artifact = await findAccessibleArtifact({ userId, id });
 
   if (!artifact) {
@@ -203,9 +175,7 @@ export async function deleteServerEvmContractArtifact(
   });
 
   if (binding) {
-    throw new Error(
-      'Remove deployed bindings for this artifact before deleting it.',
-    );
+    throw new Error('Remove deployed bindings for this artifact before deleting it.');
   }
 
   db.delete(evmContractArtifacts).where(eq(evmContractArtifacts.id, id)).run();
@@ -241,9 +211,7 @@ export async function createServerEvmContractBinding(input: {
   });
 
   if (duplicate) {
-    throw new Error(
-      'This contract address is already bound under the current provider scope.',
-    );
+    throw new Error('This contract address is already bound under the current provider scope.');
   }
 
   const now = Date.now();
@@ -295,9 +263,7 @@ export async function updateServerEvmContractBinding(input: {
   });
 
   if (duplicate && duplicate.id !== input.id) {
-    throw new Error(
-      'This contract address is already bound under the current provider scope.',
-    );
+    throw new Error('This contract address is already bound under the current provider scope.');
   }
 
   db.update(evmContractBindings)
@@ -311,35 +277,19 @@ export async function updateServerEvmContractBinding(input: {
       providerName: input.providerName,
       updatedAt: Date.now(),
     })
-    .where(
-      and(
-        eq(evmContractBindings.userId, input.userId),
-        eq(evmContractBindings.id, input.id),
-      ),
-    )
+    .where(and(eq(evmContractBindings.userId, input.userId), eq(evmContractBindings.id, input.id)))
     .run();
 
   return (
     (await db.query.evmContractBindings.findFirst({
-      where: and(
-        eq(evmContractBindings.userId, input.userId),
-        eq(evmContractBindings.id, input.id),
-      ),
+      where: and(eq(evmContractBindings.userId, input.userId), eq(evmContractBindings.id, input.id)),
     })) ?? null
   );
 }
 
-export async function deleteServerEvmContractBinding(
-  userId: string,
-  id: string,
-) {
+export async function deleteServerEvmContractBinding(userId: string, id: string) {
   db.delete(evmContractBindings)
-    .where(
-      and(
-        eq(evmContractBindings.userId, userId),
-        eq(evmContractBindings.id, id),
-      ),
-    )
+    .where(and(eq(evmContractBindings.userId, userId), eq(evmContractBindings.id, id)))
     .run();
   return { id };
 }
@@ -357,9 +307,7 @@ export async function importServerEvmContractRegistry(
     const scopedArtifactId = getScopedImportId(userId, artifact.id);
     artifactIdMap.set(artifact.id, scopedArtifactId);
 
-    db.delete(evmContractArtifacts)
-      .where(eq(evmContractArtifacts.id, scopedArtifactId))
-      .run();
+    db.delete(evmContractArtifacts).where(eq(evmContractArtifacts.id, scopedArtifactId)).run();
     db.insert(evmContractArtifacts)
       .values({
         id: scopedArtifactId,
@@ -378,16 +326,10 @@ export async function importServerEvmContractRegistry(
 
   for (const binding of input.bindings) {
     const scopedBindingId = getScopedImportId(userId, binding.id);
-    const scopedArtifactId =
-      artifactIdMap.get(binding.artifactId) ??
-      getScopedImportId(userId, binding.artifactId);
-    const addressLower =
-      binding.addressLower?.toLowerCase() ??
-      normalizeBindingAddress(binding.address);
+    const scopedArtifactId = artifactIdMap.get(binding.artifactId) ?? getScopedImportId(userId, binding.artifactId);
+    const addressLower = binding.addressLower?.toLowerCase() ?? normalizeBindingAddress(binding.address);
 
-    db.delete(evmContractBindings)
-      .where(eq(evmContractBindings.id, scopedBindingId))
-      .run();
+    db.delete(evmContractBindings).where(eq(evmContractBindings.id, scopedBindingId)).run();
     db.insert(evmContractBindings)
       .values({
         id: scopedBindingId,

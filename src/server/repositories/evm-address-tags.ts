@@ -17,20 +17,10 @@ function normalizeAddress(address: string) {
 }
 
 export async function listServerEvmAddressTags(userId: string) {
-  return db
-    .select()
-    .from(evmAddressTags)
-    .where(eq(evmAddressTags.userId, userId))
-    .orderBy(desc(evmAddressTags.updatedAt));
+  return db.select().from(evmAddressTags).where(eq(evmAddressTags.userId, userId)).orderBy(desc(evmAddressTags.updatedAt));
 }
 
-export async function upsertServerEvmAddressTag(input: {
-  userId: string;
-  providerProfileId: string;
-  providerName: string | null;
-  address: string;
-  nameTag: string;
-}) {
+export async function upsertServerEvmAddressTag(input: { userId: string; providerProfileId: string; providerName: string | null; address: string; nameTag: string }) {
   const normalizedAddressLower = normalizeAddress(input.address);
   const trimmedNameTag = input.nameTag.trim();
 
@@ -38,10 +28,7 @@ export async function upsertServerEvmAddressTag(input: {
     throw new Error('Name tag is required.');
   }
 
-  const id = getScopedImportId(
-    input.userId,
-    `${input.providerProfileId}:${normalizedAddressLower}`,
-  );
+  const id = getScopedImportId(input.userId, `${input.providerProfileId}:${normalizedAddressLower}`);
   const existing = await db.query.evmAddressTags.findFirst({
     where: eq(evmAddressTags.id, id),
   });
@@ -73,21 +60,11 @@ export async function upsertServerEvmAddressTag(input: {
   };
 }
 
-export async function deleteServerEvmAddressTag(input: {
-  userId: string;
-  providerProfileId: string;
-  address: string;
-}) {
+export async function deleteServerEvmAddressTag(input: { userId: string; providerProfileId: string; address: string }) {
   const normalizedAddressLower = normalizeAddress(input.address);
 
   db.delete(evmAddressTags)
-    .where(
-      and(
-        eq(evmAddressTags.userId, input.userId),
-        eq(evmAddressTags.providerProfileId, input.providerProfileId),
-        eq(evmAddressTags.addressLower, normalizedAddressLower),
-      ),
-    )
+    .where(and(eq(evmAddressTags.userId, input.userId), eq(evmAddressTags.providerProfileId, input.providerProfileId), eq(evmAddressTags.addressLower, normalizedAddressLower)))
     .run();
 
   return {
@@ -96,33 +73,18 @@ export async function deleteServerEvmAddressTag(input: {
   };
 }
 
-export async function clearServerEvmAddressTags(
-  userId: string,
-  providerProfileId: string,
-) {
+export async function clearServerEvmAddressTags(userId: string, providerProfileId: string) {
   db.delete(evmAddressTags)
-    .where(
-      and(
-        eq(evmAddressTags.userId, userId),
-        eq(evmAddressTags.providerProfileId, providerProfileId),
-      ),
-    )
+    .where(and(eq(evmAddressTags.userId, userId), eq(evmAddressTags.providerProfileId, providerProfileId)))
     .run();
 
   return { providerProfileId };
 }
 
-export async function importServerEvmAddressTags(
-  userId: string,
-  tags: ImportedEvmAddressTag[],
-) {
+export async function importServerEvmAddressTags(userId: string, tags: ImportedEvmAddressTag[]) {
   for (const tag of tags) {
-    const normalizedAddressLower =
-      tag.addressLower?.toLowerCase() ?? normalizeAddress(tag.address);
-    const scopedId = getScopedImportId(
-      userId,
-      `${tag.providerProfileId}:${normalizedAddressLower}`,
-    );
+    const normalizedAddressLower = tag.addressLower?.toLowerCase() ?? normalizeAddress(tag.address);
+    const scopedId = getScopedImportId(userId, `${tag.providerProfileId}:${normalizedAddressLower}`);
 
     db.delete(evmAddressTags).where(eq(evmAddressTags.id, scopedId)).run();
     db.insert(evmAddressTags)

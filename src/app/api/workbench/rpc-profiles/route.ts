@@ -1,10 +1,5 @@
 import { rpcProfileDraftSchema } from '@/platform/workbench/rpc-profile';
-import {
-  addRpcProfile,
-  deleteRpcProfile,
-  listRpcProfiles,
-  updateRpcProfile,
-} from '@/server/repositories/rpc-profiles';
+import { addRpcProfile, deleteRpcProfile, listRpcProfiles, updateRpcProfile } from '@/server/repositories/rpc-profiles';
 import { fail, ok } from '@/server/utils/api-response';
 import { normalizeApiError } from '@/server/utils/error-normalizer';
 import { requireSessionUserId } from '@/server/utils/auth-user';

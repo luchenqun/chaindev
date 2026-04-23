@@ -15,22 +15,13 @@ export default function EvmRpcPage() {
     try {
       const parsedParams = JSON.parse(params) as unknown[];
       const payload = await requestEvmRpcDirect(method, parsedParams);
-      setResult(
-        JSON.stringify(
-          { method, params: parsedParams, result: payload },
-          null,
-          2,
-        ),
-      );
+      setResult(JSON.stringify({ method, params: parsedParams, result: payload }, null, 2));
     } catch (error) {
       setResult(
         JSON.stringify(
           {
             ok: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : 'Failed to execute RPC request.',
+            error: error instanceof Error ? error.message : 'Failed to execute RPC request.',
           },
           null,
           2,
@@ -45,19 +36,10 @@ export default function EvmRpcPage() {
         <section className="tool-card">
           <span className="kicker">EVM Workbench</span>
           <h1>EVM RPC Debug</h1>
-          <p>
-            Send JSON-RPC requests directly from the browser to the active EVM
-            provider.
-          </p>
+          <p>Send JSON-RPC requests directly from the browser to the active EVM provider.</p>
           <form className="tool-form" onSubmit={handleSubmit}>
-            <input
-              value={method}
-              onChange={(event) => setMethod(event.target.value)}
-            />
-            <textarea
-              value={params}
-              onChange={(event) => setParams(event.target.value)}
-            />
+            <input value={method} onChange={(event) => setMethod(event.target.value)} />
+            <textarea value={params} onChange={(event) => setParams(event.target.value)} />
             <button className="primary-button" type="submit">
               Run
             </button>
@@ -66,9 +48,7 @@ export default function EvmRpcPage() {
         <section className="tool-card">
           <span className="kicker">Response</span>
           <h2>Raw Result</h2>
-          <pre className="mono">
-            {result || 'Submit a request to view the upstream response.'}
-          </pre>
+          <pre className="mono">{result || 'Submit a request to view the upstream response.'}</pre>
         </section>
       </main>
     </AppShell>

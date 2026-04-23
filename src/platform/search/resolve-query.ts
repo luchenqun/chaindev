@@ -2,18 +2,13 @@ import type { PlatformMode } from '@/config/chains';
 import { createEvmClient } from '@/domains/evm/server/client';
 import { parseQuery } from '@/platform/search/parse-query';
 
-export type QueryResolution =
-  | { ok: true; target: string }
-  | { ok: false; message: string };
+export type QueryResolution = { ok: true; target: string } | { ok: false; message: string };
 
 type ResolveQueryOptions = {
   evmRpcUrl?: string | null;
 };
 
-async function resolveEvmHashTarget(
-  hash: string,
-  rpcUrl?: string | null,
-): Promise<QueryResolution> {
+async function resolveEvmHashTarget(hash: string, rpcUrl?: string | null): Promise<QueryResolution> {
   if (!rpcUrl) {
     return { ok: true, target: `/evm/tx/${hash}` };
   }
@@ -36,11 +31,7 @@ async function resolveEvmHashTarget(
   };
 }
 
-export async function resolveQueryTarget(
-  raw: string,
-  mode: PlatformMode,
-  options: ResolveQueryOptions = {},
-): Promise<QueryResolution> {
+export async function resolveQueryTarget(raw: string, mode: PlatformMode, options: ResolveQueryOptions = {}): Promise<QueryResolution> {
   const match = parseQuery(raw);
 
   if (match.type === 'evm-hash') {

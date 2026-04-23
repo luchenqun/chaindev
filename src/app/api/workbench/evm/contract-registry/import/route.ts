@@ -1,8 +1,5 @@
 import { z } from 'zod';
-import {
-  importedEvmContractArtifactSchema,
-  importedEvmContractBindingSchema,
-} from '@/server/schemas/workbench-migration';
+import { importedEvmContractArtifactSchema, importedEvmContractBindingSchema } from '@/server/schemas/workbench-migration';
 import { fail, ok } from '@/server/utils/api-response';
 import { normalizeApiError } from '@/server/utils/error-normalizer';
 import { requireSessionUserId } from '@/server/utils/auth-user';

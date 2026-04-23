@@ -11,13 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   clearActiveRpcProfileCookie,
   createRpcProfile,
@@ -29,15 +23,8 @@ import {
   setLocalSelectedRpcProfile,
   writeActiveRpcProfileCookie,
 } from '@/platform/workbench/rpc-profile-client';
-import type {
-  RpcProfile,
-  RpcProfileDraft,
-  SelectedRpcProfileMap,
-} from '@/platform/workbench/rpc-profile';
-import {
-  getDefaultGuestRpcProfiles,
-  getDefaultGuestSelectedRpcProfiles,
-} from '@/platform/workbench/defaults';
+import type { RpcProfile, RpcProfileDraft, SelectedRpcProfileMap } from '@/platform/workbench/rpc-profile';
+import { getDefaultGuestRpcProfiles, getDefaultGuestSelectedRpcProfiles } from '@/platform/workbench/defaults';
 
 type RpcProviderManagerProps = {
   mode: PlatformMode;
@@ -64,19 +51,11 @@ function getInitialDraft(mode: PlatformMode): DraftState {
   };
 }
 
-function getPreferredProfile(
-  mode: PlatformMode,
-  profiles: RpcProfile[],
-  selected: SelectedRpcProfileMap,
-) {
+function getPreferredProfile(mode: PlatformMode, profiles: RpcProfile[], selected: SelectedRpcProfileMap) {
   const modeProfiles = profiles.filter((profile) => profile.mode === mode);
   const preferredId = selected[mode] ?? modeProfiles[0]?.id;
 
-  return (
-    modeProfiles.find((profile) => profile.id === preferredId) ??
-    modeProfiles[0] ??
-    null
-  );
+  return modeProfiles.find((profile) => profile.id === preferredId) ?? modeProfiles[0] ?? null;
 }
 
 function getModeLabel(mode: PlatformMode) {
@@ -104,10 +83,7 @@ function formatTimestamp(timestamp: number) {
   }).format(new Date(timestamp));
 }
 
-export function RpcProviderManager({
-  mode,
-  variant = 'compact',
-}: RpcProviderManagerProps) {
+export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderManagerProps) {
   const router = useRouter();
   const { status } = useSession();
   const isAuthenticated = status === 'authenticated';
@@ -123,33 +99,14 @@ export function RpcProviderManager({
   const [source, setSource] = useState<'guest' | 'server'>('guest');
   const [draft, setDraft] = useState<DraftState>(getInitialDraft(mode));
   const hasPersistedProfiles = profiles.length > 0;
-  const topbarProfiles = useMemo(
-    () =>
-      isAuthenticated
-        ? profiles
-        : profiles.length
-          ? profiles
-          : getDefaultGuestRpcProfiles(),
-    [isAuthenticated, profiles],
-  );
+  const topbarProfiles = useMemo(() => (isAuthenticated ? profiles : profiles.length ? profiles : getDefaultGuestRpcProfiles()), [isAuthenticated, profiles]);
   const topbarSelected = useMemo(
-    () =>
-      isAuthenticated
-        ? selected
-        : profiles.length
-          ? selected
-          : getDefaultGuestSelectedRpcProfiles(),
+    () => (isAuthenticated ? selected : profiles.length ? selected : getDefaultGuestSelectedRpcProfiles()),
     [isAuthenticated, profiles.length, selected],
   );
 
-  const activeProfile = useMemo(
-    () => getPreferredProfile(mode, profiles, selected),
-    [mode, profiles, selected],
-  );
-  const topbarActiveProfile = useMemo(
-    () => getPreferredProfile(mode, topbarProfiles, topbarSelected),
-    [mode, topbarProfiles, topbarSelected],
-  );
+  const activeProfile = useMemo(() => getPreferredProfile(mode, profiles, selected), [mode, profiles, selected]);
+  const topbarActiveProfile = useMemo(() => getPreferredProfile(mode, topbarProfiles, topbarSelected), [mode, topbarProfiles, topbarSelected]);
   const sortedProfiles = useMemo(
     () =>
       [...profiles].sort((left, right) => {
@@ -174,9 +131,7 @@ export function RpcProviderManager({
   );
 
   useEffect(() => {
-    setDraft((current) =>
-      current.mode === mode ? current : getInitialDraft(mode),
-    );
+    setDraft((current) => (current.mode === mode ? current : getInitialDraft(mode)));
   }, [mode]);
 
   useEffect(() => {
@@ -202,11 +157,7 @@ export function RpcProviderManager({
         setError(null);
       } catch (loadError) {
         if (!cancelled) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : 'Failed to load RPC providers.',
-          );
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load RPC providers.');
         }
       } finally {
         if (!cancelled) {
@@ -239,24 +190,13 @@ export function RpcProviderManager({
       return;
     }
 
-    if (
-      cookieProfile?.id !== preferred.id ||
-      cookieProfile.rpcUrl !== preferred.rpcUrl ||
-      cookieProfile.restUrl !== preferred.restUrl ||
-      cookieProfile.wsUrl !== preferred.wsUrl
-    ) {
+    if (cookieProfile?.id !== preferred.id || cookieProfile.rpcUrl !== preferred.rpcUrl || cookieProfile.restUrl !== preferred.restUrl || cookieProfile.wsUrl !== preferred.wsUrl) {
       writeActiveRpcProfileCookie(preferred);
       router.refresh();
     }
   }, [loading, mode, profiles, router, selected]);
 
-  const saveDisabled =
-    saving ||
-    !draft.name.trim() ||
-    !draft.rpcUrl.trim() ||
-    (draft.mode === 'evm'
-      ? !draft.nativeCurrencySymbol.trim()
-      : !draft.restUrl.trim());
+  const saveDisabled = saving || !draft.name.trim() || !draft.rpcUrl.trim() || (draft.mode === 'evm' ? !draft.nativeCurrencySymbol.trim() : !draft.restUrl.trim());
   function goToLogin() {
     const callbackUrl = encodeURIComponent(window.location.pathname);
     router.push(`/login?callbackUrl=${callbackUrl}`);
@@ -307,13 +247,8 @@ export function RpcProviderManager({
               wsUrl: draft.wsUrl.trim(),
             };
 
-      const { profile } = editingId
-        ? await editRpcProfile(editingId, payload)
-        : await createRpcProfile(payload);
-      const nextProfiles = [
-        profile,
-        ...profiles.filter((item) => item.id !== profile.id),
-      ];
+      const { profile } = editingId ? await editRpcProfile(editingId, payload) : await createRpcProfile(payload);
+      const nextProfiles = [profile, ...profiles.filter((item) => item.id !== profile.id)];
       const nextSelected = {
         ...selected,
         [profile.mode]: profile.id,
@@ -329,19 +264,12 @@ export function RpcProviderManager({
       setOpen(false);
       router.refresh();
     } catch (saveError) {
-      if (
-        saveError instanceof Error &&
-        saveError.name === 'AuthRequiredError'
-      ) {
+      if (saveError instanceof Error && saveError.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : 'Failed to save RPC provider.',
-      );
+      setError(saveError instanceof Error ? saveError.message : 'Failed to save RPC provider.');
     } finally {
       setSaving(false);
     }
@@ -356,10 +284,7 @@ export function RpcProviderManager({
       const remaining = profiles.filter((item) => item.id !== profile.id);
       const fallback = getPreferredProfile(profile.mode, remaining, {
         ...selected,
-        [profile.mode]:
-          selected[profile.mode] === profile.id
-            ? undefined
-            : selected[profile.mode],
+        [profile.mode]: selected[profile.mode] === profile.id ? undefined : selected[profile.mode],
       });
       const nextSelected = {
         ...selected,
@@ -385,19 +310,12 @@ export function RpcProviderManager({
         }
       }
     } catch (deleteError) {
-      if (
-        deleteError instanceof Error &&
-        deleteError.name === 'AuthRequiredError'
-      ) {
+      if (deleteError instanceof Error && deleteError.name === 'AuthRequiredError') {
         goToLogin();
         return;
       }
 
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : 'Failed to delete RPC provider.',
-      );
+      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete RPC provider.');
     } finally {
       setDeletingId(null);
     }
@@ -432,24 +350,12 @@ export function RpcProviderManager({
         <table className="data-table">
           <thead>
             <tr>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                Mode
-              </th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                Name
-              </th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                RPC URL
-              </th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                Details
-              </th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                Updated
-              </th>
-              <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">
-                Actions
-              </th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Mode</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">RPC URL</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Details</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Updated</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -458,39 +364,25 @@ export function RpcProviderManager({
                 return (
                   <tr key={profile.id} className="border-t border-slate-200">
                     <td className="px-5 py-3 text-sm text-slate-700">
-                      <Badge variant="secondary">
-                        {getModeLabel(profile.mode)}
-                      </Badge>
+                      <Badge variant="secondary">{getModeLabel(profile.mode)}</Badge>
                     </td>
                     <td className="px-5 py-3 text-sm">
-                      <span className="font-medium text-slate-900">
-                        {profile.name}
-                      </span>
+                      <span className="font-medium text-slate-900">{profile.name}</span>
                     </td>
                     <td className="max-w-[28rem] px-5 py-3 text-sm text-slate-700">
-                      <span className="block truncate font-mono text-[13px]">
-                        {profile.rpcUrl}
-                      </span>
+                      <span className="block truncate font-mono text-[13px]">{profile.rpcUrl}</span>
                     </td>
                     <td className="max-w-[20rem] px-5 py-3 text-sm text-slate-500">
                       {profile.mode === 'evm' ? (
-                        <span className="block truncate">
-                          Currency: {profile.nativeCurrencySymbol ?? 'ETH'}
-                        </span>
+                        <span className="block truncate">Currency: {profile.nativeCurrencySymbol ?? 'ETH'}</span>
                       ) : (
                         <div className="grid gap-1">
-                          <span className="block truncate">
-                            REST: {profile.restUrl ?? '-'}
-                          </span>
-                          <span className="block truncate">
-                            WS: {profile.wsUrl ?? '-'}
-                          </span>
+                          <span className="block truncate">REST: {profile.restUrl ?? '-'}</span>
+                          <span className="block truncate">WS: {profile.wsUrl ?? '-'}</span>
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-sm text-slate-500">
-                      {formatTimestamp(profile.updatedAt)}
-                    </td>
+                    <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(profile.updatedAt)}</td>
                     <td className="px-5 py-3 text-sm">
                       <div className="flex items-center justify-end gap-0">
                         {source === 'server' ? (
@@ -521,10 +413,7 @@ export function RpcProviderManager({
               })
             ) : (
               <tr>
-                <td
-                  className="px-5 py-10 text-center text-sm text-slate-500"
-                  colSpan={6}
-                >
+                <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
                   No providers saved yet.
                 </td>
               </tr>
@@ -542,28 +431,15 @@ export function RpcProviderManager({
           <div className="border-b border-slate-200 px-5 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-slate-500">
-                  Browse, activate, edit, or remove saved EVM and Cosmos
-                  providers from one place.
-                </p>
+                <p className="text-sm text-slate-500">Browse, activate, edit, or remove saved EVM and Cosmos providers from one place.</p>
               </div>
               <Button type="button" size="sm" onClick={handleOpenCreate}>
                 {isAuthenticated ? 'Add' : 'Sign In to Add'}
               </Button>
             </div>
           </div>
-          {error ? (
-            <p className="border-b border-slate-200 px-5 py-4 text-sm text-rose-600">
-              {error}
-            </p>
-          ) : null}
-          {loading ? (
-            <div className="px-5 py-10 text-sm text-slate-500">
-              Loading providers...
-            </div>
-          ) : (
-            renderProfilesTable()
-          )}
+          {error ? <p className="border-b border-slate-200 px-5 py-4 text-sm text-rose-600">{error}</p> : null}
+          {loading ? <div className="px-5 py-10 text-sm text-slate-500">Loading providers...</div> : renderProfilesTable()}
         </section>
 
         <ModalDialog
@@ -579,23 +455,11 @@ export function RpcProviderManager({
           description="Choose the chain type first, then enter the RPC endpoint used by explorer and workbench pages."
           footer={
             <>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setOpen(false)}
-              >
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                type="button"
-                disabled={saveDisabled}
-                onClick={() => void handleSave()}
-              >
-                {saving
-                  ? 'Saving...'
-                  : editingId
-                    ? 'Save Changes'
-                    : 'Save Provider'}
+              <Button type="button" disabled={saveDisabled} onClick={() => void handleSave()}>
+                {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Save Provider'}
               </Button>
             </>
           }
@@ -603,9 +467,7 @@ export function RpcProviderManager({
         >
           <div className="grid gap-4 pb-1 md:grid-cols-2">
             <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-700">
-                Chain Type
-              </span>
+              <span className="text-sm font-medium text-slate-700">Chain Type</span>
               <Select
                 value={draft.mode}
                 disabled={Boolean(editingId)}
@@ -626,9 +488,7 @@ export function RpcProviderManager({
               </Select>
             </label>
             <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-700">
-                Provider Name
-              </span>
+              <span className="text-sm font-medium text-slate-700">Provider Name</span>
               <Input
                 value={draft.name}
                 onChange={(event) =>
@@ -637,16 +497,12 @@ export function RpcProviderManager({
                     name: event.target.value,
                   }))
                 }
-                placeholder={
-                  draft.mode === 'evm' ? 'Local EVM' : 'Local Cosmos'
-                }
+                placeholder={draft.mode === 'evm' ? 'Local EVM' : 'Local Cosmos'}
               />
             </label>
             {draft.mode === 'evm' ? (
               <label className="grid gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">
-                  Currency Name
-                </span>
+                <span className="text-sm font-medium text-slate-700">Currency Name</span>
                 <Input
                   value={draft.nativeCurrencySymbol}
                   onChange={(event) =>
@@ -660,9 +516,7 @@ export function RpcProviderManager({
               </label>
             ) : null}
             <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">
-                RPC URL
-              </span>
+              <span className="text-sm font-medium text-slate-700">RPC URL</span>
               <Input
                 value={draft.rpcUrl}
                 onChange={(event) =>
@@ -671,19 +525,13 @@ export function RpcProviderManager({
                     rpcUrl: event.target.value,
                   }))
                 }
-                placeholder={
-                  draft.mode === 'evm'
-                    ? 'http://127.0.0.1:8545'
-                    : 'http://127.0.0.1:26657'
-                }
+                placeholder={draft.mode === 'evm' ? 'http://127.0.0.1:8545' : 'http://127.0.0.1:26657'}
               />
             </label>
             {draft.mode === 'cosmos' ? (
               <>
                 <label className="grid gap-2 md:col-span-2">
-                  <span className="text-sm font-medium text-slate-700">
-                    REST URL
-                  </span>
+                  <span className="text-sm font-medium text-slate-700">REST URL</span>
                   <Input
                     value={draft.restUrl}
                     onChange={(event) =>
@@ -696,9 +544,7 @@ export function RpcProviderManager({
                   />
                 </label>
                 <label className="grid gap-2 md:col-span-2">
-                  <span className="text-sm font-medium text-slate-700">
-                    WebSocket URL
-                  </span>
+                  <span className="text-sm font-medium text-slate-700">WebSocket URL</span>
                   <Input
                     value={draft.wsUrl}
                     onChange={(event) =>
@@ -724,11 +570,7 @@ export function RpcProviderManager({
             }
           }}
           title="Delete Provider"
-          description={
-            deleteTarget
-              ? `Remove provider "${deleteTarget.name}" and its saved endpoint configuration?`
-              : undefined
-          }
+          description={deleteTarget ? `Remove provider "${deleteTarget.name}" and its saved endpoint configuration?` : undefined}
           confirmLabel="Delete"
           onConfirm={() => {
             if (deleteTarget) {
@@ -747,18 +589,13 @@ export function RpcProviderManager({
           value={topbarActiveProfile?.id}
           disabled={loading || !hasPersistedProfiles}
           onValueChange={(value) => {
-            const profile =
-              topbarSortedProfiles.find((item) => item.id === value) ?? null;
+            const profile = topbarSortedProfiles.find((item) => item.id === value) ?? null;
             handleUse(profile);
           }}
         >
           <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] leading-none shadow-none focus:ring-0">
             <span className="truncate">
-              {topbarActiveProfile
-                ? `${getModeLabel(topbarActiveProfile.mode)} · ${topbarActiveProfile.name}`
-                : loading
-                  ? 'Loading providers...'
-                  : 'No provider'}
+              {topbarActiveProfile ? `${getModeLabel(topbarActiveProfile.mode)} · ${topbarActiveProfile.name}` : loading ? 'Loading providers...' : 'No provider'}
             </span>
           </SelectTrigger>
           <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
@@ -779,19 +616,12 @@ export function RpcProviderManager({
         value={activeProfile?.id}
         disabled={loading || sortedProfiles.length <= 1}
         onValueChange={(value) => {
-          const profile =
-            sortedProfiles.find((item) => item.id === value) ?? null;
+          const profile = sortedProfiles.find((item) => item.id === value) ?? null;
           handleUse(profile);
         }}
       >
         <SelectTrigger className="h-9 w-auto justify-start gap-1.5 rounded-xl border-slate-200 bg-white px-4 pr-2.5 text-[13px] shadow-sm">
-          <span className="truncate">
-            {activeProfile
-              ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}`
-              : loading
-                ? 'Loading providers...'
-                : 'No provider'}
-          </span>
+          <span className="truncate">{activeProfile ? `${getModeLabel(activeProfile.mode)} · ${activeProfile.name}` : loading ? 'Loading providers...' : 'No provider'}</span>
         </SelectTrigger>
         <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
           {sortedProfiles.map((profile) => (

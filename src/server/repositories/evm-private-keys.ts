@@ -4,10 +4,7 @@ import { isAddress } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { db } from '@/db/client';
 import { evmPrivateKeys } from '@/db/schema/workbench';
-import {
-  decryptEvmPrivateKey,
-  encryptEvmPrivateKey,
-} from '@/server/security/evm-private-key-encryption';
+import { decryptEvmPrivateKey, encryptEvmPrivateKey } from '@/server/security/evm-private-key-encryption';
 
 function normalizePrivateKey(privateKey: string) {
   let value = privateKey.trim();
@@ -38,31 +35,15 @@ function normalizeName(name: string) {
 }
 
 export async function listServerEvmPrivateKeys(userId: string) {
-  return db
-    .select()
-    .from(evmPrivateKeys)
-    .where(eq(evmPrivateKeys.userId, userId))
-    .orderBy(desc(evmPrivateKeys.updatedAt))
-    .all();
+  return db.select().from(evmPrivateKeys).where(eq(evmPrivateKeys.userId, userId)).orderBy(desc(evmPrivateKeys.updatedAt)).all();
 }
 
-export async function createServerEvmPrivateKey(input: {
-  userId: string;
-  name: string;
-  privateKey: string;
-  securityMode: 'plain' | 'encrypted';
-  password?: string;
-}) {
+export async function createServerEvmPrivateKey(input: { userId: string; name: string; privateKey: string; securityMode: 'plain' | 'encrypted'; password?: string }) {
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
-  const address = privateKeyToAccount(
-    normalizedPrivateKey as `0x${string}`,
-  ).address;
+  const address = privateKeyToAccount(normalizedPrivateKey as `0x${string}`).address;
   const addressLower = address.toLowerCase();
   const duplicate = await db.query.evmPrivateKeys.findFirst({
-    where: and(
-      eq(evmPrivateKeys.userId, input.userId),
-      eq(evmPrivateKeys.addressLower, addressLower),
-    ),
+    where: and(eq(evmPrivateKeys.userId, input.userId), eq(evmPrivateKeys.addressLower, addressLower)),
   });
 
   if (duplicate) {
@@ -70,10 +51,7 @@ export async function createServerEvmPrivateKey(input: {
   }
 
   const now = Date.now();
-  const encryptedPayload =
-    input.securityMode === 'encrypted'
-      ? encryptEvmPrivateKey(normalizedPrivateKey, input.password ?? '')
-      : null;
+  const encryptedPayload = input.securityMode === 'encrypted' ? encryptEvmPrivateKey(normalizedPrivateKey, input.password ?? '') : null;
   const row = {
     id: randomUUID(),
     userId: input.userId,
@@ -95,11 +73,7 @@ export async function createServerEvmPrivateKey(input: {
   return row;
 }
 
-export async function renameServerEvmPrivateKey(
-  userId: string,
-  id: string,
-  name: string,
-) {
+export async function renameServerEvmPrivateKey(userId: string, id: string, name: string) {
   db.update(evmPrivateKeys)
     .set({
       name: normalizeName(name),
@@ -115,34 +89,19 @@ export async function renameServerEvmPrivateKey(
   );
 }
 
-export async function updateServerEvmPrivateKey(input: {
-  userId: string;
-  id: string;
-  name: string;
-  privateKey: string;
-  securityMode: 'plain' | 'encrypted';
-  password?: string;
-}) {
+export async function updateServerEvmPrivateKey(input: { userId: string; id: string; name: string; privateKey: string; securityMode: 'plain' | 'encrypted'; password?: string }) {
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
-  const address = privateKeyToAccount(
-    normalizedPrivateKey as `0x${string}`,
-  ).address;
+  const address = privateKeyToAccount(normalizedPrivateKey as `0x${string}`).address;
   const addressLower = address.toLowerCase();
   const duplicate = await db.query.evmPrivateKeys.findFirst({
-    where: and(
-      eq(evmPrivateKeys.userId, input.userId),
-      eq(evmPrivateKeys.addressLower, addressLower),
-    ),
+    where: and(eq(evmPrivateKeys.userId, input.userId), eq(evmPrivateKeys.addressLower, addressLower)),
   });
 
   if (duplicate && duplicate.id !== input.id) {
     throw new Error('This private key address already exists.');
   }
 
-  const encryptedPayload =
-    input.securityMode === 'encrypted'
-      ? encryptEvmPrivateKey(normalizedPrivateKey, input.password ?? '')
-      : null;
+  const encryptedPayload = input.securityMode === 'encrypted' ? encryptEvmPrivateKey(normalizedPrivateKey, input.password ?? '') : null;
 
   db.update(evmPrivateKeys)
     .set({
@@ -157,29 +116,17 @@ export async function updateServerEvmPrivateKey(input: {
       authTag: encryptedPayload?.authTag ?? null,
       updatedAt: Date.now(),
     })
-    .where(
-      and(
-        eq(evmPrivateKeys.userId, input.userId),
-        eq(evmPrivateKeys.id, input.id),
-      ),
-    )
+    .where(and(eq(evmPrivateKeys.userId, input.userId), eq(evmPrivateKeys.id, input.id)))
     .run();
 
   return (
     (await db.query.evmPrivateKeys.findFirst({
-      where: and(
-        eq(evmPrivateKeys.userId, input.userId),
-        eq(evmPrivateKeys.id, input.id),
-      ),
+      where: and(eq(evmPrivateKeys.userId, input.userId), eq(evmPrivateKeys.id, input.id)),
     })) ?? null
   );
 }
 
-export async function unlockServerEvmPrivateKey(
-  userId: string,
-  id: string,
-  password: string,
-) {
+export async function unlockServerEvmPrivateKey(userId: string, id: string, password: string) {
   const item =
     (await db.query.evmPrivateKeys.findFirst({
       where: and(eq(evmPrivateKeys.userId, userId), eq(evmPrivateKeys.id, id)),
@@ -238,10 +185,7 @@ export async function deleteServerEvmPrivateKey(userId: string, id: string) {
   return { id };
 }
 
-export async function touchServerEvmPrivateKeyLastUsed(
-  userId: string,
-  id: string,
-) {
+export async function touchServerEvmPrivateKeyLastUsed(userId: string, id: string) {
   db.update(evmPrivateKeys)
     .set({
       lastUsedAt: Date.now(),

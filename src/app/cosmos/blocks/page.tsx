@@ -20,17 +20,13 @@ function CosmosBlocksPageContent() {
   const { latestFeed } = useCosmosHomeData();
   const searchParamsText = searchParams.toString();
   const currentPage = parsePageParam(searchParams.get('page'));
-  const [data, setData] = useState<Awaited<
-    ReturnType<typeof getCosmosBlocksPageDirect>
-  > | null>(null);
+  const [data, setData] = useState<Awaited<ReturnType<typeof getCosmosBlocksPageDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
 
   function handlePageChange(page: number) {
-    router.push(
-      buildPageHref(pathname, new URLSearchParams(searchParamsText), page),
-    );
+    router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
   }
 
   useEffect(() => {
@@ -47,23 +43,13 @@ function CosmosBlocksPageContent() {
           setErrorMessage(null);
 
           if (next.page !== currentPage) {
-            router.replace(
-              buildPageHref(
-                pathname,
-                new URLSearchParams(searchParamsText),
-                next.page,
-              ),
-            );
+            router.replace(buildPageHref(pathname, new URLSearchParams(searchParamsText), next.page));
           }
         }
       } catch (error) {
         if (!cancelled) {
           setData(null);
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : 'Failed to load Cosmos blocks.',
-          );
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos blocks.');
         }
       } finally {
         if (!cancelled) {
@@ -78,17 +64,11 @@ function CosmosBlocksPageContent() {
       void load();
     };
 
-    window.addEventListener(
-      'chaindev:active-rpc-profile-changed',
-      handleProfileChanged,
-    );
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(
-        'chaindev:active-rpc-profile-changed',
-        handleProfileChanged,
-      );
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [currentPage, pathname, router, searchParamsText]);
 
@@ -119,17 +99,11 @@ function CosmosBlocksPageContent() {
         };
       }
 
-      const mergedBlocks = [
-        latestFeed.blockPageItem,
-        ...current.blocks.filter(
-          (block) => block.height !== latestFeed.blockPageItem.height,
-        ),
-      ].slice(0, PAGE_SIZE);
+      const mergedBlocks = [latestFeed.blockPageItem, ...current.blocks.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
       const totalBlocks = latestFeed.latestBlockNumber || current.totalBlocks;
       const totalPages = Math.max(1, Math.ceil(totalBlocks / current.pageSize));
       const topBlock = mergedBlocks[0]?.height ?? latestFeed.latestBlock;
-      const bottomBlock =
-        mergedBlocks[mergedBlocks.length - 1]?.height ?? latestFeed.latestBlock;
+      const bottomBlock = mergedBlocks[mergedBlocks.length - 1]?.height ?? latestFeed.latestBlock;
 
       return {
         ...current,
@@ -153,12 +127,7 @@ function CosmosBlocksPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton
-          titleWidth="w-20"
-          metricCards={4}
-          rows={8}
-          columns={8}
-        />
+        <ListPageSkeleton titleWidth="w-20" metricCards={4} rows={8} columns={8} />
       </AppShell>
     );
   }
@@ -178,22 +147,13 @@ function CosmosBlocksPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">
-            Blocks
-          </h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Blocks</h1>
         </div>
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {data.summary.map((item) => (
-            <article
-              key={item.label}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                {item.label}
-              </p>
-              <p className="mt-2 text-[34px] font-semibold leading-none text-slate-900">
-                {item.value}
-              </p>
+            <article key={item.label} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
+              <p className="mt-2 text-[34px] font-semibold leading-none text-slate-900">{item.value}</p>
               <p className="mt-2 text-sm text-slate-500">{item.note}</p>
             </article>
           ))}
@@ -201,12 +161,9 @@ function CosmosBlocksPageContent() {
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-lg font-semibold text-slate-900">
-                {data.totalLabel}
-              </p>
+              <p className="text-lg font-semibold text-slate-900">{data.totalLabel}</p>
               <p className="mt-1 text-sm text-slate-500">
-                Page {data.page} of {data.totalPages}. Showing{' '}
-                {data.blocks.length} blocks from the selected Cosmos provider.
+                Page {data.page} of {data.totalPages}. Showing {data.blocks.length} blocks from the selected Cosmos provider.
               </p>
             </div>
             <div className="flex items-center gap-2 lg:justify-end">
@@ -220,21 +177,11 @@ function CosmosBlocksPageContent() {
               />
               <button
                 type="button"
-                aria-label={
-                  autoRefreshEnabled
-                    ? 'Disable auto refresh'
-                    : 'Enable auto refresh'
-                }
+                aria-label={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
                 aria-pressed={autoRefreshEnabled}
-                title={
-                  autoRefreshEnabled
-                    ? 'Auto refresh enabled'
-                    : 'Auto refresh disabled'
-                }
+                title={autoRefreshEnabled ? 'Auto refresh enabled' : 'Auto refresh disabled'}
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  autoRefreshEnabled
-                    ? 'border-sky-200 bg-sky-50 text-sky-600'
-                    : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
+                  autoRefreshEnabled ? 'border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
                 }`}
                 onClick={() => setAutoRefreshEnabled((current) => !current)}
               >
@@ -256,12 +203,7 @@ export default function CosmosBlocksPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton
-            titleWidth="w-20"
-            metricCards={4}
-            rows={8}
-            columns={8}
-          />
+          <ListPageSkeleton titleWidth="w-20" metricCards={4} rows={8} columns={8} />
         </AppShell>
       }
     >

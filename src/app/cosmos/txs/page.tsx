@@ -46,17 +46,16 @@ const EMPTY_COSMOS_TRANSACTION_SEARCH_FORM: CosmosTransactionSearchFormState = {
   endBlock: '',
 };
 
-const EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH: AppliedCosmosTransactionSearchFilters =
-  {
-    hasFilters: false,
-    hash: null,
-    sender: null,
-    recipient: null,
-    moduleName: null,
-    action: null,
-    startBlockNumber: null,
-    endBlockNumber: null,
-  };
+const EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH: AppliedCosmosTransactionSearchFilters = {
+  hasFilters: false,
+  hash: null,
+  sender: null,
+  recipient: null,
+  moduleName: null,
+  action: null,
+  startBlockNumber: null,
+  endBlockNumber: null,
+};
 
 function containsQueryQuote(value: string) {
   return /['"]/.test(value);
@@ -73,15 +72,11 @@ function describeActiveFilters(filters: AppliedCosmosTransactionSearchFilters) {
     filters.recipient ? `recipient ${filters.recipient}` : null,
     filters.moduleName ? `module ${filters.moduleName}` : null,
     filters.action ? `action ${filters.action}` : null,
-    filters.startBlockNumber != null || filters.endBlockNumber != null
-      ? 'block range'
-      : null,
+    filters.startBlockNumber != null || filters.endBlockNumber != null ? 'block range' : null,
   ].filter(Boolean);
 }
 
-function buildCosmosTransactionsSearchQuery(
-  filters: AppliedCosmosTransactionSearchFilters,
-) {
+function buildCosmosTransactionsSearchQuery(filters: AppliedCosmosTransactionSearchFilters) {
   const clauses: string[] = [];
 
   if (filters.hash) {
@@ -117,9 +112,7 @@ function buildCosmosTransactionsSearchQuery(
   return clauses.join(' AND ');
 }
 
-function parseCosmosTransactionSearchForm(
-  form: CosmosTransactionSearchFormState,
-): {
+function parseCosmosTransactionSearchForm(form: CosmosTransactionSearchFormState): {
   error: string | null;
   filters: AppliedCosmosTransactionSearchFilters;
 } {
@@ -144,23 +137,15 @@ function parseCosmosTransactionSearchForm(
     };
   }
 
-  if (
-    [sender, recipient, moduleName, action].some((value) =>
-      containsQueryQuote(value),
-    )
-  ) {
+  if ([sender, recipient, moduleName, action].some((value) => containsQueryQuote(value))) {
     return {
       error: 'Filter values must not contain quotation marks.',
       filters: EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH,
     };
   }
 
-  const startBlockNumber = form.startBlock.trim()
-    ? Number.parseInt(form.startBlock.trim(), 10)
-    : null;
-  const endBlockNumber = form.endBlock.trim()
-    ? Number.parseInt(form.endBlock.trim(), 10)
-    : null;
+  const startBlockNumber = form.startBlock.trim() ? Number.parseInt(form.startBlock.trim(), 10) : null;
+  const endBlockNumber = form.endBlock.trim() ? Number.parseInt(form.endBlock.trim(), 10) : null;
 
   if (
     (form.startBlock.trim() && !/^\d+$/.test(form.startBlock.trim())) ||
@@ -174,11 +159,7 @@ function parseCosmosTransactionSearchForm(
     };
   }
 
-  if (
-    startBlockNumber != null &&
-    endBlockNumber != null &&
-    startBlockNumber > endBlockNumber
-  ) {
+  if (startBlockNumber != null && endBlockNumber != null && startBlockNumber > endBlockNumber) {
     return {
       error: 'Start block must not be greater than end block.',
       filters: EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH,
@@ -207,48 +188,24 @@ function CosmosTransactionsPageContent() {
   const searchParamsText = searchParams.toString();
   const currentPage = parsePageParam(searchParams.get('page'));
   const { latestFeed } = useCosmosHomeData();
-  const [data, setData] = useState<Awaited<
-    ReturnType<typeof getCosmosTransactionsPageDirect>
-  > | null>(null);
+  const [data, setData] = useState<Awaited<ReturnType<typeof getCosmosTransactionsPageDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [searchForm, setSearchForm] = useState<CosmosTransactionSearchFormState>(
-    EMPTY_COSMOS_TRANSACTION_SEARCH_FORM,
-  );
-  const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(
-    null,
-  );
-  const [activeSearchFilters, setActiveSearchFilters] =
-    useState<AppliedCosmosTransactionSearchFilters>(
-      EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH,
-    );
+  const [searchForm, setSearchForm] = useState<CosmosTransactionSearchFormState>(EMPTY_COSMOS_TRANSACTION_SEARCH_FORM);
+  const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
+  const [activeSearchFilters, setActiveSearchFilters] = useState<AppliedCosmosTransactionSearchFilters>(EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const hasLoadedDataRef = useRef(false);
-  const currentQuery = useMemo(
-    () => buildCosmosTransactionsSearchQuery(activeSearchFilters),
-    [activeSearchFilters],
-  );
-  const activeFilterDescriptions = useMemo(
-    () => describeActiveFilters(activeSearchFilters),
-    [activeSearchFilters],
-  );
-  const liveBlockKey =
-    autoRefreshEnabled &&
-    !activeSearchFilters.hasFilters &&
-    currentPage === 1
-      ? latestFeed?.latestBlock ?? ''
-      : '';
+  const currentQuery = useMemo(() => buildCosmosTransactionsSearchQuery(activeSearchFilters), [activeSearchFilters]);
+  const activeFilterDescriptions = useMemo(() => describeActiveFilters(activeSearchFilters), [activeSearchFilters]);
+  const liveBlockKey = autoRefreshEnabled && !activeSearchFilters.hasFilters && currentPage === 1 ? (latestFeed?.latestBlock ?? '') : '';
 
   function handlePageChange(page: number) {
-    router.push(
-      buildPageHref(pathname, new URLSearchParams(searchParamsText), page),
-    );
+    router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
   }
 
-  function handleSearchInputChange<
-    Key extends keyof CosmosTransactionSearchFormState,
-  >(key: Key, value: CosmosTransactionSearchFormState[Key]) {
+  function handleSearchInputChange<Key extends keyof CosmosTransactionSearchFormState>(key: Key, value: CosmosTransactionSearchFormState[Key]) {
     setSearchErrorMessage(null);
     setSearchForm((current) => ({
       ...current,
@@ -268,9 +225,7 @@ function CosmosTransactionsPageContent() {
     setSearchDialogOpen(false);
 
     if (currentPage !== 1) {
-      router.push(
-        buildPageHref(pathname, new URLSearchParams(searchParamsText), 1),
-      );
+      router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), 1));
     }
   }
 
@@ -280,9 +235,7 @@ function CosmosTransactionsPageContent() {
     setActiveSearchFilters(EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH);
 
     if (currentPage !== 1) {
-      router.push(
-        buildPageHref(pathname, new URLSearchParams(searchParamsText), 1),
-      );
+      router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), 1));
     }
   }
 
@@ -307,24 +260,14 @@ function CosmosTransactionsPageContent() {
           setErrorMessage(null);
 
           if (next.page !== currentPage) {
-            router.replace(
-              buildPageHref(
-                pathname,
-                new URLSearchParams(searchParamsText),
-                next.page,
-              ),
-            );
+            router.replace(buildPageHref(pathname, new URLSearchParams(searchParamsText), next.page));
           }
         }
       } catch (error) {
         if (!cancelled) {
           hasLoadedDataRef.current = false;
           setData(null);
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : 'Failed to load Cosmos transactions.',
-          );
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos transactions.');
         }
       } finally {
         if (!cancelled) {
@@ -339,26 +282,13 @@ function CosmosTransactionsPageContent() {
       void load(true);
     };
 
-    window.addEventListener(
-      'chaindev:active-rpc-profile-changed',
-      handleProfileChanged,
-    );
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(
-        'chaindev:active-rpc-profile-changed',
-        handleProfileChanged,
-      );
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
-  }, [
-    currentPage,
-    currentQuery,
-    liveBlockKey,
-    pathname,
-    router,
-    searchParamsText,
-  ]);
+  }, [currentPage, currentQuery, liveBlockKey, pathname, router, searchParamsText]);
 
   if (loading) {
     return (
@@ -383,9 +313,7 @@ function CosmosTransactionsPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">
-            Transactions
-          </h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Transactions</h1>
         </div>
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
@@ -418,21 +346,11 @@ function CosmosTransactionsPageContent() {
               />
               <button
                 type="button"
-                aria-label={
-                  activeSearchFilters.hasFilters
-                    ? 'Edit transaction filters'
-                    : 'Search transactions'
-                }
+                aria-label={activeSearchFilters.hasFilters ? 'Edit transaction filters' : 'Search transactions'}
                 aria-pressed={activeSearchFilters.hasFilters}
-                title={
-                  activeSearchFilters.hasFilters
-                    ? 'Transaction filters active'
-                    : 'Search transactions'
-                }
+                title={activeSearchFilters.hasFilters ? 'Transaction filters active' : 'Search transactions'}
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  activeSearchFilters.hasFilters
-                    ? 'border-sky-200 bg-sky-50 text-sky-600'
-                    : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
+                  activeSearchFilters.hasFilters ? 'border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
                 }`}
                 onClick={() => setSearchDialogOpen(true)}
               >
@@ -440,11 +358,7 @@ function CosmosTransactionsPageContent() {
               </button>
               <button
                 type="button"
-                aria-label={
-                  autoRefreshEnabled
-                    ? 'Disable auto refresh'
-                    : 'Enable auto refresh'
-                }
+                aria-label={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
                 aria-pressed={autoRefreshEnabled}
                 title={
                   activeSearchFilters.hasFilters
@@ -454,9 +368,7 @@ function CosmosTransactionsPageContent() {
                       : 'Auto refresh disabled'
                 }
                 className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  autoRefreshEnabled
-                    ? 'border-sky-200 bg-sky-50 text-sky-600'
-                    : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
+                  autoRefreshEnabled ? 'border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
                 } ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
                 disabled={activeSearchFilters.hasFilters}
                 onClick={() => setAutoRefreshEnabled((current) => !current)}
@@ -470,44 +382,22 @@ function CosmosTransactionsPageContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Transaction Hash
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Type
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Block
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Age
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    From
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Gas Used / Wanted
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Fee
-                  </th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">
-                    Status
-                  </th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Transaction Hash</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Gas Used / Wanted</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Fee</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Status</th>
                 </tr>
               </thead>
               <tbody>
                 {data.transactions.length ? (
                   data.transactions.map((transaction) => (
-                    <tr
-                      key={transaction.hash}
-                      className="border-t border-slate-200"
-                    >
+                    <tr key={transaction.hash} className="border-t border-slate-200">
                       <td className="px-5 py-3 text-sm">
-                        <Link
-                          className="font-medium text-sky-600 hover:text-sky-700"
-                          href={`/cosmos/tx/${transaction.hash}`}
-                        >
+                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${transaction.hash}`}>
                           {transaction.hashLabel}
                         </Link>
                       </td>
@@ -517,10 +407,7 @@ function CosmosTransactionsPageContent() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums">
-                        <Link
-                          className="font-medium text-sky-600 hover:text-sky-700"
-                          href={`/cosmos/block/${transaction.height}`}
-                        >
+                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
                           {transaction.height}
                         </Link>
                       </td>
@@ -529,10 +416,7 @@ function CosmosTransactionsPageContent() {
                       </td>
                       <td className="px-5 py-3 text-sm">
                         {transaction.sender !== 'Unknown' ? (
-                          <Link
-                            className="font-medium text-sky-600 hover:text-sky-700"
-                            href={`/cosmos/account/${transaction.sender}`}
-                          >
+                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
                             {transaction.senderLabel}
                           </Link>
                         ) : (
@@ -542,15 +426,11 @@ function CosmosTransactionsPageContent() {
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
                         {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">
-                        {transaction.feeLabel}
-                      </td>
+                      <td className="px-5 py-3 text-sm text-slate-700">{transaction.feeLabel}</td>
                       <td className="px-5 py-3 text-sm">
                         <span
                           className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                            transaction.status === 'success'
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-rose-50 text-rose-700'
+                            transaction.status === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
                           }`}
                         >
                           {transaction.statusLabel}
@@ -560,13 +440,8 @@ function CosmosTransactionsPageContent() {
                   ))
                 ) : (
                   <tr>
-                    <td
-                      colSpan={9}
-                      className="px-5 py-10 text-center text-sm text-slate-500"
-                    >
-                      {activeSearchFilters.hasFilters
-                        ? 'No transactions matched the current filters.'
-                        : 'No transactions returned by the selected Cosmos RPC provider.'}
+                    <td colSpan={9} className="px-5 py-10 text-center text-sm text-slate-500">
+                      {activeSearchFilters.hasFilters ? 'No transactions matched the current filters.' : 'No transactions returned by the selected Cosmos RPC provider.'}
                     </td>
                   </tr>
                 )}
@@ -610,100 +485,70 @@ function CosmosTransactionsPageContent() {
       >
         <div className="grid gap-3 pb-1 md:grid-cols-2">
           <label className="grid gap-1.5 md:col-span-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Transaction Hash
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Transaction Hash</span>
             <input
               value={searchForm.hash}
-              onChange={(event) =>
-                handleSearchInputChange('hash', event.target.value)
-              }
+              onChange={(event) => handleSearchInputChange('hash', event.target.value)}
               placeholder="B7D332964F6A101E3511ED197FE240268E34A7F8141C937F8B7B658ED11EE8A1"
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Sender
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sender</span>
             <input
               value={searchForm.sender}
-              onChange={(event) =>
-                handleSearchInputChange('sender', event.target.value)
-              }
+              onChange={(event) => handleSearchInputChange('sender', event.target.value)}
               placeholder="evm1..."
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Recipient
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Recipient</span>
             <input
               value={searchForm.recipient}
-              onChange={(event) =>
-                handleSearchInputChange('recipient', event.target.value)
-              }
+              onChange={(event) => handleSearchInputChange('recipient', event.target.value)}
               placeholder="evm1..."
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Module
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Module</span>
             <input
               value={searchForm.moduleName}
-              onChange={(event) =>
-                handleSearchInputChange('moduleName', event.target.value)
-              }
+              onChange={(event) => handleSearchInputChange('moduleName', event.target.value)}
               placeholder="bank"
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Action
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Action</span>
             <input
               value={searchForm.action}
-              onChange={(event) =>
-                handleSearchInputChange('action', event.target.value)
-              }
+              onChange={(event) => handleSearchInputChange('action', event.target.value)}
               placeholder="/cosmos.bank.v1beta1.MsgSend"
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Start Block
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Block</span>
             <input
               value={searchForm.startBlock}
-              onChange={(event) =>
-                handleSearchInputChange('startBlock', event.target.value)
-              }
+              onChange={(event) => handleSearchInputChange('startBlock', event.target.value)}
               placeholder="0"
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-              End Block
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">End Block</span>
             <input
               value={searchForm.endBlock}
-              onChange={(event) =>
-                handleSearchInputChange('endBlock', event.target.value)
-              }
+              onChange={(event) => handleSearchInputChange('endBlock', event.target.value)}
               placeholder="0"
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
         </div>
-        {searchErrorMessage ? (
-          <p className="mt-4 text-sm text-rose-600">{searchErrorMessage}</p>
-        ) : null}
+        {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{searchErrorMessage}</p> : null}
       </ModalDialog>
     </AppShell>
   );

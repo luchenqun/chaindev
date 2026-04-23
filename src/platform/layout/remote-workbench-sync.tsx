@@ -14,11 +14,7 @@ export function RemoteWorkbenchSync() {
       return;
     }
 
-    void Promise.allSettled([
-      syncEvmKeyringFromServer(),
-      syncEvmAddressTagsFromServer(),
-      syncEvmContractRegistryFromServer(),
-    ]);
+    void Promise.allSettled([syncEvmKeyringFromServer(), syncEvmAddressTagsFromServer(), syncEvmContractRegistryFromServer()]);
   }, [status]);
 
   return null;

@@ -12,10 +12,7 @@ export function resolveAbsoluteCallbackUrl(callbackUrl?: string | null) {
   return new URL(callbackUrl ?? '/', window.location.origin).toString();
 }
 
-export function resolveClientRedirectUrl(
-  returnedUrl: string | null | undefined,
-  fallbackUrl?: string | null,
-) {
+export function resolveClientRedirectUrl(returnedUrl: string | null | undefined, fallbackUrl?: string | null) {
   const resolvedFallbackUrl = resolveAbsoluteCallbackUrl(fallbackUrl);
 
   if (typeof window === 'undefined') {
@@ -30,10 +27,7 @@ export function resolveClientRedirectUrl(
     const resolvedUrl = new URL(returnedUrl, window.location.origin);
 
     if (resolvedUrl.origin !== window.location.origin) {
-      return new URL(
-        `${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`,
-        window.location.origin,
-      ).toString();
+      return new URL(`${resolvedUrl.pathname}${resolvedUrl.search}${resolvedUrl.hash}`, window.location.origin).toString();
     }
 
     return resolvedUrl.toString();

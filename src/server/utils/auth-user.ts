@@ -9,8 +9,7 @@ export async function requireSessionUserId() {
 
 export async function requireSessionUser() {
   const session = await auth();
-  const user =
-    (session?.user as { id?: string; isAdmin?: boolean } | undefined) ?? null;
+  const user = (session?.user as { id?: string; isAdmin?: boolean } | undefined) ?? null;
 
   if (!user?.id) {
     return null;

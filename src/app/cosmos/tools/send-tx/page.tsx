@@ -8,10 +8,7 @@ export default function CosmosSendTxPage() {
       <main className="tool-card">
         <span className="kicker">Cosmos Workbench</span>
         <h1>Send Transaction Draft</h1>
-        <p>
-          Save message drafts, account addresses, gas, and memo values for a
-          future signing flow.
-        </p>
+        <p>Save message drafts, account addresses, gas, and memo values for a future signing flow.</p>
         <form className="tool-form">
           <div className="tool-form-grid">
             <input placeholder="From Address" />

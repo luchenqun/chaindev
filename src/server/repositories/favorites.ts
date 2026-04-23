@@ -25,10 +25,5 @@ export async function addFavorite(input: FavoriteInput) {
 }
 
 export async function listFavorites(userId: string) {
-  return db
-    .select()
-    .from(favorites)
-    .where(eq(favorites.userId, userId))
-    .orderBy(desc(favorites.createdAt))
-    .all();
+  return db.select().from(favorites).where(eq(favorites.userId, userId)).orderBy(desc(favorites.createdAt)).all();
 }

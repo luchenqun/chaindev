@@ -23,12 +23,7 @@ const bootstrapPrivateKeySchema = z
 
 const bootstrapPrivateKeyNameSchema = z.string().trim().min(1);
 
-function parseBootstrapJsonValue<T>(
-  raw: string | undefined,
-  key: string,
-  schema: z.ZodSchema<T>,
-  fallback: T,
-) {
+function parseBootstrapJsonValue<T>(raw: string | undefined, key: string, schema: z.ZodSchema<T>, fallback: T) {
   if (!raw) {
     return fallback;
   }
@@ -36,18 +31,13 @@ function parseBootstrapJsonValue<T>(
   try {
     return schema.parse(JSON.parse(raw));
   } catch (error) {
-    throw new Error(
-      `Invalid ${key} environment variable: ${
-        error instanceof Error ? error.message : 'Unknown error'
-      }`,
-    );
+    throw new Error(`Invalid ${key} environment variable: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
 export function readBootstrapEvmProvider() {
   return parseBootstrapJsonValue(
-    process.env.BOOTSTRAP_EVM_PROVIDER?.trim() ??
-      process.env.NEXT_PUBLIC_BOOTSTRAP_EVM_PROVIDER?.trim(),
+    process.env.BOOTSTRAP_EVM_PROVIDER?.trim() ?? process.env.NEXT_PUBLIC_BOOTSTRAP_EVM_PROVIDER?.trim(),
     'BOOTSTRAP_EVM_PROVIDER',
     bootstrapEvmProviderSchema,
     {
@@ -62,8 +52,7 @@ export function readBootstrapEvmProvider() {
 
 export function readBootstrapCosmosProvider() {
   return parseBootstrapJsonValue(
-    process.env.BOOTSTRAP_COSMOS_PROVIDER?.trim() ??
-      process.env.NEXT_PUBLIC_BOOTSTRAP_COSMOS_PROVIDER?.trim(),
+    process.env.BOOTSTRAP_COSMOS_PROVIDER?.trim() ?? process.env.NEXT_PUBLIC_BOOTSTRAP_COSMOS_PROVIDER?.trim(),
     'BOOTSTRAP_COSMOS_PROVIDER',
     bootstrapCosmosProviderSchema,
     {
@@ -77,9 +66,7 @@ export function readBootstrapCosmosProvider() {
 }
 
 export function readBootstrapPrivateKey() {
-  const raw =
-    process.env.BOOTSTRAP_PRIVATE_KEY?.trim() ??
-    process.env.NEXT_PUBLIC_BOOTSTRAP_PRIVATE_KEY?.trim();
+  const raw = process.env.BOOTSTRAP_PRIVATE_KEY?.trim() ?? process.env.NEXT_PUBLIC_BOOTSTRAP_PRIVATE_KEY?.trim();
 
   if (!raw) {
     return '0xf78a036930ce63791ea6ea20072986d8c3f16a6811f6a2583b0787c45086f769';
@@ -89,9 +76,7 @@ export function readBootstrapPrivateKey() {
 }
 
 export function readBootstrapPrivateKeyName() {
-  const raw =
-    process.env.BOOTSTRAP_PRIVATE_KEY_NAME?.trim() ??
-    process.env.NEXT_PUBLIC_BOOTSTRAP_PRIVATE_KEY_NAME?.trim();
+  const raw = process.env.BOOTSTRAP_PRIVATE_KEY_NAME?.trim() ?? process.env.NEXT_PUBLIC_BOOTSTRAP_PRIVATE_KEY_NAME?.trim();
 
   if (!raw) {
     return 'Alice';

@@ -25,10 +25,5 @@ export async function addRecentItem(input: RecentItemInput) {
 }
 
 export async function listRecentItems(userId: string) {
-  return db
-    .select()
-    .from(recentItems)
-    .where(eq(recentItems.userId, userId))
-    .orderBy(desc(recentItems.createdAt))
-    .all();
+  return db.select().from(recentItems).where(eq(recentItems.userId, userId)).orderBy(desc(recentItems.createdAt)).all();
 }

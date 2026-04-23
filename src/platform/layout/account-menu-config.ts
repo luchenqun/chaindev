@@ -42,9 +42,7 @@ export function getAccountMenuSections(mode: PlatformMode) {
   return accountMenuSections
     .map((section) => ({
       ...section,
-      items: section.items.filter(
-        (item) => !item.modes || item.modes.includes(mode),
-      ),
+      items: section.items.filter((item) => !item.modes || item.modes.includes(mode)),
     }))
     .filter((section) => section.items.length > 0);
 }

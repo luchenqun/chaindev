@@ -106,10 +106,7 @@ export async function PATCH(request: Request) {
       });
 
       if (!item) {
-        return fail(
-          { category: 'validation', message: 'Contract artifact not found.' },
-          404,
-        );
+        return fail({ category: 'validation', message: 'Contract artifact not found.' }, 404);
       }
 
       return ok(item);
@@ -123,10 +120,7 @@ export async function PATCH(request: Request) {
     });
 
     if (!item) {
-      return fail(
-        { category: 'validation', message: 'Bound contract not found.' },
-        404,
-      );
+      return fail({ category: 'validation', message: 'Bound contract not found.' }, 404);
     }
 
     return ok(item);
@@ -148,20 +142,11 @@ export async function DELETE(request: Request) {
     const kind = url.searchParams.get('kind');
 
     if (!id || !kind) {
-      return fail(
-        { category: 'validation', message: 'id and kind are required' },
-        400,
-      );
+      return fail({ category: 'validation', message: 'id and kind are required' }, 400);
     }
 
     if (kind === 'artifact') {
-      return ok(
-        await deleteServerEvmContractArtifact(
-          sessionUser.id,
-          id,
-          sessionUser.isAdmin,
-        ),
-      );
+      return ok(await deleteServerEvmContractArtifact(sessionUser.id, id, sessionUser.isAdmin));
     }
 
     if (kind === 'binding') {

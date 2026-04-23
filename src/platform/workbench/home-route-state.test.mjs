@@ -1,9 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  isCosmosHomeRouteActive,
-  isEvmRouteActive,
-} from './home-route-state.ts';
+import { isCosmosHomeRouteActive, isEvmRouteActive } from './home-route-state.ts';
 
 test('root route follows the active mode for cosmos home data', () => {
   assert.equal(isCosmosHomeRouteActive('/', 'cosmos'), true);

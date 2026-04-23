@@ -16,11 +16,7 @@ import {
   rememberEvmTransactionCache,
   type EvmCachedTransactionItem,
 } from '@/domains/evm/client/transaction-cache';
-import {
-  formatEvmAddressSummary,
-  formatEvmBlock,
-  formatEvmTransactionDetail,
-} from '@/domains/evm/server/formatters';
+import { formatEvmAddressSummary, formatEvmBlock, formatEvmTransactionDetail } from '@/domains/evm/server/formatters';
 
 function getActiveEvmProvider() {
   const profile = readActiveRpcProfileCookie('evm');
@@ -33,9 +29,7 @@ function getActiveEvmProvider() {
 }
 
 export function getActiveEvmCurrencyNameClient() {
-  return getEvmCurrencyName(
-    readActiveRpcProfileCookie('evm')?.nativeCurrencySymbol,
-  );
+  return getEvmCurrencyName(readActiveRpcProfileCookie('evm')?.nativeCurrencySymbol);
 }
 
 async function getEvmClientWithProfile() {
@@ -143,10 +137,7 @@ function formatBaseFee(value: bigint | null | undefined) {
     .replace(/\.?0+$/, '')} Gwei`;
 }
 
-function formatTransactionFee(
-  value: bigint | null | undefined,
-  currencyName: string,
-) {
+function formatTransactionFee(value: bigint | null | undefined, currencyName: string) {
   if (value == null) {
     return 'Unavailable';
   }
@@ -198,53 +189,36 @@ function derivePollIntervalMs(timestamps: bigint[]) {
   const latestTimestamp = timestamps[0];
   const oldestTimestamp = timestamps[timestamps.length - 1];
   const blockDistance = timestamps.length - 1;
-  const averageSeconds =
-    (Number(latestTimestamp - oldestTimestamp) / blockDistance) * 0.8;
+  const averageSeconds = (Number(latestTimestamp - oldestTimestamp) / blockDistance) * 0.8;
 
   return Math.max(1_000, Math.min(30_000, Math.round(averageSeconds * 1_000)));
 }
 
-function derivePollIntervalMsFromRange(
-  latestTimestamp: bigint,
-  oldestTimestamp: bigint,
-  blockSpan: number,
-) {
+function derivePollIntervalMsFromRange(latestTimestamp: bigint, oldestTimestamp: bigint, blockSpan: number) {
   if (blockSpan <= 0) {
     return 12_000;
   }
 
-  const averageSeconds =
-    (Number(latestTimestamp - oldestTimestamp) / blockSpan) * 0.8;
+  const averageSeconds = (Number(latestTimestamp - oldestTimestamp) / blockSpan) * 0.8;
 
   return Math.max(1_000, Math.min(30_000, Math.round(averageSeconds * 1_000)));
 }
 
 const HOME_BLOCK_FETCH_BATCH_SIZE = 12;
 
-type EvmPublicClient = Awaited<
-  ReturnType<typeof getEvmClientWithProfile>
->['client'];
+type EvmPublicClient = Awaited<ReturnType<typeof getEvmClientWithProfile>>['client'];
 
 function buildDescendingBlockNumbers(start: bigint, limit: number) {
   const numbers: bigint[] = [];
 
-  for (
-    let cursor = start;
-    cursor >= 0n && numbers.length < limit;
-    cursor -= 1n
-  ) {
+  for (let cursor = start; cursor >= 0n && numbers.length < limit; cursor -= 1n) {
     numbers.push(cursor);
   }
 
   return numbers;
 }
 
-async function getRecentBlocksChunk(
-  client: EvmPublicClient,
-  start: bigint,
-  limit: number,
-  includeTransactions = true,
-) {
+async function getRecentBlocksChunk(client: EvmPublicClient, start: bigint, limit: number, includeTransactions = true) {
   const blockNumbers = buildDescendingBlockNumbers(start, limit);
 
   return Promise.all(
@@ -269,14 +243,7 @@ function parseHexQuantity(value: unknown) {
   }
 }
 
-function formatHomeBlockItem(block: {
-  number: bigint;
-  hash: string | null;
-  miner: string;
-  transactions: readonly unknown[];
-  timestamp?: bigint | null;
-  gasUsed?: bigint | null;
-}) {
+function formatHomeBlockItem(block: { number: bigint; hash: string | null; miner: string; transactions: readonly unknown[]; timestamp?: bigint | null; gasUsed?: bigint | null }) {
   return {
     number: block.number.toString(),
     numberLabel: block.number.toString(),
@@ -302,14 +269,8 @@ type EvmHomeTransactionItem = {
   receiptStatus: EvmCachedTransactionItem['receiptStatus'] | undefined;
 };
 
-function buildHomeReceiptStatusByHash(
-  transactions: Array<Pick<EvmCachedTransactionItem, 'hash' | 'receiptStatus'>>,
-) {
-  return new Map(
-    transactions.map(
-      (transaction) => [transaction.hash, transaction.receiptStatus] as const,
-    ),
-  );
+function buildHomeReceiptStatusByHash(transactions: Array<Pick<EvmCachedTransactionItem, 'hash' | 'receiptStatus'>>) {
+  return new Map(transactions.map((transaction) => [transaction.hash, transaction.receiptStatus] as const));
 }
 
 function formatHomeTransactions(
@@ -317,10 +278,7 @@ function formatHomeTransactions(
   timestamp: bigint | null | undefined,
   currencyName: string,
   limit: number,
-  receiptStatusByHash?: Map<
-    string,
-    EvmCachedTransactionItem['receiptStatus'] | undefined
-  >,
+  receiptStatusByHash?: Map<string, EvmCachedTransactionItem['receiptStatus'] | undefined>,
 ) {
   const items: EvmHomeTransactionItem[] = [];
 
@@ -331,15 +289,8 @@ function formatHomeTransactions(
     value?: bigint;
   };
 
-  function isHomeTransactionLike(
-    transaction: unknown,
-  ): transaction is HomeTransactionLike {
-    return (
-      typeof transaction === 'object' &&
-      transaction !== null &&
-      'hash' in transaction &&
-      'from' in transaction
-    );
+  function isHomeTransactionLike(transaction: unknown): transaction is HomeTransactionLike {
+    return typeof transaction === 'object' && transaction !== null && 'hash' in transaction && 'from' in transaction;
   }
 
   for (const transaction of transactions) {
@@ -347,10 +298,7 @@ function formatHomeTransactions(
       break;
     }
 
-    if (
-      typeof transaction === 'string' ||
-      !isHomeTransactionLike(transaction)
-    ) {
+    if (typeof transaction === 'string' || !isHomeTransactionLike(transaction)) {
       continue;
     }
 
@@ -370,10 +318,7 @@ function formatHomeTransactions(
   return items;
 }
 
-function formatCachedHomeTransactions(
-  transactions: EvmCachedTransactionItem[],
-  limit: number,
-) {
+function formatCachedHomeTransactions(transactions: EvmCachedTransactionItem[], limit: number) {
   return transactions.slice(0, limit).map((transaction) => ({
     hash: transaction.hash,
     hashLabel: transaction.hashLabel,
@@ -399,21 +344,11 @@ type PageTransactionLike = {
   maxFeePerGas?: bigint | null;
 };
 
-function isPageTransactionLike(
-  transaction: unknown,
-): transaction is PageTransactionLike {
-  return (
-    typeof transaction === 'object' &&
-    transaction !== null &&
-    'hash' in transaction &&
-    'from' in transaction
-  );
+function isPageTransactionLike(transaction: unknown): transaction is PageTransactionLike {
+  return typeof transaction === 'object' && transaction !== null && 'hash' in transaction && 'from' in transaction;
 }
 
-function formatMethodLabel(
-  input: string | undefined,
-  to: string | null | undefined,
-) {
+function formatMethodLabel(input: string | undefined, to: string | null | undefined) {
   if (!to) {
     return 'Create';
   }
@@ -494,12 +429,7 @@ function finalizeTransactionsPageItems(
       toLower: transaction.to?.toLowerCase() ?? null,
       methodLabel: transaction.methodLabel,
       methodKey: transaction.methodLabel.toLowerCase(),
-      methodSelector:
-        transaction.inputData &&
-        transaction.inputData !== '0x' &&
-        transaction.inputData.length >= 10
-          ? transaction.inputData.slice(0, 10).toLowerCase()
-          : null,
+      methodSelector: transaction.inputData && transaction.inputData !== '0x' && transaction.inputData.length >= 10 ? transaction.inputData.slice(0, 10).toLowerCase() : null,
       inputData: transaction.inputData,
       amountLabel: transaction.amountLabel,
       valueWei: (transaction.value ?? 0n).toString(),
@@ -547,10 +477,7 @@ function formatTransactionsPageItemsForBlock(
       break;
     }
 
-    if (
-      typeof transaction === 'string' ||
-      !isPageTransactionLike(transaction)
-    ) {
+    if (typeof transaction === 'string' || !isPageTransactionLike(transaction)) {
       continue;
     }
 
@@ -600,11 +527,7 @@ function formatPendingGasPrice(value: bigint | null | undefined) {
     .replace(/\.?0+$/, '')} Gwei`;
 }
 
-function formatPendingTransactions(
-  transactions: readonly unknown[],
-  currencyName: string,
-  limit: number,
-) {
+function formatPendingTransactions(transactions: readonly unknown[], currencyName: string, limit: number) {
   const items: FormattedPendingTransactionItem[] = [];
 
   for (const transaction of transactions) {
@@ -612,15 +535,11 @@ function formatPendingTransactions(
       break;
     }
 
-    if (
-      typeof transaction === 'string' ||
-      !isPageTransactionLike(transaction)
-    ) {
+    if (typeof transaction === 'string' || !isPageTransactionLike(transaction)) {
       continue;
     }
 
-    const effectiveGasPrice =
-      transaction.gasPrice ?? transaction.maxFeePerGas ?? null;
+    const effectiveGasPrice = transaction.gasPrice ?? transaction.maxFeePerGas ?? null;
 
     items.push({
       hash: transaction.hash,
@@ -648,11 +567,7 @@ function formatPendingTransactions(
 
 export async function getEvmHomeMetricsDirect() {
   const { client } = await getEvmClientWithProfile();
-  const [chainId, block, gasPrice] = await Promise.all([
-    client.getChainId(),
-    client.getBlock(),
-    client.getGasPrice(),
-  ]);
+  const [chainId, block, gasPrice] = await Promise.all([client.getChainId(), client.getBlock(), client.getGasPrice()]);
 
   return {
     latestBlock: block.number.toString(),
@@ -662,23 +577,20 @@ export async function getEvmHomeMetricsDirect() {
   };
 }
 
-export async function getEvmHomeMetricsSupplementDirect(
-  includeChainId = false,
-) {
+export async function getEvmHomeMetricsSupplementDirect(includeChainId = false) {
   const { client, profile } = await getEvmClientWithProfile();
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const [chainId, gasPrice, pendingTransactionCountHex, cacheSummary] =
-    await Promise.all([
-      includeChainId ? client.getChainId() : Promise.resolve(null),
-      client.getGasPrice(),
-      client.transport
-        .request({
-          method: 'eth_getBlockTransactionCountByNumber',
-          params: ['pending'] as never,
-        })
-        .catch(() => null),
-      getEvmTransactionCacheSummary(),
-    ]);
+  const [chainId, gasPrice, pendingTransactionCountHex, cacheSummary] = await Promise.all([
+    includeChainId ? client.getChainId() : Promise.resolve(null),
+    client.getGasPrice(),
+    client.transport
+      .request({
+        method: 'eth_getBlockTransactionCountByNumber',
+        params: ['pending'] as never,
+      })
+      .catch(() => null),
+    getEvmTransactionCacheSummary(),
+  ]);
   const pendingTransactionCount = parseHexQuantity(pendingTransactionCountHex);
 
   return {
@@ -691,10 +603,7 @@ export async function getEvmHomeMetricsSupplementDirect(
     gasPriceLabel: `${Number(formatGwei(gasPrice))
       .toFixed(3)
       .replace(/\.?0+$/, '')} Gwei`,
-    pendingTransactionCountLabel:
-      pendingTransactionCount != null
-        ? formatInteger(pendingTransactionCount)
-        : 'Unavailable',
+    pendingTransactionCountLabel: pendingTransactionCount != null ? formatInteger(pendingTransactionCount) : 'Unavailable',
     cacheSummary,
   };
 }
@@ -702,27 +611,12 @@ export async function getEvmHomeMetricsSupplementDirect(
 export async function getEvmHomeBootstrapDirect(blockLimit = 6, txLimit = 6) {
   const { client, profile } = await getEvmClientWithProfile();
   const latestNumber = await client.getBlockNumber();
-  const blockCount =
-    latestNumber >= BigInt(blockLimit - 1)
-      ? blockLimit
-      : Number(latestNumber + 1n);
+  const blockCount = latestNumber >= BigInt(blockLimit - 1) ? blockLimit : Number(latestNumber + 1n);
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const [recentBlocks, cachedTransactionsPage] = await Promise.all([
-    getRecentBlocksChunk(client, latestNumber, blockCount, true),
-    getEvmCachedTransactionsPage(1, txLimit),
-  ]);
-  const cachedTransactions = formatCachedHomeTransactions(
-    cachedTransactionsPage.transactions,
-    txLimit,
-  );
-  const rememberedTransactions = await rememberEvmTransactionCache(
-    recentBlocks.flatMap((block) =>
-      formatTransactionsPageItemsForBlock(block, currencyName),
-    ),
-  );
-  const receiptStatusByHash = buildHomeReceiptStatusByHash(
-    rememberedTransactions,
-  );
+  const [recentBlocks, cachedTransactionsPage] = await Promise.all([getRecentBlocksChunk(client, latestNumber, blockCount, true), getEvmCachedTransactionsPage(1, txLimit)]);
+  const cachedTransactions = formatCachedHomeTransactions(cachedTransactionsPage.transactions, txLimit);
+  const rememberedTransactions = await rememberEvmTransactionCache(recentBlocks.flatMap((block) => formatTransactionsPageItemsForBlock(block, currencyName)));
+  const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
 
   const latestBlock = recentBlocks[0];
 
@@ -741,30 +635,15 @@ export async function getEvmHomeBootstrapDirect(blockLimit = 6, txLimit = 6) {
   }
 
   const fallbackTransactions = recentBlocks
-    .flatMap((block) =>
-      formatHomeTransactions(
-        block.transactions,
-        block.timestamp,
-        currencyName,
-        txLimit,
-        receiptStatusByHash,
-      ),
-    )
-    .filter(
-      (transaction, index, transactions) =>
-        transactions.findIndex(
-          (candidate) => candidate.hash === transaction.hash,
-        ) === index,
-    );
+    .flatMap((block) => formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit, receiptStatusByHash))
+    .filter((transaction, index, transactions) => transactions.findIndex((candidate) => candidate.hash === transaction.hash) === index);
 
   return {
     status: {
       latestBlock: latestBlock.number.toString(),
       latestBlockNumber: Number(latestBlock.number),
       latestBlockTime: formatLocalDateTime(latestBlock.timestamp),
-      latestBlockTimestamp: latestBlock.timestamp
-        ? Number(latestBlock.timestamp)
-        : null,
+      latestBlockTimestamp: latestBlock.timestamp ? Number(latestBlock.timestamp) : null,
       pollIntervalMs: 12_000,
     },
     recentBlocks: recentBlocks.map((block) => ({
@@ -772,21 +651,10 @@ export async function getEvmHomeBootstrapDirect(blockLimit = 6, txLimit = 6) {
       timestampMs: block.timestamp ? Number(block.timestamp) * 1000 : null,
       txCount: block.transactions.length,
       block: formatHomeBlockItem(block),
-      transactions: formatHomeTransactions(
-        block.transactions,
-        block.timestamp,
-        currencyName,
-        txLimit,
-        receiptStatusByHash,
-      ),
+      transactions: formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit, receiptStatusByHash),
     })),
     transactions: [...cachedTransactions, ...fallbackTransactions]
-      .filter(
-        (transaction, index, transactions) =>
-          transactions.findIndex(
-            (candidate) => candidate.hash === transaction.hash,
-          ) === index,
-      )
+      .filter((transaction, index, transactions) => transactions.findIndex((candidate) => candidate.hash === transaction.hash) === index)
       .slice(0, txLimit),
   };
 }
@@ -797,18 +665,13 @@ export async function getEvmLiveStatusDirect() {
   let pollIntervalMs = 12_000;
 
   if (latestBlock.number > 0n) {
-    const oldestBlockNumber =
-      latestBlock.number > 10n ? latestBlock.number - 10n : 0n;
+    const oldestBlockNumber = latestBlock.number > 10n ? latestBlock.number - 10n : 0n;
     const oldestBlock = await client.getBlock({
       blockNumber: oldestBlockNumber,
     });
 
     if (latestBlock.timestamp != null && oldestBlock.timestamp != null) {
-      pollIntervalMs = derivePollIntervalMsFromRange(
-        latestBlock.timestamp,
-        oldestBlock.timestamp,
-        Number(latestBlock.number - oldestBlock.number),
-      );
+      pollIntervalMs = derivePollIntervalMsFromRange(latestBlock.timestamp, oldestBlock.timestamp, Number(latestBlock.number - oldestBlock.number));
     }
   }
 
@@ -816,9 +679,7 @@ export async function getEvmLiveStatusDirect() {
     latestBlock: latestBlock.number.toString(),
     latestBlockNumber: Number(latestBlock.number),
     latestBlockTime: formatLocalDateTime(latestBlock.timestamp),
-    latestBlockTimestamp: latestBlock.timestamp
-      ? Number(latestBlock.timestamp)
-      : null,
+    latestBlockTimestamp: latestBlock.timestamp ? Number(latestBlock.timestamp) : null,
     pollIntervalMs,
   };
 }
@@ -842,16 +703,8 @@ export async function getEvmHomeActivityDirect(blockLimit = 4, txLimit = 4) {
   const cacheCandidates: EvmCachedTransactionItem[] = [];
   let cursor = latestNumber;
 
-  while (
-    cursor >= 0n &&
-    (blocks.length < blockLimit || transactions.length < txLimit)
-  ) {
-    const nextBlocks = await getRecentBlocksChunk(
-      client,
-      cursor,
-      Math.max(HOME_BLOCK_FETCH_BATCH_SIZE, blockLimit, txLimit),
-      true,
-    );
+  while (cursor >= 0n && (blocks.length < blockLimit || transactions.length < txLimit)) {
+    const nextBlocks = await getRecentBlocksChunk(client, cursor, Math.max(HOME_BLOCK_FETCH_BATCH_SIZE, blockLimit, txLimit), true);
 
     for (const block of nextBlocks) {
       if (blocks.length < blockLimit) {
@@ -859,19 +712,10 @@ export async function getEvmHomeActivityDirect(blockLimit = 4, txLimit = 4) {
       }
 
       if (transactions.length < txLimit) {
-        transactions.push(
-          ...formatHomeTransactions(
-            block.transactions,
-            block.timestamp,
-            currencyName,
-            txLimit - transactions.length,
-          ),
-        );
+        transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
       }
 
-      cacheCandidates.push(
-        ...formatTransactionsPageItemsForBlock(block, currencyName),
-      );
+      cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
 
       if (blocks.length >= blockLimit && transactions.length >= txLimit) {
         break;
@@ -887,11 +731,8 @@ export async function getEvmHomeActivityDirect(blockLimit = 4, txLimit = 4) {
     cursor = lastBlock.number - 1n;
   }
 
-  const rememberedTransactions =
-    await rememberEvmTransactionCache(cacheCandidates);
-  const receiptStatusByHash = buildHomeReceiptStatusByHash(
-    rememberedTransactions,
-  );
+  const rememberedTransactions = await rememberEvmTransactionCache(cacheCandidates);
+  const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
 
   return {
     blocks,
@@ -904,11 +745,7 @@ export async function getEvmHomeActivityDirect(blockLimit = 4, txLimit = 4) {
 
 export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
   const { client, profile } = await getEvmClientWithProfile();
-  const [chainId, gasPrice, latestNumber] = await Promise.all([
-    client.getChainId(),
-    client.getGasPrice(),
-    client.getBlockNumber(),
-  ]);
+  const [chainId, gasPrice, latestNumber] = await Promise.all([client.getChainId(), client.getGasPrice(), client.getBlockNumber()]);
   const blocks: Array<{
     number: string;
     numberLabel: string;
@@ -928,18 +765,8 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
   const cacheCandidates: EvmCachedTransactionItem[] = [];
   let cursor = latestNumber;
 
-  while (
-    cursor >= 0n &&
-    (timestamps.length < 11 ||
-      blocks.length < blockLimit ||
-      transactions.length < txLimit)
-  ) {
-    const nextBlocks = await getRecentBlocksChunk(
-      client,
-      cursor,
-      Math.max(HOME_BLOCK_FETCH_BATCH_SIZE, 11, blockLimit, txLimit),
-      true,
-    );
+  while (cursor >= 0n && (timestamps.length < 11 || blocks.length < blockLimit || transactions.length < txLimit)) {
+    const nextBlocks = await getRecentBlocksChunk(client, cursor, Math.max(HOME_BLOCK_FETCH_BATCH_SIZE, 11, blockLimit, txLimit), true);
 
     for (const block of nextBlocks) {
       if (latestBlockTimestamp == null) {
@@ -959,25 +786,12 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
       }
 
       if (transactions.length < txLimit) {
-        transactions.push(
-          ...formatHomeTransactions(
-            block.transactions,
-            block.timestamp,
-            currencyName,
-            txLimit - transactions.length,
-          ),
-        );
+        transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
       }
 
-      cacheCandidates.push(
-        ...formatTransactionsPageItemsForBlock(block, currencyName),
-      );
+      cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
 
-      if (
-        timestamps.length >= 11 &&
-        blocks.length >= blockLimit &&
-        transactions.length >= txLimit
-      ) {
+      if (timestamps.length >= 11 && blocks.length >= blockLimit && transactions.length >= txLimit) {
         break;
       }
     }
@@ -991,11 +805,8 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
     cursor = lastBlock.number - 1n;
   }
 
-  const rememberedTransactions =
-    await rememberEvmTransactionCache(cacheCandidates);
-  const receiptStatusByHash = buildHomeReceiptStatusByHash(
-    rememberedTransactions,
-  );
+  const rememberedTransactions = await rememberEvmTransactionCache(cacheCandidates);
+  const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
   const intervalSamples = timestamps
     .slice(0, 10)
     .map((timestamp, index) => {
@@ -1008,10 +819,7 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
       return Number(timestamp - previousTimestamp);
     })
     .filter((value): value is number => value != null);
-  const averageBlockTimeSeconds = intervalSamples.length
-    ? intervalSamples.reduce((sum, value) => sum + value, 0) /
-      intervalSamples.length
-    : null;
+  const averageBlockTimeSeconds = intervalSamples.length ? intervalSamples.reduce((sum, value) => sum + value, 0) / intervalSamples.length : null;
   const pendingTransactionCountHex = await client.transport
     .request({
       method: 'eth_getBlockTransactionCountByNumber',
@@ -1053,14 +861,8 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
       },
       {
         label: 'Pending Tx Count',
-        value:
-          pendingTransactionCount != null
-            ? formatInteger(pendingTransactionCount)
-            : 'Unavailable',
-        subtext:
-          pendingTransactionCount != null
-            ? 'Pending pool snapshot'
-            : 'Provider does not expose pending pool',
+        value: pendingTransactionCount != null ? formatInteger(pendingTransactionCount) : 'Unavailable',
+        subtext: pendingTransactionCount != null ? 'Pending pool snapshot' : 'Provider does not expose pending pool',
       },
       {
         label: 'Recent Tx Count',
@@ -1086,9 +888,7 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
       })),
     },
     latestBlockNumber: Number(latestNumber),
-    latestBlockTimestamp: latestBlockTimestamp
-      ? Number(latestBlockTimestamp)
-      : null,
+    latestBlockTimestamp: latestBlockTimestamp ? Number(latestBlockTimestamp) : null,
     pollIntervalMs: derivePollIntervalMs(timestamps),
   };
 }
@@ -1100,28 +900,16 @@ export async function getEvmLatestBlockActivityDirect(txLimit = 6) {
     blockTag: 'latest',
     includeTransactions: true,
   });
-  const rememberedTransactions = await rememberEvmTransactionCache(
-    formatTransactionsPageItemsForBlock(latestBlock, currencyName),
-  );
-  const receiptStatusByHash = buildHomeReceiptStatusByHash(
-    rememberedTransactions,
-  );
+  const rememberedTransactions = await rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(latestBlock, currencyName));
+  const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
 
   return {
     latestBlock: latestBlock.number.toString(),
     latestBlockNumber: Number(latestBlock.number),
     latestBlockTime: formatLocalDateTime(latestBlock.timestamp),
-    latestBlockTimestamp: latestBlock.timestamp
-      ? Number(latestBlock.timestamp)
-      : null,
+    latestBlockTimestamp: latestBlock.timestamp ? Number(latestBlock.timestamp) : null,
     block: formatHomeBlockItem(latestBlock),
-    transactions: formatHomeTransactions(
-      latestBlock.transactions,
-      latestBlock.timestamp,
-      currencyName,
-      txLimit,
-      receiptStatusByHash,
-    ),
+    transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.timestamp, currencyName, txLimit, receiptStatusByHash),
   };
 }
 
@@ -1133,8 +921,7 @@ export async function getLatestEvmBlockSummaryDirect() {
 export async function getRecentEvmBlocksDirect(limit = 8) {
   const { client } = await getEvmClientWithProfile();
   const latestNumber = await client.getBlockNumber();
-  const count =
-    latestNumber >= BigInt(limit - 1) ? limit : Number(latestNumber + 1n);
+  const count = latestNumber >= BigInt(limit - 1) ? limit : Number(latestNumber + 1n);
   const blocks = await getRecentBlocksChunk(client, latestNumber, count, false);
 
   return blocks.map((block) => formatEvmBlock(block));
@@ -1142,24 +929,13 @@ export async function getRecentEvmBlocksDirect(limit = 8) {
 
 export async function getEvmBlocksPageDirect(page = 1, limit = 10) {
   const { client } = await getEvmClientWithProfile();
-  const [latestNumber, earliestBlock] = await Promise.all([
-    client.getBlockNumber(),
-    client.getBlock({ blockNumber: 0n }).catch(() => null),
-  ]);
-  const earliestNumber =
-    earliestBlock &&
-    earliestBlock.number >= 0n &&
-    earliestBlock.number <= latestNumber
-      ? earliestBlock.number
-      : 0n;
+  const [latestNumber, earliestBlock] = await Promise.all([client.getBlockNumber(), client.getBlock({ blockNumber: 0n }).catch(() => null)]);
+  const earliestNumber = earliestBlock && earliestBlock.number >= 0n && earliestBlock.number <= latestNumber ? earliestBlock.number : 0n;
   const totalBlocks = Number(latestNumber - earliestNumber + 1n);
   const totalPages = Math.max(1, Math.ceil(totalBlocks / limit));
   const normalizedPage = Math.max(1, Math.min(page, totalPages));
   const startOffset = BigInt((normalizedPage - 1) * limit);
-  const startCursor =
-    latestNumber >= earliestNumber + startOffset
-      ? latestNumber - startOffset
-      : earliestNumber;
+  const startCursor = latestNumber >= earliestNumber + startOffset ? latestNumber - startOffset : earliestNumber;
   const blocks: Array<{
     height: string;
     hash: string;
@@ -1179,12 +955,7 @@ export async function getEvmBlocksPageDirect(page = 1, limit = 10) {
   let baseFeeCount = 0;
 
   const blockCount = Number(startCursor - earliestNumber + 1n);
-  const nextBlocks = await getRecentBlocksChunk(
-    client,
-    startCursor,
-    Math.min(limit, blockCount),
-    false,
-  );
+  const nextBlocks = await getRecentBlocksChunk(client, startCursor, Math.min(limit, blockCount), false);
 
   for (const block of nextBlocks) {
     const gasUsed = Number(block.gasUsed ?? 0n);
@@ -1207,9 +978,7 @@ export async function getEvmBlocksPageDirect(page = 1, limit = 10) {
 
   const sampleCount = blocks.length || 1;
   const averageBlockTimeMs = derivePollIntervalMs(timestamps) / 0.8;
-  const averageBaseFee = baseFeeCount
-    ? `${(totalBaseFee / baseFeeCount).toFixed(3).replace(/\.?0+$/, '')} Gwei`
-    : 'Unavailable';
+  const averageBaseFee = baseFeeCount ? `${(totalBaseFee / baseFeeCount).toFixed(3).replace(/\.?0+$/, '')} Gwei` : 'Unavailable';
 
   return {
     page: normalizedPage,
@@ -1255,10 +1024,7 @@ export async function getEvmTransactionsPageDirect(page = 1, limit = 20) {
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
   const blockWindow = 500;
   const maxTransactions = 1000;
-  const oldestNumber =
-    latestNumber >= BigInt(blockWindow - 1)
-      ? latestNumber - BigInt(blockWindow - 1)
-      : 0n;
+  const oldestNumber = latestNumber >= BigInt(blockWindow - 1) ? latestNumber - BigInt(blockWindow - 1) : 0n;
   const collected: FormattedTransactionsPageItem[] = [];
   let scannedOldestNumber = latestNumber;
 
@@ -1273,11 +1039,7 @@ export async function getEvmTransactionsPageDirect(page = 1, limit = 20) {
 
     scannedOldestNumber = cursor;
 
-    const blockTransactions = formatTransactionsPageItemsForBlock(
-      block,
-      currencyName,
-      maxTransactions - collected.length,
-    );
+    const blockTransactions = formatTransactionsPageItemsForBlock(block, currencyName, maxTransactions - collected.length);
     collected.push(...blockTransactions);
     void rememberEvmTransactionCache(blockTransactions);
 
@@ -1307,11 +1069,7 @@ export async function getEvmTransactionsPageDirect(page = 1, limit = 20) {
   };
 }
 
-export async function syncLatestEvmTransactionsDirect(input?: {
-  latestCachedBlockNumber?: string | null;
-  maxBlocks?: number;
-  maxTransactions?: number;
-}) {
+export async function syncLatestEvmTransactionsDirect(input?: { latestCachedBlockNumber?: string | null; maxBlocks?: number; maxTransactions?: number }) {
   const { client, profile } = await getEvmClientWithProfile();
   const latestBlock = await client.getBlock({
     blockTag: 'latest',
@@ -1320,16 +1078,9 @@ export async function syncLatestEvmTransactionsDirect(input?: {
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
   const maxBlocks = input?.maxBlocks ?? 500;
   const maxTransactions = input?.maxTransactions ?? 1000;
-  const cachedLatestBlockNumber =
-    input?.latestCachedBlockNumber &&
-    /^\d+$/.test(input.latestCachedBlockNumber)
-      ? BigInt(input.latestCachedBlockNumber)
-      : null;
+  const cachedLatestBlockNumber = input?.latestCachedBlockNumber && /^\d+$/.test(input.latestCachedBlockNumber) ? BigInt(input.latestCachedBlockNumber) : null;
 
-  if (
-    cachedLatestBlockNumber != null &&
-    latestBlock.number <= cachedLatestBlockNumber
-  ) {
+  if (cachedLatestBlockNumber != null && latestBlock.number <= cachedLatestBlockNumber) {
     return {
       latestBlockNumber: latestBlock.number.toString(),
       scannedBlocks: 0,
@@ -1339,15 +1090,8 @@ export async function syncLatestEvmTransactionsDirect(input?: {
     };
   }
 
-  const floorBlockNumberByWindow =
-    latestBlock.number >= BigInt(maxBlocks - 1)
-      ? latestBlock.number - BigInt(maxBlocks - 1)
-      : 0n;
-  const floorBlockNumber =
-    cachedLatestBlockNumber != null &&
-    cachedLatestBlockNumber + 1n > floorBlockNumberByWindow
-      ? cachedLatestBlockNumber + 1n
-      : floorBlockNumberByWindow;
+  const floorBlockNumberByWindow = latestBlock.number >= BigInt(maxBlocks - 1) ? latestBlock.number - BigInt(maxBlocks - 1) : 0n;
+  const floorBlockNumber = cachedLatestBlockNumber != null && cachedLatestBlockNumber + 1n > floorBlockNumberByWindow ? cachedLatestBlockNumber + 1n : floorBlockNumberByWindow;
   const cacheCandidates: EvmCachedTransactionItem[] = [];
   let cursor = latestBlock.number;
   let scannedBlocks = 0;
@@ -1355,30 +1099,18 @@ export async function syncLatestEvmTransactionsDirect(input?: {
 
   while (cursor >= floorBlockNumber && syncedTransactions < maxTransactions) {
     const remainingBlocks = Number(cursor - floorBlockNumber + 1n);
-    const nextBlocks = await getRecentBlocksChunk(
-      client,
-      cursor,
-      Math.min(HOME_BLOCK_FETCH_BATCH_SIZE, remainingBlocks),
-      true,
-    );
+    const nextBlocks = await getRecentBlocksChunk(client, cursor, Math.min(HOME_BLOCK_FETCH_BATCH_SIZE, remainingBlocks), true);
 
     for (const block of nextBlocks) {
       scannedBlocks += 1;
 
       const remainingTransactions = maxTransactions - syncedTransactions;
-      const blockTransactions = formatTransactionsPageItemsForBlock(
-        block,
-        currencyName,
-        remainingTransactions,
-      );
+      const blockTransactions = formatTransactionsPageItemsForBlock(block, currencyName, remainingTransactions);
 
       cacheCandidates.push(...blockTransactions);
       syncedTransactions += blockTransactions.length;
 
-      if (
-        syncedTransactions >= maxTransactions ||
-        block.number <= floorBlockNumber
-      ) {
+      if (syncedTransactions >= maxTransactions || block.number <= floorBlockNumber) {
         break;
       }
     }
@@ -1398,10 +1130,7 @@ export async function syncLatestEvmTransactionsDirect(input?: {
     latestBlockNumber: latestBlock.number.toString(),
     scannedBlocks,
     syncedTransactions,
-    truncatedByBlockWindow:
-      cachedLatestBlockNumber == null
-        ? latestBlock.number >= BigInt(maxBlocks)
-        : latestBlock.number - cachedLatestBlockNumber >= BigInt(maxBlocks),
+    truncatedByBlockWindow: cachedLatestBlockNumber == null ? latestBlock.number >= BigInt(maxBlocks) : latestBlock.number - cachedLatestBlockNumber >= BigInt(maxBlocks),
     truncatedByTransactionLimit: syncedTransactions >= maxTransactions,
   };
 }
@@ -1413,11 +1142,7 @@ export async function getLatestEvmTransactionsDirect(limit = 20) {
     includeTransactions: true,
   });
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const transactions = formatTransactionsPageItemsForBlock(
-    latestBlock,
-    currencyName,
-    limit,
-  );
+  const transactions = formatTransactionsPageItemsForBlock(latestBlock, currencyName, limit);
   void rememberEvmTransactionCache(transactions);
 
   return {
@@ -1426,10 +1151,7 @@ export async function getLatestEvmTransactionsDirect(limit = 20) {
   };
 }
 
-export async function getEvmPendingTransactionsDirect(
-  limit = 100,
-  pollIntervalMs = 12_000,
-) {
+export async function getEvmPendingTransactionsDirect(limit = 100, pollIntervalMs = 12_000) {
   const { client, profile } = await getEvmClientWithProfile();
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
   const pendingBlock = await client.getBlock({
@@ -1437,11 +1159,7 @@ export async function getEvmPendingTransactionsDirect(
     includeTransactions: true,
   });
 
-  const transactions = formatPendingTransactions(
-    pendingBlock.transactions,
-    currencyName,
-    limit,
-  );
+  const transactions = formatPendingTransactions(pendingBlock.transactions, currencyName, limit);
 
   return {
     totalTransactions: pendingBlock.transactions.length,
@@ -1456,11 +1174,7 @@ export async function getEvmPendingTransactionsDirect(
 export async function getEvmOverviewDirect() {
   const { client, profile } = await getEvmClientWithProfile();
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const [chainId, gasPrice, latestNumber] = await Promise.all([
-    client.getChainId(),
-    client.getGasPrice(),
-    client.getBlockNumber(),
-  ]);
+  const [chainId, gasPrice, latestNumber] = await Promise.all([client.getChainId(), client.getGasPrice(), client.getBlockNumber()]);
   const latestCachedTransactionHash = await getLatestCachedTransactionHash();
   let cacheValidationLabel = 'Verified';
 
@@ -1488,12 +1202,7 @@ export async function getEvmOverviewDirect() {
   const cacheCandidates: EvmCachedTransactionItem[] = [];
 
   const recentBlockCount = latestNumber >= 10n ? 11 : Number(latestNumber + 1n);
-  const recentBlockBatch = await getRecentBlocksChunk(
-    client,
-    latestNumber,
-    recentBlockCount,
-    true,
-  );
+  const recentBlockBatch = await getRecentBlocksChunk(client, latestNumber, recentBlockCount, true);
 
   for (const block of recentBlockBatch) {
     recentBlocks.push({
@@ -1506,35 +1215,18 @@ export async function getEvmOverviewDirect() {
     });
 
     if (recentTransactions.length < 5) {
-      recentTransactions.push(
-        ...formatHomeTransactions(
-          block.transactions,
-          block.timestamp,
-          currencyName,
-          5 - recentTransactions.length,
-        ),
-      );
-      cacheCandidates.push(
-        ...formatTransactionsPageItemsForBlock(block, currencyName),
-      );
+      recentTransactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, 5 - recentTransactions.length));
+      cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
     }
   }
 
-  const rememberedTransactions =
-    await rememberEvmTransactionCache(cacheCandidates);
-  const receiptStatusByHash = buildHomeReceiptStatusByHash(
-    rememberedTransactions,
-  );
+  const rememberedTransactions = await rememberEvmTransactionCache(cacheCandidates);
+  const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
 
-  const activityBlocks = recentBlocks
-    .slice(0, 5)
-    .map((block) => formatHomeBlockItem(block));
+  const activityBlocks = recentBlocks.slice(0, 5).map((block) => formatHomeBlockItem(block));
   const rhythmRows = recentBlocks.slice(0, 10).map((block, index) => {
     const previousBlock = recentBlocks[index + 1];
-    const intervalSeconds =
-      block.timestamp != null && previousBlock?.timestamp != null
-        ? Number(block.timestamp - previousBlock.timestamp)
-        : null;
+    const intervalSeconds = block.timestamp != null && previousBlock?.timestamp != null ? Number(block.timestamp - previousBlock.timestamp) : null;
 
     return {
       number: block.number.toString(),
@@ -1546,19 +1238,10 @@ export async function getEvmOverviewDirect() {
       timestampMs: block.timestamp ? Number(block.timestamp) * 1000 : null,
     };
   });
-  const intervalSamples = rhythmRows
-    .map((row) => row.intervalSeconds)
-    .filter((value): value is number => value != null);
-  const averageIntervalSeconds = intervalSamples.length
-    ? intervalSamples.reduce((sum, value) => sum + value, 0) /
-      intervalSamples.length
-    : null;
-  const fastestIntervalSeconds = intervalSamples.length
-    ? Math.min(...intervalSamples)
-    : null;
-  const slowestIntervalSeconds = intervalSamples.length
-    ? Math.max(...intervalSamples)
-    : null;
+  const intervalSamples = rhythmRows.map((row) => row.intervalSeconds).filter((value): value is number => value != null);
+  const averageIntervalSeconds = intervalSamples.length ? intervalSamples.reduce((sum, value) => sum + value, 0) / intervalSamples.length : null;
+  const fastestIntervalSeconds = intervalSamples.length ? Math.min(...intervalSamples) : null;
+  const slowestIntervalSeconds = intervalSamples.length ? Math.max(...intervalSamples) : null;
   const latestBlock = recentBlocks[0] ?? null;
   const pendingTransactionCountHex = await client.transport
     .request({
@@ -1576,19 +1259,14 @@ export async function getEvmOverviewDirect() {
     },
     core: {
       latestBlock: latestNumber.toString(),
-      latestBlockTimestampMs: latestBlock?.timestamp
-        ? Number(latestBlock.timestamp) * 1000
-        : null,
+      latestBlockTimestampMs: latestBlock?.timestamp ? Number(latestBlock.timestamp) * 1000 : null,
       latestBlockTime: formatLocalDateTime(latestBlock?.timestamp),
       averageBlockTime: formatIntervalSeconds(averageIntervalSeconds),
       gasPrice: `${Number(formatGwei(gasPrice))
         .toFixed(3)
         .replace(/\.?0+$/, '')} Gwei`,
       chainId: String(chainId),
-      pendingTransactionCount:
-        pendingTransactionCount != null
-          ? formatInteger(pendingTransactionCount)
-          : 'Unavailable',
+      pendingTransactionCount: pendingTransactionCount != null ? formatInteger(pendingTransactionCount) : 'Unavailable',
     },
     activity: {
       blocks: activityBlocks,
@@ -1601,9 +1279,7 @@ export async function getEvmOverviewDirect() {
       averageInterval: formatIntervalSeconds(averageIntervalSeconds),
       fastestInterval: formatIntervalSeconds(fastestIntervalSeconds),
       slowestInterval: formatIntervalSeconds(slowestIntervalSeconds),
-      recentTransactionCount: formatInteger(
-        rhythmRows.reduce((sum, row) => sum + row.txCount, 0),
-      ),
+      recentTransactionCount: formatInteger(rhythmRows.reduce((sum, row) => sum + row.txCount, 0)),
       blocks: rhythmRows,
     },
     cache: {
@@ -1612,11 +1288,7 @@ export async function getEvmOverviewDirect() {
       latestCachedTransaction: cacheSummary.latestSeenTransaction
         ? {
             hash: cacheSummary.latestSeenTransaction.hash,
-            hashLabel: shortenHash(
-              cacheSummary.latestSeenTransaction.hash,
-              18,
-              0,
-            ),
+            hashLabel: shortenHash(cacheSummary.latestSeenTransaction.hash, 18, 0),
             blockNumber: cacheSummary.latestSeenTransaction.blockNumber,
             timestampMs: cacheSummary.latestSeenTransaction.timestampMs,
           }
@@ -1625,16 +1297,8 @@ export async function getEvmOverviewDirect() {
     },
     pollIntervalMs:
       latestBlock?.timestamp != null && recentBlocks[10]?.timestamp != null
-        ? derivePollIntervalMsFromRange(
-            latestBlock.timestamp,
-            recentBlocks[10].timestamp,
-            Number(latestBlock.number - recentBlocks[10].number),
-          )
-        : derivePollIntervalMs(
-            recentBlocks
-              .map((block) => block.timestamp)
-              .filter((value): value is bigint => value != null),
-          ),
+        ? derivePollIntervalMsFromRange(latestBlock.timestamp, recentBlocks[10].timestamp, Number(latestBlock.number - recentBlocks[10].number))
+        : derivePollIntervalMs(recentBlocks.map((block) => block.timestamp).filter((value): value is bigint => value != null)),
   };
 }
 
@@ -1670,52 +1334,13 @@ export async function validateActiveEvmCacheDirect(): Promise<EvmCacheValidation
   };
 }
 
-export async function getEvmCacheDashboardDirect(
-  cachedTransactionsPage = 1,
-  observedAccountsPage = 1,
-) {
+export async function getEvmCacheDashboardDirect(cachedTransactionsPage = 1, observedAccountsPage = 1) {
   const { client, profile } = await getEvmClientWithProfile();
-  const [chainId, cacheSummary, observedAccounts, cachedTransactions] =
-    await Promise.all([
-      client.getChainId(),
-      getEvmTransactionCacheSummary(),
-      getEvmObservedAccountsPage(observedAccountsPage, 10),
-      getEvmCachedTransactionsPage(cachedTransactionsPage, 10),
-    ]);
-
-  return {
-    header: {
-      connection: 'Direct JSON-RPC',
-      providerName: profile.name,
-      nativeCurrency: getEvmCurrencyName(profile.nativeCurrencySymbol),
-      chainId: String(chainId),
-    },
-    summary: {
-      cachedTransactions: cacheSummary.totalTransactions,
-      observedAccounts: cacheSummary.totalObservedAccounts,
-      latestCachedTransaction: cacheSummary.latestSeenTransaction
-        ? {
-            hash: cacheSummary.latestSeenTransaction.hash,
-            hashLabel: shortenHash(
-              cacheSummary.latestSeenTransaction.hash,
-              18,
-              0,
-            ),
-            blockNumber: cacheSummary.latestSeenTransaction.blockNumber,
-            timestampMs: cacheSummary.latestSeenTransaction.timestampMs,
-          }
-        : null,
-    },
-    cachedTransactions,
-    observedAccounts,
-  };
-}
-
-export async function getEvmCacheSummaryDirect() {
-  const { client, profile } = await getEvmClientWithProfile();
-  const [chainId, cacheSummary] = await Promise.all([
+  const [chainId, cacheSummary, observedAccounts, cachedTransactions] = await Promise.all([
     client.getChainId(),
     getEvmTransactionCacheSummary(),
+    getEvmObservedAccountsPage(observedAccountsPage, 10),
+    getEvmCachedTransactionsPage(cachedTransactionsPage, 10),
   ]);
 
   return {
@@ -1731,11 +1356,35 @@ export async function getEvmCacheSummaryDirect() {
       latestCachedTransaction: cacheSummary.latestSeenTransaction
         ? {
             hash: cacheSummary.latestSeenTransaction.hash,
-            hashLabel: shortenHash(
-              cacheSummary.latestSeenTransaction.hash,
-              18,
-              0,
-            ),
+            hashLabel: shortenHash(cacheSummary.latestSeenTransaction.hash, 18, 0),
+            blockNumber: cacheSummary.latestSeenTransaction.blockNumber,
+            timestampMs: cacheSummary.latestSeenTransaction.timestampMs,
+          }
+        : null,
+    },
+    cachedTransactions,
+    observedAccounts,
+  };
+}
+
+export async function getEvmCacheSummaryDirect() {
+  const { client, profile } = await getEvmClientWithProfile();
+  const [chainId, cacheSummary] = await Promise.all([client.getChainId(), getEvmTransactionCacheSummary()]);
+
+  return {
+    header: {
+      connection: 'Direct JSON-RPC',
+      providerName: profile.name,
+      nativeCurrency: getEvmCurrencyName(profile.nativeCurrencySymbol),
+      chainId: String(chainId),
+    },
+    summary: {
+      cachedTransactions: cacheSummary.totalTransactions,
+      observedAccounts: cacheSummary.totalObservedAccounts,
+      latestCachedTransaction: cacheSummary.latestSeenTransaction
+        ? {
+            hash: cacheSummary.latestSeenTransaction.hash,
+            hashLabel: shortenHash(cacheSummary.latestSeenTransaction.hash, 18, 0),
             blockNumber: cacheSummary.latestSeenTransaction.blockNumber,
             timestampMs: cacheSummary.latestSeenTransaction.timestampMs,
           }
@@ -1744,10 +1393,7 @@ export async function getEvmCacheSummaryDirect() {
   };
 }
 
-export async function getEvmLatestFeedDirect(
-  txLimit = 20,
-  includePollSample = true,
-) {
+export async function getEvmLatestFeedDirect(txLimit = 20, includePollSample = true) {
   const { client, profile } = await getEvmClientWithProfile();
   const latestBlock = await client.getBlock({
     blockTag: 'latest',
@@ -1757,46 +1403,29 @@ export async function getEvmLatestFeedDirect(
   let pollIntervalMs = 12_000;
 
   if (includePollSample && latestBlock.number > 0n) {
-    const oldestBlockNumber =
-      latestBlock.number > 10n ? latestBlock.number - 10n : 0n;
+    const oldestBlockNumber = latestBlock.number > 10n ? latestBlock.number - 10n : 0n;
     const oldestBlock = await client.getBlock({
       blockNumber: oldestBlockNumber,
     });
 
     if (latestBlock.timestamp != null && oldestBlock.timestamp != null) {
-      pollIntervalMs = derivePollIntervalMsFromRange(
-        latestBlock.timestamp,
-        oldestBlock.timestamp,
-        Number(latestBlock.number - oldestBlock.number),
-      );
+      pollIntervalMs = derivePollIntervalMsFromRange(latestBlock.timestamp, oldestBlock.timestamp, Number(latestBlock.number - oldestBlock.number));
     }
   }
 
-  const rememberedTransactions = await rememberEvmTransactionCache(
-    formatTransactionsPageItemsForBlock(latestBlock, currencyName),
-  );
-  const receiptStatusByHash = buildHomeReceiptStatusByHash(
-    rememberedTransactions,
-  );
+  const rememberedTransactions = await rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(latestBlock, currencyName));
+  const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
   const transactionsPageItems = rememberedTransactions.slice(0, txLimit);
 
   return {
     latestBlock: latestBlock.number.toString(),
     latestBlockNumber: Number(latestBlock.number),
     latestBlockTime: formatLocalDateTime(latestBlock.timestamp),
-    latestBlockTimestamp: latestBlock.timestamp
-      ? Number(latestBlock.timestamp)
-      : null,
+    latestBlockTimestamp: latestBlock.timestamp ? Number(latestBlock.timestamp) : null,
     pollIntervalMs,
     block: formatHomeBlockItem(latestBlock),
     blockPageItem: formatBlocksPageItem(latestBlock),
-    transactions: formatHomeTransactions(
-      latestBlock.transactions,
-      latestBlock.timestamp,
-      currencyName,
-      txLimit,
-      receiptStatusByHash,
-    ),
+    transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.timestamp, currencyName, txLimit, receiptStatusByHash),
     transactionsPageItems,
   };
 }
@@ -1810,9 +1439,7 @@ export async function getEvmBlockByNumberDirect(number: bigint) {
   });
   const pageItems = formatTransactionsPageItemsForBlock(block, currencyName);
   await rememberEvmTransactionCache(pageItems);
-  const cachedTransactionsByHash = await getEvmCachedTransactionsByHashes(
-    pageItems.map((transaction) => transaction.hash),
-  );
+  const cachedTransactionsByHash = await getEvmCachedTransactionsByHashes(pageItems.map((transaction) => transaction.hash));
   const formattedBlock = formatEvmBlock({
     ...block,
     currencyName,
@@ -1831,9 +1458,7 @@ export async function getEvmBlockByNumberDirect(number: bigint) {
         gasUsedLabel: cachedTransaction?.gasUsedLabel,
         gasLimitLabel: cachedTransaction?.gasLimitLabel ?? transaction.gasLabel,
         effectiveGasPriceLabel: cachedTransaction?.effectiveGasPriceLabel,
-        nonceLabel:
-          cachedTransaction?.nonceLabel ??
-          String(transaction.nonce ?? 'Unavailable'),
+        nonceLabel: cachedTransaction?.nonceLabel ?? String(transaction.nonce ?? 'Unavailable'),
       };
     }),
   };
@@ -1850,9 +1475,7 @@ export async function hasEvmTransactionByHashDirect(hash: string) {
   }
 }
 
-export async function getEvmTransactionReceiptSummariesDirect(
-  hashes: string[],
-) {
+export async function getEvmTransactionReceiptSummariesDirect(hashes: string[]) {
   const { client, profile } = await getEvmClientWithProfile();
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
   const uniqueHashes = [...new Set(hashes)];
@@ -1862,21 +1485,13 @@ export async function getEvmTransactionReceiptSummariesDirect(
         hash: hash as `0x${string}`,
       });
       const effectiveGasPrice = receipt.effectiveGasPrice ?? null;
-      const feeValue =
-        receipt.gasUsed != null && effectiveGasPrice != null
-          ? receipt.gasUsed * effectiveGasPrice
-          : null;
+      const feeValue = receipt.gasUsed != null && effectiveGasPrice != null ? receipt.gasUsed * effectiveGasPrice : null;
 
       return [
         hash,
         {
           status: receipt.status ?? 'unavailable',
-          statusLabel:
-            receipt.status === 'success'
-              ? 'Success'
-              : receipt.status === 'reverted'
-                ? 'Failed'
-                : 'Unavailable',
+          statusLabel: receipt.status === 'success' ? 'Success' : receipt.status === 'reverted' ? 'Failed' : 'Unavailable',
           feeLabel: formatTransactionFee(feeValue, currencyName),
         },
       ] as const;
@@ -1909,17 +1524,10 @@ export async function getEvmTransactionByHashDirect(hash: string) {
     hash: hash as `0x${string}`,
   });
   const [receipt, latestBlockNumber] = await Promise.all([
-    client
-      .getTransactionReceipt({ hash: hash as `0x${string}` })
-      .catch(() => null),
+    client.getTransactionReceipt({ hash: hash as `0x${string}` }).catch(() => null),
     client.getBlockNumber().catch(() => null),
   ]);
-  const block =
-    transaction.blockNumber != null
-      ? await client
-          .getBlock({ blockNumber: transaction.blockNumber })
-          .catch(() => null)
-      : null;
+  const block = transaction.blockNumber != null ? await client.getBlock({ blockNumber: transaction.blockNumber }).catch(() => null) : null;
 
   return formatEvmTransactionDetail({
     currencyName: getEvmCurrencyName(profile.nativeCurrencySymbol),
@@ -1930,12 +1538,8 @@ export async function getEvmTransactionByHashDirect(hash: string) {
   });
 }
 
-export async function hydrateEvmCachedTransactionInputsByHashDirect(
-  hashes: string[],
-) {
-  const uniqueHashes = [
-    ...new Set(hashes.filter((hash) => /^0x[a-fA-F0-9]{64}$/.test(hash))),
-  ];
+export async function hydrateEvmCachedTransactionInputsByHashDirect(hashes: string[]) {
+  const uniqueHashes = [...new Set(hashes.filter((hash) => /^0x[a-fA-F0-9]{64}$/.test(hash)))];
 
   if (!uniqueHashes.length) {
     return;
@@ -1955,11 +1559,7 @@ export async function hydrateEvmCachedTransactionInputsByHashDirect(
     }),
   );
 
-  await hydrateEvmCachedTransactionInputData(
-    settled.flatMap((result) =>
-      result.status === 'fulfilled' ? [result.value] : [],
-    ),
-  );
+  await hydrateEvmCachedTransactionInputData(settled.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : [])));
 }
 
 export async function getEvmTransactionDebugTraceDirect(hash: string) {
@@ -1972,10 +1572,7 @@ export async function getEvmAddressSummaryDirect(address: string) {
   }
 
   const { client } = await getEvmClientWithProfile();
-  const [balance, nonce] = await Promise.all([
-    client.getBalance({ address }),
-    client.getTransactionCount({ address }),
-  ]);
+  const [balance, nonce] = await Promise.all([client.getBalance({ address }), client.getTransactionCount({ address })]);
 
   return formatEvmAddressSummary({
     address,
@@ -1985,9 +1582,7 @@ export async function getEvmAddressSummaryDirect(address: string) {
 }
 
 export async function getEvmAddressBalancesDirect(addresses: string[]) {
-  const uniqueAddresses = [...new Set(addresses)].filter(
-    (address): address is `0x${string}` => isAddress(address),
-  );
+  const uniqueAddresses = [...new Set(addresses)].filter((address): address is `0x${string}` => isAddress(address));
 
   if (!uniqueAddresses.length) {
     return {};
@@ -1995,12 +1590,7 @@ export async function getEvmAddressBalancesDirect(addresses: string[]) {
 
   const { client, profile } = await getEvmClientWithProfile();
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const settled = await Promise.allSettled(
-    uniqueAddresses.map(
-      async (address) =>
-        [address, await client.getBalance({ address })] as const,
-    ),
-  );
+  const settled = await Promise.allSettled(uniqueAddresses.map(async (address) => [address, await client.getBalance({ address })] as const));
 
   return Object.fromEntries(
     settled.map((result, index) => {
@@ -2015,10 +1605,7 @@ export async function getEvmAddressBalancesDirect(addresses: string[]) {
   ) as Record<string, string>;
 }
 
-export async function requestEvmRpcDirect(
-  method: string,
-  params: unknown[] = [],
-) {
+export async function requestEvmRpcDirect(method: string, params: unknown[] = []) {
   const { client } = await getEvmClientWithProfile();
 
   return client.transport.request({

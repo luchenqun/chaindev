@@ -1,32 +1,15 @@
 'use client';
 
-import {
-  createPublicClient,
-  createWalletClient,
-  encodeDeployData,
-  encodeFunctionData,
-  formatEther,
-  formatGwei,
-  parseEther,
-  parseGwei,
-  type Hex,
-} from 'viem';
+import { createPublicClient, createWalletClient, encodeDeployData, encodeFunctionData, formatEther, formatGwei, parseEther, parseGwei, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import {
-  getContractConstructor,
-  getContractFunctionBySignature,
-  parseContractAbiJson,
-  parseContractFunctionArgs,
-} from '@/domains/evm/client/abi-utils';
+import { getContractConstructor, getContractFunctionBySignature, parseContractAbiJson, parseContractFunctionArgs } from '@/domains/evm/client/abi-utils';
 import { createEvmTransport } from '@/domains/evm/lib/transport';
 import { getEvmCurrencyName } from '@/platform/workbench/rpc-profile';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 const EVM_GAS_LIMIT_MULTIPLIER = 1.35;
 const EVM_GAS_LIMIT_MULTIPLIER_SCALE = 100n;
-const EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR = BigInt(
-  Math.round(EVM_GAS_LIMIT_MULTIPLIER * Number(EVM_GAS_LIMIT_MULTIPLIER_SCALE)),
-);
+const EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR = BigInt(Math.round(EVM_GAS_LIMIT_MULTIPLIER * Number(EVM_GAS_LIMIT_MULTIPLIER_SCALE)));
 
 function getActiveEvmProfile() {
   const profile = readActiveRpcProfileCookie('evm');
@@ -89,11 +72,7 @@ function parseGasLimit(gasLimit: string) {
 }
 
 function applyGasLimitMultiplier(gasLimit: bigint) {
-  return (
-    (gasLimit * EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR +
-      (EVM_GAS_LIMIT_MULTIPLIER_SCALE - 1n)) /
-    EVM_GAS_LIMIT_MULTIPLIER_SCALE
-  );
+  return (gasLimit * EVM_GAS_LIMIT_MULTIPLIER_NUMERATOR + (EVM_GAS_LIMIT_MULTIPLIER_SCALE - 1n)) / EVM_GAS_LIMIT_MULTIPLIER_SCALE;
 }
 
 function parseGasPrice(gasPrice: string) {
@@ -172,24 +151,16 @@ function formatGweiValue(value: bigint) {
     .replace(/\.?0+$/, '');
 }
 
-function formatEip1559GasLabel(
-  maxFeePerGas: bigint,
-  maxPriorityFeePerGas: bigint,
-) {
+function formatEip1559GasLabel(maxFeePerGas: bigint, maxPriorityFeePerGas: bigint) {
   return `Max Fee ${formatGweiValue(maxFeePerGas)} Gwei / Priority Fee ${formatGweiValue(maxPriorityFeePerGas)} Gwei`;
 }
 
-async function getReceiptBlockTimestamp(
-  publicClient: ReturnType<typeof getActiveEvmClients>['publicClient'],
-  blockNumber: bigint,
-) {
+async function getReceiptBlockTimestamp(publicClient: ReturnType<typeof getActiveEvmClients>['publicClient'], blockNumber: bigint) {
   const block = await publicClient.getBlock({ blockNumber });
   return Number(block.timestamp);
 }
 
-async function getManualWriteFeeDefaults(
-  publicClient: ReturnType<typeof getActiveEvmClients>['publicClient'],
-) {
+async function getManualWriteFeeDefaults(publicClient: ReturnType<typeof getActiveEvmClients>['publicClient']) {
   try {
     const fees = await publicClient.estimateFeesPerGas({
       chain: undefined,
@@ -201,10 +172,7 @@ async function getManualWriteFeeDefaults(
       gasPrice: '',
       maxFeePerGas: formatGweiValue(fees.maxFeePerGas),
       maxPriorityFeePerGas: formatGweiValue(fees.maxPriorityFeePerGas),
-      gasPriceLabel: formatEip1559GasLabel(
-        fees.maxFeePerGas,
-        fees.maxPriorityFeePerGas,
-      ),
+      gasPriceLabel: formatEip1559GasLabel(fees.maxFeePerGas, fees.maxPriorityFeePerGas),
     };
   } catch {
     const gasPrice = await publicClient.getGasPrice();
@@ -231,17 +199,9 @@ export async function getActiveEvmContractEnvironmentDirect() {
   };
 }
 
-export async function readEvmContractMethodDirect(input: {
-  address: string;
-  abiJson: string;
-  functionSignature: string;
-  rawArgs: string[];
-}) {
+export async function readEvmContractMethodDirect(input: { address: string; abiJson: string; functionSignature: string; rawArgs: string[] }) {
   const { publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(
-    input.abiJson,
-    input.functionSignature,
-  );
+  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
 
   const result = await publicClient.readContract({
@@ -258,19 +218,9 @@ export async function readEvmContractMethodDirect(input: {
   };
 }
 
-export async function prepareEvmContractWriteDirect(input: {
-  address: string;
-  abiJson: string;
-  functionSignature: string;
-  rawArgs: string[];
-  privateKey: string;
-  value: string;
-}) {
+export async function prepareEvmContractWriteDirect(input: { address: string; abiJson: string; functionSignature: string; rawArgs: string[]; privateKey: string; value: string }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(
-    input.abiJson,
-    input.functionSignature,
-  );
+  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -299,13 +249,7 @@ export async function prepareEvmContractWriteDirect(input: {
     estimatedGas: bufferedEstimatedGas.toString(),
     gasPrice: gasPrice.toString(),
     gasPriceLabel: `${formatGweiValue(gasPrice)} Gwei`,
-    valueLabel:
-      value > 0n
-        ? formatNativeAmount(
-            value,
-            getEvmCurrencyName(profile.nativeCurrencySymbol),
-          )
-        : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+    valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
   };
 }
 
@@ -318,10 +262,7 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
   value: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(
-    input.abiJson,
-    input.functionSignature,
-  );
+  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -331,10 +272,7 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
     throw new Error('Only payable contract methods can send native value.');
   }
 
-  const [feeDefaults, nonce] = await Promise.all([
-    getManualWriteFeeDefaults(publicClient),
-    publicClient.getTransactionCount({ address: account.address }),
-  ]);
+  const [feeDefaults, nonce] = await Promise.all([getManualWriteFeeDefaults(publicClient), publicClient.getTransactionCount({ address: account.address })]);
 
   try {
     const estimatedGas = await publicClient.estimateContractGas({
@@ -359,13 +297,7 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
       value: input.value.trim() || '0',
-      valueLabel:
-        value > 0n
-          ? formatNativeAmount(
-              value,
-              getEvmCurrencyName(profile.nativeCurrencySymbol),
-            )
-          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
       simulationError: null,
     };
   } catch (error) {
@@ -381,35 +313,20 @@ export async function getEvmContractWriteManualDefaultsDirect(input: {
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
       value: input.value.trim() || '0',
-      valueLabel:
-        value > 0n
-          ? formatNativeAmount(
-              value,
-              getEvmCurrencyName(profile.nativeCurrencySymbol),
-            )
-          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
-      simulationError:
-        error instanceof Error ? error.message : 'Simulation failed.',
+      valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: error instanceof Error ? error.message : 'Simulation failed.',
     };
   }
 }
 
-export async function getEvmTransactionManualDefaultsDirect(input: {
-  to: string;
-  privateKey: string;
-  value: string;
-  data?: string;
-}) {
+export async function getEvmTransactionManualDefaultsDirect(input: { to: string; privateKey: string; value: string; data?: string }) {
   const { profile, publicClient } = getActiveEvmClients();
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
   const value = parseNativeValue(input.value);
   const data = normalizeTransactionData(input.data);
 
-  const [feeDefaults, nonce] = await Promise.all([
-    getManualWriteFeeDefaults(publicClient),
-    publicClient.getTransactionCount({ address: account.address }),
-  ]);
+  const [feeDefaults, nonce] = await Promise.all([getManualWriteFeeDefaults(publicClient), publicClient.getTransactionCount({ address: account.address })]);
 
   try {
     const estimatedGas = await publicClient.estimateGas({
@@ -430,13 +347,7 @@ export async function getEvmTransactionManualDefaultsDirect(input: {
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
       value: input.value.trim() || '0',
-      valueLabel:
-        value > 0n
-          ? formatNativeAmount(
-              value,
-              getEvmCurrencyName(profile.nativeCurrencySymbol),
-            )
-          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
       simulationError: null,
     };
   } catch (error) {
@@ -450,32 +361,15 @@ export async function getEvmTransactionManualDefaultsDirect(input: {
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
       value: input.value.trim() || '0',
-      valueLabel:
-        value > 0n
-          ? formatNativeAmount(
-              value,
-              getEvmCurrencyName(profile.nativeCurrencySymbol),
-            )
-          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
-      simulationError:
-        error instanceof Error ? error.message : 'Simulation failed.',
+      valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: error instanceof Error ? error.message : 'Simulation failed.',
     };
   }
 }
 
-export async function writeEvmContractMethodDirect(input: {
-  address: string;
-  abiJson: string;
-  functionSignature: string;
-  rawArgs: string[];
-  privateKey: string;
-  value: string;
-}) {
+export async function writeEvmContractMethodDirect(input: { address: string; abiJson: string; functionSignature: string; rawArgs: string[]; privateKey: string; value: string }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(
-    input.abiJson,
-    input.functionSignature,
-  );
+  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -515,10 +409,7 @@ export async function writeEvmContractMethodDirect(input: {
     gas,
   } as never);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  const blockTimestamp = await getReceiptBlockTimestamp(
-    publicClient,
-    receipt.blockNumber,
-  );
+  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
 
   return {
     hash,
@@ -552,10 +443,7 @@ export async function forceWriteEvmContractMethodDirect(input: {
   nonce?: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
-  const fn = getContractFunctionBySignature(
-    input.abiJson,
-    input.functionSignature,
-  );
+  const fn = getContractFunctionBySignature(input.abiJson, input.functionSignature);
   const abi = parseContractAbiJson(input.abiJson);
   const args = parseContractFunctionArgs(fn.inputs, input.rawArgs);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
@@ -574,19 +462,11 @@ export async function forceWriteEvmContractMethodDirect(input: {
           gasPrice: parseGasPrice(input.gasPrice ?? ''),
         }
       : (() => {
-          const maxFeePerGas = parseFeePerGas(
-            input.maxFeePerGas ?? '',
-            'Max fee per gas',
-          );
-          const maxPriorityFeePerGas = parseFeePerGas(
-            input.maxPriorityFeePerGas ?? '',
-            'Max priority fee per gas',
-          );
+          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? '', 'Max fee per gas');
+          const maxPriorityFeePerGas = parseFeePerGas(input.maxPriorityFeePerGas ?? '', 'Max priority fee per gas');
 
           if (maxFeePerGas < maxPriorityFeePerGas) {
-            throw new Error(
-              'Max fee per gas cannot be less than max priority fee per gas.',
-            );
+            throw new Error('Max fee per gas cannot be less than max priority fee per gas.');
           }
 
           return {
@@ -612,10 +492,7 @@ export async function forceWriteEvmContractMethodDirect(input: {
     ...feeParameters,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  const blockTimestamp = await getReceiptBlockTimestamp(
-    publicClient,
-    receipt.blockNumber,
-  );
+  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
 
   return {
     hash,
@@ -664,19 +541,11 @@ export async function forceSendEvmTransactionDirect(input: {
           gasPrice: parseGasPrice(input.gasPrice ?? ''),
         }
       : (() => {
-          const maxFeePerGas = parseFeePerGas(
-            input.maxFeePerGas ?? '',
-            'Max fee per gas',
-          );
-          const maxPriorityFeePerGas = parseFeePerGas(
-            input.maxPriorityFeePerGas ?? '',
-            'Max priority fee per gas',
-          );
+          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? '', 'Max fee per gas');
+          const maxPriorityFeePerGas = parseFeePerGas(input.maxPriorityFeePerGas ?? '', 'Max priority fee per gas');
 
           if (maxFeePerGas < maxPriorityFeePerGas) {
-            throw new Error(
-              'Max fee per gas cannot be less than max priority fee per gas.',
-            );
+            throw new Error('Max fee per gas cannot be less than max priority fee per gas.');
           }
 
           return {
@@ -697,10 +566,7 @@ export async function forceSendEvmTransactionDirect(input: {
     ...feeParameters,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  const blockTimestamp = await getReceiptBlockTimestamp(
-    publicClient,
-    receipt.blockNumber,
-  );
+  const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
 
   return {
     hash,
@@ -719,13 +585,7 @@ export async function forceSendEvmTransactionDirect(input: {
   };
 }
 
-export async function prepareEvmContractDeployDirect(input: {
-  abiJson: string;
-  bytecode: string;
-  rawArgs: string[];
-  privateKey: string;
-  value: string;
-}) {
+export async function prepareEvmContractDeployDirect(input: { abiJson: string; bytecode: string; rawArgs: string[]; privateKey: string; value: string }) {
   const { profile, publicClient } = getActiveEvmClients();
   const abi = parseContractAbiJson(input.abiJson);
   const constructorItem = getContractConstructor(input.abiJson);
@@ -755,23 +615,11 @@ export async function prepareEvmContractDeployDirect(input: {
     gasPriceLabel: `${Number(formatGwei(gasPrice))
       .toFixed(3)
       .replace(/\.?0+$/, '')} Gwei`,
-    valueLabel:
-      value > 0n
-        ? formatNativeAmount(
-            value,
-            getEvmCurrencyName(profile.nativeCurrencySymbol),
-          )
-        : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+    valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
   };
 }
 
-export async function getEvmContractDeployManualDefaultsDirect(input: {
-  abiJson: string;
-  bytecode: string;
-  rawArgs: string[];
-  privateKey: string;
-  value: string;
-}) {
+export async function getEvmContractDeployManualDefaultsDirect(input: { abiJson: string; bytecode: string; rawArgs: string[]; privateKey: string; value: string }) {
   const { profile, publicClient } = getActiveEvmClients();
   const abi = parseContractAbiJson(input.abiJson);
   const constructorItem = getContractConstructor(input.abiJson);
@@ -781,10 +629,7 @@ export async function getEvmContractDeployManualDefaultsDirect(input: {
   const account = privateKeyToAccount(normalizedPrivateKey);
   const value = parseNativeValue(input.value);
 
-  const [feeDefaults, nonce] = await Promise.all([
-    getManualWriteFeeDefaults(publicClient),
-    publicClient.getTransactionCount({ address: account.address }),
-  ]);
+  const [feeDefaults, nonce] = await Promise.all([getManualWriteFeeDefaults(publicClient), publicClient.getTransactionCount({ address: account.address })]);
 
   try {
     const data = encodeDeployData({
@@ -810,13 +655,7 @@ export async function getEvmContractDeployManualDefaultsDirect(input: {
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
       value: input.value.trim() || '0',
-      valueLabel:
-        value > 0n
-          ? formatNativeAmount(
-              value,
-              getEvmCurrencyName(profile.nativeCurrencySymbol),
-            )
-          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
       simulationError: null,
     };
   } catch (error) {
@@ -831,32 +670,16 @@ export async function getEvmContractDeployManualDefaultsDirect(input: {
       gasPriceLabel: feeDefaults.gasPriceLabel,
       nonce: String(nonce),
       value: input.value.trim() || '0',
-      valueLabel:
-        value > 0n
-          ? formatNativeAmount(
-              value,
-              getEvmCurrencyName(profile.nativeCurrencySymbol),
-            )
-          : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
-      simulationError:
-        error instanceof Error ? error.message : 'Simulation failed.',
+      valueLabel: value > 0n ? formatNativeAmount(value, getEvmCurrencyName(profile.nativeCurrencySymbol)) : `0 ${getEvmCurrencyName(profile.nativeCurrencySymbol)}`,
+      simulationError: error instanceof Error ? error.message : 'Simulation failed.',
     };
   }
 }
 
-export async function deployEvmContractDirect(input: {
-  abiJson: string;
-  bytecode: string;
-  rawArgs: string[];
-  privateKey: string;
-  value: string;
-}) {
+export async function deployEvmContractDirect(input: { abiJson: string; bytecode: string; rawArgs: string[]; privateKey: string; value: string }) {
   const { profile, publicClient } = getActiveEvmClients();
   const abi = parseContractAbiJson(input.abiJson);
-  const args = parseContractFunctionArgs(
-    getContractConstructor(input.abiJson).inputs,
-    input.rawArgs,
-  );
+  const args = parseContractFunctionArgs(getContractConstructor(input.abiJson).inputs, input.rawArgs);
   const bytecode = normalizeDeployBytecode(input.bytecode);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -922,10 +745,7 @@ export async function forceDeployEvmContractDirect(input: {
 }) {
   const { profile, publicClient } = getActiveEvmClients();
   const abi = parseContractAbiJson(input.abiJson);
-  const args = parseContractFunctionArgs(
-    getContractConstructor(input.abiJson).inputs,
-    input.rawArgs,
-  );
+  const args = parseContractFunctionArgs(getContractConstructor(input.abiJson).inputs, input.rawArgs);
   const bytecode = normalizeDeployBytecode(input.bytecode);
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
   const account = privateKeyToAccount(normalizedPrivateKey);
@@ -943,19 +763,11 @@ export async function forceDeployEvmContractDirect(input: {
           gasPrice: parseGasPrice(input.gasPrice ?? ''),
         }
       : (() => {
-          const maxFeePerGas = parseFeePerGas(
-            input.maxFeePerGas ?? '',
-            'Max fee per gas',
-          );
-          const maxPriorityFeePerGas = parseFeePerGas(
-            input.maxPriorityFeePerGas ?? '',
-            'Max priority fee per gas',
-          );
+          const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? '', 'Max fee per gas');
+          const maxPriorityFeePerGas = parseFeePerGas(input.maxPriorityFeePerGas ?? '', 'Max priority fee per gas');
 
           if (maxFeePerGas < maxPriorityFeePerGas) {
-            throw new Error(
-              'Max fee per gas cannot be less than max priority fee per gas.',
-            );
+            throw new Error('Max fee per gas cannot be less than max priority fee per gas.');
           }
 
           return {

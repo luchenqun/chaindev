@@ -23,17 +23,11 @@ export async function findAuthUserByIdentifier(identifier: string) {
   const normalizedEmail = normalizedIdentifier.toLowerCase();
 
   return db.query.users.findFirst({
-    where: or(
-      eq(users.email, normalizedEmail),
-      sql`lower(${users.username}) = ${normalizedIdentifier.toLowerCase()}`,
-    ),
+    where: or(eq(users.email, normalizedEmail), sql`lower(${users.username}) = ${normalizedIdentifier.toLowerCase()}`),
   });
 }
 
-export async function findAuthUserConflict(input: {
-  email: string;
-  username: string;
-}) {
+export async function findAuthUserConflict(input: { email: string; username: string }) {
   const normalizedEmail = input.email.trim().toLowerCase();
   const normalizedUsername = input.username.trim();
   const normalizedUsernameLower = normalizedUsername.toLowerCase();
@@ -49,13 +43,7 @@ export async function findAuthUserConflict(input: {
   });
 }
 
-export async function createCredentialUser(input: {
-  email: string;
-  username: string;
-  password: string;
-  name?: string;
-  isAdmin?: boolean;
-}) {
+export async function createCredentialUser(input: { email: string; username: string; password: string; name?: string; isAdmin?: boolean }) {
   const normalizedEmail = input.email.trim().toLowerCase();
   const normalizedUsername = input.username.trim();
   const id = randomUUID();

@@ -17,16 +17,7 @@ type RpcProfileInput = {
 
 type RpcProfileRow = typeof rpcProfiles.$inferSelect;
 
-function getRpcProfileDedupKey(
-  input: {
-    mode: string;
-    name: string;
-    nativeCurrencySymbol?: string | null;
-    rpcUrl: string;
-    restUrl?: string | null;
-    wsUrl?: string | null;
-  },
-) {
+function getRpcProfileDedupKey(input: { mode: string; name: string; nativeCurrencySymbol?: string | null; rpcUrl: string; restUrl?: string | null; wsUrl?: string | null }) {
   return JSON.stringify({
     mode: input.mode,
     name: input.name.trim(),
@@ -53,9 +44,7 @@ function dedupeRpcProfileRows(rows: RpcProfileRow[]) {
 
 export async function addRpcProfile(input: RpcProfileInput) {
   const existingProfiles = await listRpcProfiles(input.userId);
-  const duplicate = existingProfiles.find(
-    (profile) => getRpcProfileDedupKey(profile) === getRpcProfileDedupKey(input),
-  );
+  const duplicate = existingProfiles.find((profile) => getRpcProfileDedupKey(profile) === getRpcProfileDedupKey(input));
 
   if (duplicate) {
     return duplicate;
@@ -78,10 +67,7 @@ export async function addRpcProfile(input: RpcProfileInput) {
   return row;
 }
 
-export async function importRpcProfiles(
-  userId: string,
-  profiles: ImportedRpcProfile[],
-) {
+export async function importRpcProfiles(userId: string, profiles: ImportedRpcProfile[]) {
   for (const profile of profiles) {
     const row = {
       id: `${userId}:${profile.id}`,
@@ -104,20 +90,12 @@ export async function importRpcProfiles(
 }
 
 export async function listRpcProfiles(userId: string) {
-  const rows = db
-    .select()
-    .from(rpcProfiles)
-    .where(eq(rpcProfiles.userId, userId))
-    .orderBy(desc(rpcProfiles.updatedAt))
-    .all();
+  const rows = db.select().from(rpcProfiles).where(eq(rpcProfiles.userId, userId)).orderBy(desc(rpcProfiles.updatedAt)).all();
 
   return dedupeRpcProfileRows(rows);
 }
 
-export async function getLatestRpcProfileByMode(
-  userId: string,
-  mode: PlatformMode,
-) {
+export async function getLatestRpcProfileByMode(userId: string, mode: PlatformMode) {
   return (
     db
       .select()
@@ -148,22 +126,9 @@ export async function deleteRpcProfile(userId: string, id: string) {
   return { id };
 }
 
-export async function updateRpcProfile(
-  userId: string,
-  id: string,
-  input: RpcProfileInput,
-) {
-  const existingProfiles = db
-    .select()
-    .from(rpcProfiles)
-    .where(eq(rpcProfiles.userId, userId))
-    .orderBy(desc(rpcProfiles.updatedAt))
-    .all();
-  const duplicate = existingProfiles.find(
-    (profile) =>
-      profile.id !== id &&
-      getRpcProfileDedupKey(profile) === getRpcProfileDedupKey(input),
-  );
+export async function updateRpcProfile(userId: string, id: string, input: RpcProfileInput) {
+  const existingProfiles = db.select().from(rpcProfiles).where(eq(rpcProfiles.userId, userId)).orderBy(desc(rpcProfiles.updatedAt)).all();
+  const duplicate = existingProfiles.find((profile) => profile.id !== id && getRpcProfileDedupKey(profile) === getRpcProfileDedupKey(input));
 
   if (duplicate) {
     db.delete(rpcProfiles)

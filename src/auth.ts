@@ -22,11 +22,7 @@ const providers = [
 
       const user = await findAuthUserByIdentifier(identifier);
 
-      if (
-        !user?.passwordHash ||
-        !user.email ||
-        !verifyPassword(password, user.passwordHash)
-      ) {
+      if (!user?.passwordHash || !user.email || !verifyPassword(password, user.passwordHash)) {
         return null;
       }
 
@@ -55,28 +51,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.sub = user.id;
         token.isAdmin = Boolean((user as { isAdmin?: boolean }).isAdmin);
-        token.username =
-          (user as { username?: string }).username ?? user.name ?? undefined;
+        token.username = (user as { username?: string }).username ?? user.name ?? undefined;
       }
 
       return token;
     },
     session({ session, token }) {
       if (session.user) {
-        (
-          session.user as { id?: string; username?: string; isAdmin?: boolean }
-        ).id = token.sub;
-        (
-          session.user as { id?: string; username?: string; isAdmin?: boolean }
-        ).username =
-          (token as { username?: string }).username ??
-          session.user.name ??
-          undefined;
-        (
-          session.user as { id?: string; username?: string; isAdmin?: boolean }
-        ).isAdmin = Boolean((token as { isAdmin?: boolean }).isAdmin);
-        session.user.name =
-          (token as { username?: string }).username ?? session.user.name;
+        (session.user as { id?: string; username?: string; isAdmin?: boolean }).id = token.sub;
+        (session.user as { id?: string; username?: string; isAdmin?: boolean }).username = (token as { username?: string }).username ?? session.user.name ?? undefined;
+        (session.user as { id?: string; username?: string; isAdmin?: boolean }).isAdmin = Boolean((token as { isAdmin?: boolean }).isAdmin);
+        session.user.name = (token as { username?: string }).username ?? session.user.name;
       }
 
       return session;

@@ -94,15 +94,11 @@ export function formatDenomAmount(amount: string) {
   const formattedInteger = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const trimmedDecimal = decimalPart.replace(/0+$/, '').slice(0, 6);
 
-  return `${negative ? '-' : ''}${formattedInteger}${
-    trimmedDecimal ? `.${trimmedDecimal}` : ''
-  }`;
+  return `${negative ? '-' : ''}${formattedInteger}${trimmedDecimal ? `.${trimmedDecimal}` : ''}`;
 }
 
 export function shortenDenom(denom: string) {
-  return denom.length > 12
-    ? `${denom.slice(0, 8)}...${denom.slice(-4)}`
-    : denom;
+  return denom.length > 12 ? `${denom.slice(0, 8)}...${denom.slice(-4)}` : denom;
 }
 
 export function formatReadableTokenAmount(amount: string, decimals = 18) {
@@ -117,10 +113,7 @@ export function formatReadableTokenAmount(amount: string, decimals = 18) {
   }
 
   const negative = normalized.startsWith('-');
-  const digits = (negative ? normalized.slice(1) : normalized).replace(
-    /^0+(?=\d)/,
-    '',
-  ) || '0';
+  const digits = (negative ? normalized.slice(1) : normalized).replace(/^0+(?=\d)/, '') || '0';
 
   if (decimals <= 0) {
     return formatDenomAmount(`${negative ? '-' : ''}${digits}`);
@@ -129,9 +122,7 @@ export function formatReadableTokenAmount(amount: string, decimals = 18) {
   const padded = digits.padStart(decimals + 1, '0');
   const integerPart = padded.slice(0, -decimals) || '0';
   const fractionPart = padded.slice(-decimals).replace(/0+$/, '');
-  const value = fractionPart
-    ? `${integerPart}.${fractionPart}`
-    : integerPart;
+  const value = fractionPart ? `${integerPart}.${fractionPart}` : integerPart;
 
   return formatDenomAmount(`${negative ? '-' : ''}${value}`);
 }
@@ -141,9 +132,7 @@ export function formatReadableDenom(denom: string) {
   return READABLE_DENOM_ALIASES[shortened] ?? READABLE_DENOM_ALIASES[denom] ?? shortened;
 }
 
-export function formatReadableDenomCollection(
-  items: Array<{ denom: string; amount: string }> | undefined,
-) {
+export function formatReadableDenomCollection(items: Array<{ denom: string; amount: string }> | undefined) {
   if (!items?.length) {
     return '0';
   }
@@ -159,9 +148,7 @@ export function formatReadableDenomCollection(
   return visible.join(', ');
 }
 
-export function formatReadableDecCoinCollection(
-  items: Array<{ denom: string; amount: string }> | undefined,
-) {
+export function formatReadableDecCoinCollection(items: Array<{ denom: string; amount: string }> | undefined) {
   if (!items?.length) {
     return '0';
   }
@@ -189,23 +176,13 @@ export function extractTypeLabel(rawType: string | null | undefined) {
   return trimmed.replace(/([a-z0-9])([A-Z])/g, '$1 $2');
 }
 
-export function getFirstMessage(
-  payload: CosmosRestTxResponse,
-): Record<string, unknown> | null {
+export function getFirstMessage(payload: CosmosRestTxResponse): Record<string, unknown> | null {
   const message = payload.tx?.body?.messages?.[0];
   return message && typeof message === 'object' ? message : null;
 }
 
-export function findEventAttribute(
-  events: NonNullable<CosmosRestTxResponse['tx_response']>['events'],
-  type: string,
-  key: string,
-) {
-  return (
-    events
-      ?.find((event) => event.type === type)
-      ?.attributes?.find((attribute) => attribute.key === key)?.value ?? null
-  );
+export function findEventAttribute(events: NonNullable<CosmosRestTxResponse['tx_response']>['events'], type: string, key: string) {
+  return events?.find((event) => event.type === type)?.attributes?.find((attribute) => attribute.key === key)?.value ?? null;
 }
 
 export function extractSender(payload: CosmosRestTxResponse) {
@@ -225,16 +202,7 @@ export function extractSender(payload: CosmosRestTxResponse) {
     return 'Unknown';
   }
 
-  const candidateKeys = [
-    'sender',
-    'from_address',
-    'delegator_address',
-    'voter',
-    'proposer',
-    'granter',
-    'grantee',
-    'validator_address',
-  ] as const;
+  const candidateKeys = ['sender', 'from_address', 'delegator_address', 'voter', 'proposer', 'granter', 'grantee', 'validator_address'] as const;
 
   for (const key of candidateKeys) {
     const value = message[key];
@@ -272,17 +240,11 @@ export function decodeCosmosTransactionSummary(input: {
   }
 
   const firstMessage = getFirstMessage(input.payload);
-  const rawType =
-    typeof firstMessage?.['@type'] === 'string'
-      ? (firstMessage['@type'] as string)
-      : null;
+  const rawType = typeof firstMessage?.['@type'] === 'string' ? (firstMessage['@type'] as string) : null;
   const sender = extractSender(input.payload);
   const timestamp = input.timestamp ?? input.payload.tx_response?.timestamp ?? null;
   const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
-  const status =
-    (input.payload.tx_response?.code ?? input.fallbackCode ?? 1) === 0
-      ? 'success'
-      : 'failed';
+  const status = (input.payload.tx_response?.code ?? input.fallbackCode ?? 1) === 0 ? 'success' : 'failed';
 
   return {
     hash: txHash,
@@ -291,12 +253,9 @@ export function decodeCosmosTransactionSummary(input: {
     type: extractTypeLabel(rawType),
     sender,
     senderLabel: formatSenderLabel(sender),
-    feeLabel: formatReadableDenomCollection(
-      input.payload.tx?.auth_info?.fee?.amount,
-    ),
+    feeLabel: formatReadableDenomCollection(input.payload.tx?.auth_info?.fee?.amount),
     gasUsed: input.payload.tx_response?.gas_used ?? input.fallbackGasUsed ?? '0',
-    gasWanted:
-      input.payload.tx_response?.gas_wanted ?? input.fallbackGasWanted ?? '0',
+    gasWanted: input.payload.tx_response?.gas_wanted ?? input.fallbackGasWanted ?? '0',
     status,
     statusLabel: status === 'success' ? 'Success' : 'Failed',
     timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,

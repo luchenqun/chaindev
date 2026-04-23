@@ -5,11 +5,7 @@ export function normalizeApiError(error: unknown) {
     return { category: 'connection', message };
   }
 
-  if (
-    message.includes('invalid') ||
-    message.includes('parse') ||
-    message.includes('JSON')
-  ) {
+  if (message.includes('invalid') || message.includes('parse') || message.includes('JSON')) {
     return { category: 'validation', message };
   }
 

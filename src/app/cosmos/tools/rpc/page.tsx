@@ -25,10 +25,7 @@ export default function CosmosRpcPage() {
         JSON.stringify(
           {
             ok: false,
-            error:
-              error instanceof Error
-                ? error.message
-                : 'Failed to execute Cosmos request.',
+            error: error instanceof Error ? error.message : 'Failed to execute Cosmos request.',
           },
           null,
           2,
@@ -43,26 +40,14 @@ export default function CosmosRpcPage() {
         <section className="tool-card">
           <span className="kicker">Cosmos Workbench</span>
           <h1>RPC / REST Debug</h1>
-          <p>
-            Debug Cosmos RPC and REST interfaces directly from the browser
-            against the active provider.
-          </p>
+          <p>Debug Cosmos RPC and REST interfaces directly from the browser against the active provider.</p>
           <form className="tool-form" onSubmit={handleSubmit}>
-            <input
-              value={endpoint}
-              onChange={(event) => setEndpoint(event.target.value)}
-            />
-            <select
-              value={method}
-              onChange={(event) => setMethod(event.target.value)}
-            >
+            <input value={endpoint} onChange={(event) => setEndpoint(event.target.value)} />
+            <select value={method} onChange={(event) => setMethod(event.target.value)}>
               <option value="GET">GET</option>
               <option value="POST">POST</option>
             </select>
-            <textarea
-              value={payload}
-              onChange={(event) => setPayload(event.target.value)}
-            />
+            <textarea value={payload} onChange={(event) => setPayload(event.target.value)} />
             <button className="primary-button" type="submit">
               Run
             </button>
@@ -71,9 +56,7 @@ export default function CosmosRpcPage() {
         <section className="tool-card">
           <span className="kicker">Response</span>
           <h2>Raw Result</h2>
-          <pre className="mono">
-            {result || 'Submit a request to inspect the node response.'}
-          </pre>
+          <pre className="mono">{result || 'Submit a request to inspect the node response.'}</pre>
         </section>
       </main>
     </AppShell>

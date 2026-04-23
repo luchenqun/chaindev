@@ -15,14 +15,7 @@ type AddressLinkProps = {
   showCopyButton?: boolean;
 };
 
-export function AddressLink({
-  address,
-  href,
-  label,
-  className,
-  tooltipClassName,
-  showCopyButton = true,
-}: AddressLinkProps) {
+export function AddressLink({ address, href, label, className, tooltipClassName, showCopyButton = true }: AddressLinkProps) {
   void tooltipClassName;
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<number | null>(null);

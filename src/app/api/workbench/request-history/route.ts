@@ -1,7 +1,4 @@
-import {
-  addRequestHistory,
-  listRequestHistory,
-} from '@/server/repositories/request-history';
+import { addRequestHistory, listRequestHistory } from '@/server/repositories/request-history';
 import { fail, ok } from '@/server/utils/api-response';
 import { normalizeApiError } from '@/server/utils/error-normalizer';
 import { requireSessionUserId } from '@/server/utils/auth-user';

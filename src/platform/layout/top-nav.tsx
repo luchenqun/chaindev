@@ -9,10 +9,7 @@ import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { type PlatformMode } from '@/config/chains';
 import { getMessages } from '@/i18n';
-import {
-  resolveAbsoluteCallbackUrl,
-  resolveClientRedirectUrl,
-} from '@/platform/auth/callback-url';
+import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 import { getAccountMenuSections } from '@/platform/layout/account-menu-config';
 import { ChainStatusStrip } from '@/platform/layout/chain-status-strip';
 import { ActiveEvmKeySelector } from '@/platform/layout/active-evm-key-selector';
@@ -42,17 +39,11 @@ function matchesNavItem(pathname: string, href: string) {
   }
 
   if (href.startsWith('/evm/blocks')) {
-    return (
-      pathname.startsWith('/evm/blocks') ||
-      pathname.startsWith('/evm/block/')
-    );
+    return pathname.startsWith('/evm/blocks') || pathname.startsWith('/evm/block/');
   }
 
   if (href.startsWith('/evm/accounts')) {
-    return (
-      pathname.startsWith('/evm/accounts') ||
-      pathname.startsWith('/evm/address/')
-    );
+    return pathname.startsWith('/evm/accounts') || pathname.startsWith('/evm/address/');
   }
 
   if (href.startsWith('/evm/txs')) {
@@ -64,38 +55,23 @@ function matchesNavItem(pathname: string, href: string) {
   }
 
   if (href.startsWith('/cosmos/blocks')) {
-    return (
-      pathname.startsWith('/cosmos/blocks') ||
-      pathname.startsWith('/cosmos/block/')
-    );
+    return pathname.startsWith('/cosmos/blocks') || pathname.startsWith('/cosmos/block/');
   }
 
   if (href.startsWith('/cosmos/txs')) {
-    return (
-      pathname.startsWith('/cosmos/txs') ||
-      pathname.startsWith('/cosmos/tx/')
-    );
+    return pathname.startsWith('/cosmos/txs') || pathname.startsWith('/cosmos/tx/');
   }
 
   if (href.startsWith('/cosmos/accounts')) {
-    return (
-      pathname.startsWith('/cosmos/accounts') ||
-      pathname.startsWith('/cosmos/account/')
-    );
+    return pathname.startsWith('/cosmos/accounts') || pathname.startsWith('/cosmos/account/');
   }
 
   if (href.startsWith('/cosmos/proposals')) {
-    return (
-      pathname.startsWith('/cosmos/proposals') ||
-      pathname.startsWith('/cosmos/proposals/')
-    );
+    return pathname.startsWith('/cosmos/proposals') || pathname.startsWith('/cosmos/proposals/');
   }
 
   if (href.startsWith('/cosmos/validators')) {
-    return (
-      pathname.startsWith('/cosmos/validators') ||
-      pathname.startsWith('/cosmos/validator/')
-    );
+    return pathname.startsWith('/cosmos/validators') || pathname.startsWith('/cosmos/validator/');
   }
 
   if (href.startsWith('/cosmos/account/')) {
@@ -112,11 +88,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const mode = modeOverride ?? inferMode(pathname);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const { data: session, status } = useSession();
-  const username =
-    (session?.user as { username?: string } | undefined)?.username ??
-    session?.user?.name ??
-    session?.user?.email ??
-    'Account';
+  const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? session?.user?.email ?? 'Account';
   const primaryNavItems: NavItem[] =
     mode === 'cosmos'
       ? [
@@ -134,21 +106,14 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           { href: '/evm/settings/cache', label: messages.navigation.cache },
         ];
   const userMenuSections = getAccountMenuSections(mode);
-  const userMenuActive = userMenuSections.some((section) =>
-    section.items.some((item) => matchesNavItem(pathname, item.href)),
-  );
+  const userMenuActive = userMenuSections.some((section) => section.items.some((item) => matchesNavItem(pathname, item.href)));
 
   return (
     <header className="mb-4 border-b border-slate-200 bg-white">
       <div className="mx-auto grid max-w-7xl gap-3 px-5 py-2 text-xs text-slate-500 lg:grid-cols-[auto_minmax(320px,1fr)_auto] lg:items-center">
         <ChainStatusStrip mode={mode} />
         <div className="flex justify-end">
-          <GlobalSearch
-            mode={mode}
-            variant="topbar"
-            showLabel={false}
-            placeholder="Search by Address / Txn Hash / Block"
-          />
+          <GlobalSearch mode={mode} variant="topbar" showLabel={false} placeholder="Search by Address / Txn Hash / Block" />
         </div>
         <div className="flex min-w-0 items-center justify-end gap-2">
           <div className="flex h-[34px] min-w-0 items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
@@ -167,40 +132,19 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
         <div className="mx-auto grid max-w-7xl gap-5 px-5 py-0.5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-3">
-              <Image
-                alt="Chaindev"
-                className="h-[52px] w-auto"
-                height={52}
-                src="/brand-lockup.svg"
-                width={223}
-              />
+              <Image alt="Chaindev" className="h-[52px] w-auto" height={52} src="/brand-lockup.svg" width={223} />
             </Link>
           </div>
 
           <nav className="flex flex-wrap items-center justify-end gap-8 text-[15px] font-[450] text-slate-950">
-            <Link
-              className={
-                pathname === '/'
-                  ? 'py-2.5 font-[450] text-[#1697ea]'
-                  : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'
-              }
-              href="/"
-            >
+            <Link className={pathname === '/' ? 'py-2.5 font-[450] text-[#1697ea]' : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'} href="/">
               {messages.navigation.home}
             </Link>
             {primaryNavItems.map((item) => {
               const itemActive = matchesNavItem(pathname, item.href);
 
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={
-                    itemActive
-                      ? 'py-2.5 font-[450] text-[#1697ea]'
-                      : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'
-                  }
-                >
+                <Link key={item.href} href={item.href} className={itemActive ? 'py-2.5 font-[450] text-[#1697ea]' : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'}>
                   {item.label}
                 </Link>
               );
@@ -209,15 +153,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
 
           <div className="relative flex flex-wrap items-center justify-end gap-3 pl-[8px] before:absolute before:left-[-8px] before:top-1/2 before:h-[14px] before:w-[1.5px] before:-translate-y-1/2 before:bg-slate-300">
             {status === 'authenticated' ? (
-              <div
-                className="relative"
-                onMouseEnter={() => setOpenGroup('user-menu')}
-                onMouseLeave={() =>
-                  setOpenGroup((current) =>
-                    current === 'user-menu' ? null : current,
-                  )
-                }
-              >
+              <div className="relative" onMouseEnter={() => setOpenGroup('user-menu')} onMouseLeave={() => setOpenGroup((current) => (current === 'user-menu' ? null : current))}>
                 <button
                   type="button"
                   className={
@@ -236,19 +172,9 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                     <div className="border-t-[3px] border-[#19a7f2]" />
                     <div className="px-3 pt-2 pb-0">
                       {userMenuSections.map((section, sectionIndex) => (
-                        <div
-                          key={section.id}
-                          className={
-                            sectionIndex === 0
-                              ? ''
-                              : 'border-t border-slate-200'
-                          }
-                        >
+                        <div key={section.id} className={sectionIndex === 0 ? '' : 'border-t border-slate-200'}>
                           {section.items.map((item) => {
-                            const itemActive = matchesNavItem(
-                              pathname,
-                              item.href,
-                            );
+                            const itemActive = matchesNavItem(pathname, item.href);
 
                             return (
                               <Link
@@ -279,9 +205,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                                 redirect: false,
                                 callbackUrl,
                               });
-                              router.push(
-                                resolveClientRedirectUrl(result.url, callbackUrl),
-                              );
+                              router.push(resolveClientRedirectUrl(result.url, callbackUrl));
                               router.refresh();
                             })()
                           }
@@ -296,10 +220,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               </div>
             ) : (
               <Link href="/login">
-                <Button
-                  variant="ghost"
-                  className="h-8 gap-2 px-0 text-[15px] font-normal text-slate-700"
-                >
+                <Button variant="ghost" className="h-8 gap-2 px-0 text-[15px] font-normal text-slate-700">
                   <IconUserCircle className="size-4" stroke={2} />
                   {messages.navigation.signIn}
                 </Button>

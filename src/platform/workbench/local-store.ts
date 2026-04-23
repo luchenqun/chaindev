@@ -16,17 +16,11 @@ export const useWorkbenchStore = create<WorkbenchState>()(
       recentItems: [],
       favorites: [],
       addRecentItem: (value) => {
-        const next = [
-          value,
-          ...get().recentItems.filter((item) => item !== value),
-        ].slice(0, 10);
+        const next = [value, ...get().recentItems.filter((item) => item !== value)].slice(0, 10);
         set({ recentItems: next });
       },
       addFavorite: (value) => {
-        const next = [
-          value,
-          ...get().favorites.filter((item) => item !== value),
-        ].slice(0, 20);
+        const next = [value, ...get().favorites.filter((item) => item !== value)].slice(0, 20);
         set({ favorites: next });
       },
     }),

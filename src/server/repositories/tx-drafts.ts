@@ -25,10 +25,5 @@ export async function addTxDraft(input: TxDraftInput) {
 }
 
 export async function listTxDrafts(userId: string) {
-  return db
-    .select()
-    .from(txDrafts)
-    .where(eq(txDrafts.userId, userId))
-    .orderBy(desc(txDrafts.updatedAt))
-    .all();
+  return db.select().from(txDrafts).where(eq(txDrafts.userId, userId)).orderBy(desc(txDrafts.updatedAt)).all();
 }

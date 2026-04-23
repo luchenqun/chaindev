@@ -13,10 +13,7 @@ import {
   type RpcProfileDraft,
   type SelectedRpcProfileMap,
 } from '@/platform/workbench/rpc-profile';
-import {
-  getDefaultGuestRpcProfiles,
-  getDefaultGuestSelectedRpcProfiles,
-} from '@/platform/workbench/defaults';
+import { getDefaultGuestRpcProfiles, getDefaultGuestSelectedRpcProfiles } from '@/platform/workbench/defaults';
 
 type RpcProfilesResponse = {
   ok: boolean;
@@ -48,17 +45,10 @@ function dedupeRpcProfiles(profiles: RpcProfile[]) {
   return [...deduped.values()];
 }
 
-function filterSelectedRpcProfiles(
-  profiles: RpcProfile[],
-  selected: SelectedRpcProfileMap,
-) {
+function filterSelectedRpcProfiles(profiles: RpcProfile[], selected: SelectedRpcProfileMap) {
   const profileIds = new Set(profiles.map((profile) => profile.id));
 
-  return Object.fromEntries(
-    Object.entries(selected).filter(
-      ([, profileId]) => profileId && profileIds.has(profileId),
-    ),
-  ) as SelectedRpcProfileMap;
+  return Object.fromEntries(Object.entries(selected).filter(([, profileId]) => profileId && profileIds.has(profileId))) as SelectedRpcProfileMap;
 }
 
 function readJsonStorage<T>(key: string, fallback: T) {
@@ -110,19 +100,14 @@ export function listLocalRpcProfilesByMode(mode: PlatformMode) {
 }
 
 export function getLocalSelectedRpcProfiles() {
-  return readJsonStorage<SelectedRpcProfileMap>(
-    LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY,
-    {},
-  );
+  return readJsonStorage<SelectedRpcProfileMap>(LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY, {});
 }
 
 export function replaceLocalRpcProfiles(profiles: RpcProfile[]) {
   writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, profiles);
 }
 
-export function replaceLocalSelectedRpcProfiles(
-  selected: SelectedRpcProfileMap,
-) {
+export function replaceLocalSelectedRpcProfiles(selected: SelectedRpcProfileMap) {
   writeJsonStorage(LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY, selected);
 }
 
@@ -133,14 +118,8 @@ export function syncGuestRpcDefaults() {
   replaceLocalRpcProfiles(profiles);
   replaceLocalSelectedRpcProfiles(selected);
 
-  writeActiveRpcProfileCookie(
-    profiles.find((profile) => profile.id === selected.evm) ??
-      getGuestFallbackRpcProfile('evm'),
-  );
-  writeActiveRpcProfileCookie(
-    profiles.find((profile) => profile.id === selected.cosmos) ??
-      getGuestFallbackRpcProfile('cosmos'),
-  );
+  writeActiveRpcProfileCookie(profiles.find((profile) => profile.id === selected.evm) ?? getGuestFallbackRpcProfile('evm'));
+  writeActiveRpcProfileCookie(profiles.find((profile) => profile.id === selected.cosmos) ?? getGuestFallbackRpcProfile('cosmos'));
 
   return {
     profiles,
@@ -148,10 +127,7 @@ export function syncGuestRpcDefaults() {
   };
 }
 
-export function setLocalSelectedRpcProfile(
-  mode: PlatformMode,
-  profileId: string | null,
-) {
+export function setLocalSelectedRpcProfile(mode: PlatformMode, profileId: string | null) {
   const next = {
     ...getLocalSelectedRpcProfiles(),
   };
@@ -171,8 +147,7 @@ export function saveLocalRpcProfile(input: RpcProfileDraft) {
     id: crypto.randomUUID(),
     mode: input.mode,
     name: input.name,
-    nativeCurrencySymbol:
-      input.mode === 'evm' ? input.nativeCurrencySymbol : null,
+    nativeCurrencySymbol: input.mode === 'evm' ? input.nativeCurrencySymbol : null,
     rpcUrl: input.rpcUrl,
     restUrl: input.mode === 'cosmos' ? input.restUrl : null,
     wsUrl: input.mode === 'cosmos' ? input.wsUrl || null : null,
@@ -185,10 +160,7 @@ export function saveLocalRpcProfile(input: RpcProfileDraft) {
   return profile;
 }
 
-export function updateLocalRpcProfile(
-  profileId: string,
-  input: RpcProfileDraft,
-) {
+export function updateLocalRpcProfile(profileId: string, input: RpcProfileDraft) {
   const profiles = listLocalRpcProfiles();
   const previous = profiles.find((profile) => profile.id === profileId);
 
@@ -200,26 +172,20 @@ export function updateLocalRpcProfile(
     ...previous,
     mode: input.mode,
     name: input.name,
-    nativeCurrencySymbol:
-      input.mode === 'evm' ? input.nativeCurrencySymbol : null,
+    nativeCurrencySymbol: input.mode === 'evm' ? input.nativeCurrencySymbol : null,
     rpcUrl: input.rpcUrl,
     restUrl: input.mode === 'cosmos' ? input.restUrl : null,
     wsUrl: input.mode === 'cosmos' ? input.wsUrl || null : null,
     updatedAt: Date.now(),
   };
-  const next = [
-    updated,
-    ...profiles.filter((profile) => profile.id !== profileId),
-  ];
+  const next = [updated, ...profiles.filter((profile) => profile.id !== profileId)];
   writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, next);
   setLocalSelectedRpcProfile(updated.mode, updated.id);
   return updated;
 }
 
 export function deleteLocalRpcProfile(mode: PlatformMode, profileId: string) {
-  const remaining = listLocalRpcProfiles().filter(
-    (profile) => profile.id !== profileId,
-  );
+  const remaining = listLocalRpcProfiles().filter((profile) => profile.id !== profileId);
   writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, remaining);
 
   const selected = getLocalSelectedRpcProfiles();
@@ -229,11 +195,7 @@ export function deleteLocalRpcProfile(mode: PlatformMode, profileId: string) {
     return fallback;
   }
 
-  return (
-    remaining.find(
-      (profile) => profile.mode === mode && profile.id === selected[mode],
-    ) ?? null
-  );
+  return remaining.find((profile) => profile.mode === mode && profile.id === selected[mode]) ?? null;
 }
 
 export async function fetchRpcProfiles() {
@@ -258,10 +220,7 @@ export async function fetchRpcProfiles() {
   const body = (await response.json()) as RpcProfilesResponse;
 
   if (!body.data.length) {
-    const selected = filterSelectedRpcProfiles(
-      [],
-      getLocalSelectedRpcProfiles(),
-    );
+    const selected = filterSelectedRpcProfiles([], getLocalSelectedRpcProfiles());
 
     return {
       source: 'server' as const,
@@ -271,10 +230,7 @@ export async function fetchRpcProfiles() {
   }
 
   const profiles = dedupeRpcProfiles(body.data);
-  const selected = filterSelectedRpcProfiles(
-    profiles,
-    getLocalSelectedRpcProfiles(),
-  );
+  const selected = filterSelectedRpcProfiles(profiles, getLocalSelectedRpcProfiles());
 
   return {
     source: 'server' as const,
@@ -312,10 +268,7 @@ export async function createRpcProfile(input: RpcProfileDraft) {
   };
 }
 
-export async function editRpcProfile(
-  profileId: string,
-  input: RpcProfileDraft,
-) {
+export async function editRpcProfile(profileId: string, input: RpcProfileDraft) {
   const response = await fetch('/api/workbench/rpc-profiles', {
     method: 'PATCH',
     headers: {
@@ -348,12 +301,9 @@ export async function editRpcProfile(
 }
 
 export async function removeRpcProfile(mode: PlatformMode, profileId: string) {
-  const response = await fetch(
-    `/api/workbench/rpc-profiles?id=${encodeURIComponent(profileId)}`,
-    {
-      method: 'DELETE',
-    },
-  );
+  const response = await fetch(`/api/workbench/rpc-profiles?id=${encodeURIComponent(profileId)}`, {
+    method: 'DELETE',
+  });
 
   if (response.status === 401) {
     throw createAuthRequiredError();
@@ -396,9 +346,7 @@ export function readActivePlatformModeCookie() {
     return getDefaultActivePlatformMode();
   }
 
-  const pair = document.cookie
-    .split('; ')
-    .find((item) => item.startsWith(`${ACTIVE_PLATFORM_MODE_COOKIE_NAME}=`));
+  const pair = document.cookie.split('; ').find((item) => item.startsWith(`${ACTIVE_PLATFORM_MODE_COOKIE_NAME}=`));
 
   if (!pair) {
     return getDefaultActivePlatformMode();
@@ -418,16 +366,11 @@ export function readActiveRpcProfileCookie(mode: PlatformMode) {
     return getGuestFallbackRpcProfile(mode);
   }
 
-  const pair = document.cookie
-    .split('; ')
-    .find((item) => item.startsWith(`${getActiveRpcProfileCookieName(mode)}=`));
+  const pair = document.cookie.split('; ').find((item) => item.startsWith(`${getActiveRpcProfileCookieName(mode)}=`));
 
   if (!pair) {
     return getGuestFallbackRpcProfile(mode);
   }
 
-  return (
-    parseActiveRpcProfileCookie(pair.slice(pair.indexOf('=') + 1)) ??
-    getGuestFallbackRpcProfile(mode)
-  );
+  return parseActiveRpcProfileCookie(pair.slice(pair.indexOf('=') + 1)) ?? getGuestFallbackRpcProfile(mode);
 }

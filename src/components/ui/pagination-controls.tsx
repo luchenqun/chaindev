@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from '@/components/ui/pagination';
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 type PaginationControlsProps = {
   page: number;
@@ -19,14 +11,7 @@ type PaginationControlsProps = {
   onPageChange: (page: number) => void;
 };
 
-export function PaginationControls({
-  page,
-  totalPages,
-  hasPreviousPage,
-  hasNextPage,
-  disabled = false,
-  onPageChange,
-}: PaginationControlsProps) {
+export function PaginationControls({ page, totalPages, hasPreviousPage, hasNextPage, disabled = false, onPageChange }: PaginationControlsProps) {
   const visiblePages = getVisiblePages(page, totalPages);
 
   return (
@@ -34,11 +19,7 @@ export function PaginationControls({
       <Pagination className="mx-0 w-auto justify-start lg:justify-end">
         <PaginationContent>
           <PaginationItem>
-            <PaginationPrevious
-              type="button"
-              disabled={!hasPreviousPage || disabled}
-              onClick={() => onPageChange(page - 1)}
-            />
+            <PaginationPrevious type="button" disabled={!hasPreviousPage || disabled} onClick={() => onPageChange(page - 1)} />
           </PaginationItem>
           {visiblePages.map((item, index) =>
             item === 'ellipsis' ? (
@@ -47,23 +28,14 @@ export function PaginationControls({
               </PaginationItem>
             ) : (
               <PaginationItem key={item}>
-                <PaginationLink
-                  type="button"
-                  isActive={item === page}
-                  disabled={disabled}
-                  onClick={() => onPageChange(item)}
-                >
+                <PaginationLink type="button" isActive={item === page} disabled={disabled} onClick={() => onPageChange(item)}>
                   {item}
                 </PaginationLink>
               </PaginationItem>
             ),
           )}
           <PaginationItem>
-            <PaginationNext
-              type="button"
-              disabled={!hasNextPage || disabled}
-              onClick={() => onPageChange(page + 1)}
-            />
+            <PaginationNext type="button" disabled={!hasNextPage || disabled} onClick={() => onPageChange(page + 1)} />
           </PaginationItem>
         </PaginationContent>
       </Pagination>
@@ -84,13 +56,5 @@ function getVisiblePages(page: number, totalPages: number) {
     return [1, 'ellipsis', totalPages - 2, totalPages - 1, totalPages] as const;
   }
 
-  return [
-    1,
-    'ellipsis',
-    page - 1,
-    page,
-    page + 1,
-    'ellipsis',
-    totalPages,
-  ] as const;
+  return [1, 'ellipsis', page - 1, page, page + 1, 'ellipsis', totalPages] as const;
 }

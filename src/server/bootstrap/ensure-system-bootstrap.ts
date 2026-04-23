@@ -26,9 +26,7 @@ function getBootstrapAdminConfig(): BootstrapAdminConfig | null {
   }
 
   if (!email || !username || !password) {
-    throw new Error(
-      'BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_USERNAME, and BOOTSTRAP_ADMIN_PASSWORD must be set together.',
-    );
+    throw new Error('BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_USERNAME, and BOOTSTRAP_ADMIN_PASSWORD must be set together.');
   }
 
   return {
@@ -44,36 +42,22 @@ async function ensureBootstrapAdminUser(config: BootstrapAdminConfig) {
   const matchedUsers = await db
     .select()
     .from(users)
-    .where(
-      or(
-        sql`lower(${users.email}) = ${config.email}`,
-        sql`lower(${users.username}) = ${normalizedUsernameLower}`,
-      ),
-    )
+    .where(or(sql`lower(${users.email}) = ${config.email}`, sql`lower(${users.username}) = ${normalizedUsernameLower}`))
     .all();
 
   const distinctUserIds = [...new Set(matchedUsers.map((user) => user.id))];
 
   if (distinctUserIds.length > 1) {
-    throw new Error(
-      'Bootstrap admin identity matches multiple users. Resolve the email/username conflict first.',
-    );
+    throw new Error('Bootstrap admin identity matches multiple users. Resolve the email/username conflict first.');
   }
 
   if (matchedUsers[0]) {
     const existingUser = matchedUsers[0];
     const emailMatches = existingUser.email?.toLowerCase() === config.email;
-    const usernameMatches =
-      existingUser.username?.toLowerCase() === normalizedUsernameLower;
-    const nameMatches =
-      (existingUser.name ?? existingUser.username ?? '').trim() === config.name;
+    const usernameMatches = existingUser.username?.toLowerCase() === normalizedUsernameLower;
+    const nameMatches = (existingUser.name ?? existingUser.username ?? '').trim() === config.name;
 
-    if (
-      existingUser.isAdmin &&
-      emailMatches &&
-      usernameMatches &&
-      nameMatches
-    ) {
+    if (existingUser.isAdmin && emailMatches && usernameMatches && nameMatches) {
       return existingUser;
     }
 
@@ -89,9 +73,7 @@ async function ensureBootstrapAdminUser(config: BootstrapAdminConfig) {
       .where(eq(users.id, existingUser.id))
       .run();
 
-    return (
-      db.select().from(users).where(eq(users.id, existingUser.id)).get() ?? null
-    );
+    return db.select().from(users).where(eq(users.id, existingUser.id)).get() ?? null;
   }
 
   return createCredentialUser({

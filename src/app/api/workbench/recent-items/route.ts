@@ -1,7 +1,4 @@
-import {
-  addRecentItem,
-  listRecentItems,
-} from '@/server/repositories/recent-items';
+import { addRecentItem, listRecentItems } from '@/server/repositories/recent-items';
 import { fail, ok } from '@/server/utils/api-response';
 import { normalizeApiError } from '@/server/utils/error-normalizer';
 import { requireSessionUserId } from '@/server/utils/auth-user';

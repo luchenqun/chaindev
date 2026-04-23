@@ -5,10 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { HomeActivitySkeleton } from '@/components/ui/loading-placeholders';
-import {
-  getEvmAddressTags,
-  subscribeEvmAddressTags,
-} from '@/domains/evm/client/address-tags';
+import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
 import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
@@ -52,17 +49,12 @@ function formatRelativeAge(timestampMs: number | null, nowMs: number) {
 export function EvmHomeActivity() {
   const { snapshot, errorMessage, nowMs } = useEvmHomeData();
   const activity = snapshot?.activity ?? null;
-  const [nameTagsByAddress, setNameTagsByAddress] = useState<
-    Record<string, string | null>
-  >({});
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const visibleAddresses = useMemo(
     () => [
       ...new Set([
         ...(activity?.blocks.map((block) => block.miner) ?? []),
-        ...(activity?.transactions.flatMap((transaction) => [
-          transaction.from,
-          ...(transaction.to ? [transaction.to] : []),
-        ]) ?? []),
+        ...(activity?.transactions.flatMap((transaction) => [transaction.from, ...(transaction.to ? [transaction.to] : [])]) ?? []),
       ]),
     ],
     [activity],
@@ -83,17 +75,11 @@ export function EvmHomeActivity() {
       loadVisibleTags();
     };
 
-    window.addEventListener(
-      'chaindev:active-rpc-profile-changed',
-      handleProfileChanged,
-    );
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
 
     return () => {
       unsubscribe();
-      window.removeEventListener(
-        'chaindev:active-rpc-profile-changed',
-        handleProfileChanged,
-      );
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [visibleAddresses]);
 
@@ -106,13 +92,8 @@ export function EvmHomeActivity() {
       <Card>
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Latest Blocks
-            </h2>
-            <Link
-              className="text-sm font-medium text-sky-600"
-              href="/evm/blocks"
-            >
+            <h2 className="text-lg font-semibold text-slate-900">Latest Blocks</h2>
+            <Link className="text-sm font-medium text-sky-600" href="/evm/blocks">
               VIEW ALL BLOCKS
             </Link>
           </div>
@@ -121,23 +102,16 @@ export function EvmHomeActivity() {
               activity.blocks.map((block, index) => (
                 <div
                   key={`${block.number}-${block.hash}`}
-                  className={`grid grid-cols-[auto_130px_minmax(0,1fr)_auto] items-center gap-4 py-4 ${
-                    index ? 'border-t border-slate-200' : ''
-                  }`}
+                  className={`grid grid-cols-[auto_130px_minmax(0,1fr)_auto] items-center gap-4 py-4 ${index ? 'border-t border-slate-200' : ''}`}
                 >
                   <div className="flex size-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
                     <IconBox className="size-5" stroke={1.8} />
                   </div>
                   <div className="min-w-0">
-                    <Link
-                      className="block text-sm font-semibold text-sky-600 hover:text-sky-700"
-                      href={`/evm/block/${block.number}`}
-                    >
+                    <Link className="block text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/block/${block.number}`}>
                       {block.numberLabel}
                     </Link>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {formatRelativeAge(block.timestampMs, nowMs)}
-                    </p>
+                    <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(block.timestampMs, nowMs)}</p>
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm text-slate-600">
@@ -145,30 +119,18 @@ export function EvmHomeActivity() {
                       <AddressLink
                         address={block.miner}
                         href={`/evm/address/${block.miner}`}
-                        label={
-                          nameTagsByAddress[block.miner] ?? block.minerLabel
-                        }
+                        label={nameTagsByAddress[block.miner] ?? block.minerLabel}
                         className="font-semibold text-sky-600 hover:text-sky-700"
                         showCopyButton={false}
                       />
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {block.txCount}
-                    </p>
+                    <p className="mt-1 text-sm text-slate-500">{block.txCount}</p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
-                    {block.gasUsedLabel}
-                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">{block.gasUsedLabel}</div>
                 </div>
               ))
             ) : (
-              <EmptyState
-                title="Latest Blocks"
-                message={
-                  errorMessage ??
-                  'Add an EVM provider first to load latest block data.'
-                }
-              />
+              <EmptyState title="Latest Blocks" message={errorMessage ?? 'Add an EVM provider first to load latest block data.'} />
             )}
           </div>
         </CardContent>
@@ -177,9 +139,7 @@ export function EvmHomeActivity() {
       <Card>
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-900">
-              Latest Transactions
-            </h2>
+            <h2 className="text-lg font-semibold text-slate-900">Latest Transactions</h2>
             <Link className="text-sm font-medium text-sky-600" href="/evm/txs">
               VIEW ALL TRANSACTIONS
             </Link>
@@ -189,31 +149,19 @@ export function EvmHomeActivity() {
               activity.transactions.map((transaction, index) => (
                 <div
                   key={`${transaction.hash}-${index}`}
-                  className={`grid grid-cols-[auto_160px_minmax(0,1fr)_auto] items-center gap-3 py-4 ${
-                    index ? 'border-t border-slate-200' : ''
-                  }`}
+                  className={`grid grid-cols-[auto_160px_minmax(0,1fr)_auto] items-center gap-3 py-4 ${index ? 'border-t border-slate-200' : ''}`}
                 >
                   <div className="flex size-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                     <IconFileText className="size-5" stroke={1.8} />
                   </div>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-0.5">
-                      {transaction.receiptStatus === 'reverted' ? (
-                        <IconAlertCircle
-                          className="size-4 shrink-0 text-rose-500"
-                          stroke={2}
-                        />
-                      ) : null}
-                      <Link
-                        className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700"
-                        href={`/evm/tx/${transaction.hash}`}
-                      >
+                      {transaction.receiptStatus === 'reverted' ? <IconAlertCircle className="size-4 shrink-0 text-rose-500" stroke={2} /> : null}
+                      <Link className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
                         {transaction.hashLabel}
                       </Link>
                     </div>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {formatRelativeAge(transaction.timestampMs, nowMs)}
-                    </p>
+                    <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(transaction.timestampMs, nowMs)}</p>
                   </div>
                   <div className="min-w-0">
                     <p className="truncate text-sm text-slate-600">
@@ -221,10 +169,7 @@ export function EvmHomeActivity() {
                       <AddressLink
                         address={transaction.from}
                         href={`/evm/address/${transaction.from}`}
-                        label={
-                          nameTagsByAddress[transaction.from] ??
-                          transaction.fromLabel
-                        }
+                        label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
                         className="font-semibold text-sky-600 hover:text-sky-700"
                         showCopyButton={false}
                       />
@@ -235,36 +180,23 @@ export function EvmHomeActivity() {
                         <AddressLink
                           address={transaction.to}
                           href={`/evm/address/${transaction.to}`}
-                          label={resolvePreferredToAddressLabel(
-                            transaction.to,
-                            {
-                              nameTagsByAddress,
-                              fallbackLabel: transaction.toLabel,
-                            },
-                          )}
+                          label={resolvePreferredToAddressLabel(transaction.to, {
+                            nameTagsByAddress,
+                            fallbackLabel: transaction.toLabel,
+                          })}
                           className="font-semibold text-sky-600 hover:text-sky-700"
                           showCopyButton={false}
                         />
                       ) : (
-                        <span className="text-slate-500">
-                          {transaction.toLabel}
-                        </span>
+                        <span className="text-slate-500">{transaction.toLabel}</span>
                       )}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
-                    {transaction.value}
-                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">{transaction.value}</div>
                 </div>
               ))
             ) : (
-              <EmptyState
-                title="Latest Transactions"
-                message={
-                  errorMessage ??
-                  'Add an EVM provider first to load recent transactions.'
-                }
-              />
+              <EmptyState title="Latest Transactions" message={errorMessage ?? 'Add an EVM provider first to load recent transactions.'} />
             )}
           </div>
         </CardContent>

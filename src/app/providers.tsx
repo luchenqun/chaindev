@@ -7,10 +7,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { CosmosHomeDataProvider } from '@/domains/cosmos/ui/home-data-provider';
 import { syncEvmKeyringFromServer } from '@/domains/evm/client/keyring';
 import { EvmHomeDataProvider } from '@/domains/evm/ui/home-data-provider';
-import {
-  syncGuestRpcDefaults,
-  writeActivePlatformModeCookie,
-} from '@/platform/workbench/rpc-profile-client';
+import { syncGuestRpcDefaults, writeActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
 
 function ActivePlatformModeSync() {
   const pathname = usePathname();

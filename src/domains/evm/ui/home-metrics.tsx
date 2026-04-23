@@ -37,9 +37,7 @@ function MetricCard({ label, value, subtext }: Metric) {
   return (
     <div className="px-5 py-4">
       <div className="mb-2 flex items-center gap-1.5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-          {label}
-        </p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
         {subtext ? (
           <span className="group relative inline-flex">
             <span className="inline-flex items-center justify-center text-slate-300">
@@ -58,8 +56,7 @@ function MetricCard({ label, value, subtext }: Metric) {
 
 export function EvmHomeMetrics() {
   const { snapshot, errorMessage } = useEvmHomeData();
-  const metrics =
-    (snapshot?.metrics as Metric[] | undefined) ?? fallbackMetrics;
+  const metrics = (snapshot?.metrics as Metric[] | undefined) ?? fallbackMetrics;
   const firstRowMetrics = metrics.slice(0, 4);
   const secondRowMetrics = metrics.slice(4, 8);
   const headerItems = snapshot
@@ -80,12 +77,8 @@ export function EvmHomeMetrics() {
       <div className="grid divide-y divide-slate-200 md:grid-cols-4 md:divide-x md:divide-y-0">
         {headerItems.map((item) => (
           <div key={item.label} className="bg-slate-50 px-5 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              {item.label}
-            </p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
-              {item.value}
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{item.value}</p>
           </div>
         ))}
       </div>

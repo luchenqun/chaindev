@@ -2,12 +2,7 @@ import { z } from 'zod';
 import { fail, ok } from '@/server/utils/api-response';
 import { normalizeApiError } from '@/server/utils/error-normalizer';
 import { requireSessionUserId } from '@/server/utils/auth-user';
-import {
-  clearServerEvmAddressTags,
-  deleteServerEvmAddressTag,
-  listServerEvmAddressTags,
-  upsertServerEvmAddressTag,
-} from '@/server/repositories/evm-address-tags';
+import { clearServerEvmAddressTags, deleteServerEvmAddressTag, listServerEvmAddressTags, upsertServerEvmAddressTag } from '@/server/repositories/evm-address-tags';
 
 const upsertTagSchema = z.object({
   providerProfileId: z.string().trim().min(1, 'providerProfileId is required'),
@@ -65,10 +60,7 @@ export async function DELETE(request: Request) {
     const clear = url.searchParams.get('clear');
 
     if (!providerProfileId) {
-      return fail(
-        { category: 'validation', message: 'providerProfileId is required' },
-        400,
-      );
+      return fail({ category: 'validation', message: 'providerProfileId is required' }, 400);
     }
 
     if (clear === '1') {
@@ -76,15 +68,10 @@ export async function DELETE(request: Request) {
     }
 
     if (!address) {
-      return fail(
-        { category: 'validation', message: 'address is required' },
-        400,
-      );
+      return fail({ category: 'validation', message: 'address is required' }, 400);
     }
 
-    return ok(
-      await deleteServerEvmAddressTag({ userId, providerProfileId, address }),
-    );
+    return ok(await deleteServerEvmAddressTag({ userId, providerProfileId, address }));
   } catch (error) {
     return fail(normalizeApiError(error));
   }

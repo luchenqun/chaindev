@@ -9,10 +9,7 @@ type ChainSwitcherProps = {
 
 export function ChainSwitcher({ mode, onModeChange }: ChainSwitcherProps) {
   return (
-    <div
-      className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1"
-      aria-label="Mode Switch"
-    >
+    <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1" aria-label="Mode Switch">
       <button
         type="button"
         className={

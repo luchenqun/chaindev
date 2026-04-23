@@ -19,11 +19,7 @@ export function resolvePreferredToAddressLabel(
   const profile = readActiveRpcProfileCookie('evm');
 
   if (profile) {
-    const binding = listEvmContractBindings().find(
-      (item) =>
-        item.providerProfileId === profile.id &&
-        item.addressLower === address.toLowerCase(),
-    );
+    const binding = listEvmContractBindings().find((item) => item.providerProfileId === profile.id && item.addressLower === address.toLowerCase());
 
     if (binding?.label) {
       return binding.label;

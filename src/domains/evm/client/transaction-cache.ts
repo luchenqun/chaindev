@@ -137,8 +137,7 @@ const TRANSACTIONS_BY_BLOCK_INDEX = 'byBlockNumberAndTimestamp';
 const TRANSACTIONS_BY_FROM_TIMESTAMP_INDEX = 'byFromAndTimestamp';
 const TRANSACTIONS_BY_TO_TIMESTAMP_INDEX = 'byToAndTimestamp';
 const TRANSACTIONS_BY_METHOD_TIMESTAMP_INDEX = 'byMethodAndTimestamp';
-const TRANSACTIONS_BY_METHOD_SELECTOR_TIMESTAMP_INDEX =
-  'byMethodSelectorAndTimestamp';
+const TRANSACTIONS_BY_METHOD_SELECTOR_TIMESTAMP_INDEX = 'byMethodSelectorAndTimestamp';
 const TRANSACTIONS_BY_VALUE_INDEX = 'byValueAndTimestamp';
 const ADDRESS_BY_HASH_INDEX = 'byHash';
 const ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX = 'byAddressAndTimestamp';
@@ -157,18 +156,15 @@ function emitChange() {
 function toPromise<T>(request: IDBRequest<T>) {
   return new Promise<T>((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error ?? new Error('IndexedDB request failed.'));
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed.'));
   });
 }
 
 function waitForTransaction(transaction: IDBTransaction) {
   return new Promise<void>((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () =>
-      reject(transaction.error ?? new Error('IndexedDB transaction failed.'));
-    transaction.onabort = () =>
-      reject(transaction.error ?? new Error('IndexedDB transaction aborted.'));
+    transaction.onerror = () => reject(transaction.error ?? new Error('IndexedDB transaction failed.'));
+    transaction.onabort = () => reject(transaction.error ?? new Error('IndexedDB transaction aborted.'));
   });
 }
 
@@ -177,9 +173,7 @@ export function formatEvmValueWeiSortKey(value: bigint | string) {
   return normalized.padStart(EVM_VALUE_WEI_SORT_KEY_WIDTH, '0');
 }
 
-function getSortTimestamp(
-  item: Pick<EvmCachedTransactionItem, 'timestampMs' | 'blockNumber'>,
-) {
+function getSortTimestamp(item: Pick<EvmCachedTransactionItem, 'timestampMs' | 'blockNumber'>) {
   if (item.timestampMs != null) {
     return item.timestampMs;
   }
@@ -200,10 +194,7 @@ function formatInteger(value: bigint | number | null | undefined) {
   return new Intl.NumberFormat('en-US').format(Number(value));
 }
 
-function formatTransactionFee(
-  value: bigint | null | undefined,
-  currencyName: string,
-) {
+function formatTransactionFee(value: bigint | null | undefined, currencyName: string) {
   if (value == null) {
     return 'Unavailable';
   }
@@ -227,9 +218,7 @@ function formatEffectiveGasPrice(value: bigint | null | undefined) {
     .replace(/\.?0+$/, '')} Gwei`;
 }
 
-async function enrichTransactionsWithReceipts(
-  items: EvmCachedTransactionItem[],
-) {
+async function enrichTransactionsWithReceipts(items: EvmCachedTransactionItem[]) {
   const profile = readActiveRpcProfileCookie('evm');
 
   if (!profile) {
@@ -238,30 +227,20 @@ async function enrichTransactionsWithReceipts(
 
   const client = createEvmClient(profile.rpcUrl);
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const uniqueItems = [
-    ...new Map(items.map((item) => [item.hash, item])).values(),
-  ];
+  const uniqueItems = [...new Map(items.map((item) => [item.hash, item])).values()];
   const settled = await Promise.allSettled(
     uniqueItems.map(async (item) => {
       const receipt = await client.getTransactionReceipt({
         hash: item.hash as `0x${string}`,
       });
       const effectiveGasPrice = receipt.effectiveGasPrice ?? null;
-      const feeValue =
-        receipt.gasUsed != null && effectiveGasPrice != null
-          ? receipt.gasUsed * effectiveGasPrice
-          : null;
+      const feeValue = receipt.gasUsed != null && effectiveGasPrice != null ? receipt.gasUsed * effectiveGasPrice : null;
 
       return [
         item.hash,
         {
           receiptStatus: receipt.status ?? 'unavailable',
-          receiptStatusLabel:
-            receipt.status === 'success'
-              ? 'Success'
-              : receipt.status === 'reverted'
-                ? 'Failed'
-                : 'Unavailable',
+          receiptStatusLabel: receipt.status === 'success' ? 'Success' : receipt.status === 'reverted' ? 'Failed' : 'Unavailable',
           feeLabel: formatTransactionFee(feeValue, currencyName),
           gasUsedLabel: formatInteger(receipt.gasUsed),
           effectiveGasPriceLabel: formatEffectiveGasPrice(effectiveGasPrice),
@@ -269,17 +248,7 @@ async function enrichTransactionsWithReceipts(
       ] as const;
     }),
   );
-  const receiptDetailsByHash = new Map<
-    string,
-    Pick<
-      EvmCachedTransactionItem,
-      | 'receiptStatus'
-      | 'receiptStatusLabel'
-      | 'feeLabel'
-      | 'gasUsedLabel'
-      | 'effectiveGasPriceLabel'
-    >
-  >();
+  const receiptDetailsByHash = new Map<string, Pick<EvmCachedTransactionItem, 'receiptStatus' | 'receiptStatusLabel' | 'feeLabel' | 'gasUsedLabel' | 'effectiveGasPriceLabel'>>();
 
   settled.forEach((result, index) => {
     const item = uniqueItems[index];
@@ -310,21 +279,16 @@ async function enrichTransactionsWithReceipts(
   }));
 }
 
-function mergeTransactionRecord(
-  existingRecord: EvmCachedTransactionRecord,
-  item: EvmCachedTransactionItem,
-) {
+function mergeTransactionRecord(existingRecord: EvmCachedTransactionRecord, item: EvmCachedTransactionItem) {
   const nextRecord: EvmCachedTransactionRecord = {
     ...existingRecord,
     inputData: existingRecord.inputData || item.inputData,
     receiptStatus: item.receiptStatus ?? existingRecord.receiptStatus,
-    receiptStatusLabel:
-      item.receiptStatusLabel ?? existingRecord.receiptStatusLabel,
+    receiptStatusLabel: item.receiptStatusLabel ?? existingRecord.receiptStatusLabel,
     feeLabel: item.feeLabel ?? existingRecord.feeLabel,
     gasUsedLabel: item.gasUsedLabel ?? existingRecord.gasUsedLabel,
     gasLimitLabel: item.gasLimitLabel ?? existingRecord.gasLimitLabel,
-    effectiveGasPriceLabel:
-      item.effectiveGasPriceLabel ?? existingRecord.effectiveGasPriceLabel,
+    effectiveGasPriceLabel: item.effectiveGasPriceLabel ?? existingRecord.effectiveGasPriceLabel,
     nonceLabel: item.nonceLabel ?? existingRecord.nonceLabel,
   };
 
@@ -335,16 +299,13 @@ function mergeTransactionRecord(
     nextRecord.feeLabel !== existingRecord.feeLabel ||
     nextRecord.gasUsedLabel !== existingRecord.gasUsedLabel ||
     nextRecord.gasLimitLabel !== existingRecord.gasLimitLabel ||
-    nextRecord.effectiveGasPriceLabel !==
-      existingRecord.effectiveGasPriceLabel ||
+    nextRecord.effectiveGasPriceLabel !== existingRecord.effectiveGasPriceLabel ||
     nextRecord.nonceLabel !== existingRecord.nonceLabel;
 
   return changed ? nextRecord : null;
 }
 
-function toPublicTransaction(
-  record: EvmCachedTransactionRecord,
-): EvmCachedTransactionItem {
+function toPublicTransaction(record: EvmCachedTransactionRecord): EvmCachedTransactionItem {
   return {
     hash: record.hash,
     hashLabel: record.hashLabel,
@@ -375,9 +336,7 @@ function toPublicTransaction(
   };
 }
 
-function toPublicAccount(
-  record: EvmObservedAccountRecord,
-): EvmObservedAccountItem {
+function toPublicAccount(record: EvmObservedAccountRecord): EvmObservedAccountItem {
   return {
     address: record.address,
     addressLabel: formatAddressLabel(record.address),
@@ -426,14 +385,8 @@ async function getDatabase() {
 
       request.onupgradeneeded = () => {
         const database = request.result;
-        const storeNames = [
-          TRANSACTIONS_STORE,
-          ADDRESS_TRANSACTIONS_STORE,
-          ADDRESS_SUMMARIES_STORE,
-        ];
-        const hasLegacyStores = storeNames.some((storeName) =>
-          database.objectStoreNames.contains(storeName),
-        );
+        const storeNames = [TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE];
+        const hasLegacyStores = storeNames.some((storeName) => database.objectStoreNames.contains(storeName));
 
         if (hasLegacyStores) {
           storeNames.forEach((storeName) => {
@@ -443,78 +396,32 @@ async function getDatabase() {
           });
         }
 
-        const transactionsStore = database.createObjectStore(
-          TRANSACTIONS_STORE,
-          {
-            keyPath: 'hash',
-          },
-        );
-        transactionsStore.createIndex(TRANSACTIONS_BY_TIMESTAMP_INDEX, [
-          'sortTimestamp',
-          'hash',
-        ]);
-        transactionsStore.createIndex(TRANSACTIONS_BY_BLOCK_INDEX, [
-          'blockNumberValue',
-          'sortTimestamp',
-          'hash',
-        ]);
-        transactionsStore.createIndex(TRANSACTIONS_BY_FROM_TIMESTAMP_INDEX, [
-          'fromLower',
-          'sortTimestamp',
-          'hash',
-        ]);
-        transactionsStore.createIndex(TRANSACTIONS_BY_TO_TIMESTAMP_INDEX, [
-          'toLower',
-          'sortTimestamp',
-          'hash',
-        ]);
-        transactionsStore.createIndex(TRANSACTIONS_BY_METHOD_TIMESTAMP_INDEX, [
-          'methodKey',
-          'sortTimestamp',
-          'hash',
-        ]);
-        transactionsStore.createIndex(
-          TRANSACTIONS_BY_METHOD_SELECTOR_TIMESTAMP_INDEX,
-          ['methodSelector', 'sortTimestamp', 'hash'],
-        );
-        transactionsStore.createIndex(TRANSACTIONS_BY_VALUE_INDEX, [
-          'valueWeiSortKey',
-          'sortTimestamp',
-          'hash',
-        ]);
+        const transactionsStore = database.createObjectStore(TRANSACTIONS_STORE, {
+          keyPath: 'hash',
+        });
+        transactionsStore.createIndex(TRANSACTIONS_BY_TIMESTAMP_INDEX, ['sortTimestamp', 'hash']);
+        transactionsStore.createIndex(TRANSACTIONS_BY_BLOCK_INDEX, ['blockNumberValue', 'sortTimestamp', 'hash']);
+        transactionsStore.createIndex(TRANSACTIONS_BY_FROM_TIMESTAMP_INDEX, ['fromLower', 'sortTimestamp', 'hash']);
+        transactionsStore.createIndex(TRANSACTIONS_BY_TO_TIMESTAMP_INDEX, ['toLower', 'sortTimestamp', 'hash']);
+        transactionsStore.createIndex(TRANSACTIONS_BY_METHOD_TIMESTAMP_INDEX, ['methodKey', 'sortTimestamp', 'hash']);
+        transactionsStore.createIndex(TRANSACTIONS_BY_METHOD_SELECTOR_TIMESTAMP_INDEX, ['methodSelector', 'sortTimestamp', 'hash']);
+        transactionsStore.createIndex(TRANSACTIONS_BY_VALUE_INDEX, ['valueWeiSortKey', 'sortTimestamp', 'hash']);
 
-        const addressTransactionsStore = database.createObjectStore(
-          ADDRESS_TRANSACTIONS_STORE,
-          {
-            keyPath: 'id',
-          },
-        );
-        addressTransactionsStore.createIndex(
-          ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX,
-          ['addressLower', 'sortTimestamp', 'hash'],
-        );
+        const addressTransactionsStore = database.createObjectStore(ADDRESS_TRANSACTIONS_STORE, {
+          keyPath: 'id',
+        });
+        addressTransactionsStore.createIndex(ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX, ['addressLower', 'sortTimestamp', 'hash']);
         addressTransactionsStore.createIndex(ADDRESS_BY_HASH_INDEX, 'hash');
 
-        const addressSummariesStore = database.createObjectStore(
-          ADDRESS_SUMMARIES_STORE,
-          {
-            keyPath: 'addressLower',
-          },
-        );
-        addressSummariesStore.createIndex(
-          ADDRESS_SUMMARIES_BY_LAST_SEEN_INDEX,
-          ['lastSeenSort', 'addressLower'],
-        );
-        addressSummariesStore.createIndex(ADDRESS_SUMMARIES_BY_TX_COUNT_INDEX, [
-          'totalTxCount',
-          'lastSeenSort',
-          'addressLower',
-        ]);
+        const addressSummariesStore = database.createObjectStore(ADDRESS_SUMMARIES_STORE, {
+          keyPath: 'addressLower',
+        });
+        addressSummariesStore.createIndex(ADDRESS_SUMMARIES_BY_LAST_SEEN_INDEX, ['lastSeenSort', 'addressLower']);
+        addressSummariesStore.createIndex(ADDRESS_SUMMARIES_BY_TX_COUNT_INDEX, ['totalTxCount', 'lastSeenSort', 'addressLower']);
       };
 
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () =>
-        reject(request.error ?? new Error('Failed to open IndexedDB.'));
+      request.onerror = () => reject(request.error ?? new Error('Failed to open IndexedDB.'));
     });
   }
 
@@ -530,10 +437,7 @@ async function countStore(storeName: string) {
 }
 
 async function ensureAddressSummariesReady() {
-  const [transactionCount, summaryCount] = await Promise.all([
-    countStore(TRANSACTIONS_STORE),
-    countStore(ADDRESS_SUMMARIES_STORE),
-  ]);
+  const [transactionCount, summaryCount] = await Promise.all([countStore(TRANSACTIONS_STORE), countStore(ADDRESS_SUMMARIES_STORE)]);
 
   if (transactionCount === 0 || summaryCount > 0) {
     return;
@@ -547,10 +451,7 @@ async function ensureAddressSummariesReady() {
   await new Promise<void>((resolve, reject) => {
     const request = transactionsStore.openCursor();
 
-    request.onerror = () =>
-      reject(
-        request.error ?? new Error('Failed to rebuild address summaries.'),
-      );
+    request.onerror = () => reject(request.error ?? new Error('Failed to rebuild address summaries.'));
     request.onsuccess = () => {
       const cursor = request.result;
 
@@ -567,10 +468,7 @@ async function ensureAddressSummariesReady() {
 
   await waitForTransaction(readTransaction);
 
-  const writeTransaction = database.transaction(
-    ADDRESS_SUMMARIES_STORE,
-    'readwrite',
-  );
+  const writeTransaction = database.transaction(ADDRESS_SUMMARIES_STORE, 'readwrite');
   const summariesStore = writeTransaction.objectStore(ADDRESS_SUMMARIES_STORE);
   summariesStore.clear();
 
@@ -581,10 +479,7 @@ async function ensureAddressSummariesReady() {
   await waitForTransaction(writeTransaction);
 }
 
-function mergeAddressSummary(
-  summaryMap: Map<string, EvmObservedAccountRecord>,
-  item: EvmCachedTransactionRecord,
-) {
+function mergeAddressSummary(summaryMap: Map<string, EvmObservedAccountRecord>, item: EvmCachedTransactionRecord) {
   const fromLower = item.from.toLowerCase();
   const toLower = item.to?.toLowerCase() ?? null;
   const isSelf = toLower != null && toLower === fromLower;
@@ -664,34 +559,20 @@ async function rebuildAddressSummariesForAddresses(addresses: string[]) {
 
   const uniqueAddresses = [...new Set(addresses)];
   const database = await getDatabase();
-  const transaction = database.transaction(
-    [TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE],
-    'readwrite',
-  );
+  const transaction = database.transaction([TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE], 'readwrite');
   const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
-  const addressTransactionsStore = transaction.objectStore(
-    ADDRESS_TRANSACTIONS_STORE,
-  );
+  const addressTransactionsStore = transaction.objectStore(ADDRESS_TRANSACTIONS_STORE);
   const summariesStore = transaction.objectStore(ADDRESS_SUMMARIES_STORE);
-  const addressIndex = addressTransactionsStore.index(
-    ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX,
-  );
+  const addressIndex = addressTransactionsStore.index(ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX);
 
   for (const addressLower of uniqueAddresses) {
-    const range = IDBKeyRange.bound(
-      [addressLower, 0, ''],
-      [addressLower, Number.MAX_SAFE_INTEGER, '\uffff'],
-    );
+    const range = IDBKeyRange.bound([addressLower, 0, ''], [addressLower, Number.MAX_SAFE_INTEGER, '\uffff']);
     const summaryMap = new Map<string, EvmObservedAccountRecord>();
 
     await new Promise<void>((resolve, reject) => {
       const request = addressIndex.openCursor(range);
 
-      request.onerror = () =>
-        reject(
-          request.error ??
-            new Error('Failed to rebuild affected account summaries.'),
-        );
+      request.onerror = () => reject(request.error ?? new Error('Failed to rebuild affected account summaries.'));
       request.onsuccess = () => {
         const cursor = request.result;
 
@@ -703,17 +584,9 @@ async function rebuildAddressSummariesForAddresses(addresses: string[]) {
         const addressRecord = cursor.value as EvmAddressTransactionRecord;
         const transactionRequest = transactionsStore.get(addressRecord.hash);
 
-        transactionRequest.onerror = () =>
-          reject(
-            transactionRequest.error ??
-              new Error(
-                'Failed to read cached transaction during summary rebuild.',
-              ),
-          );
+        transactionRequest.onerror = () => reject(transactionRequest.error ?? new Error('Failed to read cached transaction during summary rebuild.'));
         transactionRequest.onsuccess = () => {
-          const cachedTransaction = transactionRequest.result as
-            | EvmCachedTransactionRecord
-            | undefined;
+          const cachedTransaction = transactionRequest.result as EvmCachedTransactionRecord | undefined;
 
           if (cachedTransaction) {
             mergeAddressSummary(summaryMap, cachedTransaction);
@@ -746,28 +619,23 @@ async function collectOldestTransactionsToTrim(overflow: number) {
   const store = transaction.objectStore(TRANSACTIONS_STORE);
   const index = store.index(TRANSACTIONS_BY_TIMESTAMP_INDEX);
 
-  const items = await new Promise<EvmCachedTransactionRecord[]>(
-    (resolve, reject) => {
-      const next: EvmCachedTransactionRecord[] = [];
-      const request = index.openCursor();
+  const items = await new Promise<EvmCachedTransactionRecord[]>((resolve, reject) => {
+    const next: EvmCachedTransactionRecord[] = [];
+    const request = index.openCursor();
 
-      request.onerror = () =>
-        reject(
-          request.error ?? new Error('Failed to scan cached transactions.'),
-        );
-      request.onsuccess = () => {
-        const cursor = request.result;
+    request.onerror = () => reject(request.error ?? new Error('Failed to scan cached transactions.'));
+    request.onsuccess = () => {
+      const cursor = request.result;
 
-        if (!cursor || next.length >= overflow) {
-          resolve(next);
-          return;
-        }
+      if (!cursor || next.length >= overflow) {
+        resolve(next);
+        return;
+      }
 
-        next.push(cursor.value as EvmCachedTransactionRecord);
-        cursor.continue();
-      };
-    },
-  );
+      next.push(cursor.value as EvmCachedTransactionRecord);
+      cursor.continue();
+    };
+  });
 
   await waitForTransaction(transaction);
   return items;
@@ -788,17 +656,10 @@ async function trimCachedTransactionsIfNeeded() {
   }
 
   const database = await getDatabase();
-  const transaction = database.transaction(
-    [TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE],
-    'readwrite',
-  );
+  const transaction = database.transaction([TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE], 'readwrite');
   const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
-  const addressTransactionsStore = transaction.objectStore(
-    ADDRESS_TRANSACTIONS_STORE,
-  );
-  const addressByHashIndex = addressTransactionsStore.index(
-    ADDRESS_BY_HASH_INDEX,
-  );
+  const addressTransactionsStore = transaction.objectStore(ADDRESS_TRANSACTIONS_STORE);
+  const addressByHashIndex = addressTransactionsStore.index(ADDRESS_BY_HASH_INDEX);
   const affectedAddresses = new Set<string>();
 
   for (const record of recordsToDelete) {
@@ -812,14 +673,9 @@ async function trimCachedTransactionsIfNeeded() {
     transactionsStore.delete(record.hash);
 
     await new Promise<void>((resolve, reject) => {
-      const request = addressByHashIndex.openKeyCursor(
-        IDBKeyRange.only(record.hash),
-      );
+      const request = addressByHashIndex.openKeyCursor(IDBKeyRange.only(record.hash));
 
-      request.onerror = () =>
-        reject(
-          request.error ?? new Error('Failed to trim cached address records.'),
-        );
+      request.onerror = () => reject(request.error ?? new Error('Failed to trim cached address records.'));
       request.onsuccess = () => {
         const cursor = request.result;
 
@@ -838,25 +694,16 @@ async function trimCachedTransactionsIfNeeded() {
   await rebuildAddressSummariesForAddresses([...affectedAddresses]);
 }
 
-export async function rememberEvmTransactionCache(
-  items: EvmCachedTransactionItem[],
-) {
+export async function rememberEvmTransactionCache(items: EvmCachedTransactionItem[]) {
   if (!items.length) {
     return [];
   }
 
-  const uniqueItems = await enrichTransactionsWithReceipts([
-    ...new Map(items.map((item) => [item.hash, item])).values(),
-  ]);
+  const uniqueItems = await enrichTransactionsWithReceipts([...new Map(items.map((item) => [item.hash, item])).values()]);
   const database = await getDatabase();
-  const transaction = database.transaction(
-    [TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE],
-    'readwrite',
-  );
+  const transaction = database.transaction([TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE], 'readwrite');
   const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
-  const addressTransactionsStore = transaction.objectStore(
-    ADDRESS_TRANSACTIONS_STORE,
-  );
+  const addressTransactionsStore = transaction.objectStore(ADDRESS_TRANSACTIONS_STORE);
   const summariesStore = transaction.objectStore(ADDRESS_SUMMARIES_STORE);
   const addressSummaryUpdates = new Map<string, EvmObservedAccountRecord>();
   let changed = false;
@@ -892,28 +739,20 @@ export async function rememberEvmTransactionCache(
   }
 
   for (const nextSummary of addressSummaryUpdates.values()) {
-    const currentSummary = (await toPromise(
-      summariesStore.get(nextSummary.addressLower),
-    )) as EvmObservedAccountRecord | undefined;
+    const currentSummary = (await toPromise(summariesStore.get(nextSummary.addressLower))) as EvmObservedAccountRecord | undefined;
 
     if (currentSummary) {
-      updateAddressSummary(
-        new Map([[currentSummary.addressLower, currentSummary]]),
-        {
-          addressLower: nextSummary.addressLower,
-          address: nextSummary.address,
-          sortTimestamp: nextSummary.lastSeenSort,
-          blockNumber: nextSummary.lastSeenBlockNumber,
-          totalTxCount: nextSummary.totalTxCount,
-          inboundCount: nextSummary.inboundCount,
-          outboundCount: nextSummary.outboundCount,
-          selfCount: nextSummary.selfCount,
-        },
-      );
-      currentSummary.firstSeenSort = Math.min(
-        currentSummary.firstSeenSort,
-        nextSummary.firstSeenSort,
-      );
+      updateAddressSummary(new Map([[currentSummary.addressLower, currentSummary]]), {
+        addressLower: nextSummary.addressLower,
+        address: nextSummary.address,
+        sortTimestamp: nextSummary.lastSeenSort,
+        blockNumber: nextSummary.lastSeenBlockNumber,
+        totalTxCount: nextSummary.totalTxCount,
+        inboundCount: nextSummary.inboundCount,
+        outboundCount: nextSummary.outboundCount,
+        selfCount: nextSummary.selfCount,
+      });
+      currentSummary.firstSeenSort = Math.min(currentSummary.firstSeenSort, nextSummary.firstSeenSort);
       summariesStore.put(currentSummary);
     } else {
       summariesStore.put(nextSummary);
@@ -931,16 +770,12 @@ export async function rememberEvmTransactionCache(
   return uniqueItems;
 }
 
-export async function hydrateEvmCachedTransactionInputData(
-  items: Array<{ hash: string; inputData: string }>,
-) {
+export async function hydrateEvmCachedTransactionInputData(items: Array<{ hash: string; inputData: string }>) {
   if (!items.length) {
     return;
   }
 
-  const uniqueItems = [
-    ...new Map(items.map((item) => [item.hash, item])).values(),
-  ];
+  const uniqueItems = [...new Map(items.map((item) => [item.hash, item])).values()];
   const database = await getDatabase();
   const transaction = database.transaction(TRANSACTIONS_STORE, 'readwrite');
   const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
@@ -969,10 +804,7 @@ export async function hydrateEvmCachedTransactionInputData(
 
 export async function clearEvmTransactionCache() {
   const database = await getDatabase();
-  const transaction = database.transaction(
-    [TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE],
-    'readwrite',
-  );
+  const transaction = database.transaction([TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE], 'readwrite');
   transaction.objectStore(TRANSACTIONS_STORE).clear();
   transaction.objectStore(ADDRESS_TRANSACTIONS_STORE).clear();
   transaction.objectStore(ADDRESS_SUMMARIES_STORE).clear();
@@ -998,10 +830,7 @@ export async function getLatestCachedTransactionHash() {
   const latestHash = await new Promise<string | null>((resolve, reject) => {
     const request = index.openCursor(null, 'prev');
 
-    request.onerror = () =>
-      reject(
-        request.error ?? new Error('Failed to read latest cached transaction.'),
-      );
+    request.onerror = () => reject(request.error ?? new Error('Failed to read latest cached transaction.'));
     request.onsuccess = () => {
       const cursor = request.result;
 
@@ -1022,40 +851,30 @@ export async function getLatestCachedTransactionHash() {
 export async function getEvmTransactionCacheSummary(): Promise<EvmTransactionCacheSummary> {
   await ensureAddressSummariesReady();
   const database = await getDatabase();
-  const transaction = database.transaction(
-    [TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE],
-    'readonly',
-  );
+  const transaction = database.transaction([TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE], 'readonly');
   const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
   const summariesStore = transaction.objectStore(ADDRESS_SUMMARIES_STORE);
   const index = transactionsStore.index(TRANSACTIONS_BY_TIMESTAMP_INDEX);
 
-  const [totalTransactions, totalObservedAccounts, latestSeenTransaction] =
-    await Promise.all([
-      toPromise(transactionsStore.count()),
-      toPromise(summariesStore.count()),
-      new Promise<EvmCachedTransactionItem | null>((resolve, reject) => {
-        const request = index.openCursor(null, 'prev');
+  const [totalTransactions, totalObservedAccounts, latestSeenTransaction] = await Promise.all([
+    toPromise(transactionsStore.count()),
+    toPromise(summariesStore.count()),
+    new Promise<EvmCachedTransactionItem | null>((resolve, reject) => {
+      const request = index.openCursor(null, 'prev');
 
-        request.onerror = () =>
-          reject(
-            request.error ??
-              new Error('Failed to read cached transaction summary.'),
-          );
-        request.onsuccess = () => {
-          const cursor = request.result;
+      request.onerror = () => reject(request.error ?? new Error('Failed to read cached transaction summary.'));
+      request.onsuccess = () => {
+        const cursor = request.result;
 
-          if (!cursor) {
-            resolve(null);
-            return;
-          }
+        if (!cursor) {
+          resolve(null);
+          return;
+        }
 
-          resolve(
-            toPublicTransaction(cursor.value as EvmCachedTransactionRecord),
-          );
-        };
-      }),
-    ]);
+        resolve(toPublicTransaction(cursor.value as EvmCachedTransactionRecord));
+      };
+    }),
+  ]);
 
   await waitForTransaction(transaction);
 
@@ -1075,108 +894,56 @@ function isMethodSelectorQuery(query: string | null | undefined) {
   return Boolean(query && /^0x[0-9a-f]{8}$/i.test(query));
 }
 
-function buildTimestampRange(
-  startTimeMs: number | null | undefined,
-  endTimeMs: number | null | undefined,
-) {
+function buildTimestampRange(startTimeMs: number | null | undefined, endTimeMs: number | null | undefined) {
   const lower = startTimeMs != null ? Math.max(0, startTimeMs) : 0;
-  const upper =
-    endTimeMs != null ? Math.max(lower, endTimeMs) : Number.MAX_SAFE_INTEGER;
+  const upper = endTimeMs != null ? Math.max(lower, endTimeMs) : Number.MAX_SAFE_INTEGER;
   return { lower, upper };
 }
 
-function buildSearchCursorRequest(
-  store: IDBObjectStore,
-  filters: Required<EvmCachedTransactionSearchFilters>,
-) {
-  const timestampRange = buildTimestampRange(
-    filters.startTimeMs,
-    filters.endTimeMs,
-  );
+function buildSearchCursorRequest(store: IDBObjectStore, filters: Required<EvmCachedTransactionSearchFilters>) {
+  const timestampRange = buildTimestampRange(filters.startTimeMs, filters.endTimeMs);
 
   if (filters.fromAddress) {
     const index = store.index(TRANSACTIONS_BY_FROM_TIMESTAMP_INDEX);
     return index.openCursor(
-      IDBKeyRange.bound(
-        [filters.fromAddress, timestampRange.lower, CURSOR_MIN_STRING],
-        [filters.fromAddress, timestampRange.upper, CURSOR_MAX_STRING],
-      ),
+      IDBKeyRange.bound([filters.fromAddress, timestampRange.lower, CURSOR_MIN_STRING], [filters.fromAddress, timestampRange.upper, CURSOR_MAX_STRING]),
       'prev',
     );
   }
 
   if (filters.toAddress) {
     const index = store.index(TRANSACTIONS_BY_TO_TIMESTAMP_INDEX);
-    return index.openCursor(
-      IDBKeyRange.bound(
-        [filters.toAddress, timestampRange.lower, CURSOR_MIN_STRING],
-        [filters.toAddress, timestampRange.upper, CURSOR_MAX_STRING],
-      ),
-      'prev',
-    );
+    return index.openCursor(IDBKeyRange.bound([filters.toAddress, timestampRange.lower, CURSOR_MIN_STRING], [filters.toAddress, timestampRange.upper, CURSOR_MAX_STRING]), 'prev');
   }
 
   if (filters.methodQuery && isMethodSelectorQuery(filters.methodQuery)) {
     const normalizedMethod = normalizeMethodQuery(filters.methodQuery);
     const index = store.index(TRANSACTIONS_BY_METHOD_SELECTOR_TIMESTAMP_INDEX);
-    return index.openCursor(
-      IDBKeyRange.bound(
-        [normalizedMethod, timestampRange.lower, CURSOR_MIN_STRING],
-        [normalizedMethod, timestampRange.upper, CURSOR_MAX_STRING],
-      ),
-      'prev',
-    );
+    return index.openCursor(IDBKeyRange.bound([normalizedMethod, timestampRange.lower, CURSOR_MIN_STRING], [normalizedMethod, timestampRange.upper, CURSOR_MAX_STRING]), 'prev');
   }
 
-  if (
-    filters.methodQuery &&
-    (filters.methodQuery === 'transfer' || filters.methodQuery === 'create')
-  ) {
+  if (filters.methodQuery && (filters.methodQuery === 'transfer' || filters.methodQuery === 'create')) {
     const normalizedMethod = normalizeMethodQuery(filters.methodQuery);
     const index = store.index(TRANSACTIONS_BY_METHOD_TIMESTAMP_INDEX);
-    return index.openCursor(
-      IDBKeyRange.bound(
-        [normalizedMethod, timestampRange.lower, CURSOR_MIN_STRING],
-        [normalizedMethod, timestampRange.upper, CURSOR_MAX_STRING],
-      ),
-      'prev',
-    );
+    return index.openCursor(IDBKeyRange.bound([normalizedMethod, timestampRange.lower, CURSOR_MIN_STRING], [normalizedMethod, timestampRange.upper, CURSOR_MAX_STRING]), 'prev');
   }
 
   if (filters.startBlockNumber != null || filters.endBlockNumber != null) {
     const lower = Math.max(0, filters.startBlockNumber ?? 0);
-    const upper = Math.max(
-      lower,
-      filters.endBlockNumber ?? Number.MAX_SAFE_INTEGER,
-    );
+    const upper = Math.max(lower, filters.endBlockNumber ?? Number.MAX_SAFE_INTEGER);
     const index = store.index(TRANSACTIONS_BY_BLOCK_INDEX);
-    return index.openCursor(
-      IDBKeyRange.bound(
-        [lower, timestampRange.lower, CURSOR_MIN_STRING],
-        [upper, timestampRange.upper, CURSOR_MAX_STRING],
-      ),
-      'prev',
-    );
+    return index.openCursor(IDBKeyRange.bound([lower, timestampRange.lower, CURSOR_MIN_STRING], [upper, timestampRange.upper, CURSOR_MAX_STRING]), 'prev');
   }
 
   if (filters.startTimeMs != null || filters.endTimeMs != null) {
     const index = store.index(TRANSACTIONS_BY_TIMESTAMP_INDEX);
-    return index.openCursor(
-      IDBKeyRange.bound(
-        [timestampRange.lower, CURSOR_MIN_STRING],
-        [timestampRange.upper, CURSOR_MAX_STRING],
-      ),
-      'prev',
-    );
+    return index.openCursor(IDBKeyRange.bound([timestampRange.lower, CURSOR_MIN_STRING], [timestampRange.upper, CURSOR_MAX_STRING]), 'prev');
   }
 
   return store.index(TRANSACTIONS_BY_TIMESTAMP_INDEX).openCursor(null, 'prev');
 }
 
-function matchesSearchFilters(
-  record: EvmCachedTransactionRecord,
-  filters: Required<EvmCachedTransactionSearchFilters>,
-) {
+function matchesSearchFilters(record: EvmCachedTransactionRecord, filters: Required<EvmCachedTransactionSearchFilters>) {
   if (filters.fromAddress && record.fromLower !== filters.fromAddress) {
     return false;
   }
@@ -1207,40 +974,25 @@ function matchesSearchFilters(
         fallbackMethodLabel: record.methodLabel,
       }).toLowerCase();
 
-      if (
-        !resolvedMethodLabel.includes(normalizedMethod) &&
-        !record.methodKey.includes(normalizedMethod)
-      ) {
+      if (!resolvedMethodLabel.includes(normalizedMethod) && !record.methodKey.includes(normalizedMethod)) {
         return false;
       }
     }
   }
 
-  if (
-    filters.startTimeMs != null &&
-    (record.timestampMs == null || record.timestampMs < filters.startTimeMs)
-  ) {
+  if (filters.startTimeMs != null && (record.timestampMs == null || record.timestampMs < filters.startTimeMs)) {
     return false;
   }
 
-  if (
-    filters.endTimeMs != null &&
-    (record.timestampMs == null || record.timestampMs > filters.endTimeMs)
-  ) {
+  if (filters.endTimeMs != null && (record.timestampMs == null || record.timestampMs > filters.endTimeMs)) {
     return false;
   }
 
-  if (
-    filters.startBlockNumber != null &&
-    record.blockNumberValue < filters.startBlockNumber
-  ) {
+  if (filters.startBlockNumber != null && record.blockNumberValue < filters.startBlockNumber) {
     return false;
   }
 
-  if (
-    filters.endBlockNumber != null &&
-    record.blockNumberValue > filters.endBlockNumber
-  ) {
+  if (filters.endBlockNumber != null && record.blockNumberValue > filters.endBlockNumber) {
     return false;
   }
 
@@ -1259,12 +1011,7 @@ function matchesSearchFilters(
   return true;
 }
 
-async function collectMatchingTransactionsPage(input: {
-  store: IDBObjectStore;
-  filters: Required<EvmCachedTransactionSearchFilters>;
-  offset: number;
-  limit: number;
-}) {
+async function collectMatchingTransactionsPage(input: { store: IDBObjectStore; filters: Required<EvmCachedTransactionSearchFilters>; offset: number; limit: number }) {
   const { store, filters, offset, limit } = input;
 
   return new Promise<{
@@ -1275,10 +1022,7 @@ async function collectMatchingTransactionsPage(input: {
     let totalMatches = 0;
     const request = buildSearchCursorRequest(store, filters);
 
-    request.onerror = () =>
-      reject(
-        request.error ?? new Error('Failed to search cached transactions.'),
-      );
+    request.onerror = () => reject(request.error ?? new Error('Failed to search cached transactions.'));
     request.onsuccess = () => {
       const cursor = request.result;
 
@@ -1311,14 +1055,8 @@ export async function searchEvmCachedTransactions(
     pageSize?: number;
   },
 ): Promise<EvmCachedTransactionsPage> {
-  const normalizedPage =
-    Number.isFinite(input.page) && (input.page ?? 0) > 0
-      ? Math.floor(input.page ?? 1)
-      : 1;
-  const normalizedPageSize =
-    Number.isFinite(input.pageSize) && (input.pageSize ?? 0) > 0
-      ? Math.floor(input.pageSize ?? 25)
-      : 25;
+  const normalizedPage = Number.isFinite(input.page) && (input.page ?? 0) > 0 ? Math.floor(input.page ?? 1) : 1;
+  const normalizedPageSize = Number.isFinite(input.pageSize) && (input.pageSize ?? 0) > 0 ? Math.floor(input.pageSize ?? 25) : 25;
   const filters: Required<EvmCachedTransactionSearchFilters> = {
     fromAddress: input.fromAddress?.trim().toLowerCase() || null,
     toAddress: input.toAddress?.trim().toLowerCase() || null,
@@ -1342,10 +1080,7 @@ export async function searchEvmCachedTransactions(
     offset,
     limit: normalizedPageSize,
   });
-  const totalPages = Math.max(
-    1,
-    Math.ceil(result.totalMatches / normalizedPageSize),
-  );
+  const totalPages = Math.max(1, Math.ceil(result.totalMatches / normalizedPageSize));
   const safePage = Math.min(normalizedPage, totalPages);
 
   if (safePage !== normalizedPage) {
@@ -1370,15 +1105,10 @@ export async function searchEvmCachedTransactions(
   };
 }
 
-export async function getEvmObservedAccountsPage(
-  page = 1,
-  pageSize = 25,
-): Promise<EvmObservedAccountsPage> {
+export async function getEvmObservedAccountsPage(page = 1, pageSize = 25): Promise<EvmObservedAccountsPage> {
   await ensureAddressSummariesReady();
-  const normalizedPage =
-    Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
-  const normalizedPageSize =
-    Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 25;
+  const normalizedPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const normalizedPageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 25;
   const database = await getDatabase();
   const transaction = database.transaction(ADDRESS_SUMMARIES_STORE, 'readonly');
   const summariesStore = transaction.objectStore(ADDRESS_SUMMARIES_STORE);
@@ -1388,33 +1118,30 @@ export async function getEvmObservedAccountsPage(
   const safePage = Math.min(normalizedPage, totalPages);
   const offset = (safePage - 1) * normalizedPageSize;
 
-  const accounts = await new Promise<EvmObservedAccountItem[]>(
-    (resolve, reject) => {
-      const items: EvmObservedAccountItem[] = [];
-      let skipped = 0;
-      const request = index.openCursor(null, 'prev');
+  const accounts = await new Promise<EvmObservedAccountItem[]>((resolve, reject) => {
+    const items: EvmObservedAccountItem[] = [];
+    let skipped = 0;
+    const request = index.openCursor(null, 'prev');
 
-      request.onerror = () =>
-        reject(request.error ?? new Error('Failed to read observed accounts.'));
-      request.onsuccess = () => {
-        const cursor = request.result;
+    request.onerror = () => reject(request.error ?? new Error('Failed to read observed accounts.'));
+    request.onsuccess = () => {
+      const cursor = request.result;
 
-        if (!cursor || items.length >= normalizedPageSize) {
-          resolve(items);
-          return;
-        }
+      if (!cursor || items.length >= normalizedPageSize) {
+        resolve(items);
+        return;
+      }
 
-        if (skipped < offset) {
-          skipped += 1;
-          cursor.continue();
-          return;
-        }
-
-        items.push(toPublicAccount(cursor.value as EvmObservedAccountRecord));
+      if (skipped < offset) {
+        skipped += 1;
         cursor.continue();
-      };
-    },
-  );
+        return;
+      }
+
+      items.push(toPublicAccount(cursor.value as EvmObservedAccountRecord));
+      cursor.continue();
+    };
+  });
 
   await waitForTransaction(transaction);
 
@@ -1429,57 +1156,42 @@ export async function getEvmObservedAccountsPage(
   };
 }
 
-export async function getEvmCachedTransactionsPage(
-  page = 1,
-  pageSize = 25,
-): Promise<EvmCachedTransactionsPage> {
-  const normalizedPage =
-    Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
-  const normalizedPageSize =
-    Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 25;
+export async function getEvmCachedTransactionsPage(page = 1, pageSize = 25): Promise<EvmCachedTransactionsPage> {
+  const normalizedPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const normalizedPageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 25;
   const database = await getDatabase();
   const transaction = database.transaction(TRANSACTIONS_STORE, 'readonly');
   const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
   const index = transactionsStore.index(TRANSACTIONS_BY_TIMESTAMP_INDEX);
   const totalTransactions = await toPromise(transactionsStore.count());
-  const totalPages = Math.max(
-    1,
-    Math.ceil(totalTransactions / normalizedPageSize),
-  );
+  const totalPages = Math.max(1, Math.ceil(totalTransactions / normalizedPageSize));
   const safePage = Math.min(normalizedPage, totalPages);
   const offset = (safePage - 1) * normalizedPageSize;
 
-  const transactions = await new Promise<EvmCachedTransactionItem[]>(
-    (resolve, reject) => {
-      const items: EvmCachedTransactionItem[] = [];
-      let skipped = 0;
-      const request = index.openCursor(null, 'prev');
+  const transactions = await new Promise<EvmCachedTransactionItem[]>((resolve, reject) => {
+    const items: EvmCachedTransactionItem[] = [];
+    let skipped = 0;
+    const request = index.openCursor(null, 'prev');
 
-      request.onerror = () =>
-        reject(
-          request.error ?? new Error('Failed to read cached transactions.'),
-        );
-      request.onsuccess = () => {
-        const cursor = request.result;
+    request.onerror = () => reject(request.error ?? new Error('Failed to read cached transactions.'));
+    request.onsuccess = () => {
+      const cursor = request.result;
 
-        if (!cursor || items.length >= normalizedPageSize) {
-          resolve(items);
-          return;
-        }
+      if (!cursor || items.length >= normalizedPageSize) {
+        resolve(items);
+        return;
+      }
 
-        if (skipped < offset) {
-          skipped += 1;
-          cursor.continue();
-          return;
-        }
-
-        items.push(
-          toPublicTransaction(cursor.value as EvmCachedTransactionRecord),
-        );
+      if (skipped < offset) {
+        skipped += 1;
         cursor.continue();
-      };
-    },
-  );
+        return;
+      }
+
+      items.push(toPublicTransaction(cursor.value as EvmCachedTransactionRecord));
+      cursor.continue();
+    };
+  });
 
   await waitForTransaction(transaction);
 
@@ -1494,9 +1206,7 @@ export async function getEvmCachedTransactionsPage(
   };
 }
 
-export async function getEvmCachedTransactionsByHashes(
-  hashes: string[],
-): Promise<Record<string, EvmCachedTransactionItem>> {
+export async function getEvmCachedTransactionsByHashes(hashes: string[]): Promise<Record<string, EvmCachedTransactionItem>> {
   if (!hashes.length) {
     return {};
   }
@@ -1508,59 +1218,27 @@ export async function getEvmCachedTransactionsByHashes(
   const entries = await Promise.all(
     uniqueHashes.map(async (hash) => {
       const result = await toPromise(store.get(hash));
-      return result
-        ? [hash, toPublicTransaction(result as EvmCachedTransactionRecord)]
-        : null;
+      return result ? [hash, toPublicTransaction(result as EvmCachedTransactionRecord)] : null;
     }),
   );
 
   await waitForTransaction(transaction);
 
-  return Object.fromEntries(
-    entries.filter(
-      (entry): entry is [string, EvmCachedTransactionItem] => entry != null,
-    ),
-  );
+  return Object.fromEntries(entries.filter((entry): entry is [string, EvmCachedTransactionItem] => entry != null));
 }
 
-export async function getEvmAddressCacheSnapshot(
-  address: string,
-  page = 1,
-  pageSize = 25,
-): Promise<EvmAddressCacheSnapshot> {
-  const normalizedPage =
-    Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
-  const normalizedPageSize =
-    Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 25;
+export async function getEvmAddressCacheSnapshot(address: string, page = 1, pageSize = 25): Promise<EvmAddressCacheSnapshot> {
+  const normalizedPage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const normalizedPageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.floor(pageSize) : 25;
   const database = await getDatabase();
-  const transaction = database.transaction(
-    [TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE],
-    'readonly',
-  );
+  const transaction = database.transaction([TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE], 'readonly');
   const transactionsStore = transaction.objectStore(TRANSACTIONS_STORE);
-  const addressTransactionsStore = transaction.objectStore(
-    ADDRESS_TRANSACTIONS_STORE,
-  );
-  const addressIndex = addressTransactionsStore.index(
-    ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX,
-  );
+  const addressTransactionsStore = transaction.objectStore(ADDRESS_TRANSACTIONS_STORE);
+  const addressIndex = addressTransactionsStore.index(ADDRESS_BY_ADDRESS_TIMESTAMP_INDEX);
   const addressLower = address.toLowerCase();
-  const range = IDBKeyRange.bound(
-    [addressLower, 0, ''],
-    [addressLower, Number.MAX_SAFE_INTEGER, '\uffff'],
-  );
+  const range = IDBKeyRange.bound([addressLower, 0, ''], [addressLower, Number.MAX_SAFE_INTEGER, '\uffff']);
 
-  const summary = await new Promise<
-    Omit<
-      EvmAddressCacheSnapshot,
-      | 'page'
-      | 'pageSize'
-      | 'totalPages'
-      | 'hasPreviousPage'
-      | 'hasNextPage'
-      | 'transactions'
-    >
-  >((resolve, reject) => {
+  const summary = await new Promise<Omit<EvmAddressCacheSnapshot, 'page' | 'pageSize' | 'totalPages' | 'hasPreviousPage' | 'hasNextPage' | 'transactions'>>((resolve, reject) => {
     const request = addressIndex.openCursor(range, 'prev');
     let totalTransactions = 0;
     let inboundCount = 0;
@@ -1569,11 +1247,7 @@ export async function getEvmAddressCacheSnapshot(
     let latestSeenTransaction: EvmCachedTransactionItem | null = null;
     let firstSeenTransaction: EvmCachedTransactionItem | null = null;
 
-    request.onerror = () =>
-      reject(
-        request.error ??
-          new Error('Failed to read cached address transactions.'),
-      );
+    request.onerror = () => reject(request.error ?? new Error('Failed to read cached address transactions.'));
     request.onsuccess = () => {
       const cursor = request.result;
 
@@ -1592,25 +1266,17 @@ export async function getEvmAddressCacheSnapshot(
       const addressRecord = cursor.value as EvmAddressTransactionRecord;
       const transactionRequest = transactionsStore.get(addressRecord.hash);
 
-      transactionRequest.onerror = () =>
-        reject(
-          transactionRequest.error ??
-            new Error('Failed to read cached transaction.'),
-        );
+      transactionRequest.onerror = () => reject(transactionRequest.error ?? new Error('Failed to read cached transaction.'));
       transactionRequest.onsuccess = () => {
-        const cachedTransaction = transactionRequest.result as
-          | EvmCachedTransactionRecord
-          | undefined;
+        const cachedTransaction = transactionRequest.result as EvmCachedTransactionRecord | undefined;
 
         if (cachedTransaction) {
           const publicTransaction = toPublicTransaction(cachedTransaction);
 
           totalTransactions += 1;
 
-          const fromMatches =
-            publicTransaction.from.toLowerCase() === addressLower;
-          const toMatches =
-            publicTransaction.to?.toLowerCase() === addressLower;
+          const fromMatches = publicTransaction.from.toLowerCase() === addressLower;
+          const toMatches = publicTransaction.to?.toLowerCase() === addressLower;
 
           if (fromMatches && toMatches) {
             selfCount += 1;
@@ -1632,61 +1298,46 @@ export async function getEvmAddressCacheSnapshot(
     };
   });
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(summary.totalTransactions / normalizedPageSize),
-  );
+  const totalPages = Math.max(1, Math.ceil(summary.totalTransactions / normalizedPageSize));
   const safePage = Math.min(normalizedPage, totalPages);
   const offset = (safePage - 1) * normalizedPageSize;
-  const transactions = await new Promise<EvmCachedTransactionItem[]>(
-    (resolve, reject) => {
-      const request = addressIndex.openCursor(range, 'prev');
-      const items: EvmCachedTransactionItem[] = [];
-      let skipped = 0;
+  const transactions = await new Promise<EvmCachedTransactionItem[]>((resolve, reject) => {
+    const request = addressIndex.openCursor(range, 'prev');
+    const items: EvmCachedTransactionItem[] = [];
+    let skipped = 0;
 
-      request.onerror = () =>
-        reject(
-          request.error ??
-            new Error('Failed to read cached address transactions.'),
-        );
-      request.onsuccess = () => {
-        const cursor = request.result;
+    request.onerror = () => reject(request.error ?? new Error('Failed to read cached address transactions.'));
+    request.onsuccess = () => {
+      const cursor = request.result;
 
-        if (!cursor || items.length >= normalizedPageSize) {
-          resolve(items);
+      if (!cursor || items.length >= normalizedPageSize) {
+        resolve(items);
+        return;
+      }
+
+      const addressRecord = cursor.value as EvmAddressTransactionRecord;
+      const transactionRequest = transactionsStore.get(addressRecord.hash);
+
+      transactionRequest.onerror = () => reject(transactionRequest.error ?? new Error('Failed to read cached transaction.'));
+      transactionRequest.onsuccess = () => {
+        const cachedTransaction = transactionRequest.result as EvmCachedTransactionRecord | undefined;
+
+        if (!cachedTransaction) {
+          cursor.continue();
           return;
         }
 
-        const addressRecord = cursor.value as EvmAddressTransactionRecord;
-        const transactionRequest = transactionsStore.get(addressRecord.hash);
-
-        transactionRequest.onerror = () =>
-          reject(
-            transactionRequest.error ??
-              new Error('Failed to read cached transaction.'),
-          );
-        transactionRequest.onsuccess = () => {
-          const cachedTransaction = transactionRequest.result as
-            | EvmCachedTransactionRecord
-            | undefined;
-
-          if (!cachedTransaction) {
-            cursor.continue();
-            return;
-          }
-
-          if (skipped < offset) {
-            skipped += 1;
-            cursor.continue();
-            return;
-          }
-
-          items.push(toPublicTransaction(cachedTransaction));
+        if (skipped < offset) {
+          skipped += 1;
           cursor.continue();
-        };
+          return;
+        }
+
+        items.push(toPublicTransaction(cachedTransaction));
+        cursor.continue();
       };
-    },
-  );
+    };
+  });
 
   await waitForTransaction(transaction);
   return {

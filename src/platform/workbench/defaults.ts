@@ -1,11 +1,6 @@
 import { privateKeyToAccount } from 'viem/accounts';
 import type { RpcProfile } from '@/platform/workbench/rpc-profile';
-import {
-  readBootstrapCosmosProvider,
-  readBootstrapEvmProvider,
-  readBootstrapPrivateKey,
-  readBootstrapPrivateKeyName,
-} from '@/platform/workbench/bootstrap-config';
+import { readBootstrapCosmosProvider, readBootstrapEvmProvider, readBootstrapPrivateKey, readBootstrapPrivateKeyName } from '@/platform/workbench/bootstrap-config';
 
 const DEFAULT_TIMESTAMP = 1;
 const bootstrapEvmProvider = readBootstrapEvmProvider();
@@ -53,7 +48,5 @@ export function getDefaultGuestSelectedRpcProfiles() {
 }
 
 export function getDefaultAliceAddress() {
-  return privateKeyToAccount(
-    DEFAULT_EVM_PRIVATE_KEY_VALUE as `0x${string}`,
-  ).address;
+  return privateKeyToAccount(DEFAULT_EVM_PRIVATE_KEY_VALUE as `0x${string}`).address;
 }

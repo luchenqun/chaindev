@@ -27,27 +27,13 @@ export function CosmosBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
       <table className="data-table">
         <thead>
           <tr>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">
-              Block
-            </th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">
-              Hash
-            </th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">
-              Age
-            </th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">
-              Txn
-            </th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">
-              Proposer
-            </th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">
-              Signatures
-            </th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">
-              Size
-            </th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Block</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Hash</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Age</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Txn</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Proposer</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Signatures</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Size</th>
           </tr>
         </thead>
         <tbody>
@@ -55,41 +41,26 @@ export function CosmosBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
             <tr key={block.height} className="border-t border-slate-200">
               <td className="px-4 py-2.5 text-[14px] leading-6">
                 <Link href={`${hrefPrefix}/${block.height}`}>
-                  <span className="font-medium text-sky-600 hover:text-sky-700">
-                    #{block.height}
-                  </span>
+                  <span className="font-medium text-sky-600 hover:text-sky-700">#{block.height}</span>
                 </Link>
               </td>
-              <td
-                className="px-4 py-2.5 text-[14px] leading-6 font-mono text-slate-600"
-                title={block.hash}
-              >
+              <td className="px-4 py-2.5 text-[14px] leading-6 font-mono text-slate-600" title={block.hash}>
                 {block.hashLabel}
               </td>
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-600 tabular-nums">
                 <RelativeTime timestampMs={block.timestampMs} />
               </td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 font-medium text-sky-600 tabular-nums">
-                {block.txCountLabel}
-              </td>
+              <td className="px-4 py-2.5 text-[14px] leading-6 font-medium text-sky-600 tabular-nums">{block.txCountLabel}</td>
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">
                 <Link
                   className="font-medium text-sky-600 hover:text-sky-700"
-                  href={
-                    block.proposerOperatorAddress
-                      ? `/cosmos/validator/${block.proposerOperatorAddress}`
-                      : '/cosmos/validators'
-                  }
+                  href={block.proposerOperatorAddress ? `/cosmos/validator/${block.proposerOperatorAddress}` : '/cosmos/validators'}
                 >
                   {block.proposerLabel}
                 </Link>
               </td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">
-                {block.signaturesLabel}
-              </td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700 tabular-nums">
-                {block.blockSizeLabel}
-              </td>
+              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">{block.signaturesLabel}</td>
+              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700 tabular-nums">{block.blockSizeLabel}</td>
             </tr>
           ))}
         </tbody>

@@ -1,14 +1,8 @@
 'use client';
 
 import { fromBech32, toBech32 } from '@cosmjs/encoding';
-import {
-  formatCosmosBlock,
-} from '@/domains/cosmos/server/formatters';
-import {
-  getRecentCachedCosmosTransactions,
-  rememberCosmosTransactionCache,
-  type CosmosCachedTransactionItem,
-} from '@/domains/cosmos/client/transaction-cache';
+import { formatCosmosBlock } from '@/domains/cosmos/server/formatters';
+import { getRecentCachedCosmosTransactions, rememberCosmosTransactionCache, type CosmosCachedTransactionItem } from '@/domains/cosmos/client/transaction-cache';
 import {
   decodeCosmosTransactionSummary,
   extractSender,
@@ -829,10 +823,7 @@ async function fetchJson<T>(url: string, init?: RequestInit) {
   return (await response.json()) as T;
 }
 
-function formatInteger(
-  value: string | number | bigint | null | undefined,
-  fallback = 'Unavailable',
-) {
+function formatInteger(value: string | number | bigint | null | undefined, fallback = 'Unavailable') {
   if (value == null) {
     return fallback;
   }
@@ -877,11 +868,7 @@ function normalizeBaseAccount(account: unknown): {
     return { sequence: 0, accountNumber: 0 };
   }
 
-  if (
-    'base_account' in account &&
-    account.base_account &&
-    typeof account.base_account === 'object'
-  ) {
+  if ('base_account' in account && account.base_account && typeof account.base_account === 'object') {
     return normalizeBaseAccount(account.base_account);
   }
 
@@ -898,19 +885,13 @@ function normalizeAccountAddress(account: unknown): string | null {
     return null;
   }
 
-  if (
-    'base_account' in account &&
-    account.base_account &&
-    typeof account.base_account === 'object'
-  ) {
+  if ('base_account' in account && account.base_account && typeof account.base_account === 'object') {
     return normalizeAccountAddress(account.base_account);
   }
 
   const value = account as { address?: string };
 
-  return typeof value.address === 'string' && value.address.trim()
-    ? value.address
-    : null;
+  return typeof value.address === 'string' && value.address.trim() ? value.address : null;
 }
 
 function formatDurationSeconds(seconds: number | null) {
@@ -929,16 +910,12 @@ function formatDurationSeconds(seconds: number | null) {
   return `${Math.round(seconds)}s`;
 }
 
-function formatBytes(
-  value: string | number | null | undefined,
-  fallback = 'Unavailable',
-) {
+function formatBytes(value: string | number | null | undefined, fallback = 'Unavailable') {
   if (value == null) {
     return fallback;
   }
 
-  const bytes =
-    typeof value === 'number' ? value : Number.parseInt(String(value), 10);
+  const bytes = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
 
   if (!Number.isFinite(bytes) || bytes < 0) {
     return fallback;
@@ -955,9 +932,7 @@ function formatBytes(
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
 }
 
-function formatDenomCollection(
-  items: Array<{ denom: string; amount: string }> | undefined,
-) {
+function formatDenomCollection(items: Array<{ denom: string; amount: string }> | undefined) {
   if (!items?.length) {
     return '0';
   }
@@ -995,21 +970,13 @@ function formatCosmosValidatorStatusLabel(status: string | undefined) {
   return status
     .replace(/^BOND_STATUS_/, '')
     .toLowerCase()
-    .replace(/(^\w)|_(\w)/g, (_, first, next) =>
-      String(first ?? next).toUpperCase(),
-    )
+    .replace(/(^\w)|_(\w)/g, (_, first, next) => String(first ?? next).toUpperCase())
     .replace(/_/g, ' ');
 }
 
-function formatVotingPowerPercent(
-  tokens: string | undefined,
-  status: string | undefined,
-  jailed: boolean | undefined,
-  bondedTokenTotal: bigint,
-) {
+function formatVotingPowerPercent(tokens: string | undefined, status: string | undefined, jailed: boolean | undefined, bondedTokenTotal: bigint) {
   const normalizedTokens = BigInt(tokens ?? '0');
-  const active =
-    status === 'BOND_STATUS_BONDED' && !jailed && normalizedTokens > 0n;
+  const active = status === 'BOND_STATUS_BONDED' && !jailed && normalizedTokens > 0n;
 
   if (!active || bondedTokenTotal <= 0n) {
     return '0%';
@@ -1056,9 +1023,7 @@ function safeJsonParse(value: string | undefined) {
   }
 }
 
-function extractCosmosProposalTitle(
-  proposal: NonNullable<CosmosGovProposalsResponse['proposals']>[number],
-) {
+function extractCosmosProposalTitle(proposal: NonNullable<CosmosGovProposalsResponse['proposals']>[number]) {
   if (proposal.title?.trim()) {
     return proposal.title.trim();
   }
@@ -1104,9 +1069,7 @@ function extractCosmosProposalTitle(
   return 'Untitled Proposal';
 }
 
-function extractCosmosProposalType(
-  proposal: NonNullable<CosmosGovProposalsResponse['proposals']>[number],
-) {
+function extractCosmosProposalType(proposal: NonNullable<CosmosGovProposalsResponse['proposals']>[number]) {
   const firstMessage = proposal.messages?.[0];
 
   if (firstMessage && typeof firstMessage === 'object') {
@@ -1120,9 +1083,7 @@ function extractCosmosProposalType(
   return 'Unknown';
 }
 
-function formatCosmosProposalTallyLabel(
-  tally: CosmosGovTallyResult | undefined | null,
-) {
+function formatCosmosProposalTallyLabel(tally: CosmosGovTallyResult | undefined | null) {
   if (!tally) {
     return '-';
   }
@@ -1150,11 +1111,7 @@ function formatCosmosProposalTallyLabel(
         .replace(/0+$/, '')
         .slice(0, 6);
 
-      return formatDenomAmount(
-        `${negative ? '-' : ''}${integerPart.toString()}${
-          fractionPart ? `.${fractionPart}` : ''
-        }`,
-      );
+      return formatDenomAmount(`${negative ? '-' : ''}${integerPart.toString()}${fractionPart ? `.${fractionPart}` : ''}`);
     }
 
     if (absolute > oneMillion && absolute < oneQuadrillion) {
@@ -1164,11 +1121,7 @@ function formatCosmosProposalTallyLabel(
         .replace(/0+$/, '')
         .slice(0, 6);
 
-      return formatDenomAmount(
-        `${negative ? '-' : ''}${integerPart.toString()}${
-          fractionPart ? `.${fractionPart}` : ''
-        }`,
-      );
+      return formatDenomAmount(`${negative ? '-' : ''}${integerPart.toString()}${fractionPart ? `.${fractionPart}` : ''}`);
     }
 
     return formatInteger(absolute, '0');
@@ -1190,9 +1143,7 @@ function formatCosmosProposalStatusLabel(status: string | undefined) {
   return status
     .replace(/^PROPOSAL_STATUS_/, '')
     .toLowerCase()
-    .replace(/(^\w)|_(\w)/g, (_, first, next) =>
-      String(first ?? next).toUpperCase(),
-    )
+    .replace(/(^\w)|_(\w)/g, (_, first, next) => String(first ?? next).toUpperCase())
     .replace(/_/g, ' ');
 }
 
@@ -1204,18 +1155,12 @@ function formatCosmosProposalVoteOptionLabel(option: string | undefined) {
   return option
     .replace(/^VOTE_OPTION_/, '')
     .toLowerCase()
-    .replace(/(^\w)|_(\w)/g, (_, first, next) =>
-      String(first ?? next).toUpperCase(),
-    )
+    .replace(/(^\w)|_(\w)/g, (_, first, next) => String(first ?? next).toUpperCase())
     .replace(/_/g, ' ');
 }
 
-function calculateAverageBlockTime(
-  blocks: Array<{ timestampMs: number | null }>,
-) {
-  const timestamps = blocks
-    .map((block) => block.timestampMs)
-    .filter((value): value is number => value != null);
+function calculateAverageBlockTime(blocks: Array<{ timestampMs: number | null }>) {
+  const timestamps = blocks.map((block) => block.timestampMs).filter((value): value is number => value != null);
 
   if (timestamps.length < 2) {
     return null;
@@ -1242,93 +1187,48 @@ async function getNetInfoDirect(profile: CosmosProvider) {
 }
 
 async function getUnconfirmedTxsDirect(profile: CosmosProvider) {
-  return fetchJson<TendermintUnconfirmedTxsResponse>(
-    `${profile.rpcUrl}/num_unconfirmed_txs`,
-  );
+  return fetchJson<TendermintUnconfirmedTxsResponse>(`${profile.rpcUrl}/num_unconfirmed_txs`);
 }
 
-async function getBlockchainDirect(
-  profile: CosmosProvider,
-  latestHeight: number,
-  limit: number,
-) {
+async function getBlockchainDirect(profile: CosmosProvider, latestHeight: number, limit: number) {
   const minHeight = Math.max(1, latestHeight - limit + 1);
   return getBlockchainRangeDirect(profile, minHeight, latestHeight);
 }
 
-async function getBlockchainRangeDirect(
-  profile: CosmosProvider,
-  minHeight: number,
-  maxHeight: number,
-) {
-  return fetchJson<TendermintBlockchainResponse>(
-    `${profile.rpcUrl}/blockchain?minHeight=${minHeight}&maxHeight=${maxHeight}`,
-  );
+async function getBlockchainRangeDirect(profile: CosmosProvider, minHeight: number, maxHeight: number) {
+  return fetchJson<TendermintBlockchainResponse>(`${profile.rpcUrl}/blockchain?minHeight=${minHeight}&maxHeight=${maxHeight}`);
 }
 
-async function getTxSearchDirect(
-  profile: CosmosProvider,
-  perPage: number,
-) {
-  return fetchJson<TendermintTxSearchResponse>(
-    `${profile.rpcUrl}/tx_search?query=%22tx.height%20%3E%200%22&prove=false&page=1&per_page=${perPage}&order_by=%22desc%22`,
-  );
+async function getTxSearchDirect(profile: CosmosProvider, perPage: number) {
+  return fetchJson<TendermintTxSearchResponse>(`${profile.rpcUrl}/tx_search?query=%22tx.height%20%3E%200%22&prove=false&page=1&per_page=${perPage}&order_by=%22desc%22`);
 }
 
-async function getTxSearchByHeightDirect(
-  profile: CosmosProvider,
-  height: number,
-  page: number,
-  perPage: number,
-) {
+async function getTxSearchByHeightDirect(profile: CosmosProvider, height: number, page: number, perPage: number) {
   const query = encodeURIComponent(`"tx.height = ${height}"`);
   const orderBy = encodeURIComponent('"desc"');
 
-  return fetchJson<TendermintTxSearchResponse>(
-    `${profile.rpcUrl}/tx_search?query=${query}&prove=false&page=${page}&per_page=${perPage}&order_by=${orderBy}`,
-  );
+  return fetchJson<TendermintTxSearchResponse>(`${profile.rpcUrl}/tx_search?query=${query}&prove=false&page=${page}&per_page=${perPage}&order_by=${orderBy}`);
 }
 
-async function getTxSearchWithQueryDirect(
-  profile: CosmosProvider,
-  query: string,
-  page: number,
-  perPage: number,
-) {
+async function getTxSearchWithQueryDirect(profile: CosmosProvider, query: string, page: number, perPage: number) {
   const encodedQuery = encodeURIComponent(`"${query}"`);
   const orderBy = encodeURIComponent('"desc"');
 
-  return fetchJson<TendermintTxSearchResponse>(
-    `${profile.rpcUrl}/tx_search?query=${encodedQuery}&prove=false&page=${page}&per_page=${perPage}&order_by=${orderBy}`,
-  );
+  return fetchJson<TendermintTxSearchResponse>(`${profile.rpcUrl}/tx_search?query=${encodedQuery}&prove=false&page=${page}&per_page=${perPage}&order_by=${orderBy}`);
 }
 
 async function getRestValidatorsDirect(profile: CosmosProvider) {
-  return fetchJson<CosmosValidatorsResponse>(
-    `${profile.restUrl}/cosmos/staking/v1beta1/validators?pagination.limit=200&pagination.count_total=true`,
-  );
+  return fetchJson<CosmosValidatorsResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/validators?pagination.limit=200&pagination.count_total=true`);
 }
 
-async function getRpcValidatorsDirect(
-  profile: CosmosProvider,
-  height: number,
-) {
-  return fetchJson<TendermintValidatorsResponse>(
-    `${profile.rpcUrl}/validators?height=${height}&page=1&per_page=200`,
-  );
+async function getRpcValidatorsDirect(profile: CosmosProvider, height: number) {
+  return fetchJson<TendermintValidatorsResponse>(`${profile.rpcUrl}/validators?height=${height}&page=1&per_page=200`);
 }
 
-async function getCosmosValidatorMapsDirect(
-  profile: CosmosProvider,
-  height: number,
-) {
+async function getCosmosValidatorMapsDirect(profile: CosmosProvider, height: number) {
   const now = Date.now();
 
-  if (
-    cachedCosmosValidatorMaps &&
-    cachedCosmosValidatorMaps.providerId === profile.id &&
-    now - cachedCosmosValidatorMaps.cachedAt < COSMOS_VALIDATOR_CACHE_TTL_MS
-  ) {
+  if (cachedCosmosValidatorMaps && cachedCosmosValidatorMaps.providerId === profile.id && now - cachedCosmosValidatorMaps.cachedAt < COSMOS_VALIDATOR_CACHE_TTL_MS) {
     return cachedCosmosValidatorMaps;
   }
 
@@ -1342,28 +1242,14 @@ async function getCosmosValidatorMapsDirect(
     })),
   ]);
   const monikerByPubKey = new Map(
-    (restValidatorsPayload.validators ?? []).map((validator) => [
-      validator.consensus_pubkey?.key ?? '',
-      validator.description?.moniker ?? 'Unknown',
-    ]),
+    (restValidatorsPayload.validators ?? []).map((validator) => [validator.consensus_pubkey?.key ?? '', validator.description?.moniker ?? 'Unknown']),
   );
-  const operatorAddressByPubKey = new Map(
-    (restValidatorsPayload.validators ?? []).map((validator) => [
-      validator.consensus_pubkey?.key ?? '',
-      validator.operator_address ?? '',
-    ]),
-  );
+  const operatorAddressByPubKey = new Map((restValidatorsPayload.validators ?? []).map((validator) => [validator.consensus_pubkey?.key ?? '', validator.operator_address ?? '']));
   const proposerMonikerByAddress = new Map(
-    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [
-      validator.address ?? '',
-      monikerByPubKey.get(validator.pub_key?.value ?? '') ?? 'Unknown',
-    ]),
+    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [validator.address ?? '', monikerByPubKey.get(validator.pub_key?.value ?? '') ?? 'Unknown']),
   );
   const proposerOperatorAddressByAddress = new Map(
-    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [
-      validator.address ?? '',
-      operatorAddressByPubKey.get(validator.pub_key?.value ?? '') ?? '',
-    ]),
+    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [validator.address ?? '', operatorAddressByPubKey.get(validator.pub_key?.value ?? '') ?? '']),
   );
   const nextCache = {
     providerId: profile.id,
@@ -1378,27 +1264,18 @@ async function getCosmosValidatorMapsDirect(
 }
 
 async function getCommitDirect(profile: CosmosProvider, height: string) {
-  return fetchJson<TendermintCommitResponse>(
-    `${profile.rpcUrl}/commit?height=${height}`,
-  );
+  return fetchJson<TendermintCommitResponse>(`${profile.rpcUrl}/commit?height=${height}`);
 }
 
 async function getBlockResultsDirect(profile: CosmosProvider, height: string) {
-  return fetchJson<TendermintBlockResultsResponse>(
-    `${profile.rpcUrl}/block_results?height=${height}`,
-  );
+  return fetchJson<TendermintBlockResultsResponse>(`${profile.rpcUrl}/block_results?height=${height}`);
 }
 
-async function getBlockTimestampsByHeights(
-  profile: CosmosProvider,
-  heights: string[],
-) {
+async function getBlockTimestampsByHeights(profile: CosmosProvider, heights: string[]) {
   const uniqueHeights = [...new Set(heights.filter(Boolean))];
   const entries = await Promise.all(
     uniqueHeights.map(async (height) => {
-      const payload = await fetchJson<TendermintBlockResponse>(
-        `${profile.rpcUrl}/block?height=${height}`,
-      );
+      const payload = await fetchJson<TendermintBlockResponse>(`${profile.rpcUrl}/block?height=${height}`);
 
       return [height, payload.result?.block?.header?.time ?? null] as const;
     }),
@@ -1407,20 +1284,9 @@ async function getBlockTimestampsByHeights(
   return new Map(entries);
 }
 
-async function getDecodedLatestTransactions(input: {
-  profile: CosmosProvider;
-  txs: TendermintTxSearchItem[];
-  blockTimeByHeight: Map<string, string | null>;
-  txLimit: number;
-}) {
+async function getDecodedLatestTransactions(input: { profile: CosmosProvider; txs: TendermintTxSearchItem[]; blockTimeByHeight: Map<string, string | null>; txLimit: number }) {
   const txs = input.txs.slice(0, input.txLimit);
-  const detailResults = await Promise.allSettled(
-    txs.map((tx) =>
-      fetchJson<CosmosRestTxResponse>(
-        `${input.profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`,
-      ),
-    ),
-  );
+  const detailResults = await Promise.allSettled(txs.map((tx) => fetchJson<CosmosRestTxResponse>(`${input.profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`)));
   const nextTransactions: CosmosHomeTransactionItem[] = [];
   const cacheCandidates: CosmosCachedTransactionItem[] = [];
 
@@ -1496,11 +1362,8 @@ export async function getCosmosOverviewDirect() {
 
   return {
     chainLabel: profile.name,
-    latestHeight:
-      payload.result?.sync_info?.latest_block_height ?? 'Unavailable',
-    latestBlockTime: formatLocalTimestamp(
-      payload.result?.sync_info?.latest_block_time,
-    ),
+    latestHeight: payload.result?.sync_info?.latest_block_height ?? 'Unavailable',
+    latestBlockTime: formatLocalTimestamp(payload.result?.sync_info?.latest_block_time),
     chainId: payload.result?.node_info?.network ?? 'Unavailable',
   };
 }
@@ -1508,9 +1371,7 @@ export async function getCosmosOverviewDirect() {
 export async function getRecentCosmosBlocksDirect(limit = 8) {
   const profile = getActiveCosmosProvider();
   const status = await getStatusDirect(profile);
-  const latestHeight = Number(
-    status.result?.sync_info?.latest_block_height ?? 0,
-  );
+  const latestHeight = Number(status.result?.sync_info?.latest_block_height ?? 0);
   const payload = await getBlockchainDirect(profile, latestHeight, limit);
   const blocks = (payload.result?.block_metas ?? [])
     .map((block) => {
@@ -1534,9 +1395,7 @@ export async function getRecentCosmosBlocksDirect(limit = 8) {
   return blocks.slice(0, limit);
 }
 
-function formatCosmosCommitSummary(
-  signatures: TendermintCommitSignature[] | undefined,
-) {
+function formatCosmosCommitSummary(signatures: TendermintCommitSignature[] | undefined) {
   if (!signatures?.length) {
     return 'Unavailable';
   }
@@ -1553,9 +1412,7 @@ function formatCosmosCommitSummary(
     [2, 'Commit'],
     [3, 'Nil'],
   ]);
-  const parts = [...counts.entries()]
-    .sort((left, right) => left[0] - right[0])
-    .map(([flag, count]) => `${labels.get(flag) ?? `Flag ${flag}`}: ${count}`);
+  const parts = [...counts.entries()].sort((left, right) => left[0] - right[0]).map(([flag, count]) => `${labels.get(flag) ?? `Flag ${flag}`}: ${count}`);
 
   return parts.join(' · ');
 }
@@ -1607,9 +1464,7 @@ function isLikelyBase64(value: string) {
     return false;
   }
 
-  return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(
-    value,
-  );
+  return /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value);
 }
 
 function isMostlyReadableText(value: string) {
@@ -1622,12 +1477,7 @@ function isMostlyReadableText(value: string) {
   for (const character of value) {
     const code = character.charCodeAt(0);
 
-    if (
-      code === 9 ||
-      code === 10 ||
-      code === 13 ||
-      (code >= 32 && code <= 126)
-    ) {
+    if (code === 9 || code === 10 || code === 13 || (code >= 32 && code <= 126)) {
       readable += 1;
     }
   }
@@ -1661,10 +1511,7 @@ function formatCosmosDetailedEvents(events: TendermintEvent[] | undefined) {
     type: event.type?.trim() || 'unknown',
     attributes: (event.attributes ?? []).map((attribute) => ({
       key: decodeCosmosEventField(attribute.key),
-      value: decodeCosmosEventField(
-        attribute.value,
-        attribute.key === 'signature',
-      ),
+      value: decodeCosmosEventField(attribute.value, attribute.key === 'signature'),
       indexed: Boolean(attribute.index),
     })),
   }));
@@ -1679,11 +1526,7 @@ function formatCosmosTxMessageValue(value: unknown): string {
     return value || 'Empty';
   }
 
-  if (
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    typeof value === 'bigint'
-  ) {
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
     return String(value);
   }
 
@@ -1694,12 +1537,9 @@ function formatCosmosTxMessageValue(value: unknown): string {
   }
 }
 
-function formatCosmosTxMessages(
-  messages: Array<Record<string, unknown>> | undefined,
-) {
+function formatCosmosTxMessages(messages: Array<Record<string, unknown>> | undefined) {
   return (messages ?? []).map((message) => {
-    const rawType =
-      typeof message['@type'] === 'string' ? message['@type'] : null;
+    const rawType = typeof message['@type'] === 'string' ? message['@type'] : null;
     const fields = Object.entries(message)
       .filter(([key]) => key !== '@type')
       .map(([key, value]) => ({
@@ -1733,25 +1573,12 @@ function extractCosmosTxTarget(payload: CosmosRestTxResponse) {
     return null;
   }
 
-  const candidateKeys = [
-    'to_address',
-    'recipient',
-    'receiver',
-    'validator_address',
-    'proposal_id',
-    'contract',
-    'grantee',
-    'authority',
-  ] as const;
+  const candidateKeys = ['to_address', 'recipient', 'receiver', 'validator_address', 'proposal_id', 'contract', 'grantee', 'authority'] as const;
 
   for (const key of candidateKeys) {
     const value = message[key];
 
-    if (
-      typeof value === 'string' &&
-      value.trim() &&
-      value !== extractSender(payload)
-    ) {
+    if (typeof value === 'string' && value.trim() && value !== extractSender(payload)) {
       return value;
     }
   }
@@ -1759,20 +1586,12 @@ function extractCosmosTxTarget(payload: CosmosRestTxResponse) {
   return null;
 }
 
-function getCosmosEventAttributeValue(
-  event: TendermintEvent,
-  targetKey: string,
-) {
+function getCosmosEventAttributeValue(event: TendermintEvent, targetKey: string) {
   const attribute = (event.attributes ?? []).find((item) => {
     return decodeCosmosEventField(item.key) === targetKey;
   });
 
-  return attribute
-    ? decodeCosmosEventField(
-        attribute.value,
-        decodeCosmosEventField(attribute.key) === 'signature',
-      )
-    : null;
+  return attribute ? decodeCosmosEventField(attribute.value, decodeCosmosEventField(attribute.key) === 'signature') : null;
 }
 
 function splitFinalizeBlockEvents(events: TendermintEvent[] | undefined) {
@@ -1793,10 +1612,7 @@ function splitFinalizeBlockEvents(events: TendermintEvent[] | undefined) {
   return { beginEvents, endEvents };
 }
 
-function formatCosmosBlockDetailTransaction(input: {
-  tx: TendermintTxSearchItem;
-  detail: CosmosRestTxResponse | null;
-}) {
+function formatCosmosBlockDetailTransaction(input: { tx: TendermintTxSearchItem; detail: CosmosRestTxResponse | null }) {
   const fallbackDetail =
     input.detail ??
     ({
@@ -1840,11 +1656,7 @@ function formatCosmosBlockDetailTransaction(input: {
   } satisfies CosmosBlockDetailTransactionItem;
 }
 
-function formatCosmosTransactionsPageItem(input: {
-  tx: TendermintTxSearchItem;
-  detail: CosmosRestTxResponse | null;
-  timestamp: string | null;
-}) {
+function formatCosmosTransactionsPageItem(input: { tx: TendermintTxSearchItem; detail: CosmosRestTxResponse | null; timestamp: string | null }) {
   const fallbackDetail =
     input.detail ??
     ({
@@ -1858,8 +1670,7 @@ function formatCosmosTransactionsPageItem(input: {
         events: [],
       },
     } satisfies CosmosRestTxResponse);
-  const timestamp =
-    fallbackDetail.tx_response?.timestamp ?? input.timestamp ?? null;
+  const timestamp = fallbackDetail.tx_response?.timestamp ?? input.timestamp ?? null;
   const decoded = decodeCosmosTransactionSummary({
     hash: input.tx.hash ?? 'Unavailable',
     payload: fallbackDetail,
@@ -1879,12 +1690,7 @@ function formatCosmosTransactionsPageItem(input: {
     sender: decoded.sender,
     senderLabel: decoded.senderLabel,
     target,
-    targetLabel:
-      target && target !== 'Unknown'
-        ? target.length > 20
-          ? formatCompactHash(target, 14, 8)
-          : target
-        : null,
+    targetLabel: target && target !== 'Unknown' ? (target.length > 20 ? formatCompactHash(target, 14, 8) : target) : null,
     feeLabel: decoded.feeLabel,
     gasUsedLabel: formatInteger(decoded.gasUsed, '0'),
     gasWantedLabel: formatInteger(decoded.gasWanted, '0'),
@@ -1936,12 +1742,8 @@ function formatCosmosBlocksPageItem(input: {
   const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
   const proposer = input.block.header?.proposer_address ?? 'Unknown';
   const proposerMoniker = input.proposerMonikerByAddress.get(proposer) ?? null;
-  const proposerOperatorAddress =
-    input.proposerOperatorAddressByAddress.get(proposer) ?? null;
-  const proposerLabel =
-    proposerMoniker && proposerMoniker !== 'Unknown'
-      ? proposerMoniker
-      : formatCompactHash(proposer, 10, 6);
+  const proposerOperatorAddress = input.proposerOperatorAddressByAddress.get(proposer) ?? null;
+  const proposerLabel = proposerMoniker && proposerMoniker !== 'Unknown' ? proposerMoniker : formatCompactHash(proposer, 10, 6);
   const appHash = input.block.header?.app_hash ?? 'Unavailable';
 
   return {
@@ -1951,8 +1753,7 @@ function formatCosmosBlocksPageItem(input: {
     proposer,
     proposerOperatorAddress,
     proposerLabel,
-    proposerAddressLabel:
-      proposer === 'Unknown' ? proposer : formatCompactHash(proposer, 12, 8),
+    proposerAddressLabel: proposer === 'Unknown' ? proposer : formatCompactHash(proposer, 12, 8),
     txCount: Number.parseInt(input.block.num_txs ?? '0', 10) || 0,
     txCountLabel: formatInteger(input.block.num_txs ?? '0', '0'),
     blockSizeLabel: formatBytes(input.block.block_size),
@@ -1964,15 +1765,10 @@ function formatCosmosBlocksPageItem(input: {
   } satisfies CosmosBlocksPageItem;
 }
 
-export async function getCosmosBlocksPageDirect(
-  requestedPage = 1,
-  pageSize = 20,
-) {
+export async function getCosmosBlocksPageDirect(requestedPage = 1, pageSize = 20) {
   const profile = getActiveCosmosProvider();
   const statusPayload = await getStatusDirect(profile);
-  const latestHeight = Number(
-    statusPayload.result?.sync_info?.latest_block_height ?? 0,
-  );
+  const latestHeight = Number(statusPayload.result?.sync_info?.latest_block_height ?? 0);
   const totalBlocks = Math.max(0, latestHeight);
   const totalPages = Math.max(1, Math.ceil(Math.max(totalBlocks, 1) / pageSize));
   const page = Math.min(Math.max(1, requestedPage), totalPages);
@@ -2022,36 +1818,24 @@ export async function getCosmosBlocksPageDirect(
     })),
     getCosmosValidatorMapsDirect(profile, pageMaxHeight),
   ]);
-  const blockMetas = [...(blockchainPayload.result?.block_metas ?? [])].sort(
-    (left, right) =>
-      Number(right.header?.height ?? 0) - Number(left.header?.height ?? 0),
-  );
+  const blockMetas = [...(blockchainPayload.result?.block_metas ?? [])].sort((left, right) => Number(right.header?.height ?? 0) - Number(left.header?.height ?? 0));
   const commitPayloads = await Promise.allSettled(
-    blockMetas.map((block) =>
-      block.header?.height
-        ? getCommitDirect(profile, block.header.height)
-        : Promise.reject(new Error('Missing block height.')),
-    ),
+    blockMetas.map((block) => (block.header?.height ? getCommitDirect(profile, block.header.height) : Promise.reject(new Error('Missing block height.')))),
   );
   const blocks = blockMetas.map((block, index) => {
     const commitResult = commitPayloads[index];
-    const signatures =
-      commitResult?.status === 'fulfilled'
-        ? commitResult.value.result?.signed_header?.commit?.signatures
-        : undefined;
+    const signatures = commitResult?.status === 'fulfilled' ? commitResult.value.result?.signed_header?.commit?.signatures : undefined;
 
     return formatCosmosBlocksPageItem({
       block,
       signatures,
       proposerMonikerByAddress: validatorMaps.proposerMonikerByAddress,
-      proposerOperatorAddressByAddress:
-        validatorMaps.proposerOperatorAddressByAddress,
+      proposerOperatorAddressByAddress: validatorMaps.proposerOperatorAddressByAddress,
     });
   });
   const averageBlockTime = calculateAverageBlockTime(blocks);
   const topBlock = blocks[0]?.height ?? String(pageMaxHeight);
-  const bottomBlock =
-    blocks[blocks.length - 1]?.height ?? String(pageMinHeight);
+  const bottomBlock = blocks[blocks.length - 1]?.height ?? String(pageMinHeight);
 
   return {
     page,
@@ -2087,35 +1871,17 @@ export async function getCosmosBlocksPageDirect(
   };
 }
 
-export async function getCosmosTransactionsPageDirect(input?: {
-  requestedPage?: number;
-  pageSize?: number;
-  query?: string;
-}) {
+export async function getCosmosTransactionsPageDirect(input?: { requestedPage?: number; pageSize?: number; query?: string }) {
   const profile = getActiveCosmosProvider();
   const requestedPage = Math.max(1, Math.trunc(input?.requestedPage ?? 1));
   const pageSize = Math.max(1, Math.trunc(input?.pageSize ?? 20));
   const query = input?.query?.trim() || 'tx.height > 0';
-  const [statusPayload, txSearchPayload] = await Promise.all([
-    getStatusDirect(profile),
-    getTxSearchWithQueryDirect(profile, query, requestedPage, pageSize),
-  ]);
-  const latestHeight = Number(
-    statusPayload.result?.sync_info?.latest_block_height ?? 0,
-  );
-  const totalTransactions = Number.parseInt(
-    txSearchPayload.result?.total_count ?? '0',
-    10,
-  ) || 0;
-  const totalPages = Math.max(
-    1,
-    Math.ceil(Math.max(totalTransactions, 1) / pageSize),
-  );
+  const [statusPayload, txSearchPayload] = await Promise.all([getStatusDirect(profile), getTxSearchWithQueryDirect(profile, query, requestedPage, pageSize)]);
+  const latestHeight = Number(statusPayload.result?.sync_info?.latest_block_height ?? 0);
+  const totalTransactions = Number.parseInt(txSearchPayload.result?.total_count ?? '0', 10) || 0;
+  const totalPages = Math.max(1, Math.ceil(Math.max(totalTransactions, 1) / pageSize));
   const page = Math.min(requestedPage, totalPages);
-  const searchPayload =
-    page === requestedPage
-      ? txSearchPayload
-      : await getTxSearchWithQueryDirect(profile, query, page, pageSize);
+  const searchPayload = page === requestedPage ? txSearchPayload : await getTxSearchWithQueryDirect(profile, query, page, pageSize);
   const txs = searchPayload.result?.txs ?? [];
   const heights = txs.map((tx) => tx.height ?? '').filter(Boolean);
   const blockTimeByHeight = await getBlockTimestampsByHeights(profile, heights);
@@ -2125,24 +1891,18 @@ export async function getCosmosTransactionsPageDirect(input?: {
         return Promise.resolve(null);
       }
 
-      return fetchJson<CosmosRestTxResponse>(
-        `${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`,
-      );
+      return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
     }),
   );
   const transactions = txs.map((tx, index) =>
     formatCosmosTransactionsPageItem({
       tx,
-      detail:
-        detailResults[index]?.status === 'fulfilled'
-          ? detailResults[index].value
-          : null,
+      detail: detailResults[index]?.status === 'fulfilled' ? detailResults[index].value : null,
       timestamp: blockTimeByHeight.get(tx.height ?? '') ?? null,
     }),
   );
   const topBlock = transactions[0]?.height ?? 'Unavailable';
-  const bottomBlock =
-    transactions[transactions.length - 1]?.height ?? 'Unavailable';
+  const bottomBlock = transactions[transactions.length - 1]?.height ?? 'Unavailable';
 
   return {
     page,
@@ -2152,9 +1912,7 @@ export async function getCosmosTransactionsPageDirect(input?: {
     totalPages,
     hasPreviousPage: page > 1,
     hasNextPage: page < totalPages,
-    totalLabel: totalTransactions
-      ? `${formatInteger(totalTransactions)} transactions`
-      : 'No transactions returned',
+    totalLabel: totalTransactions ? `${formatInteger(totalTransactions)} transactions` : 'No transactions returned',
     summary: [
       {
         label: 'Latest Block',
@@ -2173,8 +1931,7 @@ export async function getCosmosTransactionsPageDirect(input?: {
       },
       {
         label: 'Current Range',
-        value:
-          topBlock === 'Unavailable' ? 'Unavailable' : `#${topBlock} - #${bottomBlock}`,
+        value: topBlock === 'Unavailable' ? 'Unavailable' : `#${topBlock} - #${bottomBlock}`,
         note: `Loaded ${transactions.length} transactions on this page.`,
       },
     ],
@@ -2184,8 +1941,7 @@ export async function getCosmosTransactionsPageDirect(input?: {
 
 export async function getCosmosLatestBlockFeedDirect(height: number | string) {
   const profile = getActiveCosmosProvider();
-  const normalizedHeight =
-    typeof height === 'number' ? height : Number.parseInt(height, 10);
+  const normalizedHeight = typeof height === 'number' ? height : Number.parseInt(height, 10);
 
   if (!Number.isFinite(normalizedHeight) || normalizedHeight < 0) {
     throw new Error('Invalid Cosmos block height.');
@@ -2208,8 +1964,7 @@ export async function getCosmosLatestBlockFeedDirect(height: number | string) {
     block: blockMeta,
     signatures: commitPayload.result?.signed_header?.commit?.signatures,
     proposerMonikerByAddress: validatorMaps.proposerMonikerByAddress,
-    proposerOperatorAddressByAddress:
-      validatorMaps.proposerOperatorAddressByAddress,
+    proposerOperatorAddressByAddress: validatorMaps.proposerOperatorAddressByAddress,
   });
 
   return {
@@ -2221,11 +1976,7 @@ export async function getCosmosLatestBlockFeedDirect(height: number | string) {
   } satisfies CosmosLatestBlockFeed;
 }
 
-export async function getCosmosBlockByHeightDirect(
-  height: number,
-  requestedTxPage = 1,
-  txPageSize = 20,
-) {
+export async function getCosmosBlockByHeightDirect(height: number, requestedTxPage = 1, txPageSize = 20) {
   const profile = getActiveCosmosProvider();
   const normalizedHeight = Number.parseInt(String(height), 10);
 
@@ -2235,17 +1986,9 @@ export async function getCosmosBlockByHeightDirect(
 
   const requestedPage = Math.max(1, Math.trunc(requestedTxPage));
   const pageSize = Math.max(1, Math.trunc(txPageSize));
-  const [
-    blockchainPayload,
-    blockPayload,
-    commitPayload,
-    blockResultsPayload,
-    validatorMaps,
-  ] = await Promise.all([
+  const [blockchainPayload, blockPayload, commitPayload, blockResultsPayload, validatorMaps] = await Promise.all([
     getBlockchainRangeDirect(profile, normalizedHeight, normalizedHeight),
-    fetchJson<TendermintBlockResponse>(
-      `${profile.rpcUrl}/block?height=${normalizedHeight}`,
-    ),
+    fetchJson<TendermintBlockResponse>(`${profile.rpcUrl}/block?height=${normalizedHeight}`),
     getCommitDirect(profile, String(normalizedHeight)).catch(() => null),
     getBlockResultsDirect(profile, String(normalizedHeight)).catch(() => null),
     getCosmosValidatorMapsDirect(profile, normalizedHeight),
@@ -2253,50 +1996,25 @@ export async function getCosmosBlockByHeightDirect(
   const blockMeta = blockchainPayload.result?.block_metas?.[0];
   const blockResult = blockPayload.result;
 
-  if (
-    !blockMeta?.block_id?.hash ||
-    !blockMeta.header?.height ||
-    !blockResult?.block?.header?.height
-  ) {
+  if (!blockMeta?.block_id?.hash || !blockMeta.header?.height || !blockResult?.block?.header?.height) {
     throw new Error('Failed to load Cosmos block.');
   }
 
   const timestamp = blockMeta.header.time ?? blockResult.block.header.time ?? null;
   const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
-  const proposer =
-    blockMeta.header.proposer_address ??
-    blockResult.block.header.proposer_address ??
-    'Unknown';
-  const proposerMoniker =
-    validatorMaps.proposerMonikerByAddress.get(proposer) ?? null;
-  const proposerOperatorAddress =
-    validatorMaps.proposerOperatorAddressByAddress.get(proposer) ?? null;
-  const proposerLabel =
-    proposerMoniker && proposerMoniker !== 'Unknown'
-      ? proposerMoniker
-      : formatCompactHash(proposer, 10, 6);
-  const appHash =
-    blockMeta.header.app_hash ?? blockResult.block.header.app_hash ?? 'Unavailable';
-  const txCount =
-    Number.parseInt(
-      blockMeta.num_txs ?? String(blockResult.block.data?.txs?.length ?? 0),
-      10,
-    ) || 0;
-  const commitSignatures =
-    commitPayload?.result?.signed_header?.commit?.signatures ??
-    blockResult.block.last_commit?.signatures ??
-    [];
+  const proposer = blockMeta.header.proposer_address ?? blockResult.block.header.proposer_address ?? 'Unknown';
+  const proposerMoniker = validatorMaps.proposerMonikerByAddress.get(proposer) ?? null;
+  const proposerOperatorAddress = validatorMaps.proposerOperatorAddressByAddress.get(proposer) ?? null;
+  const proposerLabel = proposerMoniker && proposerMoniker !== 'Unknown' ? proposerMoniker : formatCompactHash(proposer, 10, 6);
+  const appHash = blockMeta.header.app_hash ?? blockResult.block.header.app_hash ?? 'Unavailable';
+  const txCount = Number.parseInt(blockMeta.num_txs ?? String(blockResult.block.data?.txs?.length ?? 0), 10) || 0;
+  const commitSignatures = commitPayload?.result?.signed_header?.commit?.signatures ?? blockResult.block.last_commit?.signatures ?? [];
   const rawBeginBlockEvents = blockResultsPayload?.result?.begin_block_events ?? [];
   const rawEndBlockEvents = blockResultsPayload?.result?.end_block_events ?? [];
-  const rawFinalizeBlockEvents =
-    blockResultsPayload?.result?.finalize_block_events ?? [];
+  const rawFinalizeBlockEvents = blockResultsPayload?.result?.finalize_block_events ?? [];
   const finalizeBlockEventGroups = splitFinalizeBlockEvents(rawFinalizeBlockEvents);
-  const beginBlockEvents = rawBeginBlockEvents.length
-    ? rawBeginBlockEvents
-    : finalizeBlockEventGroups.beginEvents;
-  const endBlockEvents = rawEndBlockEvents.length
-    ? rawEndBlockEvents
-    : finalizeBlockEventGroups.endEvents;
+  const beginBlockEvents = rawBeginBlockEvents.length ? rawBeginBlockEvents : finalizeBlockEventGroups.beginEvents;
+  const endBlockEvents = rawEndBlockEvents.length ? rawEndBlockEvents : finalizeBlockEventGroups.endEvents;
   const beginBlockEventSummary = summarizeCosmosEvents(beginBlockEvents);
   const endBlockEventSummary = summarizeCosmosEvents(endBlockEvents);
   const detailedBeginBlockEvents = formatCosmosDetailedEvents(beginBlockEvents);
@@ -2308,28 +2026,13 @@ export async function getCosmosBlockByHeightDirect(
       txs: [] as TendermintTxSearchItem[],
     },
   } satisfies TendermintTxSearchResponse;
-  let txSearchPayload =
-    txCount > 0
-      ? await getTxSearchByHeightDirect(
-          profile,
-          normalizedHeight,
-          requestedPage,
-          pageSize,
-        ).catch(() => txSearchFallback)
-      : txSearchFallback;
-  const totalCount =
-    Number.parseInt(txSearchPayload.result?.total_count ?? String(txCount), 10) ||
-    txCount;
+  let txSearchPayload = txCount > 0 ? await getTxSearchByHeightDirect(profile, normalizedHeight, requestedPage, pageSize).catch(() => txSearchFallback) : txSearchFallback;
+  const totalCount = Number.parseInt(txSearchPayload.result?.total_count ?? String(txCount), 10) || txCount;
   const totalPages = Math.max(1, Math.ceil(Math.max(totalCount, 1) / pageSize));
   const page = Math.min(requestedPage, totalPages);
 
   if (txCount > 0 && page !== requestedPage) {
-    txSearchPayload = await getTxSearchByHeightDirect(
-      profile,
-      normalizedHeight,
-      page,
-      pageSize,
-    ).catch(() => txSearchFallback);
+    txSearchPayload = await getTxSearchByHeightDirect(profile, normalizedHeight, page, pageSize).catch(() => txSearchFallback);
   }
 
   const txs = txSearchPayload.result?.txs ?? [];
@@ -2339,18 +2042,13 @@ export async function getCosmosBlockByHeightDirect(
         return Promise.resolve(null);
       }
 
-      return fetchJson<CosmosRestTxResponse>(
-        `${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`,
-      );
+      return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
     }),
   );
   const transactions = txs.map((tx, index) =>
     formatCosmosBlockDetailTransaction({
       tx,
-      detail:
-        txDetailResults[index]?.status === 'fulfilled'
-          ? txDetailResults[index].value
-          : null,
+      detail: txDetailResults[index]?.status === 'fulfilled' ? txDetailResults[index].value : null,
     }),
   );
 
@@ -2375,14 +2073,8 @@ export async function getCosmosBlockByHeightDirect(
     blockSizeLabel: formatBytes(blockMeta.block_size),
     signaturesLabel: formatCosmosCommitSummary(commitSignatures),
     signaturesCount: commitSignatures.length,
-    canonicalLabel:
-      commitPayload?.canonical == null
-        ? 'Unknown'
-        : commitPayload.canonical
-          ? 'Yes'
-          : 'No',
-    eventsCount:
-      detailedBeginBlockEvents.length + detailedEndBlockEvents.length,
+    canonicalLabel: commitPayload?.canonical == null ? 'Unknown' : commitPayload.canonical ? 'Yes' : 'No',
+    eventsCount: detailedBeginBlockEvents.length + detailedEndBlockEvents.length,
     beginBlockEventsLabel: beginBlockEventSummary.label,
     endBlockEventsLabel: endBlockEventSummary.label,
     beginBlockEventsPreview: beginBlockEventSummary.preview,
@@ -2394,14 +2086,8 @@ export async function getCosmosBlockByHeightDirect(
 
       return {
         validatorAddress: signature.validator_address ?? 'Unavailable',
-        operatorAddress:
-          validatorMaps.proposerOperatorAddressByAddress.get(
-            signature.validator_address ?? '',
-          ) ?? null,
-        moniker:
-          validatorMaps.proposerMonikerByAddress.get(
-            signature.validator_address ?? '',
-          ) ?? 'Unknown',
+        operatorAddress: validatorMaps.proposerOperatorAddressByAddress.get(signature.validator_address ?? '') ?? null,
+        moniker: validatorMaps.proposerMonikerByAddress.get(signature.validator_address ?? '') ?? 'Unknown',
         flagLabel: getCosmosCommitFlagLabel(flag),
         hasSignature: Boolean(signature.signature),
       };
@@ -2423,10 +2109,7 @@ export async function getCosmosBlockByHeightDirect(
       txSearch: txSearchPayload,
       txDetails: txs.map((tx, index) => ({
         hash: tx.hash ?? 'Unavailable',
-        detail:
-          txDetailResults[index]?.status === 'fulfilled'
-            ? txDetailResults[index].value
-            : null,
+        detail: txDetailResults[index]?.status === 'fulfilled' ? txDetailResults[index].value : null,
       })),
     },
   } satisfies CosmosBlockDetail;
@@ -2434,9 +2117,7 @@ export async function getCosmosBlockByHeightDirect(
 
 export async function getCosmosTxByHashDirect(hash: string) {
   const profile = getActiveCosmosProvider();
-  const payload = await fetchJson<CosmosRestTxResponse>(
-    `${profile.restUrl}/cosmos/tx/v1beta1/txs/${hash}`,
-  );
+  const payload = await fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${hash}`);
   const tx = payload.tx_response;
 
   if (!tx?.txhash || !tx.height) {
@@ -2469,12 +2150,7 @@ export async function getCosmosTxByHashDirect(hash: string) {
     sender: decoded.sender,
     senderLabel: decoded.senderLabel,
     target,
-    targetLabel:
-      target && target !== 'Unknown'
-        ? target.length > 20
-          ? formatCompactHash(target, 14, 8)
-          : target
-        : null,
+    targetLabel: target && target !== 'Unknown' ? (target.length > 20 ? formatCompactHash(target, 14, 8) : target) : null,
     timestamp: timestamp ?? null,
     timestampLabel: formatLocalTimestamp(timestamp ?? undefined),
     timestampMs: decoded.timestampMs,
@@ -2494,10 +2170,7 @@ export async function getCosmosTxByHashDirect(hash: string) {
   } satisfies CosmosTxDetail;
 }
 
-export async function getCosmosAccountsPageDirect(
-  requestedPage = 1,
-  pageSize = 20,
-) {
+export async function getCosmosAccountsPageDirect(requestedPage = 1, pageSize = 20) {
   const profile = getActiveCosmosProvider();
   const page = Math.max(1, Math.trunc(requestedPage));
   const limit = Math.max(1, Math.trunc(pageSize));
@@ -2505,9 +2178,7 @@ export async function getCosmosAccountsPageDirect(
   const payload = await fetchJson<CosmosAuthAccountsResponse>(
     `${profile.restUrl}/cosmos/auth/v1beta1/accounts?pagination.count_total=true&pagination.offset=${offset}&pagination.limit=${limit}`,
   );
-  const totalAccounts =
-    Number.parseInt(payload.pagination?.total ?? '0', 10) ||
-    (payload.accounts?.length ?? 0);
+  const totalAccounts = Number.parseInt(payload.pagination?.total ?? '0', 10) || (payload.accounts?.length ?? 0);
   const totalPages = Math.max(1, Math.ceil(Math.max(totalAccounts, 1) / limit));
   const normalizedPage = Math.min(page, totalPages);
 
@@ -2515,27 +2186,17 @@ export async function getCosmosAccountsPageDirect(
     return getCosmosAccountsPageDirect(normalizedPage, limit);
   }
 
-  const accounts = (payload.accounts ?? []).filter((account) =>
-    normalizeAccountAddress(account),
-  );
+  const accounts = (payload.accounts ?? []).filter((account) => normalizeAccountAddress(account));
   const balanceResults = await Promise.allSettled(
     accounts.map((account) =>
-      fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(
-        `${profile.restUrl}/cosmos/bank/v1beta1/balances/${normalizeAccountAddress(account)}`,
-      ),
+      fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(`${profile.restUrl}/cosmos/bank/v1beta1/balances/${normalizeAccountAddress(account)}`),
     ),
   );
   const items = accounts.map((account, index) => {
     const address = normalizeAccountAddress(account) ?? 'Unavailable';
     const baseAccount = normalizeBaseAccount(account);
-    const rawType =
-      typeof (account as { '@type'?: unknown })['@type'] === 'string'
-        ? ((account as { '@type': string })['@type'] as string)
-        : null;
-    const balances =
-      balanceResults[index]?.status === 'fulfilled'
-        ? balanceResults[index].value.balances ?? []
-        : [];
+    const rawType = typeof (account as { '@type'?: unknown })['@type'] === 'string' ? ((account as { '@type': string })['@type'] as string) : null;
+    const balances = balanceResults[index]?.status === 'fulfilled' ? (balanceResults[index].value.balances ?? []) : [];
 
     return {
       address,
@@ -2552,8 +2213,7 @@ export async function getCosmosAccountsPageDirect(
     } satisfies CosmosAccountsPageItem;
   });
   const topAccount = items[0]?.accountNumberLabel ?? 'Unavailable';
-  const bottomAccount =
-    items[items.length - 1]?.accountNumberLabel ?? 'Unavailable';
+  const bottomAccount = items[items.length - 1]?.accountNumberLabel ?? 'Unavailable';
 
   return {
     page: normalizedPage,
@@ -2562,9 +2222,7 @@ export async function getCosmosAccountsPageDirect(
     totalPages,
     hasPreviousPage: normalizedPage > 1,
     hasNextPage: normalizedPage < totalPages,
-    totalLabel: totalAccounts
-      ? `${formatInteger(totalAccounts)} accounts`
-      : 'No accounts returned',
+    totalLabel: totalAccounts ? `${formatInteger(totalAccounts)} accounts` : 'No accounts returned',
     summary: [
       {
         label: 'Total Accounts',
@@ -2583,10 +2241,7 @@ export async function getCosmosAccountsPageDirect(
       },
       {
         label: 'Account Range',
-        value:
-          topAccount === 'Unavailable'
-            ? 'Unavailable'
-            : `#${topAccount} - #${bottomAccount}`,
+        value: topAccount === 'Unavailable' ? 'Unavailable' : `#${topAccount} - #${bottomAccount}`,
         note: `Loaded ${items.length} accounts on this page.`,
       },
     ],
@@ -2594,66 +2249,44 @@ export async function getCosmosAccountsPageDirect(
   };
 }
 
-export async function getCosmosAccountDetailDirect(input: {
-  address: string;
-  txPage?: number;
-  txPageSize?: number;
-}) {
+export async function getCosmosAccountDetailDirect(input: { address: string; txPage?: number; txPageSize?: number }) {
   const profile = getActiveCosmosProvider();
   const address = input.address.trim();
   const requestedTxPage = Math.max(1, Math.trunc(input.txPage ?? 1));
   const txPageSize = Math.max(1, Math.trunc(input.txPageSize ?? 10));
   const txQuery = `message.sender='${address}'`;
-  const [balancesPayload, accountPayload, delegationsPayload, txSearchPayload] =
-    await Promise.all([
-      fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(
-        `${profile.restUrl}/cosmos/bank/v1beta1/balances/${address}`,
-      ),
-      fetchJson<{ account?: unknown }>(
-        `${profile.restUrl}/cosmos/auth/v1beta1/accounts/${address}`,
-      ).catch(() => ({
-        account: null,
-      })),
-      fetchJson<CosmosDelegationsResponse>(
-        `${profile.restUrl}/cosmos/staking/v1beta1/delegations/${address}?pagination.limit=200&pagination.count_total=true`,
-      ).catch(() => ({
-        delegation_responses: [],
-        pagination: { total: '0' },
-      })),
-      getTxSearchWithQueryDirect(profile, txQuery, requestedTxPage, txPageSize).catch(
-        () => ({
-          result: {
-            total_count: '0',
-            txs: [],
-          },
-        }),
-      ),
-    ]);
+  const [balancesPayload, accountPayload, delegationsPayload, txSearchPayload] = await Promise.all([
+    fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(`${profile.restUrl}/cosmos/bank/v1beta1/balances/${address}`),
+    fetchJson<{ account?: unknown }>(`${profile.restUrl}/cosmos/auth/v1beta1/accounts/${address}`).catch(() => ({
+      account: null,
+    })),
+    fetchJson<CosmosDelegationsResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/delegations/${address}?pagination.limit=200&pagination.count_total=true`).catch(() => ({
+      delegation_responses: [],
+      pagination: { total: '0' },
+    })),
+    getTxSearchWithQueryDirect(profile, txQuery, requestedTxPage, txPageSize).catch(() => ({
+      result: {
+        total_count: '0',
+        txs: [],
+      },
+    })),
+  ]);
   const baseAccount = normalizeBaseAccount(accountPayload.account);
   const rawType =
-    typeof (accountPayload.account as { '@type'?: unknown } | null)?.['@type'] ===
-    'string'
-      ? ((accountPayload.account as { '@type': string })['@type'] as string)
-      : null;
+    typeof (accountPayload.account as { '@type'?: unknown } | null)?.['@type'] === 'string' ? ((accountPayload.account as { '@type': string })['@type'] as string) : null;
   const balances = balancesPayload.balances ?? [];
-  const totalTransactions =
-    Number.parseInt(txSearchPayload.result?.total_count ?? '0', 10) || 0;
-  const txTotalPages = Math.max(
-    1,
-    Math.ceil(Math.max(totalTransactions, 1) / txPageSize),
-  );
+  const totalTransactions = Number.parseInt(txSearchPayload.result?.total_count ?? '0', 10) || 0;
+  const txTotalPages = Math.max(1, Math.ceil(Math.max(totalTransactions, 1) / txPageSize));
   const txPage = Math.min(requestedTxPage, txTotalPages);
   const effectiveTxSearchPayload =
     txPage === requestedTxPage
       ? txSearchPayload
-      : await getTxSearchWithQueryDirect(profile, txQuery, txPage, txPageSize).catch(
-          () => ({
-            result: {
-              total_count: '0',
-              txs: [],
-            },
-          }),
-        );
+      : await getTxSearchWithQueryDirect(profile, txQuery, txPage, txPageSize).catch(() => ({
+          result: {
+            total_count: '0',
+            txs: [],
+          },
+        }));
   const txs = effectiveTxSearchPayload.result?.txs ?? [];
   const txHeights = txs.map((tx) => tx.height ?? '').filter(Boolean);
   const blockTimeByHeight = await getBlockTimestampsByHeights(profile, txHeights);
@@ -2663,18 +2296,13 @@ export async function getCosmosAccountDetailDirect(input: {
         return Promise.resolve(null);
       }
 
-      return fetchJson<CosmosRestTxResponse>(
-        `${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`,
-      );
+      return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
     }),
   );
   const transactions = txs.map((tx, index) =>
     formatCosmosTransactionsPageItem({
       tx,
-      detail:
-        txDetailResults[index]?.status === 'fulfilled'
-          ? txDetailResults[index].value
-          : null,
+      detail: txDetailResults[index]?.status === 'fulfilled' ? txDetailResults[index].value : null,
       timestamp: blockTimeByHeight.get(tx.height ?? '') ?? null,
     }),
   );
@@ -2683,34 +2311,28 @@ export async function getCosmosAccountDetailDirect(input: {
     pagination: { total: '0' },
   }));
   const monikerByOperatorAddress = new Map(
-    (restValidatorsPayload.validators ?? []).map((validator) => [
-      validator.operator_address ?? '',
-      validator.description?.moniker ?? 'Unknown',
-    ]),
+    (restValidatorsPayload.validators ?? []).map((validator) => [validator.operator_address ?? '', validator.description?.moniker ?? 'Unknown']),
   );
-  const delegations = (delegationsPayload.delegation_responses ?? []).map(
-    (item) => {
-      const validatorAddress = item.delegation?.validator_address ?? 'Unavailable';
-      const balanceItem = item.balance?.denom
-        ? [
-            {
-              denom: item.balance.denom,
-              amount: item.balance.amount ?? '0',
-            },
-          ]
-        : [];
+  const delegations = (delegationsPayload.delegation_responses ?? []).map((item) => {
+    const validatorAddress = item.delegation?.validator_address ?? 'Unavailable';
+    const balanceItem = item.balance?.denom
+      ? [
+          {
+            denom: item.balance.denom,
+            amount: item.balance.amount ?? '0',
+          },
+        ]
+      : [];
 
-      return {
-        validatorAddress,
-        validatorAddressLabel: formatCompactHash(validatorAddress, 14, 10),
-        validatorMoniker:
-          monikerByOperatorAddress.get(validatorAddress) ?? null,
-        amountLabel: formatReadableDenomCollection(balanceItem),
-        sharesLabel: formatDenomAmount(item.delegation?.shares ?? '0'),
-        rawJson: item,
-      } satisfies CosmosAccountDetailDelegationItem;
-    },
-  );
+    return {
+      validatorAddress,
+      validatorAddressLabel: formatCompactHash(validatorAddress, 14, 10),
+      validatorMoniker: monikerByOperatorAddress.get(validatorAddress) ?? null,
+      amountLabel: formatReadableDenomCollection(balanceItem),
+      sharesLabel: formatDenomAmount(item.delegation?.shares ?? '0'),
+      rawJson: item,
+    } satisfies CosmosAccountDetailDelegationItem;
+  });
 
   return {
     address,
@@ -2732,9 +2354,7 @@ export async function getCosmosAccountDetailDirect(input: {
       hasNextPage: txPage < txTotalPages,
       items: transactions,
     },
-    delegationsCount:
-      Number.parseInt(delegationsPayload.pagination?.total ?? '0', 10) ||
-      delegations.length,
+    delegationsCount: Number.parseInt(delegationsPayload.pagination?.total ?? '0', 10) || delegations.length,
     delegations,
     rawJson: {
       account: accountPayload.account,
@@ -2742,10 +2362,7 @@ export async function getCosmosAccountDetailDirect(input: {
       delegations: delegationsPayload,
       txDetails: txs.map((tx, index) => ({
         hash: tx.hash ?? 'Unavailable',
-        detail:
-          txDetailResults[index]?.status === 'fulfilled'
-            ? txDetailResults[index].value
-            : null,
+        detail: txDetailResults[index]?.status === 'fulfilled' ? txDetailResults[index].value : null,
       })),
     },
   } satisfies CosmosAccountDetail;
@@ -2754,12 +2371,8 @@ export async function getCosmosAccountDetailDirect(input: {
 export async function getCosmosAccountSummaryDirect(address: string) {
   const profile = getActiveCosmosProvider();
   const [balancesPayload, accountPayload] = await Promise.all([
-    fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(
-      `${profile.restUrl}/cosmos/bank/v1beta1/balances/${address}`,
-    ),
-    fetchJson<{ account?: unknown }>(
-      `${profile.restUrl}/cosmos/auth/v1beta1/accounts/${address}`,
-    ).catch(() => ({
+    fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(`${profile.restUrl}/cosmos/bank/v1beta1/balances/${address}`),
+    fetchJson<{ account?: unknown }>(`${profile.restUrl}/cosmos/auth/v1beta1/accounts/${address}`).catch(() => ({
       account: null,
     })),
   ]);
@@ -2773,21 +2386,14 @@ export async function getCosmosAccountSummaryDirect(address: string) {
   };
 }
 
-export async function getCosmosValidatorsDirect(
-  requestedPage = 1,
-  pageSize = 50,
-) {
+export async function getCosmosValidatorsDirect(requestedPage = 1, pageSize = 50) {
   const profile = getActiveCosmosProvider();
   const page = Math.max(1, Math.trunc(requestedPage));
   const limit = Math.max(1, Math.trunc(pageSize));
   const offset = (page - 1) * limit;
   const [payload, poolPayload, overview] = await Promise.all([
-    fetchJson<CosmosValidatorsResponse>(
-      `${profile.restUrl}/cosmos/staking/v1beta1/validators?pagination.count_total=true&pagination.offset=${offset}&pagination.limit=${limit}`,
-    ),
-    fetchJson<CosmosPoolResponse>(
-      `${profile.restUrl}/cosmos/staking/v1beta1/pool`,
-    ).catch(() => ({
+    fetchJson<CosmosValidatorsResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/validators?pagination.count_total=true&pagination.offset=${offset}&pagination.limit=${limit}`),
+    fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`).catch(() => ({
       pool: {
         bonded_tokens: '0',
         not_bonded_tokens: '0',
@@ -2797,9 +2403,7 @@ export async function getCosmosValidatorsDirect(
       latestHeight: 'Unavailable',
     })),
   ]);
-  const totalValidators =
-    Number.parseInt(payload.pagination?.total ?? '0', 10) ||
-    (payload.validators?.length ?? 0);
+  const totalValidators = Number.parseInt(payload.pagination?.total ?? '0', 10) || (payload.validators?.length ?? 0);
   const totalPages = Math.max(1, Math.ceil(Math.max(totalValidators, 1) / limit));
   const normalizedPage = Math.min(page, totalPages);
 
@@ -2810,40 +2414,23 @@ export async function getCosmosValidatorsDirect(
   const bondedTokenTotal = BigInt(poolPayload.pool?.bonded_tokens ?? '0');
   const validators = (payload.validators ?? [])
     .map((validator) => {
-      const accountAddress = deriveCosmosAccountAddressFromValidator(
-        validator.operator_address ?? '',
-      );
+      const accountAddress = deriveCosmosAccountAddressFromValidator(validator.operator_address ?? '');
 
       return {
         moniker: validator.description?.moniker ?? 'Unnamed',
         operatorAddress: validator.operator_address ?? 'Unavailable',
-        operatorAddressLabel: formatCompactHash(
-          validator.operator_address ?? 'Unavailable',
-          14,
-          10,
-        ),
+        operatorAddressLabel: formatCompactHash(validator.operator_address ?? 'Unavailable', 14, 10),
         accountAddress,
-        accountAddressLabel: accountAddress
-          ? formatCompactHash(accountAddress, 14, 10)
-          : null,
+        accountAddressLabel: accountAddress ? formatCompactHash(accountAddress, 14, 10) : null,
         status: validator.status ?? 'Unknown',
         statusLabel: formatCosmosValidatorStatusLabel(validator.status),
         jailed: Boolean(validator.jailed),
         jailedLabel: validator.jailed ? 'Yes' : 'No',
         tokens: validator.tokens ?? '0',
         tokensLabel: formatReadableTokenAmount(validator.tokens ?? '0'),
-        delegatorSharesLabel: formatDenomAmount(
-          validator.delegator_shares ?? '0',
-        ),
-        votingPowerPercentLabel: formatVotingPowerPercent(
-          validator.tokens,
-          validator.status,
-          validator.jailed,
-          bondedTokenTotal,
-        ),
-        commissionRateLabel: formatCosmosCommissionRate(
-          validator.commission?.commission_rates?.rate,
-        ),
+        delegatorSharesLabel: formatDenomAmount(validator.delegator_shares ?? '0'),
+        votingPowerPercentLabel: formatVotingPowerPercent(validator.tokens, validator.status, validator.jailed, bondedTokenTotal),
+        commissionRateLabel: formatCosmosCommissionRate(validator.commission?.commission_rates?.rate),
         website: validator.description?.website ?? null,
         identity: validator.description?.identity ?? null,
         details: validator.description?.details ?? null,
@@ -2860,9 +2447,7 @@ export async function getCosmosValidatorsDirect(
 
       return left.moniker.localeCompare(right.moniker);
     });
-  const activeCount = validators.filter(
-    (validator) => validator.status === 'BOND_STATUS_BONDED' && !validator.jailed,
-  ).length;
+  const activeCount = validators.filter((validator) => validator.status === 'BOND_STATUS_BONDED' && !validator.jailed).length;
   const jailedCount = validators.filter((validator) => validator.jailed).length;
 
   return {
@@ -2872,9 +2457,7 @@ export async function getCosmosValidatorsDirect(
     totalPages,
     hasPreviousPage: normalizedPage > 1,
     hasNextPage: normalizedPage < totalPages,
-    totalLabel: totalValidators
-      ? `${formatInteger(totalValidators)} validators`
-      : 'No validators returned',
+    totalLabel: totalValidators ? `${formatInteger(totalValidators)} validators` : 'No validators returned',
     summary: [
       {
         label: 'Total Validators',
@@ -2901,11 +2484,7 @@ export async function getCosmosValidatorsDirect(
   };
 }
 
-export async function getCosmosValidatorDetailDirect(input: {
-  address: string;
-  txPage?: number;
-  txPageSize?: number;
-}) {
+export async function getCosmosValidatorDetailDirect(input: { address: string; txPage?: number; txPageSize?: number }) {
   const profile = getActiveCosmosProvider();
   const address = input.address.trim();
   const requestedTxPage = Math.max(1, Math.trunc(input.txPage ?? 1));
@@ -2915,23 +2494,15 @@ export async function getCosmosValidatorDetailDirect(input: {
     throw new Error('Validator address is required.');
   }
 
-  const [
-    validatorPayload,
-    delegationsPayload,
-    poolPayload,
-  ] = await Promise.all([
-    fetchJson<CosmosValidatorResponse>(
-      `${profile.restUrl}/cosmos/staking/v1beta1/validators/${encodeURIComponent(address)}`,
-    ),
+  const [validatorPayload, delegationsPayload, poolPayload] = await Promise.all([
+    fetchJson<CosmosValidatorResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/validators/${encodeURIComponent(address)}`),
     fetchJson<CosmosDelegationsResponse>(
       `${profile.restUrl}/cosmos/staking/v1beta1/validators/${encodeURIComponent(address)}/delegations?pagination.limit=200&pagination.count_total=true`,
     ).catch(() => ({
       delegation_responses: [],
       pagination: { total: '0' },
     })),
-    fetchJson<CosmosPoolResponse>(
-      `${profile.restUrl}/cosmos/staking/v1beta1/pool`,
-    ).catch(() => ({
+    fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`).catch(() => ({
       pool: {
         bonded_tokens: '0',
         not_bonded_tokens: '0',
@@ -2944,38 +2515,22 @@ export async function getCosmosValidatorDetailDirect(input: {
     throw new Error('Failed to load Cosmos validator.');
   }
 
-  const accountAddress = deriveCosmosAccountAddressFromValidator(
-    validator.operator_address,
-  );
+  const accountAddress = deriveCosmosAccountAddressFromValidator(validator.operator_address);
   const txQueryAddress = accountAddress ?? validator.operator_address;
   const txQuery = `message.sender='${txQueryAddress}'`;
-  const txSearchPayload = await getTxSearchWithQueryDirect(
-    profile,
-    txQuery,
-    requestedTxPage,
-    txPageSize,
-  ).catch(() => ({
+  const txSearchPayload = await getTxSearchWithQueryDirect(profile, txQuery, requestedTxPage, txPageSize).catch(() => ({
     result: {
       total_count: '0',
       txs: [],
     },
   }));
-  const totalTransactions =
-    Number.parseInt(txSearchPayload.result?.total_count ?? '0', 10) || 0;
-  const txTotalPages = Math.max(
-    1,
-    Math.ceil(Math.max(totalTransactions, 1) / txPageSize),
-  );
+  const totalTransactions = Number.parseInt(txSearchPayload.result?.total_count ?? '0', 10) || 0;
+  const txTotalPages = Math.max(1, Math.ceil(Math.max(totalTransactions, 1) / txPageSize));
   const txPage = Math.min(requestedTxPage, txTotalPages);
   const effectiveTxSearchPayload =
     txPage === requestedTxPage
       ? txSearchPayload
-      : await getTxSearchWithQueryDirect(
-          profile,
-          txQuery,
-          txPage,
-          txPageSize,
-        ).catch(() => ({
+      : await getTxSearchWithQueryDirect(profile, txQuery, txPage, txPageSize).catch(() => ({
           result: {
             total_count: '0',
             txs: [],
@@ -2990,35 +2545,29 @@ export async function getCosmosValidatorDetailDirect(input: {
         return Promise.resolve(null);
       }
 
-      return fetchJson<CosmosRestTxResponse>(
-        `${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`,
-      );
+      return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
     }),
   );
   const transactions = txs.map((tx, index) =>
     formatCosmosTransactionsPageItem({
       tx,
-      detail:
-        txDetailResults[index]?.status === 'fulfilled'
-          ? txDetailResults[index].value
-          : null,
+      detail: txDetailResults[index]?.status === 'fulfilled' ? txDetailResults[index].value : null,
       timestamp: blockTimeByHeight.get(tx.height ?? '') ?? null,
     }),
   );
-  const [stakeRewardsPayload, commissionRewardsPayload, outstandingRewardsPayload] =
-    await Promise.all([
-      accountAddress
-        ? fetchJson<CosmosValidatorDelegatorRewardsResponse>(
-            `${profile.restUrl}/cosmos/distribution/v1beta1/delegators/${encodeURIComponent(accountAddress)}/rewards/${encodeURIComponent(validator.operator_address)}`,
-          ).catch(() => null)
-        : Promise.resolve(null),
-      fetchJson<CosmosValidatorCommissionResponse>(
-        `${profile.restUrl}/cosmos/distribution/v1beta1/validators/${encodeURIComponent(validator.operator_address)}/commission`,
-      ).catch(() => null),
-      fetchJson<CosmosValidatorOutstandingRewardsResponse>(
-        `${profile.restUrl}/cosmos/distribution/v1beta1/validators/${encodeURIComponent(validator.operator_address)}/outstanding_rewards`,
-      ).catch(() => null),
-    ]);
+  const [stakeRewardsPayload, commissionRewardsPayload, outstandingRewardsPayload] = await Promise.all([
+    accountAddress
+      ? fetchJson<CosmosValidatorDelegatorRewardsResponse>(
+          `${profile.restUrl}/cosmos/distribution/v1beta1/delegators/${encodeURIComponent(accountAddress)}/rewards/${encodeURIComponent(validator.operator_address)}`,
+        ).catch(() => null)
+      : Promise.resolve(null),
+    fetchJson<CosmosValidatorCommissionResponse>(`${profile.restUrl}/cosmos/distribution/v1beta1/validators/${encodeURIComponent(validator.operator_address)}/commission`).catch(
+      () => null,
+    ),
+    fetchJson<CosmosValidatorOutstandingRewardsResponse>(
+      `${profile.restUrl}/cosmos/distribution/v1beta1/validators/${encodeURIComponent(validator.operator_address)}/outstanding_rewards`,
+    ).catch(() => null),
+  ]);
   const validatorDelegations = delegationsPayload.delegation_responses ?? [];
   const delegations = validatorDelegations.map((item) => {
     const delegatorAddress = item.delegation?.delegator_address ?? 'Unavailable';
@@ -3030,8 +2579,7 @@ export async function getCosmosValidatorDetailDirect(input: {
           },
         ]
       : [];
-    const isSelfBond =
-      accountAddress != null && delegatorAddress === accountAddress;
+    const isSelfBond = accountAddress != null && delegatorAddress === accountAddress;
 
     return {
       delegatorAddress,
@@ -3042,9 +2590,7 @@ export async function getCosmosValidatorDetailDirect(input: {
       rawJson: item,
     } satisfies CosmosValidatorDetailDelegationItem;
   });
-  const selfBondEntry = validatorDelegations.find(
-    (item) => item.delegation?.delegator_address === accountAddress,
-  );
+  const selfBondEntry = validatorDelegations.find((item) => item.delegation?.delegator_address === accountAddress);
   const selfBondAmount = selfBondEntry?.balance?.denom
     ? formatReadableDenomCollection([
         {
@@ -3060,9 +2606,7 @@ export async function getCosmosValidatorDetailDirect(input: {
     operatorAddress: validator.operator_address,
     operatorAddressLabel: formatCompactHash(validator.operator_address, 14, 10),
     accountAddress,
-    accountAddressLabel: accountAddress
-      ? formatCompactHash(accountAddress, 14, 10)
-      : null,
+    accountAddressLabel: accountAddress ? formatCompactHash(accountAddress, 14, 10) : null,
     consensusPubkey: validator.consensus_pubkey?.key ?? null,
     status: validator.status ?? 'Unknown',
     statusLabel: formatCosmosValidatorStatusLabel(validator.status),
@@ -3070,38 +2614,19 @@ export async function getCosmosValidatorDetailDirect(input: {
     jailedLabel: validator.jailed ? 'Yes' : 'No',
     tokensLabel: formatReadableTokenAmount(validator.tokens ?? '0'),
     delegatorSharesLabel: formatDenomAmount(validator.delegator_shares ?? '0'),
-    votingPowerPercentLabel: formatVotingPowerPercent(
-      validator.tokens,
-      validator.status,
-      validator.jailed,
-      bondedTokenTotal,
-    ),
-    commissionRateLabel: formatCosmosCommissionRate(
-      validator.commission?.commission_rates?.rate,
-    ),
-    minSelfDelegationLabel: formatDenomAmount(
-      validator.min_self_delegation ?? '0',
-    ),
+    votingPowerPercentLabel: formatVotingPowerPercent(validator.tokens, validator.status, validator.jailed, bondedTokenTotal),
+    commissionRateLabel: formatCosmosCommissionRate(validator.commission?.commission_rates?.rate),
+    minSelfDelegationLabel: formatDenomAmount(validator.min_self_delegation ?? '0'),
     selfBondLabel: selfBondAmount,
-    stakeRewardsLabel: formatReadableDecCoinCollection(
-      stakeRewardsPayload?.rewards,
-    ),
-    commissionRewardsLabel: formatReadableDecCoinCollection(
-      commissionRewardsPayload?.commission?.commission,
-    ),
-    outstandingRewardsLabel: formatReadableDecCoinCollection(
-      outstandingRewardsPayload?.rewards?.rewards,
-    ),
+    stakeRewardsLabel: formatReadableDecCoinCollection(stakeRewardsPayload?.rewards),
+    commissionRewardsLabel: formatReadableDecCoinCollection(commissionRewardsPayload?.commission?.commission),
+    outstandingRewardsLabel: formatReadableDecCoinCollection(outstandingRewardsPayload?.rewards?.rewards),
     identity: validator.description?.identity ?? null,
     website: validator.description?.website ?? null,
     securityContact: validator.description?.security_contact ?? null,
     details: validator.description?.details ?? null,
-    unbondingHeightLabel:
-      validator.unbonding_height && validator.unbonding_height !== '0'
-        ? formatInteger(validator.unbonding_height)
-        : null,
-    unbondingTime:
-      'unbonding_time' in validator ? (validator.unbonding_time ?? null) : null,
+    unbondingHeightLabel: validator.unbonding_height && validator.unbonding_height !== '0' ? formatInteger(validator.unbonding_height) : null,
+    unbondingTime: 'unbonding_time' in validator ? (validator.unbonding_time ?? null) : null,
     transactionsPage: {
       page: txPage,
       pageSize: txPageSize,
@@ -3111,9 +2636,7 @@ export async function getCosmosValidatorDetailDirect(input: {
       hasNextPage: txPage < txTotalPages,
       items: transactions,
     },
-    delegationsCount:
-      Number.parseInt(delegationsPayload.pagination?.total ?? '0', 10) ||
-      delegations.length,
+    delegationsCount: Number.parseInt(delegationsPayload.pagination?.total ?? '0', 10) || delegations.length,
     delegations,
     rawJson: {
       validator,
@@ -3124,19 +2647,13 @@ export async function getCosmosValidatorDetailDirect(input: {
       txSearch: effectiveTxSearchPayload,
       txDetails: txs.map((tx, index) => ({
         hash: tx.hash ?? 'Unavailable',
-        detail:
-          txDetailResults[index]?.status === 'fulfilled'
-            ? txDetailResults[index].value
-            : null,
+        detail: txDetailResults[index]?.status === 'fulfilled' ? txDetailResults[index].value : null,
       })),
     },
   } satisfies CosmosValidatorDetail;
 }
 
-export async function getCosmosProposalsDirect(
-  requestedPage = 1,
-  pageSize = 15,
-): Promise<CosmosProposalsPage> {
+export async function getCosmosProposalsDirect(requestedPage = 1, pageSize = 15): Promise<CosmosProposalsPage> {
   const profile = getActiveCosmosProvider();
   const page = Math.max(1, Math.trunc(requestedPage));
   const limit = Math.max(1, Math.trunc(pageSize));
@@ -3144,9 +2661,7 @@ export async function getCosmosProposalsDirect(
   const payload = await fetchJson<CosmosGovProposalsResponse>(
     `${profile.restUrl}/cosmos/gov/v1/proposals?pagination.count_total=true&pagination.offset=${offset}&pagination.limit=${limit}`,
   );
-  const totalProposals =
-    Number.parseInt(payload.pagination?.total ?? '0', 10) ||
-    (payload.proposals?.length ?? 0);
+  const totalProposals = Number.parseInt(payload.pagination?.total ?? '0', 10) || (payload.proposals?.length ?? 0);
   const totalPages = Math.max(1, Math.ceil(Math.max(totalProposals, 1) / limit));
   const normalizedPage = Math.min(page, totalPages);
 
@@ -3163,9 +2678,7 @@ export async function getCosmosProposalsDirect(
         return Promise.resolve(null);
       }
 
-      return fetchJson<CosmosGovProposalTallyResponse>(
-        `${profile.restUrl}/cosmos/gov/v1/proposals/${id}/tally`,
-      );
+      return fetchJson<CosmosGovProposalTallyResponse>(`${profile.restUrl}/cosmos/gov/v1/proposals/${id}/tally`);
     }),
   );
 
@@ -3176,16 +2689,11 @@ export async function getCosmosProposalsDirect(
     totalPages,
     hasPreviousPage: normalizedPage > 1,
     hasNextPage: normalizedPage < totalPages,
-    totalLabel: totalProposals
-      ? `${formatInteger(totalProposals)} proposals`
-      : 'No proposals returned',
+    totalLabel: totalProposals ? `${formatInteger(totalProposals)} proposals` : 'No proposals returned',
     proposals: proposals
       .map((proposal, index) => {
         const id = proposal.id ?? proposal.proposal_id ?? 'Unavailable';
-        const tallyResponse =
-          tallyResponses[index]?.status === 'fulfilled'
-            ? tallyResponses[index].value
-            : null;
+        const tallyResponse = tallyResponses[index]?.status === 'fulfilled' ? tallyResponses[index].value : null;
         const tally = tallyResponse?.tally ?? proposal.final_tally_result;
 
         return {
@@ -3222,11 +2730,7 @@ export async function getCosmosProposalsDirect(
   };
 }
 
-export async function getCosmosProposalByIdDirect(
-  id: string,
-  requestedVotePage = 1,
-  votePageSize = 20,
-): Promise<CosmosProposalDetail> {
+export async function getCosmosProposalByIdDirect(id: string, requestedVotePage = 1, votePageSize = 20): Promise<CosmosProposalDetail> {
   const profile = getActiveCosmosProvider();
   const proposalId = id.trim();
 
@@ -3238,12 +2742,8 @@ export async function getCosmosProposalByIdDirect(
   const limit = Math.max(1, Math.trunc(votePageSize));
   const offset = (votePage - 1) * limit;
   const [proposalPayload, tallyPayload, votesPayload] = await Promise.all([
-    fetchJson<CosmosGovProposalResponse>(
-      `${profile.restUrl}/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`,
-    ),
-    fetchJson<CosmosGovProposalTallyResponse>(
-      `${profile.restUrl}/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/tally`,
-    ).catch(() => null),
+    fetchJson<CosmosGovProposalResponse>(`${profile.restUrl}/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`),
+    fetchJson<CosmosGovProposalTallyResponse>(`${profile.restUrl}/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/tally`).catch(() => null),
     fetchJson<CosmosGovProposalVotesResponse>(
       `${profile.restUrl}/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.count_total=true&pagination.offset=${offset}&pagination.limit=${limit}`,
     ).catch(() => ({
@@ -3257,9 +2757,7 @@ export async function getCosmosProposalByIdDirect(
     throw new Error('Failed to load Cosmos proposal.');
   }
 
-  const totalVotes =
-    Number.parseInt(votesPayload.pagination?.total ?? '0', 10) ||
-    (votesPayload.votes?.length ?? 0);
+  const totalVotes = Number.parseInt(votesPayload.pagination?.total ?? '0', 10) || (votesPayload.votes?.length ?? 0);
   const totalPages = Math.max(1, Math.ceil(Math.max(totalVotes, 1) / limit));
   const page = Math.min(votePage, totalPages);
   const effectiveVotesPayload =
@@ -3288,9 +2786,7 @@ export async function getCosmosProposalByIdDirect(
     votingStartTimeLabel: formatLocalTimestamp(proposal.voting_start_time),
     votingEndTime: proposal.voting_end_time ?? null,
     votingEndTimeLabel: formatLocalTimestamp(proposal.voting_end_time),
-    tallyLabel: formatCosmosProposalTallyLabel(
-      tallyPayload?.tally ?? proposal.final_tally_result,
-    ),
+    tallyLabel: formatCosmosProposalTallyLabel(tallyPayload?.tally ?? proposal.final_tally_result),
     votesPage: {
       page,
       pageSize: limit,
@@ -3304,9 +2800,7 @@ export async function getCosmosProposalByIdDirect(
           ? vote.options
               .map((item) => {
                 const label = formatCosmosProposalVoteOptionLabel(item.option);
-                return item.weight?.trim()
-                  ? `${label} (${formatDenomAmount(item.weight)})`
-                  : label;
+                return item.weight?.trim() ? `${label} (${formatDenomAmount(item.weight)})` : label;
               })
               .join(', ')
           : formatCosmosProposalVoteOptionLabel(vote.option);
@@ -3327,109 +2821,61 @@ export async function getCosmosProposalByIdDirect(
   } satisfies CosmosProposalDetail;
 }
 
-export async function getCosmosHomeSnapshotDirect(
-  blockLimit = 6,
-  txLimit = 6,
-): Promise<CosmosHomeSnapshot> {
+export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): Promise<CosmosHomeSnapshot> {
   const profile = getActiveCosmosProvider();
-  const [
-    statusPayload,
-    netInfoPayload,
-    unconfirmedPayload,
-    txSearchPayload,
-    restValidatorsPayload,
-    poolPayload,
-    communityPoolPayload,
-    supplyPayload,
-    cachedTransactions,
-  ] = await Promise.all([
-    getStatusDirect(profile),
-    getNetInfoDirect(profile).catch(() => ({ result: { n_peers: '0' } })),
-    getUnconfirmedTxsDirect(profile).catch(() => ({
-      result: { n_txs: '0', total: '0' },
-    })),
-    getTxSearchDirect(profile, txLimit),
-    getRestValidatorsDirect(profile),
-    fetchJson<CosmosPoolResponse>(
-      `${profile.restUrl}/cosmos/staking/v1beta1/pool`,
-    ),
-    fetchJson<CosmosCommunityPoolResponse>(
-      `${profile.restUrl}/cosmos/distribution/v1beta1/community_pool`,
-    ),
-    fetchJson<CosmosSupplyResponse>(
-      `${profile.restUrl}/cosmos/bank/v1beta1/supply`,
-    ),
-    getRecentCachedCosmosTransactions(txLimit).catch(() => []),
-  ]);
-  const latestHeight = Number(
-    statusPayload.result?.sync_info?.latest_block_height ?? 0,
-  );
+  const [statusPayload, netInfoPayload, unconfirmedPayload, txSearchPayload, restValidatorsPayload, poolPayload, communityPoolPayload, supplyPayload, cachedTransactions] =
+    await Promise.all([
+      getStatusDirect(profile),
+      getNetInfoDirect(profile).catch(() => ({ result: { n_peers: '0' } })),
+      getUnconfirmedTxsDirect(profile).catch(() => ({
+        result: { n_txs: '0', total: '0' },
+      })),
+      getTxSearchDirect(profile, txLimit),
+      getRestValidatorsDirect(profile),
+      fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`),
+      fetchJson<CosmosCommunityPoolResponse>(`${profile.restUrl}/cosmos/distribution/v1beta1/community_pool`),
+      fetchJson<CosmosSupplyResponse>(`${profile.restUrl}/cosmos/bank/v1beta1/supply`),
+      getRecentCachedCosmosTransactions(txLimit).catch(() => []),
+    ]);
+  const latestHeight = Number(statusPayload.result?.sync_info?.latest_block_height ?? 0);
   const [blockchainPayload, rpcValidatorsPayload] = await Promise.all([
     getBlockchainDirect(profile, latestHeight, Math.max(blockLimit, 10)),
     getRpcValidatorsDirect(profile, latestHeight).catch(() => ({
       result: { validators: [] },
     })),
   ]);
-  const blockMetas = [...(blockchainPayload.result?.block_metas ?? [])].sort(
-    (left, right) =>
-      Number(right.header?.height ?? 0) - Number(left.header?.height ?? 0),
-  );
+  const blockMetas = [...(blockchainPayload.result?.block_metas ?? [])].sort((left, right) => Number(right.header?.height ?? 0) - Number(left.header?.height ?? 0));
   const monikerByPubKey = new Map(
-    (restValidatorsPayload.validators ?? []).map((validator) => [
-      validator.consensus_pubkey?.key ?? '',
-      validator.description?.moniker ?? 'Unknown',
-    ]),
+    (restValidatorsPayload.validators ?? []).map((validator) => [validator.consensus_pubkey?.key ?? '', validator.description?.moniker ?? 'Unknown']),
   );
-  const operatorAddressByPubKey = new Map(
-    (restValidatorsPayload.validators ?? []).map((validator) => [
-      validator.consensus_pubkey?.key ?? '',
-      validator.operator_address ?? '',
-    ]),
-  );
+  const operatorAddressByPubKey = new Map((restValidatorsPayload.validators ?? []).map((validator) => [validator.consensus_pubkey?.key ?? '', validator.operator_address ?? '']));
   const proposerMonikerByAddress = new Map(
-    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [
-      validator.address ?? '',
-      monikerByPubKey.get(validator.pub_key?.value ?? '') ?? 'Unknown',
-    ]),
+    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [validator.address ?? '', monikerByPubKey.get(validator.pub_key?.value ?? '') ?? 'Unknown']),
   );
   const proposerOperatorAddressByAddress = new Map(
-    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [
-      validator.address ?? '',
-      operatorAddressByPubKey.get(validator.pub_key?.value ?? '') ?? '',
-    ]),
+    (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [validator.address ?? '', operatorAddressByPubKey.get(validator.pub_key?.value ?? '') ?? '']),
   );
-  const blocks: CosmosHomeBlockItem[] = blockMetas.slice(0, blockLimit).map(
-    (block) => {
-      const height = block.header?.height ?? '0';
-      const timestamp = block.header?.time;
-      const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
-      const proposer = block.header?.proposer_address ?? 'Unknown';
-      const proposerMoniker =
-        proposerMonikerByAddress.get(proposer) ??
-        statusPayload.result?.node_info?.moniker ??
-        proposer;
+  const blocks: CosmosHomeBlockItem[] = blockMetas.slice(0, blockLimit).map((block) => {
+    const height = block.header?.height ?? '0';
+    const timestamp = block.header?.time;
+    const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
+    const proposer = block.header?.proposer_address ?? 'Unknown';
+    const proposerMoniker = proposerMonikerByAddress.get(proposer) ?? statusPayload.result?.node_info?.moniker ?? proposer;
 
-      return {
-        height,
-        hash: block.block_id?.hash ?? 'Unavailable',
-        hashLabel: formatCompactHash(block.block_id?.hash ?? 'Unavailable'),
-        proposer,
-        proposerOperatorAddress:
-          proposerOperatorAddressByAddress.get(proposer) ?? null,
-        proposerLabel:
-          proposerMoniker && proposerMoniker !== 'Unknown'
-            ? proposerMoniker
-            : formatCompactHash(proposer, 10, 6),
-        txCount: formatInteger(block.num_txs ?? '0', '0'),
-        blockSizeLabel: formatBytes(block.block_size),
-        timeLabel: formatLocalTimestamp(timestamp),
-        timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
-      };
-    },
-  );
-  const blockTimeByHeight = new Map(
-    blockMetas.map((block) => [block.header?.height ?? '', block.header?.time ?? null]),
-  );
+    return {
+      height,
+      hash: block.block_id?.hash ?? 'Unavailable',
+      hashLabel: formatCompactHash(block.block_id?.hash ?? 'Unavailable'),
+      proposer,
+      proposerOperatorAddress: proposerOperatorAddressByAddress.get(proposer) ?? null,
+      proposerLabel: proposerMoniker && proposerMoniker !== 'Unknown' ? proposerMoniker : formatCompactHash(proposer, 10, 6),
+      txCount: formatInteger(block.num_txs ?? '0', '0'),
+      blockSizeLabel: formatBytes(block.block_size),
+      timeLabel: formatLocalTimestamp(timestamp),
+      timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
+    };
+  });
+  const blockTimeByHeight = new Map(blockMetas.map((block) => [block.header?.height ?? '', block.header?.time ?? null]));
   const missingHeights = (txSearchPayload.result?.txs ?? [])
     .slice(0, txLimit)
     .map((tx) => tx.height ?? '')
@@ -3480,15 +2926,12 @@ export async function getCosmosHomeSnapshotDirect(
       connection: profile.wsUrl ? 'RPC + WebSocket' : 'RPC Polling',
       providerName: profile.name,
       chainId: statusPayload.result?.node_info?.network ?? 'Unavailable',
-      latestBlockTime: formatLocalTimestamp(
-        statusPayload.result?.sync_info?.latest_block_time,
-      ),
+      latestBlockTime: formatLocalTimestamp(statusPayload.result?.sync_info?.latest_block_time),
     },
     metrics: [
       {
         label: 'Moniker',
-        value:
-          statusPayload.result?.node_info?.moniker ?? profile.name ?? 'Unavailable',
+        value: statusPayload.result?.node_info?.moniker ?? profile.name ?? 'Unavailable',
       },
       {
         label: 'Block Height',
@@ -3500,10 +2943,7 @@ export async function getCosmosHomeSnapshotDirect(
       },
       {
         label: 'Unconfirmed Txs',
-        value: formatInteger(
-          unconfirmedPayload.result?.n_txs ?? unconfirmedPayload.result?.total,
-          '0',
-        ),
+        value: formatInteger(unconfirmedPayload.result?.n_txs ?? unconfirmedPayload.result?.total, '0'),
       },
       {
         label: 'Validator Count',
@@ -3523,9 +2963,7 @@ export async function getCosmosHomeSnapshotDirect(
       },
       {
         label: 'Not Bonded Tokens',
-        value: formatReadableTokenAmount(
-          poolPayload.pool?.not_bonded_tokens ?? '0',
-        ),
+        value: formatReadableTokenAmount(poolPayload.pool?.not_bonded_tokens ?? '0'),
       },
       {
         label: 'Community Pool',
@@ -3545,28 +2983,16 @@ export async function getCosmosHomeSnapshotDirect(
   };
 }
 
-export async function requestCosmosRpcDirect(input: {
-  endpoint: string;
-  method: string;
-  payload?: unknown;
-  useRpc?: boolean;
-}) {
+export async function requestCosmosRpcDirect(input: { endpoint: string; method: string; payload?: unknown; useRpc?: boolean }) {
   const profile = getActiveCosmosProvider();
   const baseUrl = input.useRpc ? profile.rpcUrl : profile.restUrl;
-  const target = input.endpoint.startsWith('http')
-    ? input.endpoint
-    : `${baseUrl}${input.endpoint}`;
+  const target = input.endpoint.startsWith('http') ? input.endpoint : `${baseUrl}${input.endpoint}`;
   const response = await fetch(target, {
     method: input.method,
     headers: {
       'Content-Type': 'application/json',
     },
-    body:
-      input.method === 'GET'
-        ? undefined
-        : input.payload
-          ? JSON.stringify(input.payload)
-          : undefined,
+    body: input.method === 'GET' ? undefined : input.payload ? JSON.stringify(input.payload) : undefined,
   });
   const text = await response.text();
 

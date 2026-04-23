@@ -40,11 +40,7 @@ function getActiveTagScope() {
 }
 
 function sortItems(items: EvmAddressTagItem[]) {
-  return [...items].sort(
-    (left, right) =>
-      right.updatedAt - left.updatedAt ||
-      left.address.localeCompare(right.address),
-  );
+  return [...items].sort((left, right) => right.updatedAt - left.updatedAt || left.address.localeCompare(right.address));
 }
 
 function getScopedItems(scope = getActiveTagScope()) {
@@ -119,10 +115,7 @@ export function getEvmAddressTag(address: string) {
   ensureLoaded();
 
   const addressLower = normalizeAddress(address);
-  return (
-    getScopedItems().find((item) => item.addressLower === addressLower)
-      ?.nameTag ?? null
-  );
+  return getScopedItems().find((item) => item.addressLower === addressLower)?.nameTag ?? null;
 }
 
 export function getEvmAddressTags(addresses: string[]) {
@@ -131,13 +124,7 @@ export function getEvmAddressTags(addresses: string[]) {
   const scopedItems = getScopedItems();
 
   return Object.fromEntries(
-    addresses
-      .filter((address) => isAddress(address))
-      .map((address) => [
-        address,
-        scopedItems.find((item) => item.addressLower === address.toLowerCase())
-          ?.nameTag ?? null,
-      ]),
+    addresses.filter((address) => isAddress(address)).map((address) => [address, scopedItems.find((item) => item.addressLower === address.toLowerCase())?.nameTag ?? null]),
   ) as Record<string, string | null>;
 }
 
@@ -194,12 +181,7 @@ export async function upsertEvmAddressTag(address: string, nameTag: string) {
 
   cache = {
     ...cache,
-    [scope]: sortItems([
-      nextItem,
-      ...getScopedItems(scope).filter(
-        (item) => item.addressLower !== nextItem.addressLower,
-      ),
-    ]),
+    [scope]: sortItems([nextItem, ...getScopedItems(scope).filter((item) => item.addressLower !== nextItem.addressLower)]),
   };
   loaded = true;
   emitChange();
@@ -212,12 +194,9 @@ export async function deleteEvmAddressTag(address: string) {
     throw new Error('No active EVM provider selected.');
   }
 
-  const response = await fetch(
-    `/api/workbench/evm/address-tags?providerProfileId=${encodeURIComponent(activeProfile.id)}&address=${encodeURIComponent(address)}`,
-    {
-      method: 'DELETE',
-    },
-  );
+  const response = await fetch(`/api/workbench/evm/address-tags?providerProfileId=${encodeURIComponent(activeProfile.id)}&address=${encodeURIComponent(address)}`, {
+    method: 'DELETE',
+  });
 
   if (response.status === 401) {
     throw createAuthRequiredError();
@@ -230,9 +209,7 @@ export async function deleteEvmAddressTag(address: string) {
   const normalizedAddressLower = normalizeAddress(address);
   cache = {
     ...cache,
-    [activeProfile.id]: getScopedItems(activeProfile.id).filter(
-      (item) => item.addressLower !== normalizedAddressLower,
-    ),
+    [activeProfile.id]: getScopedItems(activeProfile.id).filter((item) => item.addressLower !== normalizedAddressLower),
   };
   loaded = true;
   emitChange();
@@ -245,12 +222,9 @@ export async function clearEvmAddressTags() {
     throw new Error('No active EVM provider selected.');
   }
 
-  const response = await fetch(
-    `/api/workbench/evm/address-tags?providerProfileId=${encodeURIComponent(activeProfile.id)}&clear=1`,
-    {
-      method: 'DELETE',
-    },
-  );
+  const response = await fetch(`/api/workbench/evm/address-tags?providerProfileId=${encodeURIComponent(activeProfile.id)}&clear=1`, {
+    method: 'DELETE',
+  });
 
   if (response.status === 401) {
     throw createAuthRequiredError();

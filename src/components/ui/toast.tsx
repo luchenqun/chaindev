@@ -1,18 +1,7 @@
 'use client';
 
-import {
-  IconAlertCircleFilled,
-  IconCircleCheckFilled,
-  IconInfoCircleFilled,
-} from '@tabler/icons-react';
-import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { IconAlertCircleFilled, IconCircleCheckFilled, IconInfoCircleFilled } from '@tabler/icons-react';
+import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 type ToastTone = 'success' | 'info' | 'error';
@@ -36,15 +25,7 @@ type ToastContextValue = {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
-function ToastCard({
-  title,
-  description,
-  tone,
-}: {
-  title: string;
-  description?: ReactNode;
-  tone: ToastTone;
-}) {
+function ToastCard({ title, description, tone }: { title: string; description?: ReactNode; tone: ToastTone }) {
   return (
     <div
       className={cn(
@@ -64,9 +45,7 @@ function ToastCard({
         )}
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-900">{title}</p>
-          {description ? (
-            <div className="mt-1 text-sm text-slate-600">{description}</div>
-          ) : null}
+          {description ? <div className="mt-1 text-sm text-slate-600">{description}</div> : null}
         </div>
       </div>
     </div>
@@ -120,12 +99,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {toasts.length ? (
         <div className="pointer-events-none fixed left-1/2 top-5 z-[70] flex w-full max-w-md -translate-x-1/2 flex-col gap-3 px-4">
           {toasts.map((toast) => (
-            <ToastCard
-              key={toast.id}
-              title={toast.title}
-              description={toast.description}
-              tone={toast.tone}
-            />
+            <ToastCard key={toast.id} title={toast.title} description={toast.description} tone={toast.tone} />
           ))}
         </div>
       ) : null}

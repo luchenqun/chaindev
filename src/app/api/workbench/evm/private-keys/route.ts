@@ -105,16 +105,10 @@ export async function PATCH(request: Request) {
     const touchPayload = touchPrivateKeySchema.safeParse(rawBody);
 
     if (touchPayload.success) {
-      const item = await touchServerEvmPrivateKeyLastUsed(
-        userId,
-        touchPayload.data.id,
-      );
+      const item = await touchServerEvmPrivateKeyLastUsed(userId, touchPayload.data.id);
 
       if (!item) {
-        return fail(
-          { category: 'validation', message: 'Private key entry not found.' },
-          404,
-        );
+        return fail({ category: 'validation', message: 'Private key entry not found.' }, 404);
       }
 
       return ok(item);
@@ -123,17 +117,10 @@ export async function PATCH(request: Request) {
     const unlockPayload = unlockPrivateKeySchema.safeParse(rawBody);
 
     if (unlockPayload.success) {
-      const unlocked = await unlockServerEvmPrivateKey(
-        userId,
-        unlockPayload.data.id,
-        unlockPayload.data.password,
-      );
+      const unlocked = await unlockServerEvmPrivateKey(userId, unlockPayload.data.id, unlockPayload.data.password);
 
       if (!unlocked) {
-        return fail(
-          { category: 'validation', message: 'Private key entry not found.' },
-          404,
-        );
+        return fail({ category: 'validation', message: 'Private key entry not found.' }, 404);
       }
 
       return ok(unlocked);
@@ -152,10 +139,7 @@ export async function PATCH(request: Request) {
       });
 
       if (!item) {
-        return fail(
-          { category: 'validation', message: 'Private key entry not found.' },
-          404,
-        );
+        return fail({ category: 'validation', message: 'Private key entry not found.' }, 404);
       }
 
       return ok(item);
@@ -165,10 +149,7 @@ export async function PATCH(request: Request) {
     const item = await renameServerEvmPrivateKey(userId, body.id, body.name);
 
     if (!item) {
-      return fail(
-        { category: 'validation', message: 'Private key entry not found.' },
-        404,
-      );
+      return fail({ category: 'validation', message: 'Private key entry not found.' }, 404);
     }
 
     return ok(item);

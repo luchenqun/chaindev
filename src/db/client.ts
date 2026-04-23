@@ -9,10 +9,7 @@ const configuredDatabaseUrl = process.env.DATABASE_URL;
 const databasePath = configuredDatabaseUrl
   ? configuredDatabaseUrl.startsWith('/')
     ? configuredDatabaseUrl
-    : join(
-        /* turbopackIgnore: true */ process.cwd(),
-        configuredDatabaseUrl.replace(/^\.\//, ''),
-      )
+    : join(/* turbopackIgnore: true */ process.cwd(), configuredDatabaseUrl.replace(/^\.\//, ''))
   : join(process.cwd(), 'data', 'chaindev.sqlite');
 
 mkdirSync(dirname(databasePath), { recursive: true });
@@ -70,9 +67,7 @@ function ensureAuthSchema() {
     CREATE UNIQUE INDEX IF NOT EXISTS user_username_unique ON user(username);
   `);
 
-  const userColumns = new Set(
-    getTableColumns('user').map((column) => column.name),
-  );
+  const userColumns = new Set(getTableColumns('user').map((column) => column.name));
 
   if (!userColumns.has('username')) {
     sqlite.exec('ALTER TABLE user ADD COLUMN username TEXT');
@@ -83,9 +78,7 @@ function ensureAuthSchema() {
   }
 
   if (!userColumns.has('is_admin')) {
-    sqlite.exec(
-      'ALTER TABLE user ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0',
-    );
+    sqlite.exec('ALTER TABLE user ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0');
   }
 
   sqlite.exec(`
@@ -228,21 +221,15 @@ function ensureWorkbenchSchema() {
       ON evm_private_keys(user_id, address_lower);
   `);
 
-  const contractArtifactColumns = new Set(
-    getTableColumns('evm_contract_artifacts').map((column) => column.name),
-  );
-  const rpcProfileColumns = new Set(
-    getTableColumns('rpc_profiles').map((column) => column.name),
-  );
+  const contractArtifactColumns = new Set(getTableColumns('evm_contract_artifacts').map((column) => column.name));
+  const rpcProfileColumns = new Set(getTableColumns('rpc_profiles').map((column) => column.name));
 
   if (!rpcProfileColumns.has('ws_url')) {
     sqlite.exec('ALTER TABLE rpc_profiles ADD COLUMN ws_url TEXT');
   }
 
   if (!contractArtifactColumns.has('scope')) {
-    sqlite.exec(
-      "ALTER TABLE evm_contract_artifacts ADD COLUMN scope TEXT NOT NULL DEFAULT 'user'",
-    );
+    sqlite.exec("ALTER TABLE evm_contract_artifacts ADD COLUMN scope TEXT NOT NULL DEFAULT 'user'");
   }
 }
 
@@ -259,10 +246,9 @@ declare global {
   var __chaindevBootstrapPromise: Promise<void> | undefined;
 }
 
-globalThis.__chaindevBootstrapPromise ??=
-  import('@/server/bootstrap/ensure-system-bootstrap')
-    .then(({ ensureSystemBootstrap }) => ensureSystemBootstrap())
-    .then(() => undefined)
-    .catch((error) => {
-      console.error('Failed to initialize system bootstrap data.', error);
-    });
+globalThis.__chaindevBootstrapPromise ??= import('@/server/bootstrap/ensure-system-bootstrap')
+  .then(({ ensureSystemBootstrap }) => ensureSystemBootstrap())
+  .then(() => undefined)
+  .catch((error) => {
+    console.error('Failed to initialize system bootstrap data.', error);
+  });

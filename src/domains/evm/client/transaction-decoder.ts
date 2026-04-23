@@ -1,23 +1,8 @@
 'use client';
 
-import {
-  decodeEventLog,
-  decodeFunctionData,
-  toEventSelector,
-  toFunctionSelector,
-  type Abi,
-  type AbiEvent,
-  type Hex,
-} from 'viem';
-import {
-  getContractFunctions,
-  parseContractAbiJson,
-} from '@/domains/evm/client/abi-utils';
-import {
-  getEvmContractArtifact,
-  listEvmContractArtifacts,
-  listEvmContractBindings,
-} from '@/domains/evm/client/contract-registry';
+import { decodeEventLog, decodeFunctionData, toEventSelector, toFunctionSelector, type Abi, type AbiEvent, type Hex } from 'viem';
+import { getContractFunctions, parseContractAbiJson } from '@/domains/evm/client/abi-utils';
+import { getEvmContractArtifact, listEvmContractArtifacts, listEvmContractBindings } from '@/domains/evm/client/contract-registry';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 export type EvmDecodedTransactionInput = {
@@ -175,26 +160,14 @@ function stringifyDecodedValue(value: unknown) {
     return value.toString();
   }
 
-  if (
-    typeof value === 'number' ||
-    typeof value === 'boolean' ||
-    value === null
-  ) {
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
     return String(value);
   }
 
-  return JSON.stringify(
-    value,
-    (_, currentValue) =>
-      typeof currentValue === 'bigint' ? currentValue.toString() : currentValue,
-    2,
-  );
+  return JSON.stringify(value, (_, currentValue) => (typeof currentValue === 'bigint' ? currentValue.toString() : currentValue), 2);
 }
 
-function formatFallbackMethodLabel(
-  inputData: string | undefined,
-  to: string | null | undefined,
-) {
+function formatFallbackMethodLabel(inputData: string | undefined, to: string | null | undefined) {
   if (!to) {
     return 'Create';
   }
@@ -213,11 +186,7 @@ function findBoundArtifact(address: string | null | undefined) {
     return null;
   }
 
-  const binding = listEvmContractBindings().find(
-    (item) =>
-      item.providerProfileId === profile.id &&
-      item.addressLower === address.toLowerCase(),
-  );
+  const binding = listEvmContractBindings().find((item) => item.providerProfileId === profile.id && item.addressLower === address.toLowerCase());
 
   if (!binding) {
     return null;
@@ -243,26 +212,14 @@ function findMatchingEventInAbi(abiJson: string, topic0: string | null) {
   const abi = parseContractAbiJson(abiJson);
   const events = abi.filter(isAbiEventItem);
 
-  return (
-    events.find(
-      (event) =>
-        !event.anonymous &&
-        toEventSelector(getEventSignature(event)).toLowerCase() === topic0,
-    ) ?? null
-  );
+  return events.find((event) => !event.anonymous && toEventSelector(getEventSignature(event)).toLowerCase() === topic0) ?? null;
 }
 
-function resolveReceiptLogEvent(input: {
-  address: string | null | undefined;
-  topic0: string | null;
-}): MatchedReceiptLogEvent | null {
+function resolveReceiptLogEvent(input: { address: string | null | undefined; topic0: string | null }): MatchedReceiptLogEvent | null {
   const boundArtifact = findBoundArtifact(input.address);
 
   if (boundArtifact) {
-    const matchedEvent = findMatchingEventInAbi(
-      boundArtifact.artifact.abiJson,
-      input.topic0,
-    );
+    const matchedEvent = findMatchingEventInAbi(boundArtifact.artifact.abiJson, input.topic0);
 
     if (matchedEvent) {
       return {
@@ -311,11 +268,7 @@ function getEventSignature(event: AbiEvent) {
   return `${event.name}(${event.inputs.map((input) => input.type).join(',')})`;
 }
 
-function readDecodedEventArgument(
-  decodedArgs: unknown,
-  input: AbiEvent['inputs'][number],
-  index: number,
-) {
+function readDecodedEventArgument(decodedArgs: unknown, input: AbiEvent['inputs'][number], index: number) {
   if (Array.isArray(decodedArgs)) {
     return decodedArgs[index];
   }
@@ -333,14 +286,8 @@ function readDecodedEventArgument(
   return undefined;
 }
 
-function resolveIndexedTopicHex(
-  event: AbiEvent,
-  topics: string[],
-  inputIndex: number,
-) {
-  const indexedPosition = event.inputs
-    .slice(0, inputIndex + 1)
-    .filter((input) => input.indexed).length;
+function resolveIndexedTopicHex(event: AbiEvent, topics: string[], inputIndex: number) {
+  const indexedPosition = event.inputs.slice(0, inputIndex + 1).filter((input) => input.indexed).length;
 
   return topics[(event.anonymous ? 0 : 1) + indexedPosition - 1] ?? null;
 }
@@ -357,11 +304,7 @@ export function decodeHexToUtf8(value: string) {
   }
 
   try {
-    const bytes = Uint8Array.from(
-      normalizedValue
-        .match(/.{1,2}/g)
-        ?.map((item) => Number.parseInt(item, 16)) ?? [],
-    );
+    const bytes = Uint8Array.from(normalizedValue.match(/.{1,2}/g)?.map((item) => Number.parseInt(item, 16)) ?? []);
 
     return new TextDecoder().decode(bytes).replace(/\u0000/g, '');
   } catch {
@@ -369,10 +312,7 @@ export function decodeHexToUtf8(value: string) {
   }
 }
 
-export function decodeBoundEvmTransactionInput(input: {
-  to: string | null | undefined;
-  inputData: string | undefined;
-}): EvmDecodedTransactionInput | null {
+export function decodeBoundEvmTransactionInput(input: { to: string | null | undefined; inputData: string | undefined }): EvmDecodedTransactionInput | null {
   const normalizedInputData = input.inputData ?? '0x';
   const boundArtifact = findBoundArtifact(input.to);
 
@@ -382,10 +322,7 @@ export function decodeBoundEvmTransactionInput(input: {
 
   const selector = normalizedInputData.slice(0, 10).toLowerCase();
   const functions = getContractFunctions(boundArtifact.artifact.abiJson);
-  const matchedFunction = functions.find(
-    (fn) =>
-      toFunctionSelector(`function ${fn.signature}`).toLowerCase() === selector,
-  );
+  const matchedFunction = functions.find((fn) => toFunctionSelector(`function ${fn.signature}`).toLowerCase() === selector);
 
   if (!matchedFunction) {
     return null;
@@ -426,11 +363,7 @@ export function decodeBoundEvmTransactionInput(input: {
   }
 }
 
-export function decodeBoundEvmReceiptLog(input: {
-  address: string | null | undefined;
-  topics: string[];
-  data: string | undefined;
-}): EvmDecodedReceiptLog | null {
+export function decodeBoundEvmReceiptLog(input: { address: string | null | undefined; topics: string[]; data: string | undefined }): EvmDecodedReceiptLog | null {
   if (!input.address || !input.topics.length) {
     return null;
   }
@@ -445,13 +378,8 @@ export function decodeBoundEvmReceiptLog(input: {
     return null;
   }
 
-  const normalizedTopics = input.topics.map((topic) =>
-    topic.toLowerCase(),
-  ) as Hex[];
-  const decodedTopics: [] | [Hex, ...Hex[]] =
-    normalizedTopics.length > 0
-      ? [normalizedTopics[0], ...normalizedTopics.slice(1)]
-      : [];
+  const normalizedTopics = input.topics.map((topic) => topic.toLowerCase()) as Hex[];
+  const decodedTopics: [] | [Hex, ...Hex[]] = normalizedTopics.length > 0 ? [normalizedTopics[0], ...normalizedTopics.slice(1)] : [];
   const normalizedData = (input.data ?? '0x') as Hex;
 
   try {
@@ -473,16 +401,8 @@ export function decodeBoundEvmReceiptLog(input: {
         name: eventInput.name || `arg${index + 1}`,
         type: eventInput.type,
         indexed: Boolean(eventInput.indexed),
-        value: stringifyDecodedValue(
-          readDecodedEventArgument(decoded.args, eventInput, index),
-        ),
-        rawHex: eventInput.indexed
-          ? resolveIndexedTopicHex(
-              matchedArtifact.event,
-              normalizedTopics,
-              index,
-            )
-          : null,
+        value: stringifyDecodedValue(readDecodedEventArgument(decoded.args, eventInput, index)),
+        rawHex: eventInput.indexed ? resolveIndexedTopicHex(matchedArtifact.event, normalizedTopics, index) : null,
       })),
     };
   } catch {
@@ -497,31 +417,15 @@ export function decodeBoundEvmReceiptLog(input: {
         name: eventInput.name || `arg${index + 1}`,
         type: eventInput.type,
         indexed: Boolean(eventInput.indexed),
-        value: eventInput.indexed
-          ? (resolveIndexedTopicHex(
-              matchedArtifact.event,
-              input.topics,
-              index,
-            ) ?? 'Unavailable')
-          : (input.data ?? '0x'),
-        rawHex: eventInput.indexed
-          ? resolveIndexedTopicHex(matchedArtifact.event, input.topics, index)
-          : null,
+        value: eventInput.indexed ? (resolveIndexedTopicHex(matchedArtifact.event, input.topics, index) ?? 'Unavailable') : (input.data ?? '0x'),
+        rawHex: eventInput.indexed ? resolveIndexedTopicHex(matchedArtifact.event, input.topics, index) : null,
       })),
     };
   }
 }
 
-export function resolveEvmTransactionMethodLabel(input: {
-  to: string | null | undefined;
-  inputData: string | undefined;
-  fallbackMethodLabel?: string;
-}) {
+export function resolveEvmTransactionMethodLabel(input: { to: string | null | undefined; inputData: string | undefined; fallbackMethodLabel?: string }) {
   const decoded = decodeBoundEvmTransactionInput(input);
 
-  return (
-    decoded?.methodLabel ??
-    input.fallbackMethodLabel ??
-    formatFallbackMethodLabel(input.inputData, input.to)
-  );
+  return decoded?.methodLabel ?? input.fallbackMethodLabel ?? formatFallbackMethodLabel(input.inputData, input.to);
 }

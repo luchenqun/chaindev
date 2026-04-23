@@ -37,10 +37,8 @@ function emitChange() {
 function waitForTransaction(transaction: IDBTransaction) {
   return new Promise<void>((resolve, reject) => {
     transaction.oncomplete = () => resolve();
-    transaction.onerror = () =>
-      reject(transaction.error ?? new Error('IndexedDB transaction failed.'));
-    transaction.onabort = () =>
-      reject(transaction.error ?? new Error('IndexedDB transaction aborted.'));
+    transaction.onerror = () => reject(transaction.error ?? new Error('IndexedDB transaction failed.'));
+    transaction.onabort = () => reject(transaction.error ?? new Error('IndexedDB transaction aborted.'));
   });
 }
 
@@ -68,23 +66,17 @@ async function getDatabase() {
         const store = database.createObjectStore(TRANSACTIONS_STORE, {
           keyPath: 'id',
         });
-        store.createIndex(BY_PROVIDER_TIMESTAMP_INDEX, [
-          'providerProfileId',
-          'sortTimestamp',
-        ]);
+        store.createIndex(BY_PROVIDER_TIMESTAMP_INDEX, ['providerProfileId', 'sortTimestamp']);
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () =>
-      reject(request.error ?? new Error('Failed to open IndexedDB.'));
+    request.onerror = () => reject(request.error ?? new Error('Failed to open IndexedDB.'));
   });
 
   return databasePromise;
 }
 
-function toRecord(
-  item: CosmosCachedTransactionItem,
-): CosmosCachedTransactionRecord {
+function toRecord(item: CosmosCachedTransactionItem): CosmosCachedTransactionRecord {
   return {
     ...item,
     id: `${item.providerProfileId}:${item.hash}`,
@@ -92,21 +84,12 @@ function toRecord(
   };
 }
 
-export async function rememberCosmosTransactionCache(
-  items: CosmosCachedTransactionItem[],
-) {
-  if (
-    typeof window === 'undefined' ||
-    !('indexedDB' in window) ||
-    items.length === 0
-  ) {
+export async function rememberCosmosTransactionCache(items: CosmosCachedTransactionItem[]) {
+  if (typeof window === 'undefined' || !('indexedDB' in window) || items.length === 0) {
     return items;
   }
 
-  const uniqueItems = [
-    ...new Map(items.map((item) => [`${item.providerProfileId}:${item.hash}`, item]))
-      .values(),
-  ];
+  const uniqueItems = [...new Map(items.map((item) => [`${item.providerProfileId}:${item.hash}`, item])).values()];
   const database = await getDatabase();
   const transaction = database.transaction(TRANSACTIONS_STORE, 'readwrite');
   const store = transaction.objectStore(TRANSACTIONS_STORE);
@@ -135,47 +118,38 @@ export async function getRecentCachedCosmosTransactions(limit = 6) {
   const transaction = database.transaction(TRANSACTIONS_STORE, 'readonly');
   const store = transaction.objectStore(TRANSACTIONS_STORE);
   const index = store.index(BY_PROVIDER_TIMESTAMP_INDEX);
-  const range = IDBKeyRange.bound(
-    [profile.id, 0],
-    [profile.id, Number.MAX_SAFE_INTEGER],
-  );
-  const items = await new Promise<CosmosCachedTransactionItem[]>(
-    (resolve, reject) => {
-      const request = index.openCursor(range, 'prev');
-      const nextItems: CosmosCachedTransactionItem[] = [];
+  const range = IDBKeyRange.bound([profile.id, 0], [profile.id, Number.MAX_SAFE_INTEGER]);
+  const items = await new Promise<CosmosCachedTransactionItem[]>((resolve, reject) => {
+    const request = index.openCursor(range, 'prev');
+    const nextItems: CosmosCachedTransactionItem[] = [];
 
-      request.onerror = () =>
-        reject(
-          request.error ??
-            new Error('Failed to read recent cached Cosmos transactions.'),
-        );
-      request.onsuccess = () => {
-        const cursor = request.result;
+    request.onerror = () => reject(request.error ?? new Error('Failed to read recent cached Cosmos transactions.'));
+    request.onsuccess = () => {
+      const cursor = request.result;
 
-        if (!cursor || nextItems.length >= limit) {
-          resolve(nextItems);
-          return;
-        }
+      if (!cursor || nextItems.length >= limit) {
+        resolve(nextItems);
+        return;
+      }
 
-        const value = cursor.value as CosmosCachedTransactionRecord;
-        nextItems.push({
-          providerProfileId: value.providerProfileId,
-          hash: value.hash,
-          height: value.height,
-          timestampMs: value.timestampMs,
-          typeLabel: value.typeLabel,
-          sender: value.sender,
-          senderLabel: value.senderLabel,
-          feeLabel: value.feeLabel,
-          gasUsed: value.gasUsed,
-          gasWanted: value.gasWanted,
-          status: value.status,
-          statusLabel: value.statusLabel,
-        });
-        cursor.continue();
-      };
-    },
-  );
+      const value = cursor.value as CosmosCachedTransactionRecord;
+      nextItems.push({
+        providerProfileId: value.providerProfileId,
+        hash: value.hash,
+        height: value.height,
+        timestampMs: value.timestampMs,
+        typeLabel: value.typeLabel,
+        sender: value.sender,
+        senderLabel: value.senderLabel,
+        feeLabel: value.feeLabel,
+        gasUsed: value.gasUsed,
+        gasWanted: value.gasWanted,
+        status: value.status,
+        statusLabel: value.statusLabel,
+      });
+      cursor.continue();
+    };
+  });
 
   await waitForTransaction(transaction);
   return items;

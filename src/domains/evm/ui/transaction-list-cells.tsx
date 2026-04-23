@@ -1,11 +1,6 @@
 'use client';
 
-import {
-  IconAlertCircle,
-  IconArrowUpRight,
-  IconCopy,
-  IconEye,
-} from '@tabler/icons-react';
+import { IconAlertCircle, IconArrowUpRight, IconCopy, IconEye } from '@tabler/icons-react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
@@ -64,17 +59,9 @@ export function TransactionHashCell(props: TransactionPreviewData) {
 
   return (
     <div className="flex items-center gap-0.5">
-      {receiptStatus === 'reverted' ? (
-        <IconAlertCircle
-          className="size-5 shrink-0 text-rose-500"
-          stroke={1.9}
-        />
-      ) : null}
+      {receiptStatus === 'reverted' ? <IconAlertCircle className="size-5 shrink-0 text-rose-500" stroke={1.9} /> : null}
       <div className="relative inline-flex items-center gap-1.5">
-        <Link
-          className="font-medium text-sky-600 hover:text-sky-700"
-          href={`/evm/tx/${hash}`}
-        >
+        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${hash}`}>
           {hashLabel}
         </Link>
         <button
@@ -97,10 +84,7 @@ export function TransactionHashCell(props: TransactionPreviewData) {
   );
 }
 
-export function TransactionPreviewButton(props: {
-  transaction: TransactionPreviewData;
-  methodLabel: string;
-}) {
+export function TransactionPreviewButton(props: { transaction: TransactionPreviewData; methodLabel: string }) {
   const { transaction, methodLabel } = props;
   const [open, setOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState<{
@@ -130,15 +114,9 @@ export function TransactionPreviewButton(props: {
       const viewportHeight = window.innerHeight;
       const preferredLeft = rect.right + 12;
       const fallbackLeft = rect.left - panelWidth - 12;
-      const left =
-        preferredLeft + panelWidth <= viewportWidth - 16
-          ? preferredLeft
-          : Math.max(16, fallbackLeft);
+      const left = preferredLeft + panelWidth <= viewportWidth - 16 ? preferredLeft : Math.max(16, fallbackLeft);
       const centeredTop = rect.top + rect.height / 2 - panelHeight / 2;
-      const top = Math.min(
-        Math.max(16, centeredTop),
-        Math.max(16, viewportHeight - panelHeight - 16),
-      );
+      const top = Math.min(Math.max(16, centeredTop), Math.max(16, viewportHeight - panelHeight - 16));
 
       setPanelPosition({ top, left });
     }
@@ -146,12 +124,7 @@ export function TransactionPreviewButton(props: {
     function handlePointerDown(event: MouseEvent) {
       const target = event.target as Node;
 
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(target) &&
-        panelRef.current &&
-        !panelRef.current.contains(target)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(target) && panelRef.current && !panelRef.current.contains(target)) {
         setOpen(false);
       }
     }
@@ -181,12 +154,8 @@ export function TransactionPreviewButton(props: {
       <button
         ref={triggerRef}
         type="button"
-        aria-label={
-          open ? 'Hide transaction preview' : 'Show transaction preview'
-        }
-        className={`inline-flex size-5 items-center justify-center transition ${
-          open ? 'text-slate-700' : 'text-slate-500 hover:text-slate-700'
-        }`}
+        aria-label={open ? 'Hide transaction preview' : 'Show transaction preview'}
+        className={`inline-flex size-5 items-center justify-center transition ${open ? 'text-slate-700' : 'text-slate-500 hover:text-slate-700'}`}
         onClick={() => setOpen((current) => !current)}
       >
         <IconEye className="size-4.5" stroke={1.8} />
@@ -202,74 +171,43 @@ export function TransactionPreviewButton(props: {
               }}
             >
               <div className="border-b border-slate-200 pb-4">
-                <p className="text-lg font-semibold text-slate-900">
-                  Additional Info
-                </p>
+                <p className="text-lg font-semibold text-slate-900">Additional Info</p>
               </div>
 
               <div className="space-y-2 py-2">
                 <section className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    Status
-                  </p>
-                  <p
-                    className={`text-sm font-semibold ${getCachedStatusClasses(transaction.receiptStatus)}`}
-                  >
-                    {transaction.receiptStatusLabel ?? 'Unavailable'}
-                  </p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Status</p>
+                  <p className={`text-sm font-semibold ${getCachedStatusClasses(transaction.receiptStatus)}`}>{transaction.receiptStatusLabel ?? 'Unavailable'}</p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    Method
-                  </p>
-                  <p className="text-sm font-medium text-slate-900">
-                    {methodLabel}
-                  </p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
+                  <p className="text-sm font-medium text-slate-900">{methodLabel}</p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    Transaction Fee
-                  </p>
-                  <p className="text-sm font-medium text-slate-900">
-                    {transaction.feeLabel ?? 'Unavailable'}
-                  </p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Transaction Fee</p>
+                  <p className="text-sm font-medium text-slate-900">{transaction.feeLabel ?? 'Unavailable'}</p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    Gas Info
-                  </p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Info</p>
                   <p className="text-sm font-medium text-slate-900">
-                    {transaction.gasUsedLabel ?? 'Unavailable'} gas used from{' '}
-                    {transaction.gasLimitLabel ?? 'Unavailable'} limit
+                    {transaction.gasUsedLabel ?? 'Unavailable'} gas used from {transaction.gasLimitLabel ?? 'Unavailable'} limit
                   </p>
-                  <p className="text-xs text-slate-500">
-                    @ {transaction.effectiveGasPriceLabel ?? 'Unavailable'}
-                  </p>
+                  <p className="text-xs text-slate-500">@ {transaction.effectiveGasPriceLabel ?? 'Unavailable'}</p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    Nonce
-                  </p>
-                  <p className="text-sm font-medium text-slate-900">
-                    {transaction.nonceLabel ?? 'Unavailable'}
-                  </p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Nonce</p>
+                  <p className="text-sm font-medium text-slate-900">{transaction.nonceLabel ?? 'Unavailable'}</p>
                 </section>
               </div>
 
               <div className="border-t border-slate-200 pt-2">
-                <Link
-                  className="inline-flex items-center gap-1 text-sm font-medium text-sky-600 transition hover:text-sky-700"
-                  href={`/evm/tx/${transaction.hash}`}
-                >
+                <Link className="inline-flex items-center gap-1 text-sm font-medium text-sky-600 transition hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
                   See more details
-                  <IconArrowUpRight
-                    className="size-3.5 text-slate-400"
-                    stroke={1.8}
-                  />
+                  <IconArrowUpRight className="size-3.5 text-slate-400" stroke={1.8} />
                 </Link>
               </div>
             </div>,

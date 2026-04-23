@@ -1,26 +1,16 @@
 import { z } from 'zod';
-import {
-  createCredentialUser,
-  findAuthUserConflict,
-} from '@/server/repositories/auth-users';
+import { createCredentialUser, findAuthUserConflict } from '@/server/repositories/auth-users';
 import { seedDefaultWorkbenchForUser } from '@/server/repositories/workbench-bootstrap';
 import { fail, ok } from '@/server/utils/api-response';
 
 const registerSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(2, '用户名至少 2 位。')
-    .max(40, '用户名不能超过 40 位。'),
+  username: z.string().trim().min(2, '用户名至少 2 位。').max(40, '用户名不能超过 40 位。'),
   email: z
     .string()
     .trim()
     .email('请输入有效邮箱地址。')
     .transform((value) => value.toLowerCase()),
-  password: z
-    .string()
-    .min(8, '密码至少 8 位。')
-    .max(128, '密码不能超过 128 位。'),
+  password: z.string().min(8, '密码至少 8 位。').max(128, '密码不能超过 128 位。'),
 });
 
 export async function POST(request: Request) {
@@ -33,17 +23,11 @@ export async function POST(request: Request) {
       username: normalizedUsername,
     });
 
-    if (
-      existing?.email?.toLowerCase() === body.email ||
-      existing?.username?.toLowerCase() === body.email
-    ) {
+    if (existing?.email?.toLowerCase() === body.email || existing?.username?.toLowerCase() === body.email) {
       return fail({ category: 'validation', message: '该邮箱已注册。' }, 409);
     }
 
-    if (
-      existing?.username?.toLowerCase() === normalizedUsernameLower ||
-      existing?.email?.toLowerCase() === normalizedUsernameLower
-    ) {
+    if (existing?.username?.toLowerCase() === normalizedUsernameLower || existing?.email?.toLowerCase() === normalizedUsernameLower) {
       return fail({ category: 'validation', message: '该用户名已存在。' }, 409);
     }
 
@@ -53,10 +37,7 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
-      return fail(
-        { category: 'server', message: '注册失败，请稍后重试。' },
-        500,
-      );
+      return fail({ category: 'server', message: '注册失败，请稍后重试。' }, 500);
     }
 
     await seedDefaultWorkbenchForUser(user.id);

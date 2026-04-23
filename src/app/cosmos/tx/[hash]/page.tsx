@@ -4,12 +4,7 @@ import JsonView from '@uiw/react-json-view';
 import { IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { copyText } from '@/components/ui/copy-text';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { RelativeTime } from '@/components/relative-time';
@@ -22,21 +17,9 @@ import {
 } from '@/domains/cosmos/ui/detail-primitives';
 import { AppShell } from '@/platform/layout/app-shell';
 
-function StatusBadge({
-  status,
-  label,
-}: {
-  status: 'success' | 'failed';
-  label: string;
-}) {
+function StatusBadge({ status, label }: { status: 'success' | 'failed'; label: string }) {
   return (
-    <span
-      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-        status === 'success'
-          ? 'bg-emerald-50 text-emerald-700'
-          : 'bg-rose-50 text-rose-700'
-      }`}
-    >
+    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${status === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
       {label}
     </span>
   );
@@ -84,19 +67,12 @@ function TxEventsSection({
       {events.length ? (
         <div className="grid gap-3">
           {events.map((event, index) => {
-            const showIndexedColumn = event.attributes.some(
-              (attribute) => !attribute.indexed,
-            );
+            const showIndexedColumn = event.attributes.some((attribute) => !attribute.indexed);
 
             return (
-              <article
-                key={`${event.type}-${index}`}
-                className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
-              >
+              <article key={`${event.type}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-                    {`${index + 1}. ${event.type}`}
-                  </span>
+                  <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{`${index + 1}. ${event.type}`}</span>
                   <span className="text-xs text-slate-500">
                     {event.attributes.length} attribute
                     {event.attributes.length === 1 ? '' : 's'}
@@ -108,67 +84,38 @@ function TxEventsSection({
                     <table className="min-w-full w-max border-collapse whitespace-nowrap">
                       <thead>
                         <tr>
-                          <th className="w-[180px] min-w-[180px] border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">
-                            Key
-                          </th>
-                          <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">
-                            Value
-                          </th>
-                          {showIndexedColumn ? (
-                            <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">
-                              Indexed
-                            </th>
-                          ) : null}
+                          <th className="w-[180px] min-w-[180px] border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Key</th>
+                          <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Value</th>
+                          {showIndexedColumn ? <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Indexed</th> : null}
                         </tr>
                       </thead>
                       <tbody>
                         {event.attributes.map((attribute, attributeIndex) => (
-                          <tr
-                            key={`${event.type}-${attribute.key}-${attributeIndex}`}
-                            className="border-t border-slate-200"
-                          >
-                            <td className="w-[180px] min-w-[180px] px-3 py-2 text-sm text-slate-700 mono">
-                              {attribute.key || 'Unknown'}
-                            </td>
+                          <tr key={`${event.type}-${attribute.key}-${attributeIndex}`} className="border-t border-slate-200">
+                            <td className="w-[180px] min-w-[180px] px-3 py-2 text-sm text-slate-700 mono">{attribute.key || 'Unknown'}</td>
                             <td className="px-3 py-2 text-sm text-slate-900">
                               <div className="flex items-start gap-2">
-                                <span className="mono whitespace-pre-wrap break-all">
-                                  {attribute.value || 'Empty'}
-                                </span>
+                                <span className="mono whitespace-pre-wrap break-all">{attribute.value || 'Empty'}</span>
                                 <span className="relative inline-flex shrink-0">
                                   <button
                                     type="button"
                                     className="inline-flex h-5 w-5 items-center justify-center text-slate-400 transition hover:text-sky-600"
                                     aria-label="Copy event value"
-                                    onClick={() =>
-                                      void handleCopy(
-                                        attribute.value || '',
-                                        `${event.type}-${attribute.key}-${attributeIndex}`,
-                                      )
-                                    }
+                                    onClick={() => void handleCopy(attribute.value || '', `${event.type}-${attribute.key}-${attributeIndex}`)}
                                   >
                                     <IconCopy className="size-3.5" stroke={1.8} />
                                   </button>
                                   <span
                                     className={`pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition-opacity ${
-                                      copiedKey ===
-                                      `${event.type}-${attribute.key}-${attributeIndex}`
-                                        ? 'opacity-100'
-                                        : 'opacity-0'
+                                      copiedKey === `${event.type}-${attribute.key}-${attributeIndex}` ? 'opacity-100' : 'opacity-0'
                                     }`}
                                   >
-                                    <span className="block whitespace-nowrap">
-                                      Copied!
-                                    </span>
+                                    <span className="block whitespace-nowrap">Copied!</span>
                                   </span>
                                 </span>
                               </div>
                             </td>
-                            {showIndexedColumn ? (
-                              <td className="px-3 py-2 text-sm text-slate-700">
-                                {attribute.indexed ? 'true' : 'false'}
-                              </td>
-                            ) : null}
+                            {showIndexedColumn ? <td className="px-3 py-2 text-sm text-slate-700">{attribute.indexed ? 'true' : 'false'}</td> : null}
                           </tr>
                         ))}
                       </tbody>
@@ -204,26 +151,16 @@ function TxMessagesSection({
     <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
       <div className="mb-4">
         <p className="text-base font-semibold text-slate-900">Messages</p>
-        <p className="mt-1 text-sm text-slate-500">
-          Decoded from the transaction body returned by the active Cosmos REST
-          endpoint.
-        </p>
+        <p className="mt-1 text-sm text-slate-500">Decoded from the transaction body returned by the active Cosmos REST endpoint.</p>
       </div>
 
       {messages.length ? (
         <div className="grid gap-4">
           {messages.map((message, index) => (
-            <article
-              key={`${message.type}-${index}`}
-              className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
-            >
+            <article key={`${message.type}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
-                  {message.title}
-                </span>
-                <span className="text-xs text-slate-500 mono">
-                  {message.type}
-                </span>
+                <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{message.title}</span>
+                <span className="text-xs text-slate-500 mono">{message.type}</span>
               </div>
 
               {message.fields.length ? (
@@ -231,26 +168,15 @@ function TxMessagesSection({
                   <table className="min-w-full w-full border-collapse">
                     <thead>
                       <tr>
-                        <th className="w-[180px] min-w-[180px] border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">
-                          Field
-                        </th>
-                        <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">
-                          Value
-                        </th>
+                        <th className="w-[180px] min-w-[180px] border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Field</th>
+                        <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Value</th>
                       </tr>
                     </thead>
                     <tbody>
                       {message.fields.map((field, fieldIndex) => (
-                        <tr
-                          key={`${field.key}-${fieldIndex}`}
-                          className="border-t border-slate-200"
-                        >
-                          <td className="w-[180px] min-w-[180px] px-3 py-2 text-sm text-slate-700 mono">
-                            {field.key}
-                          </td>
-                          <td className="px-3 py-2 text-sm text-slate-900 mono whitespace-pre-wrap break-all align-top">
-                            {field.value}
-                          </td>
+                        <tr key={`${field.key}-${fieldIndex}`} className="border-t border-slate-200">
+                          <td className="w-[180px] min-w-[180px] px-3 py-2 text-sm text-slate-700 mono">{field.key}</td>
+                          <td className="px-3 py-2 text-sm text-slate-900 mono whitespace-pre-wrap break-all align-top">{field.value}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -274,13 +200,9 @@ export default function CosmosTxPage() {
   const hash = params.hash;
   const isValid = useMemo(() => /^[A-Fa-f0-9]{64}$/.test(hash), [hash]);
   const [copiedHash, setCopiedHash] = useState(false);
-  const [transaction, setTransaction] = useState<Awaited<
-    ReturnType<typeof getCosmosTxByHashDirect>
-  > | null>(null);
+  const [transaction, setTransaction] = useState<Awaited<ReturnType<typeof getCosmosTxByHashDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'json'>(
-    'overview',
-  );
+  const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'json'>('overview');
   const copyTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -309,11 +231,7 @@ export default function CosmosTxPage() {
       } catch (error) {
         if (!cancelled) {
           setTransaction(null);
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : 'Failed to load Cosmos transaction.',
-          );
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos transaction.');
         }
       }
     }
@@ -342,12 +260,7 @@ export default function CosmosTxPage() {
     if (!errorMessage) {
       return (
         <AppShell>
-          <DetailPageSkeleton
-            titleWidth="w-44"
-            groups={3}
-            rowsPerGroup={4}
-            secondaryCard={false}
-          />
+          <DetailPageSkeleton titleWidth="w-44" groups={3} rowsPerGroup={4} secondaryCard={false} />
         </AppShell>
       );
     }
@@ -363,8 +276,7 @@ export default function CosmosTxPage() {
   }
 
   const hasEvents = transaction.eventsCount > 0;
-  const resolvedActiveTab =
-    activeTab === 'events' && !hasEvents ? 'overview' : activeTab;
+  const resolvedActiveTab = activeTab === 'events' && !hasEvents ? 'overview' : activeTab;
   const transactionHash = transaction.hash;
 
   async function handleCopyHash() {
@@ -387,11 +299,7 @@ export default function CosmosTxPage() {
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <button
             type="button"
-            className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-              resolvedActiveTab === 'overview'
-                ? 'bg-sky-600 text-white'
-                : 'bg-slate-100 text-slate-500'
-            }`}
+            className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'overview' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('overview')}
           >
             Overview
@@ -399,11 +307,7 @@ export default function CosmosTxPage() {
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-              !hasEvents
-                ? 'cursor-not-allowed bg-slate-100 text-slate-300'
-                : resolvedActiveTab === 'events'
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-slate-100 text-slate-500'
+              !hasEvents ? 'cursor-not-allowed bg-slate-100 text-slate-300' : resolvedActiveTab === 'events' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'
             }`}
             onClick={() => {
               if (hasEvents) {
@@ -417,11 +321,7 @@ export default function CosmosTxPage() {
           </button>
           <button
             type="button"
-            className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-              resolvedActiveTab === 'json'
-                ? 'bg-sky-600 text-white'
-                : 'bg-slate-100 text-slate-500'
-            }`}
+            className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'json' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('json')}
           >
             JSON
@@ -438,9 +338,7 @@ export default function CosmosTxPage() {
                       label="Transaction Hash"
                       value={
                         <span className="inline-flex items-start gap-1.5">
-                          <span className="mono break-all whitespace-pre-wrap">
-                            {transaction.hash}
-                          </span>
+                          <span className="mono break-all whitespace-pre-wrap">{transaction.hash}</span>
                           <span className="relative inline-flex shrink-0">
                             <button
                               type="button"
@@ -455,30 +353,17 @@ export default function CosmosTxPage() {
                                 copiedHash ? 'opacity-100' : 'opacity-0'
                               }`}
                             >
-                              <span className="block whitespace-nowrap">
-                                Copied!
-                              </span>
+                              <span className="block whitespace-nowrap">Copied!</span>
                             </span>
                           </span>
                         </span>
                       }
                     />
-                    <DetailRow
-                      label="Status"
-                      value={
-                        <StatusBadge
-                          status={transaction.status}
-                          label={transaction.statusLabel}
-                        />
-                      }
-                    />
+                    <DetailRow label="Status" value={<StatusBadge status={transaction.status} label={transaction.statusLabel} />} />
                     <DetailRow
                       label="Block"
                       value={
-                        <Link
-                          className="font-medium text-sky-600 hover:text-sky-700"
-                          href={`/cosmos/block/${transaction.height}`}
-                        >
+                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
                           {transaction.height}
                         </Link>
                       }
@@ -489,16 +374,9 @@ export default function CosmosTxPage() {
                         transaction.timestampMs ? (
                           <span className="inline-flex flex-wrap items-center gap-2">
                             <span>
-                              <RelativeTime
-                                timestampMs={transaction.timestampMs}
-                              />
+                              <RelativeTime timestampMs={transaction.timestampMs} />
                             </span>
-                            <span className="text-slate-500">
-                              ({formatTimestampWithSeconds(
-                                transaction.timestamp,
-                                'Unavailable',
-                              )})
-                            </span>
+                            <span className="text-slate-500">({formatTimestampWithSeconds(transaction.timestamp, 'Unavailable')})</span>
                           </span>
                         ) : (
                           'Unavailable'
@@ -515,10 +393,7 @@ export default function CosmosTxPage() {
                       label="Sender"
                       value={
                         transaction.sender !== 'Unknown' ? (
-                          <Link
-                            className="font-medium text-sky-600 hover:text-sky-700 mono"
-                            href={`/cosmos/account/${transaction.sender}`}
-                          >
+                          <Link className="font-medium text-sky-600 hover:text-sky-700 mono" href={`/cosmos/account/${transaction.sender}`}>
                             {transaction.sender}
                           </Link>
                         ) : (
@@ -534,20 +409,9 @@ export default function CosmosTxPage() {
                     <DetailRow label="Code" value={String(transaction.code)} />
                     <DetailRow label="Message Count" value={String(transaction.messageCount)} />
                     <DetailRow label="Transaction Fee" value={transaction.feeLabel} />
-                    <DetailRow
-                      label="Gas Used / Wanted"
-                      value={`${transaction.gasUsedLabel} / ${transaction.gasWantedLabel}`}
-                    />
-                    <DetailRow
-                      label="Memo"
-                      value={transaction.memo || '-'}
-                      mono={Boolean(transaction.memo)}
-                    />
-                    <DetailRow
-                      label="Raw Log"
-                      value={transaction.rawLog || '-'}
-                      mono={Boolean(transaction.rawLog)}
-                    />
+                    <DetailRow label="Gas Used / Wanted" value={`${transaction.gasUsedLabel} / ${transaction.gasWantedLabel}`} />
+                    <DetailRow label="Memo" value={transaction.memo || '-'} mono={Boolean(transaction.memo)} />
+                    <DetailRow label="Raw Log" value={transaction.rawLog || '-'} mono={Boolean(transaction.rawLog)} />
                   </dl>
                 </DetailGroup>
               </div>

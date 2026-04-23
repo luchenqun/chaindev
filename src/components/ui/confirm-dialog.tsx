@@ -14,15 +14,7 @@ type ConfirmDialogProps = {
   onConfirm: () => void;
 };
 
-export function ConfirmDialog({
-  open,
-  onOpenChange,
-  title,
-  description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
-  onConfirm,
-}: ConfirmDialogProps) {
+export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm }: ConfirmDialogProps) {
   useEffect(() => {
     if (!open) {
       return;
@@ -51,27 +43,14 @@ export function ConfirmDialog({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-16">
-      <button
-        type="button"
-        aria-label="Close confirmation dialog"
-        className="absolute inset-0 bg-slate-900/45"
-        onClick={() => onOpenChange(false)}
-      />
+      <button type="button" aria-label="Close confirmation dialog" className="absolute inset-0 bg-slate-900/45" onClick={() => onOpenChange(false)} />
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_24px_64px_rgba(15,23,42,0.24)]">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          {description ? (
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              {description}
-            </p>
-          ) : null}
+          {description ? <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p> : null}
         </div>
         <div className="mt-6 flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {cancelLabel}
           </Button>
           <Button

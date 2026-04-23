@@ -1,15 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import {
-  createContext,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getActiveCosmosProvider,
   getCosmosHomeSnapshotDirect,
@@ -20,11 +12,7 @@ import {
 } from '@/domains/cosmos/client/queries';
 import { decodeCosmosHomeTransactionsByHashes } from '@/domains/cosmos/client/home-transactions';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
-import {
-  isCosmosHomeRouteActive,
-  isCosmosLiveBlockRouteActive,
-  isCosmosRouteActive,
-} from '@/platform/workbench/home-route-state';
+import { isCosmosHomeRouteActive, isCosmosLiveBlockRouteActive, isCosmosRouteActive } from '@/platform/workbench/home-route-state';
 
 type CosmosHomeDataContextValue = {
   snapshot: CosmosHomeSnapshot | null;
@@ -36,10 +24,8 @@ type CosmosHomeDataContextValue = {
   setAutoRefreshEnabled: (enabled: boolean) => void;
 };
 
-const CosmosHomeDataContext =
-  createContext<CosmosHomeDataContextValue | null>(null);
-const COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY =
-  'chaindev-cosmos-home-auto-refresh-enabled';
+const CosmosHomeDataContext = createContext<CosmosHomeDataContextValue | null>(null);
+const COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY = 'chaindev-cosmos-home-auto-refresh-enabled';
 const COSMOS_HOME_BLOCK_LIMIT = 6;
 const COSMOS_HOME_TX_LIMIT = 6;
 
@@ -89,9 +75,7 @@ function readStoredAutoRefreshEnabled() {
     return true;
   }
 
-  const value = window.localStorage.getItem(
-    COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY,
-  );
+  const value = window.localStorage.getItem(COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY);
 
   if (value == null) {
     return true;
@@ -110,11 +94,7 @@ function parseMetricInteger(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function updateSnapshotMetric(
-  metrics: CosmosHomeSnapshot['metrics'],
-  label: string,
-  nextValue: string,
-) {
+function updateSnapshotMetric(metrics: CosmosHomeSnapshot['metrics'], label: string, nextValue: string) {
   return metrics.map((metric) =>
     metric.label === label
       ? {
@@ -125,14 +105,8 @@ function updateSnapshotMetric(
   );
 }
 
-function mergeLatestBlocks(
-  current: CosmosHomeSnapshot['activity']['blocks'],
-  next: CosmosHomeSnapshot['activity']['blocks'][number],
-) {
-  return [next, ...current.filter((item) => item.height !== next.height)].slice(
-    0,
-    COSMOS_HOME_BLOCK_LIMIT,
-  );
+function mergeLatestBlocks(current: CosmosHomeSnapshot['activity']['blocks'], next: CosmosHomeSnapshot['activity']['blocks'][number]) {
+  return [next, ...current.filter((item) => item.height !== next.height)].slice(0, COSMOS_HOME_BLOCK_LIMIT);
 }
 
 async function sha256HexFromBase64(input: string) {
@@ -145,22 +119,15 @@ async function sha256HexFromBase64(input: string) {
     .toUpperCase();
 }
 
-export function CosmosHomeDataProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const activeMode = readActivePlatformModeCookie();
   const [snapshot, setSnapshot] = useState<CosmosHomeSnapshot | null>(null);
-  const [latestFeed, setLatestFeed] =
-    useState<CosmosHomeDataContextValue['latestFeed']>(null);
+  const [latestFeed, setLatestFeed] = useState<CosmosHomeDataContextValue['latestFeed']>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [connectionMode, setConnectionMode] = useState<'ws' | 'poll'>('poll');
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(() =>
-    readStoredAutoRefreshEnabled(),
-  );
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(() => readStoredAutoRefreshEnabled());
   const pollTimeoutRef = useRef<number | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const refreshQueuedRef = useRef(false);
@@ -185,20 +152,14 @@ export function CosmosHomeDataProvider({
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(
-      COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY,
-      String(autoRefreshEnabled),
-    );
+    window.localStorage.setItem(COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY, String(autoRefreshEnabled));
   }, [autoRefreshEnabled]);
 
   useEffect(() => {
     let disposed = false;
     const isHomeRoute = isCosmosHomeRouteActive(pathname, activeMode);
     const isCosmosRoute = isCosmosRouteActive(pathname, activeMode);
-    const shouldSubscribeToLiveBlocks = isCosmosLiveBlockRouteActive(
-      pathname,
-      activeMode,
-    );
+    const shouldSubscribeToLiveBlocks = isCosmosLiveBlockRouteActive(pathname, activeMode);
 
     function clearTimers() {
       if (pollTimeoutRef.current != null) {
@@ -251,11 +212,7 @@ export function CosmosHomeDataProvider({
           return;
         }
 
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Failed to load Cosmos homepage activity.',
-        );
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos homepage activity.');
         if (!websocketRef.current && autoRefreshEnabled) {
           schedulePoll(12_000);
         }
@@ -265,10 +222,7 @@ export function CosmosHomeDataProvider({
     async function loadLatestFeed() {
       try {
         const overview = await getCosmosOverviewDirect();
-        const latestHeight = Number.parseInt(
-          String(overview.latestHeight ?? '0'),
-          10,
-        );
+        const latestHeight = Number.parseInt(String(overview.latestHeight ?? '0'), 10);
 
         if (!Number.isFinite(latestHeight) || latestHeight < 1) {
           if (!disposed) {
@@ -290,11 +244,7 @@ export function CosmosHomeDataProvider({
           return;
         }
 
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : 'Failed to load the latest Cosmos block.',
-        );
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to load the latest Cosmos block.');
       }
     }
 
@@ -314,9 +264,7 @@ export function CosmosHomeDataProvider({
       }, 250);
     }
 
-    function mergeDecodedTransactions(
-      decodedTransactions: CosmosHomeSnapshot['activity']['transactions'],
-    ) {
+    function mergeDecodedTransactions(decodedTransactions: CosmosHomeSnapshot['activity']['transactions']) {
       if (!decodedTransactions.length) {
         return;
       }
@@ -326,9 +274,7 @@ export function CosmosHomeDataProvider({
           return current;
         }
 
-        const decodedByHash = new Map(
-          decodedTransactions.map((transaction) => [transaction.hash, transaction]),
-        );
+        const decodedByHash = new Map(decodedTransactions.map((transaction) => [transaction.hash, transaction]));
 
         const merged = current.activity.transactions.map((transaction) => {
           return decodedByHash.get(transaction.hash) ?? transaction;
@@ -390,10 +336,7 @@ export function CosmosHomeDataProvider({
         return;
       }
 
-      if (
-        liveBlockHydrationRef.current.requestedHeight === height ||
-        liveBlockHydrationRef.current.latestAppliedHeight === height
-      ) {
+      if (liveBlockHydrationRef.current.requestedHeight === height || liveBlockHydrationRef.current.latestAppliedHeight === height) {
         return;
       }
 
@@ -407,9 +350,7 @@ export function CosmosHomeDataProvider({
         }
 
         liveBlockHydrationRef.current.latestAppliedHeight = nextFeed.latestBlock;
-        setLatestFeed((current) =>
-          current?.latestBlock === nextFeed.latestBlock ? current : nextFeed,
-        );
+        setLatestFeed((current) => (current?.latestBlock === nextFeed.latestBlock ? current : nextFeed));
 
         setSnapshot((current) => {
           if (!current) {
@@ -417,27 +358,15 @@ export function CosmosHomeDataProvider({
           }
 
           const txCountValue = nextFeed.blockPageItem.txCount;
-          const isNewerBlock =
-            Number.isFinite(nextFeed.latestBlockNumber) &&
-            nextFeed.latestBlockNumber > current.latestHeight;
+          const isNewerBlock = Number.isFinite(nextFeed.latestBlockNumber) && nextFeed.latestBlockNumber > current.latestHeight;
           let nextMetrics = current.metrics;
 
           if (isNewerBlock) {
-            nextMetrics = updateSnapshotMetric(
-              nextMetrics,
-              'Block Height',
-              formatMetricInteger(nextFeed.latestBlockNumber),
-            );
+            nextMetrics = updateSnapshotMetric(nextMetrics, 'Block Height', formatMetricInteger(nextFeed.latestBlockNumber));
             nextMetrics = updateSnapshotMetric(
               nextMetrics,
               'Confirmed Txs',
-              formatMetricInteger(
-                parseMetricInteger(
-                  current.metrics.find(
-                    (metric) => metric.label === 'Confirmed Txs',
-                  )?.value ?? '0',
-                ) + txCountValue,
-              ),
+              formatMetricInteger(parseMetricInteger(current.metrics.find((metric) => metric.label === 'Confirmed Txs')?.value ?? '0') + txCountValue),
             );
           }
 
@@ -448,9 +377,7 @@ export function CosmosHomeDataProvider({
               latestBlockTime: nextFeed.latestBlockTime,
             },
             metrics: nextMetrics,
-            latestHeight: isNewerBlock
-              ? nextFeed.latestBlockNumber
-              : current.latestHeight,
+            latestHeight: isNewerBlock ? nextFeed.latestBlockNumber : current.latestHeight,
             refreshedAt: Date.now(),
             activity: {
               ...current.activity,
@@ -459,8 +386,7 @@ export function CosmosHomeDataProvider({
                 hash: nextFeed.blockPageItem.hash,
                 hashLabel: nextFeed.blockPageItem.hashLabel,
                 proposer: nextFeed.blockPageItem.proposer,
-                proposerOperatorAddress:
-                  nextFeed.blockPageItem.proposerOperatorAddress,
+                proposerOperatorAddress: nextFeed.blockPageItem.proposerOperatorAddress,
                 proposerLabel: nextFeed.blockPageItem.proposerLabel,
                 txCount: nextFeed.blockPageItem.txCountLabel,
                 blockSizeLabel: nextFeed.blockPageItem.blockSizeLabel,
@@ -631,28 +557,20 @@ export function CosmosHomeDataProvider({
         void loadSnapshot();
       }
 
-      if (
-        isCosmosLiveBlockRouteActive(pathname, readActivePlatformModeCookie())
-      ) {
+      if (isCosmosLiveBlockRouteActive(pathname, readActivePlatformModeCookie())) {
         setupWebSocket();
       } else if (isCosmosRouteActive(pathname, readActivePlatformModeCookie())) {
         void loadLatestFeed();
       }
     };
 
-    window.addEventListener(
-      'chaindev:active-rpc-profile-changed',
-      handleProfileChanged,
-    );
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
 
     return () => {
       disposed = true;
       clearTimers();
       closeSocket();
-      window.removeEventListener(
-        'chaindev:active-rpc-profile-changed',
-        handleProfileChanged,
-      );
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [activeMode, autoRefreshEnabled, pathname]);
 
@@ -666,30 +584,17 @@ export function CosmosHomeDataProvider({
       autoRefreshEnabled,
       setAutoRefreshEnabled,
     }),
-    [
-      autoRefreshEnabled,
-      connectionMode,
-      errorMessage,
-      latestFeed,
-      nowMs,
-      snapshot,
-    ],
+    [autoRefreshEnabled, connectionMode, errorMessage, latestFeed, nowMs, snapshot],
   );
 
-  return (
-    <CosmosHomeDataContext.Provider value={value}>
-      {children}
-    </CosmosHomeDataContext.Provider>
-  );
+  return <CosmosHomeDataContext.Provider value={value}>{children}</CosmosHomeDataContext.Provider>;
 }
 
 export function useCosmosHomeData() {
   const context = useContext(CosmosHomeDataContext);
 
   if (!context) {
-    throw new Error(
-      'useCosmosHomeData must be used within CosmosHomeDataProvider.',
-    );
+    throw new Error('useCosmosHomeData must be used within CosmosHomeDataProvider.');
   }
 
   return context;

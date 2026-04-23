@@ -11,27 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  deleteEvmAddressTag,
-  getEvmAddressTag,
-  getEvmAddressTags,
-  subscribeEvmAddressTags,
-  upsertEvmAddressTag,
-} from '@/domains/evm/client/address-tags';
+import { deleteEvmAddressTag, getEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsertEvmAddressTag } from '@/domains/evm/client/address-tags';
 import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
-import {
-  getEvmAddressCacheSnapshot,
-  MAX_CACHED_EVM_TRANSACTIONS,
-  subscribeEvmTransactionCache,
-} from '@/domains/evm/client/transaction-cache';
+import { getEvmAddressCacheSnapshot, MAX_CACHED_EVM_TRANSACTIONS, subscribeEvmTransactionCache } from '@/domains/evm/client/transaction-cache';
 import {
   createEvmContractBinding,
   getEvmContractArtifact,
@@ -46,16 +30,9 @@ import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transacti
 import { getActiveEvmContractEnvironmentDirect } from '@/domains/evm/client/contract-executor';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { AddressContractPanel } from '@/domains/evm/ui/address-contract-panel';
-import {
-  getActiveEvmCurrencyNameClient,
-  getEvmAddressSummaryDirect,
-  hydrateEvmCachedTransactionInputsByHashDirect,
-} from '@/domains/evm/client/queries';
+import { getActiveEvmCurrencyNameClient, getEvmAddressSummaryDirect, hydrateEvmCachedTransactionInputsByHashDirect } from '@/domains/evm/client/queries';
 import { AppShell } from '@/platform/layout/app-shell';
-import {
-  TransactionHashCell,
-  TransactionPreviewButton,
-} from '@/domains/evm/ui/transaction-list-cells';
+import { TransactionHashCell, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
 
 const VISIBLE_TRANSACTIONS = 25;
 type AddressPageTab = 'transactions' | 'contract';
@@ -89,10 +66,7 @@ function AddressPageSkeleton() {
 
       <section className="grid gap-4 xl:grid-cols-3">
         {Array.from({ length: 3 }).map((_, index) => (
-          <article
-            key={index}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]"
-          >
+          <article key={index} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <Skeleton className="h-7 w-28" />
             <div className="mt-5 space-y-5">
               {Array.from({ length: 3 }).map((__, rowIndex) => (
@@ -122,10 +96,7 @@ function AddressPageSkeleton() {
             <thead>
               <tr>
                 {Array.from({ length: 9 }).map((_, index) => (
-                  <th
-                    key={index}
-                    className="border-b border-slate-200 px-5 py-3 text-left"
-                  >
+                  <th key={index} className="border-b border-slate-200 px-5 py-3 text-left">
                     <Skeleton className="h-4 w-20" />
                   </th>
                 ))}
@@ -136,15 +107,7 @@ function AddressPageSkeleton() {
                 <tr key={rowIndex} className="border-t border-slate-200">
                   {Array.from({ length: 9 }).map((__, columnIndex) => (
                     <td key={columnIndex} className="px-5 py-3">
-                      <Skeleton
-                        className={`h-4 ${
-                          columnIndex === 0
-                            ? 'w-32'
-                            : columnIndex === 4 || columnIndex === 5
-                              ? 'w-28'
-                              : 'w-20'
-                        }`}
-                      />
+                      <Skeleton className={`h-4 ${columnIndex === 0 ? 'w-32' : columnIndex === 4 || columnIndex === 5 ? 'w-28' : 'w-20'}`} />
                     </td>
                   ))}
                 </tr>
@@ -196,23 +159,11 @@ function getDirection(
   return { label: 'IN', className: 'bg-emerald-50 text-emerald-700' };
 }
 
-function AddressMetric({
-  label,
-  value,
-  subtext,
-  tooltip,
-}: {
-  label: string;
-  value: React.ReactNode;
-  subtext?: React.ReactNode;
-  tooltip?: React.ReactNode;
-}) {
+function AddressMetric({ label, value, subtext, tooltip }: { label: string; value: React.ReactNode; subtext?: React.ReactNode; tooltip?: React.ReactNode }) {
   return (
     <div>
       <div className="flex items-center gap-1.5">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">
-          {label}
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</p>
         {tooltip ? (
           <span className="group relative inline-flex">
             <span className="inline-flex items-center justify-center text-slate-300">
@@ -225,9 +176,7 @@ function AddressMetric({
         ) : null}
       </div>
       <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
-      {subtext ? (
-        <p className="mt-1 text-sm text-slate-500">{subtext}</p>
-      ) : null}
+      {subtext ? <p className="mt-1 text-sm text-slate-500">{subtext}</p> : null}
     </div>
   );
 }
@@ -242,16 +191,12 @@ export default function EvmAddressPage() {
   const requestedTab = searchParams.get('tab');
   const requestedContractTab = searchParams.get('contractTab');
   const transactionPage = parsePageParam(searchParams.get('page'));
-  const [summary, setSummary] = useState<Awaited<
-    ReturnType<typeof getEvmAddressSummaryDirect>
-  > | null>(null);
+  const [summary, setSummary] = useState<Awaited<ReturnType<typeof getEvmAddressSummaryDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nameTag, setNameTag] = useState<string | null>(null);
   const [tagInput, setTagInput] = useState('');
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
-  const [addressCacheSnapshot, setAddressCacheSnapshot] = useState<
-    Awaited<ReturnType<typeof getEvmAddressCacheSnapshot>>
-  >({
+  const [addressCacheSnapshot, setAddressCacheSnapshot] = useState<Awaited<ReturnType<typeof getEvmAddressCacheSnapshot>>>({
     page: 1,
     pageSize: VISIBLE_TRANSACTIONS,
     totalPages: 1,
@@ -265,16 +210,11 @@ export default function EvmAddressPage() {
     outboundCount: 0,
     selfCount: 0,
   });
-  const [nameTagsByAddress, setNameTagsByAddress] = useState<
-    Record<string, string | null>
-  >({});
+  const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
-  const [contractEnvironment, setContractEnvironment] =
-    useState<ContractEnvironmentState>(null);
-  const [contractBinding, setContractBinding] =
-    useState<EvmContractBinding | null>(null);
-  const [contractArtifact, setContractArtifact] =
-    useState<EvmContractArtifact | null>(null);
+  const [contractEnvironment, setContractEnvironment] = useState<ContractEnvironmentState>(null);
+  const [contractBinding, setContractBinding] = useState<EvmContractBinding | null>(null);
+  const [contractArtifact, setContractArtifact] = useState<EvmContractArtifact | null>(null);
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false);
   const [bindingArtifactId, setBindingArtifactId] = useState('');
   const [bindingLabelInput, setBindingLabelInput] = useState('');
@@ -282,9 +222,7 @@ export default function EvmAddressPage() {
   const currencyName = getActiveEvmCurrencyNameClient();
 
   function goToLogin() {
-    router.push(
-      `/login?callbackUrl=${encodeURIComponent(`/evm/address/${address}`)}`,
-    );
+    router.push(`/login?callbackUrl=${encodeURIComponent(`/evm/address/${address}`)}`);
   }
 
   useEffect(() => {
@@ -295,11 +233,7 @@ export default function EvmAddressPage() {
     let cancelled = false;
 
     async function loadAddressCache() {
-      const nextSnapshot = await getEvmAddressCacheSnapshot(
-        address,
-        transactionPage,
-        VISIBLE_TRANSACTIONS,
-      );
+      const nextSnapshot = await getEvmAddressCacheSnapshot(address, transactionPage, VISIBLE_TRANSACTIONS);
 
       if (!cancelled) {
         setAddressCacheSnapshot(nextSnapshot);
@@ -339,17 +273,11 @@ export default function EvmAddressPage() {
       loadTag();
     };
 
-    window.addEventListener(
-      'chaindev:active-rpc-profile-changed',
-      handleProfileChanged,
-    );
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
 
     return () => {
       unsubscribe();
-      window.removeEventListener(
-        'chaindev:active-rpc-profile-changed',
-        handleProfileChanged,
-      );
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [address, isValid]);
 
@@ -371,11 +299,7 @@ export default function EvmAddressPage() {
       } catch (error) {
         if (!cancelled) {
           setSummary(null);
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : 'Failed to load address summary.',
-          );
+          setErrorMessage(error instanceof Error ? error.message : 'Failed to load address summary.');
         }
       }
     }
@@ -404,19 +328,14 @@ export default function EvmAddressPage() {
       }
 
       const nextBinding =
-        listEvmContractBindingsByScope(
-          nextEnvironment.chainId,
-          nextEnvironment.providerProfileId,
-          nextEnvironment.providerName,
-        ).find((binding) => binding.addressLower === address.toLowerCase()) ??
-        null;
+        listEvmContractBindingsByScope(nextEnvironment.chainId, nextEnvironment.providerProfileId, nextEnvironment.providerName).find(
+          (binding) => binding.addressLower === address.toLowerCase(),
+        ) ?? null;
 
       setContractEnvironment(nextEnvironment);
       setArtifacts(listEvmContractArtifacts());
       setContractBinding(nextBinding);
-      setContractArtifact(
-        nextBinding ? getEvmContractArtifact(nextBinding.artifactId) : null,
-      );
+      setContractArtifact(nextBinding ? getEvmContractArtifact(nextBinding.artifactId) : null);
     }
 
     void loadContractBinding();
@@ -429,18 +348,12 @@ export default function EvmAddressPage() {
       void loadContractBinding();
     };
 
-    window.addEventListener(
-      'chaindev:active-rpc-profile-changed',
-      handleProfileChanged,
-    );
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
 
     return () => {
       cancelled = true;
       unsubscribe();
-      window.removeEventListener(
-        'chaindev:active-rpc-profile-changed',
-        handleProfileChanged,
-      );
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [address, isValid]);
 
@@ -451,26 +364,10 @@ export default function EvmAddressPage() {
   const inboundCount = addressCacheSnapshot.inboundCount;
   const outboundCount = addressCacheSnapshot.outboundCount;
   const selfCount = addressCacheSnapshot.selfCount;
-  const resolvedActiveTab =
-    requestedTab === 'contract' &&
-    contractBinding &&
-    contractArtifact &&
-    contractEnvironment
-      ? 'contract'
-      : 'transactions';
-  const initialContractTab: ContractSubview =
-    requestedContractTab === 'code' || requestedContractTab === 'write'
-      ? requestedContractTab
-      : 'read';
+  const resolvedActiveTab = requestedTab === 'contract' && contractBinding && contractArtifact && contractEnvironment ? 'contract' : 'transactions';
+  const initialContractTab: ContractSubview = requestedContractTab === 'code' || requestedContractTab === 'write' ? requestedContractTab : 'read';
   const visibleAddresses = useMemo(
-    () => [
-      ...new Set(
-        visibleTransactions.flatMap((transaction) => [
-          transaction.from,
-          ...(transaction.to ? [transaction.to] : []),
-        ]),
-      ),
-    ],
+    () => [...new Set(visibleTransactions.flatMap((transaction) => [transaction.from, ...(transaction.to ? [transaction.to] : [])]))],
     [visibleTransactions],
   );
   const decodedMethodLabelByHash = useMemo(() => {
@@ -488,17 +385,10 @@ export default function EvmAddressPage() {
         }),
       ]),
     );
-  }, [
-    visibleTransactions,
-    contractBinding,
-    contractArtifact,
-    contractEnvironment,
-  ]);
+  }, [visibleTransactions, contractBinding, contractArtifact, contractEnvironment]);
 
   useEffect(() => {
-    const hashesNeedingInputData = visibleTransactions
-      .filter((transaction) => transaction.to && !transaction.inputData)
-      .map((transaction) => transaction.hash);
+    const hashesNeedingInputData = visibleTransactions.filter((transaction) => transaction.to && !transaction.inputData).map((transaction) => transaction.hash);
 
     if (!hashesNeedingInputData.length) {
       return;
@@ -522,17 +412,11 @@ export default function EvmAddressPage() {
       loadVisibleTags();
     };
 
-    window.addEventListener(
-      'chaindev:active-rpc-profile-changed',
-      handleProfileChanged,
-    );
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
 
     return () => {
       unsubscribe();
-      window.removeEventListener(
-        'chaindev:active-rpc-profile-changed',
-        handleProfileChanged,
-      );
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [visibleAddresses]);
 
@@ -580,12 +464,7 @@ export default function EvmAddressPage() {
       return;
     }
 
-    const defaultArtifact =
-      (contractBinding
-        ? getEvmContractArtifact(contractBinding.artifactId)
-        : contractArtifact) ??
-      artifacts[0] ??
-      null;
+    const defaultArtifact = (contractBinding ? getEvmContractArtifact(contractBinding.artifactId) : contractArtifact) ?? artifacts[0] ?? null;
 
     setBindingError(null);
     setBindingArtifactId(defaultArtifact?.id ?? '');
@@ -595,9 +474,7 @@ export default function EvmAddressPage() {
 
   function handleBindingArtifactChange(nextArtifactId: string) {
     setBindingArtifactId(nextArtifactId);
-    setBindingLabelInput(
-      artifacts.find((artifact) => artifact.id === nextArtifactId)?.name ?? '',
-    );
+    setBindingLabelInput(artifacts.find((artifact) => artifact.id === nextArtifactId)?.name ?? '');
   }
 
   async function handleSaveBinding() {
@@ -637,9 +514,7 @@ export default function EvmAddressPage() {
         return;
       }
 
-      setBindingError(
-        error instanceof Error ? error.message : 'Failed to bind artifact.',
-      );
+      setBindingError(error instanceof Error ? error.message : 'Failed to bind artifact.');
     }
   }
 
@@ -658,12 +533,9 @@ export default function EvmAddressPage() {
     }
 
     const query = nextParams.toString();
-    router.replace(
-      query ? `/evm/address/${address}?${query}` : `/evm/address/${address}`,
-      {
-        scroll: false,
-      },
-    );
+    router.replace(query ? `/evm/address/${address}?${query}` : `/evm/address/${address}`, {
+      scroll: false,
+    });
   }
 
   function handleTransactionPageChange(nextPage: number) {
@@ -676,12 +548,9 @@ export default function EvmAddressPage() {
     }
 
     const query = nextParams.toString();
-    router.replace(
-      query ? `/evm/address/${address}?${query}` : `/evm/address/${address}`,
-      {
-        scroll: false,
-      },
-    );
+    router.replace(query ? `/evm/address/${address}?${query}` : `/evm/address/${address}`, {
+      scroll: false,
+    });
   }
 
   if (!isValid) {
@@ -719,33 +588,15 @@ export default function EvmAddressPage() {
       <main className="section-block">
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[1.171875rem] font-semibold text-slate-900">
-              Address
-            </h1>
-            <span className="text-sm font-medium text-slate-500 mono">
-              {summary.address}
-            </span>
-            <ActionIconButton
-              tooltip={nameTag ? 'Edit tag' : 'Add tag'}
-              className="text-slate-400 hover:text-sky-600"
-              onClick={openTagDialog}
-            >
+            <h1 className="text-[1.171875rem] font-semibold text-slate-900">Address</h1>
+            <span className="text-sm font-medium text-slate-500 mono">{summary.address}</span>
+            <ActionIconButton tooltip={nameTag ? 'Edit tag' : 'Add tag'} className="text-slate-400 hover:text-sky-600" onClick={openTagDialog}>
               <IconTag className="size-4" stroke={1.8} />
             </ActionIconButton>
-            <ActionIconButton
-              tooltip={
-                contractBinding ? 'Edit artifact binding' : 'Bind artifact'
-              }
-              className="text-slate-400 hover:text-sky-600"
-              onClick={openBindingDialog}
-            >
+            <ActionIconButton tooltip={contractBinding ? 'Edit artifact binding' : 'Bind artifact'} className="text-slate-400 hover:text-sky-600" onClick={openBindingDialog}>
               <IconBinaryTree2 className="size-4" stroke={1.8} />
             </ActionIconButton>
-            {nameTag ? (
-              <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
-                {nameTag}
-              </span>
-            ) : null}
+            {nameTag ? <span className="inline-flex rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">{nameTag}</span> : null}
           </div>
         </div>
 
@@ -753,16 +604,10 @@ export default function EvmAddressPage() {
           <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="grid sm:grid-cols-2 xl:grid-cols-4">
               <div className="border-b border-slate-200 p-5 sm:border-r xl:border-r">
-                <AddressMetric
-                  label={`${currencyName} Balance`}
-                  value={formatBalanceLabel(summary.balance, currencyName)}
-                />
+                <AddressMetric label={`${currencyName} Balance`} value={formatBalanceLabel(summary.balance, currencyName)} />
               </div>
               <div className="border-b border-slate-200 p-5 xl:border-r">
-                <AddressMetric
-                  label="Nonce"
-                  value={summary.nonce.toLocaleString('en-US')}
-                />
+                <AddressMetric label="Nonce" value={summary.nonce.toLocaleString('en-US')} />
               </div>
               <div className="border-b border-slate-200 p-5 sm:border-r xl:border-r">
                 <AddressMetric
@@ -770,19 +615,13 @@ export default function EvmAddressPage() {
                   value={
                     latestSeenTransaction ? (
                       <span className="text-base font-semibold text-slate-900">
-                        <RelativeTime
-                          timestampMs={latestSeenTransaction.timestampMs}
-                        />
+                        <RelativeTime timestampMs={latestSeenTransaction.timestampMs} />
                       </span>
                     ) : (
                       'Not cached yet'
                     )
                   }
-                  tooltip={
-                    latestSeenTransaction
-                      ? 'Most recent cached transaction involving this address'
-                      : 'Browse blocks or transactions first to populate the local cache'
-                  }
+                  tooltip={latestSeenTransaction ? 'Most recent cached transaction involving this address' : 'Browse blocks or transactions first to populate the local cache'}
                 />
               </div>
               <div className="border-b border-slate-200 p-5">
@@ -791,9 +630,7 @@ export default function EvmAddressPage() {
                   value={
                     firstSeenTransaction ? (
                       <span className="text-base font-semibold text-slate-900">
-                        <RelativeTime
-                          timestampMs={firstSeenTransaction.timestampMs}
-                        />
+                        <RelativeTime timestampMs={firstSeenTransaction.timestampMs} />
                       </span>
                     ) : (
                       'Not cached yet'
@@ -805,35 +642,24 @@ export default function EvmAddressPage() {
               <div className="border-b border-slate-200 p-5 sm:border-b-0 sm:border-r xl:border-r">
                 <AddressMetric
                   label="Observed Transactions"
-                  value={addressCacheSnapshot.totalTransactions.toLocaleString(
-                    'en-US',
-                  )}
+                  value={addressCacheSnapshot.totalTransactions.toLocaleString('en-US')}
                   tooltip={`Showing latest ${visibleTransactions.length} cached records`}
                 />
               </div>
               <div className="border-b border-slate-200 p-5 xl:border-b-0 xl:border-r">
-                <AddressMetric
-                  label="Directions"
-                  value={`${inboundCount} In / ${outboundCount} Out / ${selfCount} Self`}
-                />
+                <AddressMetric label="Directions" value={`${inboundCount} In / ${outboundCount} Out / ${selfCount} Self`} />
               </div>
               <div className="p-5 sm:border-r xl:border-r">
                 <AddressMetric
                   label="Cached Transactions"
-                  value={addressCacheSnapshot.totalTransactions.toLocaleString(
-                    'en-US',
-                  )}
+                  value={addressCacheSnapshot.totalTransactions.toLocaleString('en-US')}
                   tooltip={`IndexedDB cap: ${MAX_CACHED_EVM_TRANSACTIONS.toLocaleString('en-US')}. If the newest cached transaction hash no longer resolves on the current provider, the local cache is cleared.`}
                 />
               </div>
               <div className="p-5">
                 <AddressMetric
                   label="Address Coverage"
-                  value={
-                    addressCacheSnapshot.totalTransactions
-                      ? `${addressCacheSnapshot.totalTransactions} matched`
-                      : 'No cached matches'
-                  }
+                  value={addressCacheSnapshot.totalTransactions ? `${addressCacheSnapshot.totalTransactions} matched` : 'No cached matches'}
                   tooltip="Only transactions seen from recent block queries are cached locally"
                 />
               </div>
@@ -844,11 +670,7 @@ export default function EvmAddressPage() {
         <div className="mt-5 flex flex-wrap gap-2">
           <button
             type="button"
-            className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-              resolvedActiveTab === 'transactions'
-                ? 'bg-sky-600 text-white'
-                : 'bg-slate-100 text-slate-500'
-            }`}
+            className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'transactions' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => navigateToTab('transactions')}
           >
             Transactions
@@ -856,11 +678,7 @@ export default function EvmAddressPage() {
           {contractBinding && contractArtifact && contractEnvironment ? (
             <button
               type="button"
-              className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${
-                resolvedActiveTab === 'contract'
-                  ? 'bg-sky-600 text-white'
-                  : 'bg-slate-100 text-slate-500'
-              }`}
+              className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'contract' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
               onClick={() => navigateToTab('contract')}
             >
               Contract
@@ -873,16 +691,9 @@ export default function EvmAddressPage() {
             <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <p className="text-lg font-semibold text-slate-900">
-                  Showing {visibleTransactions.length} from a total of{' '}
-                  {addressCacheSnapshot.totalTransactions.toLocaleString(
-                    'en-US',
-                  )}{' '}
-                  cached transactions
+                  Showing {visibleTransactions.length} from a total of {addressCacheSnapshot.totalTransactions.toLocaleString('en-US')} cached transactions
                 </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Showing IndexedDB-cached transactions where the address
-                  appears in either the `from` or `to` field.
-                </p>
+                <p className="mt-1 text-sm text-slate-500">Showing IndexedDB-cached transactions where the address appears in either the `from` or `to` field.</p>
               </div>
               <PaginationControls
                 page={addressCacheSnapshot.page}
@@ -897,57 +708,28 @@ export default function EvmAddressPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Transaction Hash
-                    </th>
-                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Method
-                    </th>
-                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Block
-                    </th>
-                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Age
-                    </th>
-                    <th className="w-[44px] border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Dir
-                    </th>
-                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      From
-                    </th>
-                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      To
-                    </th>
-                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Amount
-                    </th>
-                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">
-                      Txn Fee
-                    </th>
+                    <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">Transaction Hash</th>
+                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
+                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
+                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
+                    <th className="w-[44px] border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Dir</th>
+                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
+                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">To</th>
+                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
+                    <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Fee</th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleTransactions.length ? (
                     visibleTransactions.map((transaction) => {
-                      const direction = getDirection(
-                        transaction,
-                        normalizedAddress,
-                      );
-                      const decodedMethodLabel =
-                        decodedMethodLabelByHash[transaction.hash] ??
-                        transaction.methodLabel;
+                      const direction = getDirection(transaction, normalizedAddress);
+                      const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
 
                       return (
-                        <tr
-                          key={transaction.hash}
-                          className="border-t border-slate-200"
-                        >
+                        <tr key={transaction.hash} className="border-t border-slate-200">
                           <td className="pl-5 pr-1 py-3 text-sm">
                             <div className="flex items-center gap-3">
-                              <TransactionPreviewButton
-                                transaction={transaction}
-                                methodLabel={decodedMethodLabel}
-                              />
+                              <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
                               <TransactionHashCell {...transaction} />
                             </div>
                           </td>
@@ -957,24 +739,15 @@ export default function EvmAddressPage() {
                             </span>
                           </td>
                           <td className="px-1 py-3 text-sm tabular-nums">
-                            <Link
-                              className="font-medium text-sky-600 hover:text-sky-700"
-                              href={`/evm/block/${transaction.blockNumber}`}
-                            >
+                            <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
                               {transaction.blockNumber}
                             </Link>
                           </td>
                           <td className="px-1 py-3 text-sm text-slate-700">
-                            <RelativeTime
-                              timestampMs={transaction.timestampMs}
-                            />
+                            <RelativeTime timestampMs={transaction.timestampMs} />
                           </td>
                           <td className="w-[44px] px-1 py-3 text-sm">
-                            <span
-                              className={`inline-flex min-w-[44px] justify-center rounded-md px-2 py-1 text-xs font-semibold ${direction.className}`}
-                            >
-                              {direction.label}
-                            </span>
+                            <span className={`inline-flex min-w-[44px] justify-center rounded-md px-2 py-1 text-xs font-semibold ${direction.className}`}>{direction.label}</span>
                           </td>
                           <td className="px-1 py-3 text-sm">
                             <AddressLink
@@ -982,10 +755,7 @@ export default function EvmAddressPage() {
                               href={`/evm/address/${transaction.from}`}
                               label={
                                 nameTagsByAddress[transaction.from] ??
-                                (transaction.from.toLowerCase() ===
-                                normalizedAddress
-                                  ? formatAddressLabel(transaction.from)
-                                  : transaction.fromLabel)
+                                (transaction.from.toLowerCase() === normalizedAddress ? formatAddressLabel(transaction.from) : transaction.fromLabel)
                               }
                               className="font-medium text-sky-600 hover:text-sky-700"
                             />
@@ -995,41 +765,25 @@ export default function EvmAddressPage() {
                               <AddressLink
                                 address={transaction.to}
                                 href={`/evm/address/${transaction.to}`}
-                                label={resolvePreferredToAddressLabel(
-                                  transaction.to,
-                                  {
-                                    nameTagsByAddress,
-                                    fallbackLabel: transaction.toLabel,
-                                  },
-                                )}
+                                label={resolvePreferredToAddressLabel(transaction.to, {
+                                  nameTagsByAddress,
+                                  fallbackLabel: transaction.toLabel,
+                                })}
                                 className="font-medium text-sky-600 hover:text-sky-700"
                               />
                             ) : (
-                              <span className="text-slate-500">
-                                Contract Creation
-                              </span>
+                              <span className="text-slate-500">Contract Creation</span>
                             )}
                           </td>
-                          <td className="px-1 py-3 text-sm font-medium tabular-nums text-slate-900">
-                            {transaction.amountLabel}
-                          </td>
-                          <td className="px-1 py-3 text-sm tabular-nums text-slate-500">
-                            {transaction.feeLabel ?? (
-                              <span className="text-slate-400">--</span>
-                            )}
-                          </td>
+                          <td className="px-1 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.amountLabel}</td>
+                          <td className="px-1 py-3 text-sm tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
                         </tr>
                       );
                     })
                   ) : (
                     <tr>
-                      <td
-                        colSpan={9}
-                        className="px-1 py-10 text-center text-sm text-slate-500"
-                      >
-                        No cached transactions for this address yet. Browse
-                        recent blocks or the tx list first so matching
-                        transactions can be written into IndexedDB.
+                      <td colSpan={9} className="px-1 py-10 text-center text-sm text-slate-500">
+                        No cached transactions for this address yet. Browse recent blocks or the tx list first so matching transactions can be written into IndexedDB.
                       </td>
                     </tr>
                   )}
@@ -1040,12 +794,7 @@ export default function EvmAddressPage() {
         ) : (
           <section className="mt-4">
             {contractBinding && contractArtifact && contractEnvironment ? (
-              <AddressContractPanel
-                binding={contractBinding}
-                artifact={contractArtifact}
-                environment={contractEnvironment}
-                initialTab={initialContractTab}
-              />
+              <AddressContractPanel binding={contractBinding} artifact={contractArtifact} environment={contractEnvironment} initialTab={initialContractTab} />
             ) : null}
           </section>
         )}
@@ -1058,19 +807,11 @@ export default function EvmAddressPage() {
           footer={
             <>
               {nameTag ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleRemoveTag}
-                >
+                <Button type="button" variant="outline" onClick={handleRemoveTag}>
                   Remove
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setTagDialogOpen(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => setTagDialogOpen(false)}>
                 Cancel
               </Button>
               <Button type="button" onClick={handleSaveTag}>
@@ -1082,11 +823,7 @@ export default function EvmAddressPage() {
         >
           <label className="grid gap-2 pb-1">
             <span className="text-sm font-medium text-slate-700">Tag</span>
-            <Input
-              value={tagInput}
-              onChange={(event) => setTagInput(event.target.value)}
-              placeholder="Enter name tag"
-            />
+            <Input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder="Enter name tag" />
           </label>
         </ModalDialog>
 
@@ -1102,18 +839,10 @@ export default function EvmAddressPage() {
           description="Associate this address with a saved artifact under the current provider scope."
           footer={
             <>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setBindingDialogOpen(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => setBindingDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={() => void handleSaveBinding()}
-                disabled={!artifacts.length}
-              >
+              <Button type="button" onClick={() => void handleSaveBinding()} disabled={!artifacts.length}>
                 Save
               </Button>
             </>
@@ -1122,22 +851,10 @@ export default function EvmAddressPage() {
         >
           <div className="grid gap-4 pb-1">
             <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-700">
-                Artifact
-              </span>
-              <Select
-                value={bindingArtifactId}
-                onValueChange={handleBindingArtifactChange}
-                disabled={!artifacts.length}
-              >
+              <span className="text-sm font-medium text-slate-700">Artifact</span>
+              <Select value={bindingArtifactId} onValueChange={handleBindingArtifactChange} disabled={!artifacts.length}>
                 <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      artifacts.length
-                        ? 'Select artifact'
-                        : 'No saved artifacts'
-                    }
-                  />
+                  <SelectValue placeholder={artifacts.length ? 'Select artifact' : 'No saved artifacts'} />
                 </SelectTrigger>
                 <SelectContent>
                   {artifacts.map((artifact) => (
@@ -1151,33 +868,18 @@ export default function EvmAddressPage() {
 
             <label className="grid gap-2">
               <span className="text-sm font-medium text-slate-700">Label</span>
-              <Input
-                value={bindingLabelInput}
-                onChange={(event) => setBindingLabelInput(event.target.value)}
-                placeholder="Enter binding label"
-              />
+              <Input value={bindingLabelInput} onChange={(event) => setBindingLabelInput(event.target.value)} placeholder="Enter binding label" />
             </label>
 
             <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-700">
-                Address
-              </span>
-              <Input
-                value={address}
-                readOnly
-                className="bg-slate-50 text-slate-500"
-              />
+              <span className="text-sm font-medium text-slate-700">Address</span>
+              <Input value={address} readOnly className="bg-slate-50 text-slate-500" />
             </label>
 
-            {bindingError ? (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
-                {bindingError}
-              </div>
-            ) : null}
+            {bindingError ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">{bindingError}</div> : null}
             {!artifacts.length ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                No saved artifacts yet. Create or import one in the contracts
-                page first.
+                No saved artifacts yet. Create or import one in the contracts page first.
               </div>
             ) : null}
           </div>

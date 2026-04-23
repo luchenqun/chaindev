@@ -65,21 +65,13 @@ function toJsonSafe(value: unknown): unknown {
   }
 
   if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entryValue]) => [
-        key,
-        toJsonSafe(entryValue),
-      ]),
-    );
+    return Object.fromEntries(Object.entries(value).map(([key, entryValue]) => [key, toJsonSafe(entryValue)]));
   }
 
   return value;
 }
 
-function formatDisplayAmount(
-  value: bigint | null | undefined,
-  currencyName: string,
-) {
+function formatDisplayAmount(value: bigint | null | undefined, currencyName: string) {
   const amount = Number(formatEther(value ?? 0n));
 
   if (amount === 0) {
@@ -157,11 +149,7 @@ export function formatEvmBlock(block: {
         gasPrice?: bigint | null;
         input?: string;
         nonce?: number;
-      } =>
-        typeof transaction === 'object' &&
-        transaction !== null &&
-        'hash' in transaction &&
-        'from' in transaction,
+      } => typeof transaction === 'object' && transaction !== null && 'hash' in transaction && 'from' in transaction,
     )
     .map((transaction) => ({
       hash: transaction.hash,
@@ -174,10 +162,7 @@ export function formatEvmBlock(block: {
       toLabel: shortenAddress(transaction.to),
       methodLabel: formatMethodLabel(transaction.input, transaction.to),
       inputData: transaction.input ?? '0x',
-      valueLabel: formatDisplayAmount(
-        transaction.value,
-        block.currencyName ?? 'ETH',
-      ),
+      valueLabel: formatDisplayAmount(transaction.value, block.currencyName ?? 'ETH'),
       maxTxCostLabel:
         transaction.gas != null && transaction.gasPrice != null
           ? `${Number(formatEther(transaction.gas * transaction.gasPrice))
@@ -217,15 +202,7 @@ export function formatEvmBlock(block: {
   };
 }
 
-export function formatEvmTransaction(transaction: {
-  hash: string;
-  blockNumber?: bigint | null;
-  from: string;
-  to?: string | null;
-  value?: bigint;
-  nonce?: number;
-  gas?: bigint;
-}) {
+export function formatEvmTransaction(transaction: { hash: string; blockNumber?: bigint | null; from: string; to?: string | null; value?: bigint; nonce?: number; gas?: bigint }) {
   return {
     hash: transaction.hash,
     blockNumber: transaction.blockNumber?.toString() ?? null,
@@ -237,10 +214,7 @@ export function formatEvmTransaction(transaction: {
   };
 }
 
-function formatDetailedAmount(
-  value: bigint | null | undefined,
-  currencyName: string,
-) {
+function formatDetailedAmount(value: bigint | null | undefined, currencyName: string) {
   if (value == null) {
     return `0 ${currencyName}`;
   }
@@ -254,10 +228,7 @@ function formatDetailedAmount(
   return `${amount.toFixed(6).replace(/\.?0+$/, '')} ${currencyName}`;
 }
 
-function formatDetailedFee(
-  value: bigint | null | undefined,
-  currencyName: string,
-) {
+function formatDetailedFee(value: bigint | null | undefined, currencyName: string) {
   if (value == null) {
     return 'Unavailable';
   }
@@ -271,10 +242,7 @@ function formatDetailedFee(
   return `${amount.toFixed(9).replace(/\.?0+$/, '')} ${currencyName}`;
 }
 
-function formatMethodLabel(
-  input: string | null | undefined,
-  to: string | null | undefined,
-) {
+function formatMethodLabel(input: string | null | undefined, to: string | null | undefined) {
   if (!to) {
     return 'Contract Creation';
   }
@@ -320,12 +288,7 @@ function formatTransactionGasFeesLabel(input: {
     const parts = [
       ['Base', formatGasFeeValue(input.baseFeePerGas)],
       ['Max', formatGasFeeValue(input.maxFeePerGas ?? input.effectiveGasPrice)],
-      [
-        'Max Priority',
-        formatGasFeeValue(
-          input.maxPriorityFeePerGas ?? input.effectiveGasPrice,
-        ),
-      ],
+      ['Max Priority', formatGasFeeValue(input.maxPriorityFeePerGas ?? input.effectiveGasPrice)],
     ]
       .filter(([, value]) => value !== null)
       .map(([label, value]) => `${label}: ${value}`);
@@ -333,9 +296,7 @@ function formatTransactionGasFeesLabel(input: {
     return parts.length ? parts.join(' | ') : 'Unavailable';
   }
 
-  const baseLabel = formatGasFeeValue(
-    input.gasPrice ?? input.effectiveGasPrice,
-  );
+  const baseLabel = formatGasFeeValue(input.gasPrice ?? input.effectiveGasPrice);
 
   return baseLabel ? `Base: ${baseLabel}` : 'Unavailable';
 }
@@ -370,45 +331,25 @@ export function formatEvmTransactionDetail(input: {
     baseFeePerGas?: bigint | null;
   } | null;
 }) {
-  const { transaction, receipt, block, latestBlockNumber, currencyName } =
-    input;
+  const { transaction, receipt, block, latestBlockNumber, currencyName } = input;
   const blockNumber = transaction.blockNumber ?? null;
   const gasLimit = transaction.gas ?? null;
   const gasUsed = receipt?.gasUsed ?? null;
-  const gasUsedRatio =
-    gasLimit != null && gasUsed != null && Number(gasLimit) > 0
-      ? (Number(gasUsed) / Number(gasLimit)) * 100
-      : null;
-  const effectiveGasPrice =
-    receipt?.effectiveGasPrice ?? transaction.gasPrice ?? null;
-  const feeValue =
-    gasUsed != null && effectiveGasPrice != null
-      ? gasUsed * effectiveGasPrice
-      : null;
-  const confirmations =
-    latestBlockNumber != null &&
-    blockNumber != null &&
-    latestBlockNumber >= blockNumber
-      ? latestBlockNumber - blockNumber + 1n
-      : null;
-  const status =
-    receipt?.status ?? (blockNumber != null ? 'success' : 'pending');
+  const gasUsedRatio = gasLimit != null && gasUsed != null && Number(gasLimit) > 0 ? (Number(gasUsed) / Number(gasLimit)) * 100 : null;
+  const effectiveGasPrice = receipt?.effectiveGasPrice ?? transaction.gasPrice ?? null;
+  const feeValue = gasUsed != null && effectiveGasPrice != null ? gasUsed * effectiveGasPrice : null;
+  const confirmations = latestBlockNumber != null && blockNumber != null && latestBlockNumber >= blockNumber ? latestBlockNumber - blockNumber + 1n : null;
+  const status = receipt?.status ?? (blockNumber != null ? 'success' : 'pending');
   const interactedWith = transaction.to ?? receipt?.contractAddress ?? null;
 
   return {
     hash: transaction.hash,
     blockNumber: blockNumber?.toString() ?? null,
-    confirmationsLabel:
-      confirmations != null ? formatInteger(confirmations) : null,
+    confirmationsLabel: confirmations != null ? formatInteger(confirmations) : null,
     timestampMs: formatTimestamp(block?.timestamp),
     timestampLabel: formatTimestampLabel(block?.timestamp),
     status,
-    statusLabel:
-      status === 'success'
-        ? 'Success'
-        : status === 'reverted'
-          ? 'Failed'
-          : 'Pending',
+    statusLabel: status === 'success' ? 'Success' : status === 'reverted' ? 'Failed' : 'Pending',
     from: transaction.from,
     fromLabel: shortenAddress(transaction.from),
     to: transaction.to ?? null,
@@ -418,10 +359,7 @@ export function formatEvmTransactionDetail(input: {
     contractAddress: receipt?.contractAddress ?? null,
     valueLabel: formatDetailedAmount(transaction.value, currencyName),
     feeLabel: formatDetailedFee(feeValue, currencyName),
-    gasPriceLabel:
-      effectiveGasPrice != null
-        ? `${formatGwei(effectiveGasPrice)} Gwei`
-        : 'Unavailable',
+    gasPriceLabel: effectiveGasPrice != null ? `${formatGwei(effectiveGasPrice)} Gwei` : 'Unavailable',
     gasFeesLabel: formatTransactionGasFeesLabel({
       type: transaction.type,
       baseFeePerGas: block?.baseFeePerGas,
@@ -432,14 +370,9 @@ export function formatEvmTransactionDetail(input: {
     }),
     gasLimitLabel: formatInteger(gasLimit),
     gasUsedLabel: formatInteger(gasUsed),
-    gasUsedPercent:
-      gasUsedRatio != null ? formatPercent(gasUsedRatio) : 'Unavailable',
-    nonceLabel:
-      transaction.nonce != null ? String(transaction.nonce) : 'Unavailable',
-    positionLabel:
-      transaction.transactionIndex != null
-        ? String(transaction.transactionIndex)
-        : 'Unavailable',
+    gasUsedPercent: gasUsedRatio != null ? formatPercent(gasUsedRatio) : 'Unavailable',
+    nonceLabel: transaction.nonce != null ? String(transaction.nonce) : 'Unavailable',
+    positionLabel: transaction.transactionIndex != null ? String(transaction.transactionIndex) : 'Unavailable',
     typeLabel: formatTransactionTypeLabel(transaction.type),
     methodLabel: formatMethodLabel(transaction.input, transaction.to),
     inputData: transaction.input ?? '0x',
@@ -453,11 +386,7 @@ export function formatEvmTransactionDetail(input: {
   };
 }
 
-export function formatEvmAddressSummary(input: {
-  address: string;
-  balance: bigint;
-  nonce: number;
-}) {
+export function formatEvmAddressSummary(input: { address: string; balance: bigint; nonce: number }) {
   return {
     address: input.address,
     balance: formatEther(input.balance),

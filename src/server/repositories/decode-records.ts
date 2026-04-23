@@ -27,10 +27,5 @@ export async function addDecodeRecord(input: DecodeRecordInput) {
 }
 
 export async function listDecodeRecords(userId: string) {
-  return db
-    .select()
-    .from(decodeRecords)
-    .where(eq(decodeRecords.userId, userId))
-    .orderBy(desc(decodeRecords.createdAt))
-    .all();
+  return db.select().from(decodeRecords).where(eq(decodeRecords.userId, userId)).orderBy(desc(decodeRecords.createdAt)).all();
 }

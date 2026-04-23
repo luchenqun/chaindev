@@ -8,14 +8,9 @@ import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AuthFormShell } from '@/platform/auth/auth-form-shell';
-import {
-  resolveAbsoluteCallbackUrl,
-  resolveClientRedirectUrl,
-} from '@/platform/auth/callback-url';
+import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 
-type RegisterResponse =
-  | { ok: true; data: { userId: string } }
-  | { ok: false; error: { category: string; message: string } };
+type RegisterResponse = { ok: true; data: { userId: string } } | { ok: false; error: { category: string; message: string } };
 
 export function SignUpForm() {
   const router = useRouter();
@@ -72,9 +67,7 @@ export function SignUpForm() {
       return;
     }
 
-    router.push(
-      resolveClientRedirectUrl(signInResult.url, resolveAbsoluteCallbackUrl('/')),
-    );
+    router.push(resolveClientRedirectUrl(signInResult.url, resolveAbsoluteCallbackUrl('/')));
     router.refresh();
   }
 
@@ -84,10 +77,7 @@ export function SignUpForm() {
       subtitle={
         <>
           已有账号？
-          <Link
-            href="/login"
-            className="ml-2 font-medium text-sky-600 hover:text-sky-700"
-          >
+          <Link href="/login" className="ml-2 font-medium text-sky-600 hover:text-sky-700">
             Sign In here
           </Link>
         </>
@@ -95,9 +85,7 @@ export function SignUpForm() {
     >
       <form className="grid gap-5" onSubmit={handleSubmit}>
         <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">
-            Username
-          </span>
+          <span className="text-[15px] font-semibold text-slate-900">Username</span>
           <Input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
@@ -108,9 +96,7 @@ export function SignUpForm() {
         </label>
 
         <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">
-            Email Address
-          </span>
+          <span className="text-[15px] font-semibold text-slate-900">Email Address</span>
           <Input
             type="email"
             autoComplete="email"
@@ -123,9 +109,7 @@ export function SignUpForm() {
         </label>
 
         <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">
-            Password
-          </span>
+          <span className="text-[15px] font-semibold text-slate-900">Password</span>
           <div className="relative">
             <Input
               type={showPassword ? 'text' : 'password'}
@@ -142,19 +126,13 @@ export function SignUpForm() {
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
               onClick={() => setShowPassword((current) => !current)}
             >
-              {showPassword ? (
-                <IconEyeOff className="size-5" stroke={1.8} />
-              ) : (
-                <IconEye className="size-5" stroke={1.8} />
-              )}
+              {showPassword ? <IconEyeOff className="size-5" stroke={1.8} /> : <IconEye className="size-5" stroke={1.8} />}
             </button>
           </div>
         </label>
 
         <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">
-            Confirm Password
-          </span>
+          <span className="text-[15px] font-semibold text-slate-900">Confirm Password</span>
           <div className="relative">
             <Input
               type={showConfirmPassword ? 'text' : 'password'}
@@ -167,32 +145,18 @@ export function SignUpForm() {
             />
             <button
               type="button"
-              aria-label={
-                showConfirmPassword ? 'Hide password' : 'Show password'
-              }
+              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
               onClick={() => setShowConfirmPassword((current) => !current)}
             >
-              {showConfirmPassword ? (
-                <IconEyeOff className="size-5" stroke={1.8} />
-              ) : (
-                <IconEye className="size-5" stroke={1.8} />
-              )}
+              {showConfirmPassword ? <IconEyeOff className="size-5" stroke={1.8} /> : <IconEye className="size-5" stroke={1.8} />}
             </button>
           </div>
         </label>
 
-        {error ? (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
-            {error}
-          </div>
-        ) : null}
+        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
 
-        <Button
-          type="submit"
-          className="mt-2 h-14 rounded-2xl text-[18px] font-semibold"
-          disabled={submitting}
-        >
+        <Button type="submit" className="mt-2 h-14 rounded-2xl text-[18px] font-semibold" disabled={submitting}>
           {submitting ? 'Creating Account...' : 'Create an Account'}
         </Button>
       </form>

@@ -13,9 +13,7 @@ export async function syncWhenLoggedIn<T>(resource: string, payload: T) {
   };
 
   if (!response.ok || !body.ok) {
-    throw new Error(
-      body.error?.message ?? `Failed to sync workbench resource: ${resource}`,
-    );
+    throw new Error(body.error?.message ?? `Failed to sync workbench resource: ${resource}`);
   }
 
   return body;

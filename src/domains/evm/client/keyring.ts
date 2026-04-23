@@ -2,12 +2,7 @@
 
 import { type Hex } from 'viem';
 import { z } from 'zod';
-import {
-  DEFAULT_EVM_PRIVATE_KEY_ID,
-  DEFAULT_EVM_PRIVATE_KEY_NAME,
-  DEFAULT_EVM_PRIVATE_KEY_VALUE,
-  getDefaultAliceAddress,
-} from '@/platform/workbench/defaults';
+import { DEFAULT_EVM_PRIVATE_KEY_ID, DEFAULT_EVM_PRIVATE_KEY_NAME, DEFAULT_EVM_PRIVATE_KEY_VALUE, getDefaultAliceAddress } from '@/platform/workbench/defaults';
 
 const serverKeyItemSchema = z.object({
   id: z.string().min(1),
@@ -117,9 +112,7 @@ function readActiveKeyCookie() {
     return null;
   }
 
-  const pair = document.cookie
-    .split('; ')
-    .find((item) => item.startsWith(`${ACTIVE_KEY_COOKIE_NAME}=`));
+  const pair = document.cookie.split('; ').find((item) => item.startsWith(`${ACTIVE_KEY_COOKIE_NAME}=`));
 
   return pair ? decodeURIComponent(pair.slice(pair.indexOf('=') + 1)) : null;
 }
@@ -137,9 +130,7 @@ function writeActiveKeyCookie(value: string | null) {
   document.cookie = `${ACTIVE_KEY_COOKIE_NAME}=${encodeURIComponent(value)}; Max-Age=${60 * 60 * 24 * 365}; Path=/; SameSite=Lax`;
 }
 
-function mapServerItem(
-  item: z.infer<typeof serverKeyItemSchema>,
-): EvmStoredPrivateKey {
+function mapServerItem(item: z.infer<typeof serverKeyItemSchema>): EvmStoredPrivateKey {
   return {
     id: item.id,
     name: item.name,
@@ -157,10 +148,7 @@ function mapServerItem(
   };
 }
 
-function mergeServerKeyItem(
-  current: EvmStoredPrivateKey | undefined,
-  next: EvmStoredPrivateKey,
-) {
+function mergeServerKeyItem(current: EvmStoredPrivateKey | undefined, next: EvmStoredPrivateKey) {
   if (!current || next.securityMode !== 'encrypted' || !current.privateKey) {
     return next;
   }
@@ -173,10 +161,7 @@ function mergeServerKeyItem(
 
 function applyCache(items: EvmStoredPrivateKey[], source: KeyringSource) {
   const cookieActiveKeyId = readActiveKeyCookie();
-  const activeKeyId =
-    cookieActiveKeyId && items.some((item) => item.id === cookieActiveKeyId)
-      ? cookieActiveKeyId
-      : (items[0]?.id ?? null);
+  const activeKeyId = cookieActiveKeyId && items.some((item) => item.id === cookieActiveKeyId) ? cookieActiveKeyId : (items[0]?.id ?? null);
 
   cache = {
     items,
@@ -238,13 +223,9 @@ export async function syncEvmKeyringFromServer() {
   }
 
   const body = serverKeyListResponseSchema.parse(await response.json());
-  const previousItemsById = new Map(
-    getCache().items.map((item) => [item.id, item]),
-  );
+  const previousItemsById = new Map(getCache().items.map((item) => [item.id, item]));
   return applyCache(
-    body.data
-      .map(mapServerItem)
-      .map((item) => mergeServerKeyItem(previousItemsById.get(item.id), item)),
+    body.data.map(mapServerItem).map((item) => mergeServerKeyItem(previousItemsById.get(item.id), item)),
     'server',
   );
 }
@@ -263,11 +244,7 @@ export function getEvmStoredPrivateKey(itemId: string) {
 
 export function getActiveEvmStoredPrivateKey() {
   const store = getCache();
-  return (
-    store.items.find((item) => item.id === store.activeKeyId) ??
-    store.items[0] ??
-    null
-  );
+  return store.items.find((item) => item.id === store.activeKeyId) ?? store.items[0] ?? null;
 }
 
 export function isEvmStoredPrivateKeyUnlocked(itemId: string) {
@@ -276,17 +253,10 @@ export function isEvmStoredPrivateKeyUnlocked(itemId: string) {
 }
 
 export function countUnlockedEvmStoredPrivateKeys() {
-  return getCache().items.filter(
-    (item) => item.securityMode === 'plain' || item.privateKey,
-  ).length;
+  return getCache().items.filter((item) => item.securityMode === 'plain' || item.privateKey).length;
 }
 
-export async function createEvmStoredPrivateKey(input: {
-  name: string;
-  privateKey: string;
-  securityMode: EvmStoredPrivateKeySecurityMode;
-  password?: string;
-}) {
+export async function createEvmStoredPrivateKey(input: { name: string; privateKey: string; securityMode: EvmStoredPrivateKeySecurityMode; password?: string }) {
   const response = await requestKeyring('/api/workbench/evm/private-keys', {
     method: 'POST',
     headers: {
@@ -307,10 +277,7 @@ export async function createEvmStoredPrivateKey(input: {
   const body = serverKeyResponseSchema.parse(await response.json());
   const item = mapServerItem(body.data);
   const store = getCache();
-  applyCache(
-    [item, ...store.items.filter((current) => current.id !== item.id)],
-    'server',
-  );
+  applyCache([item, ...store.items.filter((current) => current.id !== item.id)], 'server');
   return item;
 }
 
@@ -327,30 +294,20 @@ export async function renameEvmStoredPrivateKey(itemId: string, name: string) {
   });
 
   if (!response.ok) {
-    throw new Error(
-      await parseError(response, 'Failed to rename private key.'),
-    );
+    throw new Error(await parseError(response, 'Failed to rename private key.'));
   }
 
   const body = serverKeyResponseSchema.parse(await response.json());
   const item = mapServerItem(body.data);
   const store = getCache();
   applyCache(
-    store.items.map((current) =>
-      current.id === item.id ? mergeServerKeyItem(current, item) : current,
-    ),
+    store.items.map((current) => (current.id === item.id ? mergeServerKeyItem(current, item) : current)),
     'server',
   );
   return item;
 }
 
-export async function updateEvmStoredPrivateKey(input: {
-  id: string;
-  name: string;
-  privateKey: string;
-  securityMode: EvmStoredPrivateKeySecurityMode;
-  password?: string;
-}) {
+export async function updateEvmStoredPrivateKey(input: { id: string; name: string; privateKey: string; securityMode: EvmStoredPrivateKeySecurityMode; password?: string }) {
   const response = await requestKeyring('/api/workbench/evm/private-keys', {
     method: 'PATCH',
     headers: {
@@ -367,18 +324,14 @@ export async function updateEvmStoredPrivateKey(input: {
   });
 
   if (!response.ok) {
-    throw new Error(
-      await parseError(response, 'Failed to update private key.'),
-    );
+    throw new Error(await parseError(response, 'Failed to update private key.'));
   }
 
   const body = serverKeyResponseSchema.parse(await response.json());
   const item = mapServerItem(body.data);
   const store = getCache();
   applyCache(
-    store.items.map((current) =>
-      current.id === item.id ? mergeServerKeyItem(current, item) : current,
-    ),
+    store.items.map((current) => (current.id === item.id ? mergeServerKeyItem(current, item) : current)),
     'server',
   );
   return item;
@@ -400,17 +353,12 @@ export function setActiveEvmStoredPrivateKey(itemId: string) {
 }
 
 export async function deleteEvmStoredPrivateKey(itemId: string) {
-  const response = await requestKeyring(
-    `/api/workbench/evm/private-keys?id=${encodeURIComponent(itemId)}`,
-    {
-      method: 'DELETE',
-    },
-  );
+  const response = await requestKeyring(`/api/workbench/evm/private-keys?id=${encodeURIComponent(itemId)}`, {
+    method: 'DELETE',
+  });
 
   if (!response.ok) {
-    throw new Error(
-      await parseError(response, 'Failed to delete private key.'),
-    );
+    throw new Error(await parseError(response, 'Failed to delete private key.'));
   }
 
   const store = getCache();
@@ -424,10 +372,7 @@ export async function deleteEvmStoredPrivateKey(itemId: string) {
   applyCache(remainingItems, store.source);
 }
 
-export async function unlockEvmStoredPrivateKey(
-  itemId: string,
-  password: string,
-) {
+export async function unlockEvmStoredPrivateKey(itemId: string, password: string) {
   const item = getEvmStoredPrivateKey(itemId);
 
   if (!item) {
@@ -451,9 +396,7 @@ export async function unlockEvmStoredPrivateKey(
   });
 
   if (!response.ok) {
-    throw new Error(
-      await parseError(response, 'Failed to unlock private key.'),
-    );
+    throw new Error(await parseError(response, 'Failed to unlock private key.'));
   }
 
   const body = unlockedPrivateKeyResponseSchema.parse(await response.json());
@@ -463,9 +406,7 @@ export async function unlockEvmStoredPrivateKey(
   };
   const store = getCache();
   applyCache(
-    store.items.map((current) =>
-      current.id === itemId ? unlockedItem : current,
-    ),
+    store.items.map((current) => (current.id === itemId ? unlockedItem : current)),
     store.source,
   );
   return unlockedItem;
@@ -492,10 +433,7 @@ export function lockEvmStoredPrivateKey(itemId: string) {
   );
 }
 
-export async function peekEvmStoredPrivateKey(
-  itemId: string,
-  password?: string,
-) {
+export async function peekEvmStoredPrivateKey(itemId: string, password?: string) {
   const item = getEvmStoredPrivateKey(itemId);
 
   if (!item) {
@@ -511,8 +449,7 @@ export async function peekEvmStoredPrivateKey(
       throw new Error('Password is required.');
     }
 
-    return (await unlockEvmStoredPrivateKey(itemId, password))
-      .privateKey as Hex;
+    return (await unlockEvmStoredPrivateKey(itemId, password)).privateKey as Hex;
   }
 
   if (!item.privateKey) {
@@ -542,17 +479,12 @@ async function touchLastUsed(itemId: string) {
   const item = mapServerItem(body.data);
   const store = getCache();
   applyCache(
-    store.items.map((current) =>
-      current.id === item.id ? mergeServerKeyItem(current, item) : current,
-    ),
+    store.items.map((current) => (current.id === item.id ? mergeServerKeyItem(current, item) : current)),
     store.source,
   );
 }
 
-export async function resolveEvmStoredPrivateKey(
-  itemId: string,
-  password?: string,
-) {
+export async function resolveEvmStoredPrivateKey(itemId: string, password?: string) {
   const privateKey = await peekEvmStoredPrivateKey(itemId, password);
   void touchLastUsed(itemId);
   return privateKey;

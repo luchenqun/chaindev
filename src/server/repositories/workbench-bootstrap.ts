@@ -1,9 +1,4 @@
-import {
-  DEFAULT_COSMOS_RPC_PROFILE,
-  DEFAULT_EVM_PRIVATE_KEY_NAME,
-  DEFAULT_EVM_PRIVATE_KEY_VALUE,
-  DEFAULT_EVM_RPC_PROFILE,
-} from '@/platform/workbench/defaults';
+import { DEFAULT_COSMOS_RPC_PROFILE, DEFAULT_EVM_PRIVATE_KEY_NAME, DEFAULT_EVM_PRIVATE_KEY_VALUE, DEFAULT_EVM_RPC_PROFILE } from '@/platform/workbench/defaults';
 import { db } from '@/db/client';
 import { evmPrivateKeys, rpcProfiles } from '@/db/schema/workbench';
 import { createServerEvmPrivateKey } from '@/server/repositories/evm-private-keys';

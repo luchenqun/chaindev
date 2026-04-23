@@ -31,10 +31,5 @@ export async function addRequestHistory(input: RequestHistoryInput) {
 }
 
 export async function listRequestHistory(userId: string) {
-  return db
-    .select()
-    .from(requestHistory)
-    .where(eq(requestHistory.userId, userId))
-    .orderBy(desc(requestHistory.createdAt))
-    .all();
+  return db.select().from(requestHistory).where(eq(requestHistory.userId, userId)).orderBy(desc(requestHistory.createdAt)).all();
 }

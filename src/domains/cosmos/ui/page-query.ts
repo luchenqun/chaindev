@@ -8,11 +8,7 @@ export function parsePageParam(rawPage: string | null) {
   return parsed;
 }
 
-export function buildPageHref(
-  pathname: string,
-  searchParams: URLSearchParams,
-  page: number,
-) {
+export function buildPageHref(pathname: string, searchParams: URLSearchParams, page: number) {
   const params = new URLSearchParams(searchParams.toString());
 
   if (page <= 1) {

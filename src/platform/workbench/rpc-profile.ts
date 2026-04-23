@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { type PlatformMode } from '@/config/chains';
-import {
-  DEFAULT_COSMOS_RPC_PROFILE,
-  DEFAULT_EVM_RPC_PROFILE,
-} from '@/platform/workbench/defaults';
+import { DEFAULT_COSMOS_RPC_PROFILE, DEFAULT_EVM_RPC_PROFILE } from '@/platform/workbench/defaults';
 
 export const platformModeSchema = z.enum(['evm', 'cosmos']);
 export const ACTIVE_PLATFORM_MODE_COOKIE_NAME = 'chaindev-active-platform-mode';
@@ -16,10 +13,7 @@ const baseRpcProfileDraftSchema = z.object({
 export const rpcProfileDraftSchema = z.discriminatedUnion('mode', [
   baseRpcProfileDraftSchema.extend({
     mode: z.literal('evm'),
-    nativeCurrencySymbol: z
-      .string()
-      .trim()
-      .min(1, 'Currency name is required.'),
+    nativeCurrencySymbol: z.string().trim().min(1, 'Currency name is required.'),
   }),
   baseRpcProfileDraftSchema.extend({
     mode: z.literal('cosmos'),
@@ -58,8 +52,7 @@ export type RpcProfile = z.infer<typeof rpcProfileSchema>;
 export type SelectedRpcProfileMap = Partial<Record<PlatformMode, string>>;
 
 export const LOCAL_RPC_PROFILES_STORAGE_KEY = 'chaindev-rpc-profiles-v1';
-export const LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY =
-  'chaindev-selected-rpc-profiles-v1';
+export const LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY = 'chaindev-selected-rpc-profiles-v1';
 
 export function getActiveRpcProfileCookieName(mode: PlatformMode) {
   return `chaindev-active-rpc-profile-${mode}`;
