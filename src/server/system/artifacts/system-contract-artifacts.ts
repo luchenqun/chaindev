@@ -6,4 +6,4 @@ export const SYSTEM_CONTRACT_ARTIFACTS = [
   ...EVM_SYSTEM_ARTIFACTS,
   ...MOCA_SYSTEM_ARTIFACTS,
   ...DEPLOYABLE_CONTRACT_ARTIFACTS,
-];
+].sort((left, right) => left.contractName.localeCompare(right.contractName, 'en', { sensitivity: 'base' }));

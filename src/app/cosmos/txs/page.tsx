@@ -1,10 +1,11 @@
 'use client';
 
-import { IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconPlayerPause, IconPlayerPlay, IconSearch } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { RelativeTime } from '@/components/relative-time';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -194,7 +195,7 @@ function CosmosTransactionsPageContent() {
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
   const [activeSearchFilters, setActiveSearchFilters] = useState<AppliedCosmosTransactionSearchFilters>(EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const hasLoadedDataRef = useRef(false);
   const currentQuery = useMemo(() => buildCosmosTransactionsSearchQuery(activeSearchFilters), [activeSearchFilters]);
@@ -335,46 +336,39 @@ function CosmosTransactionsPageContent() {
                 Page {data.page} of {data.totalPages}.
               </p>
             </div>
-            <div className="flex items-center gap-2 lg:justify-end">
+            <div className="flex items-center gap-0.5 lg:justify-end">
               <PaginationControls
                 page={data.page}
                 totalPages={data.totalPages}
                 hasPreviousPage={data.hasPreviousPage}
                 hasNextPage={data.hasNextPage}
                 disabled={loading}
+                plain
                 onPageChange={handlePageChange}
               />
-              <button
-                type="button"
-                aria-label={activeSearchFilters.hasFilters ? 'Edit transaction filters' : 'Search transactions'}
+              <ActionIconButton
+                tooltip={activeSearchFilters.hasFilters ? 'Edit transaction filters' : 'Search transactions'}
                 aria-pressed={activeSearchFilters.hasFilters}
-                title={activeSearchFilters.hasFilters ? 'Transaction filters active' : 'Search transactions'}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  activeSearchFilters.hasFilters ? 'border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
-                }`}
+                className={activeSearchFilters.hasFilters ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
                 onClick={() => setSearchDialogOpen(true)}
               >
                 <IconSearch className="size-4" stroke={1.8} />
-              </button>
-              <button
-                type="button"
-                aria-label={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
-                aria-pressed={autoRefreshEnabled}
-                title={
+              </ActionIconButton>
+              <ActionIconButton
+                tooltip={
                   activeSearchFilters.hasFilters
                     ? 'Auto refresh is unavailable while transaction filters are active.'
                     : autoRefreshEnabled
-                      ? 'Auto refresh enabled'
-                      : 'Auto refresh disabled'
+                      ? 'Disable auto refresh'
+                      : 'Enable auto refresh'
                 }
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  autoRefreshEnabled ? 'border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
-                } ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
+                aria-pressed={autoRefreshEnabled}
+                className={`${autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'} ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
                 disabled={activeSearchFilters.hasFilters}
                 onClick={() => setAutoRefreshEnabled((current) => !current)}
               >
-                <IconRefresh className="size-4" stroke={1.8} />
-              </button>
+                {autoRefreshEnabled ? <IconPlayerPause className="size-4" stroke={1.8} /> : <IconPlayerPlay className="size-4" stroke={1.8} />}
+              </ActionIconButton>
             </div>
           </div>
 

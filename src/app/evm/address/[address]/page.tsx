@@ -14,7 +14,7 @@ import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteEvmAddressTag, getEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsertEvmAddressTag } from '@/domains/evm/client/address-tags';
-import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
+import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { getEvmAddressCacheSnapshot, MAX_CACHED_EVM_TRANSACTIONS, subscribeEvmTransactionCache } from '@/domains/evm/client/transaction-cache';
 import {
   createEvmContractBinding,
@@ -700,6 +700,7 @@ export default function EvmAddressPage() {
                 totalPages={addressCacheSnapshot.totalPages}
                 hasPreviousPage={addressCacheSnapshot.hasPreviousPage}
                 hasNextPage={addressCacheSnapshot.hasNextPage}
+                plain
                 onPageChange={handleTransactionPageChange}
               />
             </div>
@@ -751,10 +752,10 @@ export default function EvmAddressPage() {
                             <AddressLink
                               address={transaction.from}
                               href={`/evm/address/${transaction.from}`}
-                              label={
-                                nameTagsByAddress[transaction.from] ??
-                                (transaction.from.toLowerCase() === normalizedAddress ? formatAddressLabel(transaction.from) : transaction.fromLabel)
-                              }
+                              label={resolvePreferredAddressLabel(transaction.from, {
+                                nameTagsByAddress,
+                                fallbackLabel: transaction.from.toLowerCase() === normalizedAddress ? formatAddressLabel(transaction.from) : transaction.fromLabel,
+                              })}
                               className="font-medium text-sky-600 hover:text-sky-700"
                             />
                           </td>

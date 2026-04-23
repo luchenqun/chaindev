@@ -3,7 +3,7 @@
 import { listEvmContractBindings } from '@/domains/evm/client/contract-registry';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
-export function resolvePreferredToAddressLabel(
+export function resolvePreferredAddressLabel(
   address: string,
   options?: {
     nameTagsByAddress?: Record<string, string | null>;
@@ -27,4 +27,14 @@ export function resolvePreferredToAddressLabel(
   }
 
   return options?.fallbackLabel ?? address;
+}
+
+export function resolvePreferredToAddressLabel(
+  address: string,
+  options?: {
+    nameTagsByAddress?: Record<string, string | null>;
+    fallbackLabel?: string;
+  },
+) {
+  return resolvePreferredAddressLabel(address, options);
 }

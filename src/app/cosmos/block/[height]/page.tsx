@@ -401,6 +401,7 @@ export default function CosmosBlockDetailPage() {
                   totalPages={block.transactionsPage.totalPages}
                   hasPreviousPage={block.transactionsPage.hasPreviousPage}
                   hasNextPage={block.transactionsPage.hasNextPage}
+                  plain
                   onPageChange={setCurrentTxPage}
                 />
               ) : null}

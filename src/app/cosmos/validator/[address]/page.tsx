@@ -231,6 +231,7 @@ export default function CosmosValidatorPage() {
                 totalPages={validator.transactionsPage.totalPages}
                 hasPreviousPage={validator.transactionsPage.hasPreviousPage}
                 hasNextPage={validator.transactionsPage.hasNextPage}
+                plain
                 onPageChange={setCurrentTxPage}
               />
             </div>

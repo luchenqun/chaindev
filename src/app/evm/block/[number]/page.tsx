@@ -8,7 +8,7 @@ import { IconChevronLeft, IconChevronRight, IconLanguage, IconMinus, IconPlus } 
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { RelativeTime } from '@/components/relative-time';
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
-import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
+import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
@@ -501,7 +501,10 @@ export default function EvmBlockDetailPage() {
                             <AddressLink
                               address={transaction.from}
                               href={`/evm/address/${transaction.from}`}
-                              label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
+                              label={resolvePreferredAddressLabel(transaction.from, {
+                                nameTagsByAddress,
+                                fallbackLabel: transaction.fromLabel,
+                              })}
                               className="font-medium text-sky-600 hover:text-sky-700"
                             />
                           </td>

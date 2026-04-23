@@ -1,6 +1,6 @@
 'use client';
 
-import { IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconCoin, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Suspense, useEffect, useMemo, useState } from 'react';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
+import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { deleteEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsertEvmAddressTag } from '@/domains/evm/client/address-tags';
 import { getEvmObservedAccountsPage } from '@/domains/evm/client/transaction-cache';
@@ -62,6 +63,7 @@ function EvmAccountsPageContent() {
     address: string;
     nameTag: string;
   } | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   function goToLogin() {
     router.push('/login?callbackUrl=%2Fevm%2Faccounts');
@@ -117,7 +119,7 @@ function EvmAccountsPageContent() {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
-  }, [currentPage, pathname, router, searchParamsText]);
+  }, [currentPage, pathname, refreshVersion, router, searchParamsText]);
 
   const visibleAddresses = useMemo(() => data?.accounts.map((account) => account.address) ?? [], [data]);
 
@@ -189,7 +191,7 @@ function EvmAccountsPageContent() {
         return;
       }
 
-      setTagErrorMessage(error instanceof Error ? error.message : 'Failed to save name tag.');
+      setTagErrorMessage(error instanceof Error ? error.message : 'Failed to save tag.');
     }
   }
 
@@ -243,25 +245,31 @@ function EvmAccountsPageContent() {
               <p className="text-lg font-semibold text-slate-900">Observed {data.totalAccounts.toLocaleString('en-US')} accounts from cached transactions</p>
               <p className="mt-1 text-sm text-slate-500">Showing locally indexed addresses discovered from recent block scans only.</p>
             </div>
-            <div className="flex items-center gap-2 lg:justify-end">
-              <button
-                type="button"
-                className={`inline-flex h-8 items-center justify-center rounded-md border px-3 text-sm font-medium transition ${
-                  balanceLoading ? 'cursor-wait border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-600 hover:text-slate-900'
-                }`}
-                disabled={!data.accounts.length || balanceLoading}
-                onClick={() => void handleLoadBalances()}
-              >
-                {balanceLoading ? 'Loading Balances...' : 'Load Balances'}
-              </button>
+            <div className="flex items-center gap-0.5 lg:justify-end">
               <PaginationControls
                 page={data.page}
                 totalPages={data.totalPages}
                 hasPreviousPage={data.hasPreviousPage}
                 hasNextPage={data.hasNextPage}
                 disabled={loading}
+                plain
                 onPageChange={handlePageChange}
               />
+              <ActionIconButton
+                tooltip="Refresh accounts from cache"
+                className="text-slate-400 hover:text-sky-600"
+                onClick={() => setRefreshVersion((current) => current + 1)}
+              >
+                <IconRefresh className="size-4" stroke={1.8} />
+              </ActionIconButton>
+              <ActionIconButton
+                tooltip={balanceLoading ? 'Loading balances...' : 'Load balances'}
+                className={balanceLoading ? 'cursor-wait text-sky-600' : 'text-slate-400 hover:text-sky-600'}
+                disabled={!data.accounts.length || balanceLoading}
+                onClick={() => void handleLoadBalances()}
+              >
+                <IconCoin className="size-4" stroke={1.8} />
+              </ActionIconButton>
             </div>
           </div>
 
@@ -271,11 +279,11 @@ function EvmAccountsPageContent() {
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">#</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Address</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name Tag</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Balance</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Last Seen</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Count</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Tag Action</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Last Seen</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Tag</th>
                 </tr>
               </thead>
               <tbody>
@@ -291,88 +299,54 @@ function EvmAccountsPageContent() {
                           className="font-medium text-sky-600 hover:text-sky-700"
                         />
                       </td>
+                      <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{balancesByAddress[account.address] ?? 'Not loaded'}</td>
+                      <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.lastSeenBlockNumber}</td>
+                      <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.totalTxCount.toLocaleString('en-US')}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">
+                        <RelativeTime timestampMs={account.lastSeenTimestampMs} />
+                      </td>
                       <td className="px-5 py-3 text-sm text-slate-500">
-                        {editingTagAddress === account.address ? (
-                          <div className="flex min-w-[220px] flex-col gap-2">
-                            <Input value={tagInputValue} onChange={(event) => setTagInputValue(event.target.value)} placeholder="Name tag" />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                type="button"
+                        {nameTagsByAddress[account.address] ? (
+                          <div className="inline-flex max-w-[220px] items-center gap-1.5">
+                            <span className="max-w-[160px] truncate font-medium text-slate-900">{nameTagsByAddress[account.address]}</span>
+                            <div className="flex shrink-0 items-center">
+                              <ActionIconButton
+                                className="text-slate-400 hover:text-slate-700"
+                                tooltip="Edit tag"
+                                aria-label="Edit tag"
+                                onClick={() => handleStartTagEdit(account.address)}
+                              >
+                                <IconPencil className="size-4" stroke={1.8} />
+                              </ActionIconButton>
+                              <ActionIconButton
+                                className="text-slate-400 hover:text-rose-600"
+                                tooltip="Delete tag"
+                                aria-label="Delete tag"
                                 onClick={() => {
                                   if (status !== 'authenticated') {
                                     goToLogin();
                                     return;
                                   }
 
-                                  void handleSaveTag(account.address);
+                                  setDeleteTarget({
+                                    address: account.address,
+                                    nameTag: nameTagsByAddress[account.address] ?? '',
+                                  });
                                 }}
                               >
-                                Save
-                              </Button>
-                              <Button size="sm" type="button" variant="ghost" onClick={handleCancelTagEdit}>
-                                Cancel
-                              </Button>
+                                <IconTrash className="size-4" stroke={1.8} />
+                              </ActionIconButton>
                             </div>
-                            {tagErrorMessage ? <span className="text-xs text-rose-600">{tagErrorMessage}</span> : null}
                           </div>
                         ) : (
-                          <span className={nameTagsByAddress[account.address] ? 'font-medium text-slate-900' : ''}>{nameTagsByAddress[account.address] ?? '-'}</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{balancesByAddress[account.address] ?? 'Not loaded'}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700">
-                        <div className="flex flex-col gap-0.5">
-                          <span>
-                            <RelativeTime timestampMs={account.lastSeenTimestampMs} />
-                          </span>
-                          <span className="text-xs text-slate-400">Block #{account.lastSeenBlockNumber}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.totalTxCount.toLocaleString('en-US')}</td>
-                      <td className="px-5 py-3 text-sm text-slate-500">
-                        {editingTagAddress === account.address ? null : (
-                          <div className="flex items-center">
-                            {nameTagsByAddress[account.address] ? (
-                              <>
-                                <ActionIconButton
-                                  className="text-slate-400 hover:text-slate-700"
-                                  tooltip="Edit name tag"
-                                  aria-label="Edit name tag"
-                                  onClick={() => handleStartTagEdit(account.address)}
-                                >
-                                  <IconPencil className="size-4" stroke={1.8} />
-                                </ActionIconButton>
-                                <ActionIconButton
-                                  className="text-slate-400 hover:text-rose-600"
-                                  tooltip="Delete name tag"
-                                  aria-label="Delete name tag"
-                                  onClick={() => {
-                                    if (status !== 'authenticated') {
-                                      goToLogin();
-                                      return;
-                                    }
-
-                                    setDeleteTarget({
-                                      address: account.address,
-                                      nameTag: nameTagsByAddress[account.address] ?? '',
-                                    });
-                                  }}
-                                >
-                                  <IconTrash className="size-4" stroke={1.8} />
-                                </ActionIconButton>
-                              </>
-                            ) : (
-                              <ActionIconButton
-                                className="text-slate-400 hover:text-slate-700"
-                                tooltip="Add name tag"
-                                aria-label="Add name tag"
-                                onClick={() => handleStartTagEdit(account.address)}
-                              >
-                                <IconPlus className="size-4" stroke={1.8} />
-                              </ActionIconButton>
-                            )}
-                          </div>
+                          <ActionIconButton
+                            className="text-slate-400 hover:text-slate-700"
+                            tooltip="Add tag"
+                            aria-label="Add tag"
+                            onClick={() => handleStartTagEdit(account.address)}
+                          >
+                            <IconPlus className="size-4" stroke={1.8} />
+                          </ActionIconButton>
                         )}
                       </td>
                     </tr>
@@ -395,7 +369,7 @@ function EvmAccountsPageContent() {
               setDeleteTarget(null);
             }
           }}
-          title="Delete Name Tag"
+          title="Delete Tag"
           description={deleteTarget ? `Delete the label "${deleteTarget.nameTag}" for ${deleteTarget.address.slice(0, 8)}...${deleteTarget.address.slice(-6)}?` : undefined}
           confirmLabel="Delete"
           onConfirm={() => {
@@ -404,6 +378,61 @@ function EvmAccountsPageContent() {
             }
           }}
         />
+        <ModalDialog
+          open={editingTagAddress !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleCancelTagEdit();
+            }
+          }}
+          title={editingTagAddress && nameTagsByAddress[editingTagAddress] ? 'Edit Tag' : 'Add Tag'}
+          description={
+            editingTagAddress
+              ? `Set a label for address ${editingTagAddress}.`
+              : undefined
+          }
+          maxWidthClassName="max-w-md"
+          footer={
+            <>
+              <Button type="button" variant="ghost" onClick={handleCancelTagEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (!editingTagAddress) {
+                    return;
+                  }
+
+                  if (status !== 'authenticated') {
+                    goToLogin();
+                    return;
+                  }
+
+                  void handleSaveTag(editingTagAddress);
+                }}
+              >
+                Save
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <label htmlFor="evm-account-name-tag-input" className="text-sm font-medium text-slate-700">
+                Tag
+              </label>
+              <Input
+                id="evm-account-name-tag-input"
+                value={tagInputValue}
+                onChange={(event) => setTagInputValue(event.target.value)}
+                placeholder="Tag"
+                autoFocus
+              />
+            </div>
+            {tagErrorMessage ? <p className="text-sm text-rose-600">{tagErrorMessage}</p> : null}
+          </div>
+        </ModalDialog>
       </main>
     </AppShell>
   );

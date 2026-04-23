@@ -1,8 +1,9 @@
 'use client';
 
-import { IconRefresh } from '@tabler/icons-react';
+import { IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getEvmBlocksPageDirect } from '@/domains/evm/client/queries';
@@ -44,7 +45,7 @@ function EvmBlocksPageContent() {
   const currentPage = parsePageParam(searchParams.get('page'));
   const [data, setData] = useState<Awaited<ReturnType<typeof getEvmBlocksPageDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
 
   function handlePageChange(page: number) {
@@ -161,27 +162,24 @@ function EvmBlocksPageContent() {
                 Page {data.page} of {data.totalPages}. Showing {data.blocks.length} blocks from the selected provider.
               </p>
             </div>
-            <div className="flex items-center gap-2 lg:justify-end">
+            <div className="flex items-center gap-0.5 lg:justify-end">
               <PaginationControls
                 page={data.page}
                 totalPages={data.totalPages}
                 hasPreviousPage={data.hasPreviousPage}
                 hasNextPage={data.hasNextPage}
                 disabled={loading}
+                plain
                 onPageChange={handlePageChange}
               />
-              <button
-                type="button"
-                aria-label={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
+              <ActionIconButton
+                tooltip={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
                 aria-pressed={autoRefreshEnabled}
-                title={autoRefreshEnabled ? 'Auto refresh enabled' : 'Auto refresh disabled'}
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                  autoRefreshEnabled ? 'border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
-                }`}
+                className={autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
                 onClick={() => setAutoRefreshEnabled((current) => !current)}
               >
-                <IconRefresh className="size-4" stroke={1.8} />
-              </button>
+                {autoRefreshEnabled ? <IconPlayerPause className="size-4" stroke={1.8} /> : <IconPlayerPlay className="size-4" stroke={1.8} />}
+              </ActionIconButton>
             </div>
           </div>
           <div className="p-0">

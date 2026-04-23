@@ -103,7 +103,6 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           { href: '/evm/accounts', label: 'Accounts' },
           { href: '/evm/txs', label: 'Transactions' },
           { href: '/evm/contracts', label: messages.navigation.contracts },
-          { href: '/evm/settings/cache', label: messages.navigation.cache },
         ];
   const userMenuSections = getAccountMenuSections(mode);
   const userMenuActive = userMenuSections.some((section) => section.items.some((item) => matchesNavItem(pathname, item.href)));

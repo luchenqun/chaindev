@@ -8,10 +8,11 @@ type PaginationControlsProps = {
   hasPreviousPage: boolean;
   hasNextPage: boolean;
   disabled?: boolean;
+  plain?: boolean;
   onPageChange: (page: number) => void;
 };
 
-export function PaginationControls({ page, totalPages, hasPreviousPage, hasNextPage, disabled = false, onPageChange }: PaginationControlsProps) {
+export function PaginationControls({ page, totalPages, hasPreviousPage, hasNextPage, disabled = false, plain = false, onPageChange }: PaginationControlsProps) {
   const visiblePages = getVisiblePages(page, totalPages);
 
   return (
@@ -19,23 +20,45 @@ export function PaginationControls({ page, totalPages, hasPreviousPage, hasNextP
       <Pagination className="mx-0 w-auto justify-start lg:justify-end">
         <PaginationContent>
           <PaginationItem>
-            <PaginationPrevious type="button" disabled={!hasPreviousPage || disabled} onClick={() => onPageChange(page - 1)} />
+            <PaginationPrevious
+              type="button"
+              className={plain ? 'inline-flex h-8 items-center justify-center gap-1 px-0 leading-none align-middle text-slate-900 hover:bg-transparent hover:text-sky-600' : undefined}
+              disabled={!hasPreviousPage || disabled}
+              onClick={() => onPageChange(page - 1)}
+            />
           </PaginationItem>
           {visiblePages.map((item, index) =>
             item === 'ellipsis' ? (
               <PaginationItem key={`ellipsis-${index}`}>
-                <PaginationEllipsis />
+                <PaginationEllipsis className={plain ? 'flex h-8 items-center justify-center px-1 text-slate-500' : undefined} />
               </PaginationItem>
             ) : (
               <PaginationItem key={item}>
-                <PaginationLink type="button" isActive={item === page} disabled={disabled} onClick={() => onPageChange(item)}>
+                <PaginationLink
+                  type="button"
+                  isActive={item === page}
+                  className={
+                    plain
+                      ? item === page
+                        ? 'inline-flex h-8 w-auto min-w-0 items-center justify-center rounded-none border-0 bg-transparent px-1 leading-none text-sky-600 shadow-none hover:bg-transparent hover:text-sky-600'
+                        : 'inline-flex h-8 w-auto min-w-0 items-center justify-center rounded-none border-0 bg-transparent px-1 leading-none text-slate-500 hover:bg-transparent hover:text-sky-600'
+                      : undefined
+                  }
+                  disabled={disabled}
+                  onClick={() => onPageChange(item)}
+                >
                   {item}
                 </PaginationLink>
               </PaginationItem>
             ),
           )}
           <PaginationItem>
-            <PaginationNext type="button" disabled={!hasNextPage || disabled} onClick={() => onPageChange(page + 1)} />
+            <PaginationNext
+              type="button"
+              className={plain ? 'inline-flex h-8 items-center justify-center gap-1 px-0 leading-none align-middle text-slate-900 hover:bg-transparent hover:text-sky-600' : undefined}
+              disabled={!hasNextPage || disabled}
+              onClick={() => onPageChange(page + 1)}
+            />
           </PaginationItem>
         </PaginationContent>
       </Pagination>

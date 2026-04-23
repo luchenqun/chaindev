@@ -50,7 +50,7 @@ export function ModalDialog({ open, onOpenChange, title, description, children, 
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           {description ? <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p> : null}
         </div>
-        <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-6">{children}</div>
+        <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-6 pb-6">{children}</div>
         {footer ? (
           <div className="mt-5 shrink-0 border-t border-slate-200 px-6 py-4">
             <div className="flex justify-end gap-2">{footer}</div>

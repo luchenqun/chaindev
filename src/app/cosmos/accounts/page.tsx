@@ -145,6 +145,7 @@ function CosmosAccountsPageContent() {
                   hasPreviousPage={data.hasPreviousPage}
                   hasNextPage={data.hasNextPage}
                   disabled={loading}
+                  plain
                   onPageChange={handlePageChange}
                 />
                 <ActionIconButton

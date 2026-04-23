@@ -156,6 +156,7 @@ function formatTimestamp(timestamp: number) {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   }).format(new Date(timestamp));
 }
@@ -1013,8 +1014,8 @@ export default function EvmContractsRegistryPage() {
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Label</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Address</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Artifact</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Chain ID</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Provider</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Updated</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
                 </tr>
               </thead>
@@ -1032,8 +1033,8 @@ export default function EvmContractsRegistryPage() {
                         />
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">{artifactsById[binding.artifactId]?.name ?? 'Missing Artifact'}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{binding.chainId}</td>
                       <td className="px-5 py-3 text-sm text-slate-700">{binding.providerName}</td>
+                      <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(binding.updatedAt)}</td>
                       <td className="px-5 py-3 text-sm">
                         <div className="flex items-center justify-end gap-0">
                           <span className="group relative inline-flex">

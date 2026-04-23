@@ -142,7 +142,16 @@ function ensureLoaded() {
 }
 
 function sortBindings(bindings: EvmContractBinding[]) {
-  return [...bindings].sort((left, right) => right.updatedAt - left.updatedAt || left.label.localeCompare(right.label));
+  return [...bindings].sort(
+    (left, right) =>
+      toDisplayedTimestampSeconds(right.updatedAt) - toDisplayedTimestampSeconds(left.updatedAt) ||
+      left.label.localeCompare(right.label, 'en', { sensitivity: 'base' }) ||
+      left.address.localeCompare(right.address, 'en', { sensitivity: 'base' }),
+  );
+}
+
+function toDisplayedTimestampSeconds(timestamp: number) {
+  return Math.floor(timestamp / 1_000);
 }
 
 function buildGeneratedDefaultBindings(artifacts: EvmContractArtifact[], scope: BindingScope) {
@@ -367,7 +376,12 @@ export function parseEvmContractArtifactImportPayload(raw: string) {
 
 export function listEvmContractArtifacts() {
   ensureLoaded();
-  return readRegistryStore().artifacts.sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name));
+  return readRegistryStore().artifacts.sort(
+    (left, right) =>
+      toDisplayedTimestampSeconds(right.updatedAt) - toDisplayedTimestampSeconds(left.updatedAt) ||
+      left.name.localeCompare(right.name, 'en', { sensitivity: 'base' }) ||
+      left.id.localeCompare(right.id, 'en', { sensitivity: 'base' }),
+  );
 }
 
 export function getEvmContractArtifact(artifactId: string) {

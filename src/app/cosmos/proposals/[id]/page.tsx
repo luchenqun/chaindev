@@ -177,6 +177,7 @@ export default function CosmosProposalPage() {
                 totalPages={proposal.votesPage.totalPages}
                 hasPreviousPage={proposal.votesPage.hasPreviousPage}
                 hasNextPage={proposal.votesPage.hasNextPage}
+                plain
                 onPageChange={setCurrentVotePage}
               />
             </div>

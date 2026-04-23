@@ -224,6 +224,7 @@ export default function CosmosAccountPage() {
                 totalPages={account.transactionsPage.totalPages}
                 hasPreviousPage={account.transactionsPage.hasPreviousPage}
                 hasNextPage={account.transactionsPage.hasNextPage}
+                plain
                 onPageChange={setCurrentTxPage}
               />
             </div>

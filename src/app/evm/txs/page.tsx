@@ -1,22 +1,24 @@
 'use client';
 
-import { IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconPlayerPause, IconPlayerPlay, IconRefresh, IconSearch, IconShieldCheck, IconTrash } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { isAddress, parseEther } from 'viem';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { RelativeTime } from '@/components/relative-time';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
-import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
+import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
-import { getEvmCachedTransactionsPage, getEvmTransactionCacheSummary, searchEvmCachedTransactions } from '@/domains/evm/client/transaction-cache';
+import { MAX_CACHED_EVM_TRANSACTIONS, clearEvmTransactionCache, getEvmCachedTransactionsPage, getEvmTransactionCacheSummary, searchEvmCachedTransactions } from '@/domains/evm/client/transaction-cache';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
-import { syncLatestEvmTransactionsDirect } from '@/domains/evm/client/queries';
+import { syncLatestEvmTransactionsDirect, validateActiveEvmCacheDirect } from '@/domains/evm/client/queries';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { PendingTransactionsPanel } from '@/domains/evm/ui/pending-transactions-panel';
 import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
@@ -37,6 +39,18 @@ type TransactionsPageData = {
   subtitle: string;
   transactions: Awaited<ReturnType<typeof getEvmCachedTransactionsPage>>['transactions'];
 };
+
+type CacheValidationResult = Awaited<ReturnType<typeof validateActiveEvmCacheDirect>>;
+
+function SummaryCard({ label, value, note, valueClassName }: { label: string; value: ReactNode; note: ReactNode; valueClassName?: string }) {
+  return (
+    <article className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <div className={`mt-2 min-w-0 text-[30px] font-semibold leading-none text-slate-900 ${valueClassName ?? ''}`}>{value}</div>
+      <div className="mt-2 text-sm text-slate-500">{note}</div>
+    </article>
+  );
+}
 
 type TransactionSearchFormState = {
   from: string;
@@ -298,13 +312,17 @@ function EvmTransactionsPageContent() {
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
   const [activeSearchFilters, setActiveSearchFilters] = useState<AppliedTransactionSearchFilters>(EMPTY_APPLIED_TRANSACTION_SEARCH);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [decodeVersion, setDecodeVersion] = useState(0);
   const [syncingLatest, setSyncingLatest] = useState(false);
   const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [cacheRefreshVersion, setCacheRefreshVersion] = useState(0);
+  const [cacheSummary, setCacheSummary] = useState<Awaited<ReturnType<typeof getEvmTransactionCacheSummary>> | null>(null);
+  const [cacheActionState, setCacheActionState] = useState<CacheValidationResult | null>(null);
+  const [cacheActionLoading, setCacheActionLoading] = useState<'validate' | 'reload' | 'clear' | null>(null);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const hasLoadedDataRef = useRef(false);
   const visibleAddresses = useMemo(() => [...new Set(data?.transactions.flatMap((transaction) => [transaction.from, ...(transaction.to ? [transaction.to] : [])]) ?? [])], [data]);
   const decodedMethodLabelByHash = useMemo(() => {
@@ -356,6 +374,7 @@ function EvmTransactionsPageContent() {
         ]);
 
         if (!cancelled) {
+          setCacheSummary(cacheSummary);
           const next = activeSearchFilters.hasFilters
             ? buildFilteredTransactionsPageData({
                 page: cachedPage,
@@ -379,6 +398,7 @@ function EvmTransactionsPageContent() {
         if (!cancelled) {
           hasLoadedDataRef.current = false;
           setData(null);
+          setCacheSummary(null);
           setErrorMessage(error instanceof Error ? error.message : 'Failed to load transactions.');
         }
       } finally {
@@ -466,6 +486,79 @@ function EvmTransactionsPageContent() {
       setCacheRefreshVersion((version) => version + 1);
     }
   }
+
+  async function handleValidateCache() {
+    setCacheActionLoading('validate');
+
+    try {
+      const result = await validateActiveEvmCacheDirect();
+      setCacheActionState(result);
+      setClearDialogOpen(false);
+      setCacheRefreshVersion((current) => current + 1);
+    } catch (error) {
+      setCacheActionState({
+        status: 'failed',
+        label: error instanceof Error ? error.message : 'Failed to validate cache.',
+      });
+    } finally {
+      setCacheActionLoading(null);
+    }
+  }
+
+  async function handleClearCache() {
+    setCacheActionLoading('clear');
+
+    try {
+      await clearEvmTransactionCache();
+      setCacheActionState({
+        status: 'cleared',
+        label: 'Cleared current local EVM cache.',
+      });
+      setClearDialogOpen(false);
+      setCacheRefreshVersion((current) => current + 1);
+    } catch (error) {
+      setCacheActionState({
+        status: 'failed',
+        label: error instanceof Error ? error.message : 'Failed to clear cache.',
+      });
+    } finally {
+      setCacheActionLoading(null);
+    }
+  }
+
+  async function handleReloadCache() {
+    setCacheActionLoading('reload');
+
+    try {
+      await clearEvmTransactionCache();
+      const result = await syncLatestEvmTransactionsDirect({
+        maxBlocks: 500,
+        maxTransactions: MAX_CACHED_EVM_TRANSACTIONS,
+      });
+      setCacheActionState({
+        status: 'valid',
+        label: `Reloaded ${result.syncedTransactions.toLocaleString('en-US')} transactions from ${result.scannedBlocks.toLocaleString('en-US')} recent blocks.`,
+      });
+      setClearDialogOpen(false);
+      setCacheRefreshVersion((current) => current + 1);
+    } catch (error) {
+      setCacheActionState({
+        status: 'failed',
+        label: error instanceof Error ? error.message : 'Failed to reload cache.',
+      });
+    } finally {
+      setCacheActionLoading(null);
+    }
+  }
+
+  const validationToneClassName =
+    cacheActionState?.status === 'valid'
+      ? 'text-emerald-600'
+      : cacheActionState?.status === 'cleared'
+        ? 'text-amber-600'
+        : cacheActionState?.status === 'failed'
+          ? 'text-rose-600'
+          : 'text-slate-900';
 
   function handleSearchInputChange<Key extends keyof TransactionSearchFormState>(key: Key, value: TransactionSearchFormState[Key]) {
     setSearchErrorMessage(null);
@@ -601,139 +694,216 @@ function EvmTransactionsPageContent() {
         </div>
 
         {activeTab === 'history' ? (
-          <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <p className="text-lg font-semibold text-slate-900">{data.title}</p>
-                <p className="mt-1 text-sm text-slate-500">{data.subtitle}</p>
-                {syncingLatest || syncStatusMessage ? (
-                  <p className="mt-2 text-xs text-sky-600">{syncingLatest ? 'Loading latest on-chain transactions...' : syncStatusMessage}</p>
-                ) : null}
-              </div>
-              <div className="flex items-center gap-2 lg:justify-end">
-                <PaginationControls
-                  page={data.page}
-                  totalPages={data.totalPages}
-                  hasPreviousPage={data.hasPreviousPage}
-                  hasNextPage={data.hasNextPage}
-                  disabled={loading}
-                  onPageChange={handlePageChange}
-                />
-                <button
-                  type="button"
-                  aria-label={activeSearchFilters.hasFilters ? 'Edit cache search filters' : 'Search cached transactions'}
-                  aria-pressed={activeSearchFilters.hasFilters}
-                  title={activeSearchFilters.hasFilters ? 'Cache search filters active' : 'Search cached transactions'}
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                    activeSearchFilters.hasFilters ? 'border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
-                  }`}
-                  onClick={() => setSearchDialogOpen(true)}
-                >
-                  <IconSearch className="size-4" stroke={1.8} />
-                </button>
-                <button
-                  type="button"
-                  aria-label={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
-                  aria-pressed={autoRefreshEnabled}
-                  title={
-                    activeSearchFilters.hasFilters
-                      ? 'Auto refresh is unavailable while cache search filters are active.'
-                      : autoRefreshEnabled
-                        ? 'Auto refresh enabled'
-                        : 'Auto refresh disabled'
-                  }
-                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md border transition ${
-                    autoRefreshEnabled ? 'border-sky-200 bg-sky-50 text-sky-600' : 'border-slate-200 bg-white text-slate-400 hover:text-slate-600'
-                  } ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
-                  disabled={activeSearchFilters.hasFilters}
-                  onClick={() => setAutoRefreshEnabled((current) => !current)}
-                >
-                  <IconRefresh className="size-4" stroke={1.8} />
-                </button>
-              </div>
-            </div>
+          <>
+            <section className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <SummaryCard
+                label="Cached Transactions"
+                value={(cacheSummary?.totalTransactions ?? 0).toLocaleString('en-US')}
+                note="Stored in local IndexedDB"
+              />
+              <SummaryCard
+                label="Observed Accounts"
+                value={(cacheSummary?.totalObservedAccounts ?? 0).toLocaleString('en-US')}
+                note="Derived from cached transaction participants"
+              />
+              <SummaryCard
+                label="Latest Cached Transaction"
+                value={
+                  cacheSummary?.latestSeenTransaction ? (
+                    <Link
+                      className="block truncate text-[22px] leading-tight text-sky-600 hover:text-sky-700"
+                      href={`/evm/tx/${cacheSummary.latestSeenTransaction.hash}`}
+                      title={cacheSummary.latestSeenTransaction.hash}
+                    >
+                      {cacheSummary.latestSeenTransaction.hashLabel}
+                    </Link>
+                  ) : (
+                    'Unavailable'
+                  )
+                }
+                valueClassName="text-[22px] leading-tight"
+                note={
+                  cacheSummary?.latestSeenTransaction ? (
+                    <span>
+                      <RelativeTime timestampMs={cacheSummary.latestSeenTransaction.timestampMs} />
+                      {` - Block #${cacheSummary.latestSeenTransaction.blockNumber}`}
+                    </span>
+                  ) : (
+                    'No cached transaction snapshot yet'
+                  )
+                }
+              />
+              <SummaryCard
+                label="Validation Status"
+                value={<span className={validationToneClassName}>{cacheActionState?.label ?? 'Not checked'}</span>}
+                note="Validate against the active provider cache"
+              />
+            </section>
 
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Transaction Hash</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">To</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Fee</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.transactions.length ? (
-                    data.transactions.map((transaction) => {
-                      const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
+            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-lg font-semibold text-slate-900">{data.title}</p>
+                  <p className="mt-1 text-sm text-slate-500">{data.subtitle}</p>
+                  {syncingLatest || syncStatusMessage ? (
+                    <p className="mt-2 text-xs text-sky-600">{syncingLatest ? 'Loading latest on-chain transactions...' : syncStatusMessage}</p>
+                  ) : null}
+                </div>
+                <div className="flex items-center gap-0.5 lg:justify-end">
+                  <PaginationControls
+                    page={data.page}
+                    totalPages={data.totalPages}
+                    hasPreviousPage={data.hasPreviousPage}
+                    hasNextPage={data.hasNextPage}
+                    disabled={loading}
+                    plain
+                    onPageChange={handlePageChange}
+                  />
+                  <ActionIconButton
+                    tooltip={activeSearchFilters.hasFilters ? 'Edit cache search filters' : 'Search cached transactions'}
+                    aria-pressed={activeSearchFilters.hasFilters}
+                    className={activeSearchFilters.hasFilters ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
+                    onClick={() => setSearchDialogOpen(true)}
+                  >
+                    <IconSearch className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                  <ActionIconButton
+                    tooltip={
+                      activeSearchFilters.hasFilters
+                        ? 'Auto refresh is unavailable while cache search filters are active.'
+                        : autoRefreshEnabled
+                          ? 'Disable auto refresh'
+                          : 'Enable auto refresh'
+                    }
+                    aria-pressed={autoRefreshEnabled}
+                    className={`${autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'} ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
+                    disabled={activeSearchFilters.hasFilters}
+                    onClick={() => setAutoRefreshEnabled((current) => !current)}
+                  >
+                    {autoRefreshEnabled ? <IconPlayerPause className="size-4" stroke={1.8} /> : <IconPlayerPlay className="size-4" stroke={1.8} />}
+                  </ActionIconButton>
+                  <ActionIconButton
+                    tooltip={cacheActionLoading === 'validate' ? 'Validating cache...' : 'Validate cache'}
+                    className={cacheActionLoading === 'validate' ? 'cursor-wait text-sky-600' : 'text-slate-400 hover:text-sky-600'}
+                    disabled={cacheActionLoading != null}
+                    onClick={() => void handleValidateCache()}
+                  >
+                    <IconShieldCheck className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                  <ActionIconButton
+                    tooltip={cacheActionLoading === 'reload' ? 'Reloading cache...' : 'Reload cache'}
+                    className={cacheActionLoading === 'reload' ? 'cursor-wait text-sky-600' : 'text-slate-400 hover:text-sky-600'}
+                    disabled={cacheActionLoading != null}
+                    onClick={() => void handleReloadCache()}
+                  >
+                    <IconRefresh className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                  <ActionIconButton
+                    tooltip={cacheActionLoading === 'clear' ? 'Clearing cache...' : 'Clear cache'}
+                    className={cacheActionLoading === 'clear' ? 'cursor-wait text-rose-600' : 'text-slate-400 hover:text-rose-600'}
+                    disabled={cacheActionLoading != null}
+                    onClick={() => setClearDialogOpen(true)}
+                  >
+                    <IconTrash className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                </div>
+              </div>
 
-                      return (
-                        <tr key={transaction.hash} className="border-t border-slate-200">
-                          <td className="px-5 py-3 text-sm">
-                            <div className="flex items-center gap-3">
-                              <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
-                              <TransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} receiptStatus={transaction.receiptStatus} />
-                            </div>
-                          </td>
-                          <td className="px-5 py-3 text-sm">
-                            <TransactionMethodBadge methodLabel={decodedMethodLabel} />
-                          </td>
-                          <td className="px-5 py-3 text-sm tabular-nums">
-                            <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
-                              {transaction.blockNumber}
-                            </Link>
-                          </td>
-                          <td className="px-5 py-3 text-sm text-slate-700">
-                            <RelativeTime timestampMs={transaction.timestampMs} />
-                          </td>
-                          <td className="px-5 py-3 text-sm">
-                            <AddressLink
-                              address={transaction.from}
-                              href={`/evm/address/${transaction.from}`}
-                              label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
-                              className="font-medium text-sky-600 hover:text-sky-700"
-                            />
-                          </td>
-                          <td className="px-5 py-3 text-sm">
-                            {transaction.to ? (
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Transaction Hash</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">To</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Fee</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.transactions.length ? (
+                      data.transactions.map((transaction) => {
+                        const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
+
+                        return (
+                          <tr key={transaction.hash} className="border-t border-slate-200">
+                            <td className="px-5 py-3 text-sm">
+                              <div className="flex items-center gap-3">
+                                <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
+                                <TransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} receiptStatus={transaction.receiptStatus} />
+                              </div>
+                            </td>
+                            <td className="px-5 py-3 text-sm">
+                              <TransactionMethodBadge methodLabel={decodedMethodLabel} />
+                            </td>
+                            <td className="px-5 py-3 text-sm tabular-nums">
+                              <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
+                                {transaction.blockNumber}
+                              </Link>
+                            </td>
+                            <td className="px-5 py-3 text-sm text-slate-700">
+                              <RelativeTime timestampMs={transaction.timestampMs} />
+                            </td>
+                            <td className="px-5 py-3 text-sm">
                               <AddressLink
-                                address={transaction.to}
-                                href={`/evm/address/${transaction.to}`}
-                                label={resolvePreferredToAddressLabel(transaction.to, {
+                                address={transaction.from}
+                                href={`/evm/address/${transaction.from}`}
+                                label={resolvePreferredAddressLabel(transaction.from, {
                                   nameTagsByAddress,
-                                  fallbackLabel: transaction.toLabel,
+                                  fallbackLabel: transaction.fromLabel,
                                 })}
                                 className="font-medium text-sky-600 hover:text-sky-700"
                               />
-                            ) : (
-                              <span className="text-slate-500">Contract Creation</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.amountLabel}</td>
-                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-500">
-                        No cached transactions available yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                            </td>
+                            <td className="px-5 py-3 text-sm">
+                              {transaction.to ? (
+                                <AddressLink
+                                  address={transaction.to}
+                                  href={`/evm/address/${transaction.to}`}
+                                  label={resolvePreferredToAddressLabel(transaction.to, {
+                                    nameTagsByAddress,
+                                    fallbackLabel: transaction.toLabel,
+                                  })}
+                                  className="font-medium text-sky-600 hover:text-sky-700"
+                                />
+                              ) : (
+                                <span className="text-slate-500">Contract Creation</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.amountLabel}</td>
+                            <td className="px-5 py-3 text-sm tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-500">
+                          No cached transactions available yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
         ) : (
           <PendingTransactionsPanel />
         )}
       </main>
+      <ConfirmDialog
+        open={clearDialogOpen}
+        onOpenChange={setClearDialogOpen}
+        title="Clear Cache"
+        description="Clear all locally cached EVM transactions and observed accounts from IndexedDB?"
+        confirmLabel="Clear Cache"
+        onConfirm={() => {
+          void handleClearCache();
+        }}
+      />
       <ModalDialog
         open={searchDialogOpen}
         onOpenChange={setSearchDialogOpen}

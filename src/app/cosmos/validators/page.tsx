@@ -110,6 +110,7 @@ function CosmosValidatorsPageContent() {
                   hasPreviousPage={data.hasPreviousPage}
                   hasNextPage={data.hasNextPage}
                   disabled={loading}
+                  plain
                   onPageChange={handlePageChange}
                 />
                 <button

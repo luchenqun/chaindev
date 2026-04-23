@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
-import { resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
+import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
 import { getEvmPendingTransactionsDirect } from '@/domains/evm/client/queries';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
@@ -227,7 +227,10 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
                     <AddressLink
                       address={transaction.from}
                       href={`/evm/address/${transaction.from}`}
-                      label={nameTagsByAddress[transaction.from] ?? transaction.fromLabel}
+                      label={resolvePreferredAddressLabel(transaction.from, {
+                        nameTagsByAddress,
+                        fallbackLabel: transaction.fromLabel,
+                      })}
                       className="font-medium text-sky-600 hover:text-sky-700"
                     />
                   </td>
