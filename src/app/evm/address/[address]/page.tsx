@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconBinaryTree2, IconInfoCircle, IconTag } from '@tabler/icons-react';
 import { RelativeTime } from '@/components/relative-time';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -160,18 +161,33 @@ function getDirection(
 }
 
 function AddressMetric({ label, value, subtext, tooltip }: { label: string; value: React.ReactNode; subtext?: React.ReactNode; tooltip?: React.ReactNode }) {
+  const tooltipTriggerRef = useRef<HTMLSpanElement | null>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+
   return (
     <div>
       <div className="flex items-center gap-1.5">
         <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</p>
         {tooltip ? (
-          <span className="group relative inline-flex">
-            <span className="inline-flex items-center justify-center text-slate-300">
+          <span
+            ref={tooltipTriggerRef}
+            className="inline-flex"
+            onBlur={() => setTooltipOpen(false)}
+            onFocus={() => setTooltipOpen(true)}
+            onMouseEnter={() => setTooltipOpen(true)}
+            onMouseLeave={() => setTooltipOpen(false)}
+            tabIndex={0}
+          >
+            <span className="inline-flex items-center justify-center text-slate-300 outline-none">
               <IconInfoCircle className="size-3.5" stroke={1.8} />
             </span>
-            <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 w-[260px] -translate-x-1/2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-medium leading-5 text-white opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.28)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <FloatingTooltip
+              open={tooltipOpen}
+              anchorRef={tooltipTriggerRef}
+              className="w-[260px] whitespace-normal bg-slate-800 leading-5 text-white"
+            >
               {tooltip}
-            </span>
+            </FloatingTooltip>
           </span>
         ) : null}
       </div>
@@ -855,7 +871,7 @@ export default function EvmAddressPage() {
                 <SelectTrigger>
                   <SelectValue placeholder={artifacts.length ? 'Select artifact' : 'No saved artifacts'} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-80">
                   {artifacts.map((artifact) => (
                     <SelectItem key={artifact.id} value={artifact.id}>
                       {artifact.name}

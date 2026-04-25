@@ -89,6 +89,15 @@ function parseGasPrice(gasPrice: string) {
   return parseGwei(value);
 }
 
+function isAutoTransactionFieldValue(value: string | undefined) {
+  if (!value) {
+    return true;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  return !normalizedValue || normalizedValue === 'auto';
+}
+
 function parseFeePerGas(value: string, fieldLabel: string) {
   const normalizedValue = value.trim();
 
@@ -454,14 +463,20 @@ export async function forceWriteEvmContractMethodDirect(input: {
   });
   const value = input.value.trim() ? parseEther(input.value.trim()) : 0n;
   const gas = parseGasLimit(input.gasLimit);
-  const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
+  const nonce = isAutoTransactionFieldValue(input.nonce) ? undefined : parseNonce(input.nonce ?? '');
   const feeParameters =
     input.transactionType === 'LEGACY'
       ? {
           type: 'legacy' as const,
-          gasPrice: parseGasPrice(input.gasPrice ?? ''),
+          ...(isAutoTransactionFieldValue(input.gasPrice) ? {} : { gasPrice: parseGasPrice(input.gasPrice ?? '') }),
         }
       : (() => {
+          if (isAutoTransactionFieldValue(input.maxFeePerGas) || isAutoTransactionFieldValue(input.maxPriorityFeePerGas)) {
+            return {
+              type: 'eip1559' as const,
+            };
+          }
+
           const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? '', 'Max fee per gas');
           const maxPriorityFeePerGas = parseFeePerGas(input.maxPriorityFeePerGas ?? '', 'Max priority fee per gas');
 
@@ -532,15 +547,21 @@ export async function forceSendEvmTransactionDirect(input: {
   });
   const value = parseNativeValue(input.value);
   const gas = parseGasLimit(input.gasLimit);
-  const nonce = input.nonce?.trim() ? parseNonce(input.nonce) : undefined;
+  const nonce = isAutoTransactionFieldValue(input.nonce) ? undefined : parseNonce(input.nonce ?? '');
   const data = normalizeTransactionData(input.data);
   const feeParameters =
     input.transactionType === 'LEGACY'
       ? {
           type: 'legacy' as const,
-          gasPrice: parseGasPrice(input.gasPrice ?? ''),
+          ...(isAutoTransactionFieldValue(input.gasPrice) ? {} : { gasPrice: parseGasPrice(input.gasPrice ?? '') }),
         }
       : (() => {
+          if (isAutoTransactionFieldValue(input.maxFeePerGas) || isAutoTransactionFieldValue(input.maxPriorityFeePerGas)) {
+            return {
+              type: 'eip1559' as const,
+            };
+          }
+
           const maxFeePerGas = parseFeePerGas(input.maxFeePerGas ?? '', 'Max fee per gas');
           const maxPriorityFeePerGas = parseFeePerGas(input.maxPriorityFeePerGas ?? '', 'Max priority fee per gas');
 

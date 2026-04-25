@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
-import { MAX_CACHED_EVM_TRANSACTIONS, clearEvmTransactionCache, getEvmCachedTransactionsPage, getEvmTransactionCacheSummary, searchEvmCachedTransactions } from '@/domains/evm/client/transaction-cache';
+import { clearEvmTransactionCache, getEvmCachedTransactionsPage, getEvmTransactionCacheSummary, searchEvmCachedTransactions } from '@/domains/evm/client/transaction-cache';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { syncLatestEvmTransactionsDirect, validateActiveEvmCacheDirect } from '@/domains/evm/client/queries';
@@ -25,6 +25,8 @@ import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton }
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 20;
+const RELOAD_CACHE_MAX_BLOCKS = 600;
+const RELOAD_CACHE_MAX_TRANSACTIONS = 1000;
 
 type TransactionsPageData = {
   page: number;
@@ -315,8 +317,6 @@ function EvmTransactionsPageContent() {
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [decodeVersion, setDecodeVersion] = useState(0);
-  const [syncingLatest, setSyncingLatest] = useState(false);
-  const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [cacheRefreshVersion, setCacheRefreshVersion] = useState(0);
   const [cacheSummary, setCacheSummary] = useState<Awaited<ReturnType<typeof getEvmTransactionCacheSummary>> | null>(null);
@@ -422,59 +422,6 @@ function EvmTransactionsPageContent() {
     };
   }, [activeSearchFilters, cacheRefreshVersion, currentPage, pathname, router, searchParamsText]);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function syncLatest() {
-      setSyncingLatest(true);
-      setSyncStatusMessage('Loading latest on-chain transactions...');
-
-      try {
-        const cacheSummary = await getEvmTransactionCacheSummary();
-        const result = await syncLatestEvmTransactionsDirect({
-          latestCachedBlockNumber: cacheSummary.latestSeenTransaction?.blockNumber ?? null,
-        });
-
-        if (cancelled) {
-          return;
-        }
-
-        if (result.syncedTransactions > 0) {
-          setCacheRefreshVersion((current) => current + 1);
-          setSyncStatusMessage(null);
-          return;
-        }
-
-        if (result.truncatedByBlockWindow || result.truncatedByTransactionLimit) {
-          setSyncStatusMessage('Latest sync reached the temporary scan limit.');
-        } else {
-          setSyncStatusMessage(null);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setSyncStatusMessage(error instanceof Error ? error.message : 'Failed to load latest transactions.');
-        }
-      } finally {
-        if (!cancelled) {
-          setSyncingLatest(false);
-        }
-      }
-    }
-
-    void syncLatest();
-
-    const handleProfileChanged = () => {
-      void syncLatest();
-    };
-
-    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
-    };
-  }, []);
-
   function handleAutoRefreshFeed(latestFeed: NonNullable<ReturnType<typeof useEvmHomeData>['latestFeed']>) {
     if (currentPage !== 1 || activeSearchFilters.hasFilters || !data) {
       return;
@@ -532,8 +479,8 @@ function EvmTransactionsPageContent() {
     try {
       await clearEvmTransactionCache();
       const result = await syncLatestEvmTransactionsDirect({
-        maxBlocks: 500,
-        maxTransactions: MAX_CACHED_EVM_TRANSACTIONS,
+        maxBlocks: RELOAD_CACHE_MAX_BLOCKS,
+        maxTransactions: RELOAD_CACHE_MAX_TRANSACTIONS,
       });
       setCacheActionState({
         status: 'valid',
@@ -745,9 +692,6 @@ function EvmTransactionsPageContent() {
                 <div className="min-w-0">
                   <p className="text-lg font-semibold text-slate-900">{data.title}</p>
                   <p className="mt-1 text-sm text-slate-500">{data.subtitle}</p>
-                  {syncingLatest || syncStatusMessage ? (
-                    <p className="mt-2 text-xs text-sky-600">{syncingLatest ? 'Loading latest on-chain transactions...' : syncStatusMessage}</p>
-                  ) : null}
                 </div>
                 <div className="flex items-center gap-0.5 lg:justify-end">
                   <PaginationControls

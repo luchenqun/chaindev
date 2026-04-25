@@ -5006,6 +5006,37 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         stateMutability: 'view',
         type: 'function',
       },
+      {
+        anonymous: false,
+        inputs: [
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'contractAddress',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'granter',
+            type: 'address',
+          },
+          {
+            indexed: true,
+            internalType: 'address',
+            name: 'grantee',
+            type: 'address',
+          },
+          {
+            indexed: false,
+            internalType: 'uint256',
+            name: 'amount',
+            type: 'uint256',
+          },
+        ],
+        name: 'UseGasWaiver',
+        type: 'event',
+      },
     ],
     bytecode: null,
   },

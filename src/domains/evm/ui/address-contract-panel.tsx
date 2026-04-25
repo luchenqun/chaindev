@@ -452,7 +452,7 @@ function createInitialManualWriteDialogState(): ManualWriteDialogState {
   return {
     transactionType: 'EIP1559',
     value: '0',
-    gasPrice: '',
+    gasPrice: 'auto',
     maxFeePerGas: 'auto',
     maxPriorityFeePerGas: 'auto',
     gasLimit: '',
@@ -1559,22 +1559,20 @@ export function AddressContractPanel({
       >
         {manualWriteTarget ? (
           <div className="grid gap-4 pb-1">
-            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2">
+            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
                 <p className="mt-1 break-all text-sm text-slate-900 mono">{binding.address}</p>
               </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
-                <p className="mt-1 text-sm text-slate-900">{manualWriteTarget}</p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
-                <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? 'No Key Selected'}</p>
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Chain ID</p>
-                <p className="mt-1 text-sm text-slate-900">{environment.chainId}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
+                  <p className="mt-1 text-sm text-slate-900">{manualWriteTarget}</p>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
+                  <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? 'No Key Selected'}</p>
+                </div>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -1622,7 +1620,7 @@ export function AddressContractPanel({
                         gasPrice: event.target.value,
                       }))
                     }
-                    placeholder="0.001"
+                    placeholder="auto"
                   />
                 </div>
               ) : (

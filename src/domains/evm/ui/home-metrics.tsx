@@ -1,6 +1,8 @@
 'use client';
 
 import { IconInfoCircle } from '@tabler/icons-react';
+import { useRef, useState } from 'react';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { MetricCardsSkeleton } from '@/components/ui/loading-placeholders';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 
@@ -34,18 +36,33 @@ const fallbackHeader: HeaderItem[] = [
 ];
 
 function MetricCard({ label, value, subtext }: Metric) {
+  const tooltipTriggerRef = useRef<HTMLSpanElement | null>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+
   return (
     <div className="px-5 py-4">
       <div className="mb-2 flex items-center gap-1.5">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
         {subtext ? (
-          <span className="group relative inline-flex">
-            <span className="inline-flex items-center justify-center text-slate-300">
+          <span
+            ref={tooltipTriggerRef}
+            className="inline-flex"
+            onBlur={() => setTooltipOpen(false)}
+            onFocus={() => setTooltipOpen(true)}
+            onMouseEnter={() => setTooltipOpen(true)}
+            onMouseLeave={() => setTooltipOpen(false)}
+            tabIndex={0}
+          >
+            <span className="inline-flex items-center justify-center text-slate-300 outline-none">
               <IconInfoCircle className="size-3.5" stroke={1.8} />
             </span>
-            <span className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 w-[220px] -translate-x-1/2 rounded-xl bg-slate-800 px-3 py-2 text-xs font-medium leading-5 text-white opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.28)] transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <FloatingTooltip
+              open={tooltipOpen}
+              anchorRef={tooltipTriggerRef}
+              className="w-[220px] whitespace-normal bg-slate-800 leading-5 text-white"
+            >
               {subtext}
-            </span>
+            </FloatingTooltip>
           </span>
         ) : null}
       </div>

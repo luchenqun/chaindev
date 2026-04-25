@@ -9,6 +9,7 @@ import { isAddress, type AbiParameter } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
 import { JsonInput } from '@/components/ui/json-input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
@@ -209,11 +210,36 @@ function getDefaultBindingAddressForArtifact(artifact?: Pick<EvmContractArtifact
   return getArtifactDefaultAddressByName(artifact.name) ?? '';
 }
 
+function InteractContractLink({ href }: { href: string }) {
+  const triggerRef = useRef<HTMLAnchorElement | null>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+
+  return (
+    <span className="inline-flex">
+      <Link
+        ref={triggerRef}
+        href={href}
+        aria-label="Interact with contract"
+        className="inline-flex items-center justify-center p-[3px] text-slate-400 transition hover:text-slate-700"
+        onBlur={() => setTooltipOpen(false)}
+        onFocus={() => setTooltipOpen(true)}
+        onMouseEnter={() => setTooltipOpen(true)}
+        onMouseLeave={() => setTooltipOpen(false)}
+      >
+        <IconLinkPlus className="size-4" stroke={1.8} />
+      </Link>
+      <FloatingTooltip open={tooltipOpen} anchorRef={triggerRef} className="whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] text-white shadow-[0_8px_20px_rgba(15,23,42,0.18)]">
+        Interact with contract
+      </FloatingTooltip>
+    </span>
+  );
+}
+
 function createInitialDeployDialogState(): DeployDialogState {
   return {
     transactionType: 'EIP1559',
     value: '0',
-    gasPrice: '',
+    gasPrice: 'auto',
     maxFeePerGas: 'auto',
     maxPriorityFeePerGas: 'auto',
     gasLimit: '',
@@ -1037,18 +1063,7 @@ export default function EvmContractsRegistryPage() {
                       <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(binding.updatedAt)}</td>
                       <td className="px-5 py-3 text-sm">
                         <div className="flex items-center justify-end gap-0">
-                          <span className="group relative inline-flex">
-                            <Link
-                              href={`/evm/address/${binding.address}?tab=contract&contractTab=read`}
-                              aria-label="Interact with contract"
-                              className="inline-flex items-center justify-center p-[3px] text-slate-400 transition hover:text-slate-700"
-                            >
-                              <IconLinkPlus className="size-4" stroke={1.8} />
-                            </Link>
-                            <span className="pointer-events-none absolute bottom-full right-0 z-20 mb-1.5 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] font-medium text-white opacity-0 shadow-[0_8px_20px_rgba(15,23,42,0.18)] transition duration-75 group-hover:opacity-100 group-focus-within:opacity-100">
-                              Interact with contract
-                            </span>
-                          </span>
+                          <InteractContractLink href={`/evm/address/${binding.address}?tab=contract&contractTab=read`} />
                           {isGeneratedDefaultEvmContractBinding(binding) ? null : (
                             <>
                               <ActionIconButton
@@ -1625,7 +1640,7 @@ export default function EvmContractsRegistryPage() {
                         gasPrice: event.target.value,
                       }))
                     }
-                    placeholder="0.001"
+                    placeholder="auto"
                   />
                 </div>
               ) : (

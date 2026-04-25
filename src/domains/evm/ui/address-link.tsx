@@ -4,6 +4,7 @@ import { IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { copyText } from '@/components/ui/copy-text';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { cn } from '@/lib/utils';
 
 type AddressLinkProps = {
@@ -19,6 +20,7 @@ export function AddressLink({ address, href, label, className, tooltipClassName,
   void tooltipClassName;
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<number | null>(null);
+  const copyButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     return () => {
@@ -52,6 +54,7 @@ export function AddressLink({ address, href, label, className, tooltipClassName,
       {showCopyButton ? (
         <span className="relative inline-flex">
           <button
+            ref={copyButtonRef}
             type="button"
             className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
             aria-label="Copy address"
@@ -59,14 +62,9 @@ export function AddressLink({ address, href, label, className, tooltipClassName,
           >
             <IconCopy className="size-4" stroke={1.8} />
           </button>
-          <span
-            className={cn(
-              'pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 opacity-0 shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition-opacity',
-              copied ? 'opacity-100' : '',
-            )}
-          >
+          <FloatingTooltip open={copied} anchorRef={copyButtonRef} className={cn('whitespace-nowrap border border-slate-200 bg-white text-slate-700')}>
             <span className="block whitespace-nowrap">Copied!</span>
-          </span>
+          </FloatingTooltip>
         </span>
       ) : null}
     </span>
