@@ -650,8 +650,9 @@ export default function EvmTxPage() {
     [transaction, decodedTransactionInput],
   );
   const rewriteTargetAddress = useMemo(() => transaction?.interactedWith ?? transaction?.to ?? null, [transaction]);
+  const isContractDeployment = Boolean(transaction && !transaction.to);
   const isRewriteTransfer = Boolean(transaction?.to && transaction.inputData === '0x');
-  const canRewriteTransaction = Boolean(rewriteTargetAddress && (decodedTransactionInput || isRewriteTransfer));
+  const canRewriteTransaction = Boolean(!isContractDeployment && rewriteTargetAddress && (decodedTransactionInput || isRewriteTransfer));
 
   useEffect(() => {
     if (!isValid) {

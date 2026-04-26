@@ -643,8 +643,12 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
             )}
           </SelectTrigger>
           <SelectContent className="min-w-[26rem] max-w-[min(40rem,calc(100vw-2rem))]">
-            {topbarSortedProfiles.map((profile) => (
-              <SelectItem key={profile.id} value={profile.id} className="items-start py-2.5">
+            {topbarSortedProfiles.map((profile, index) => (
+              <SelectItem
+                key={profile.id}
+                value={profile.id}
+                className={`items-start rounded-none py-2.5 ${index < topbarSortedProfiles.length - 1 ? 'border-b border-slate-100' : ''}`}
+              >
                 {renderProviderOption(profile)}
               </SelectItem>
             ))}
@@ -675,8 +679,12 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
           )}
         </SelectTrigger>
         <SelectContent className="min-w-[26rem] max-w-[min(40rem,calc(100vw-2rem))]">
-          {sortedProfiles.map((profile) => (
-            <SelectItem key={profile.id} value={profile.id} className="items-start py-2.5">
+          {sortedProfiles.map((profile, index) => (
+            <SelectItem
+              key={profile.id}
+              value={profile.id}
+              className={`items-start rounded-none py-2.5 ${index < sortedProfiles.length - 1 ? 'border-b border-slate-100' : ''}`}
+            >
               {renderProviderOption(profile)}
             </SelectItem>
           ))}
