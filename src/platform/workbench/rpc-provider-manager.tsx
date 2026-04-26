@@ -207,8 +207,17 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
 
     void load();
 
+    const handleProfilesChanged = () => {
+      void load();
+    };
+
+    window.addEventListener('chaindev:rpc-profiles-changed', handleProfilesChanged);
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleProfilesChanged);
+
     return () => {
       cancelled = true;
+      window.removeEventListener('chaindev:rpc-profiles-changed', handleProfilesChanged);
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfilesChanged);
     };
   }, [status]);
 

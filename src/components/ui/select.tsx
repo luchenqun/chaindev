@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import * as SelectPrimitive from '@radix-ui/react-select';
-import { IconCheck, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
+import { IconCheck, IconChevronDown } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
 
 function Select({ ...props }: React.ComponentProps<typeof SelectPrimitive.Root>) {
@@ -48,13 +48,9 @@ function SelectContent({ className, children, position = 'popper', ...props }: R
         )}
         {...props}
       >
-        <SelectPrimitive.ScrollUpButton className="flex cursor-default items-center justify-center py-1">
-          <IconChevronUp className="size-4 text-slate-500" stroke={2} />
-        </SelectPrimitive.ScrollUpButton>
-        <SelectPrimitive.Viewport className="max-h-80 overflow-y-auto p-1">{children}</SelectPrimitive.Viewport>
-        <SelectPrimitive.ScrollDownButton className="flex cursor-default items-center justify-center py-1">
-          <IconChevronDown className="size-4 text-slate-500" stroke={2} />
-        </SelectPrimitive.ScrollDownButton>
+        <SelectPrimitive.Viewport className="max-h-[min(28rem,var(--radix-select-content-available-height))] overflow-y-auto p-1">
+          {children}
+        </SelectPrimitive.Viewport>
       </SelectPrimitive.Content>
     </SelectPrimitive.Portal>
   );

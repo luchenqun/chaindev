@@ -85,6 +85,14 @@ function notifyActiveRpcProfileChanged() {
   window.dispatchEvent(new CustomEvent('chaindev:active-rpc-profile-changed'));
 }
 
+function notifyRpcProfilesChanged() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent('chaindev:rpc-profiles-changed'));
+}
+
 function createAuthRequiredError() {
   const error = new Error('AUTH_REQUIRED');
   error.name = 'AuthRequiredError';
@@ -105,10 +113,12 @@ export function getLocalSelectedRpcProfiles() {
 
 export function replaceLocalRpcProfiles(profiles: RpcProfile[]) {
   writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, profiles);
+  notifyRpcProfilesChanged();
 }
 
 export function replaceLocalSelectedRpcProfiles(selected: SelectedRpcProfileMap) {
   writeJsonStorage(LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY, selected);
+  notifyRpcProfilesChanged();
 }
 
 export function syncGuestRpcDefaults() {
@@ -139,6 +149,7 @@ export function setLocalSelectedRpcProfile(mode: PlatformMode, profileId: string
   }
 
   writeJsonStorage(LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY, next);
+  notifyRpcProfilesChanged();
 }
 
 export function saveLocalRpcProfile(input: RpcProfileDraft) {
@@ -157,6 +168,7 @@ export function saveLocalRpcProfile(input: RpcProfileDraft) {
   const next = [profile, ...listLocalRpcProfiles()];
   writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, next);
   setLocalSelectedRpcProfile(profile.mode, profile.id);
+  notifyRpcProfilesChanged();
   return profile;
 }
 
@@ -181,12 +193,14 @@ export function updateLocalRpcProfile(profileId: string, input: RpcProfileDraft)
   const next = [updated, ...profiles.filter((profile) => profile.id !== profileId)];
   writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, next);
   setLocalSelectedRpcProfile(updated.mode, updated.id);
+  notifyRpcProfilesChanged();
   return updated;
 }
 
 export function deleteLocalRpcProfile(mode: PlatformMode, profileId: string) {
   const remaining = listLocalRpcProfiles().filter((profile) => profile.id !== profileId);
   writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, remaining);
+  notifyRpcProfilesChanged();
 
   const selected = getLocalSelectedRpcProfiles();
   if (selected[mode] === profileId) {
@@ -261,6 +275,7 @@ export async function createRpcProfile(input: RpcProfileDraft) {
 
   const body = (await response.json()) as { ok: boolean; data: RpcProfile };
   setLocalSelectedRpcProfile(body.data.mode, body.data.id);
+  notifyRpcProfilesChanged();
 
   return {
     source: 'server' as const,
@@ -293,6 +308,7 @@ export async function editRpcProfile(profileId: string, input: RpcProfileDraft) 
 
   const body = (await response.json()) as { ok: boolean; data: RpcProfile };
   setLocalSelectedRpcProfile(body.data.mode, body.data.id);
+  notifyRpcProfilesChanged();
 
   return {
     source: 'server' as const,
@@ -317,6 +333,7 @@ export async function removeRpcProfile(mode: PlatformMode, profileId: string) {
   }
 
   const body = (await response.json()) as { ok: boolean; data: { id: string } };
+  notifyRpcProfilesChanged();
   return {
     source: 'server' as const,
     fallbackProfile: null,

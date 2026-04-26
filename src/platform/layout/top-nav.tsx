@@ -93,15 +93,15 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
     mode === 'cosmos'
       ? [
           { href: '/cosmos/blocks', label: 'Blocks' },
-          { href: '/cosmos/accounts', label: 'Accounts' },
           { href: '/cosmos/txs', label: 'Transactions' },
+          { href: '/cosmos/accounts', label: 'Accounts' },
           { href: '/cosmos/validators', label: 'Validators' },
           { href: '/cosmos/proposals', label: 'Proposals' },
         ]
       : [
           { href: '/evm/blocks', label: 'Blocks' },
-          { href: '/evm/accounts', label: 'Accounts' },
           { href: '/evm/txs', label: 'Transactions' },
+          { href: '/evm/accounts', label: 'Accounts' },
           { href: '/evm/contracts', label: messages.navigation.contracts },
         ];
   const userMenuSections = getAccountMenuSections(mode);
