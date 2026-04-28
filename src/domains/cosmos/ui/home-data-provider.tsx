@@ -121,7 +121,7 @@ async function sha256HexFromBase64(input: string) {
 
 export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const activeMode = readActivePlatformModeCookie();
+  const [activeMode, setActiveMode] = useState(() => readActivePlatformModeCookie());
   const [snapshot, setSnapshot] = useState<CosmosHomeSnapshot | null>(null);
   const [latestFeed, setLatestFeed] = useState<CosmosHomeDataContextValue['latestFeed']>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -148,6 +148,22 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
 
     return () => {
       window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleModeChanged = () => {
+      setActiveMode(readActivePlatformModeCookie());
+    };
+
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
+    window.addEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
+    window.addEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
+
+    return () => {
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
+      window.removeEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
+      window.removeEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
     };
   }, []);
 

@@ -387,7 +387,13 @@ export function writeActiveRpcProfileCookie(profile: RpcProfile | null) {
 }
 
 export function writeActivePlatformModeCookie(mode: PlatformMode) {
+  const previous = readActivePlatformModeCookie();
+
   document.cookie = `${ACTIVE_PLATFORM_MODE_COOKIE_NAME}=${mode}; Max-Age=${60 * 60 * 24 * 365}; Path=/; SameSite=Lax`;
+
+  if (previous !== mode) {
+    window.dispatchEvent(new CustomEvent('chaindev:active-platform-mode-changed'));
+  }
 }
 
 export function readActivePlatformModeCookie() {

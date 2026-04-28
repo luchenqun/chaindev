@@ -7,6 +7,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { CosmosHomeDataProvider } from '@/domains/cosmos/ui/home-data-provider';
 import { syncEvmKeyringFromServer } from '@/domains/evm/client/keyring';
 import { EvmHomeDataProvider } from '@/domains/evm/ui/home-data-provider';
+import { setClientAuthenticated } from '@/platform/auth/client-session-state';
 import { syncGuestRpcDefaults, writeActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
 
 function ActivePlatformModeSync() {
@@ -30,11 +31,20 @@ function GuestWorkbenchDefaultsSync() {
   const { status } = useSession();
 
   useEffect(() => {
+    setClientAuthenticated(status === 'authenticated');
+
     if (status !== 'unauthenticated') {
       return;
     }
 
     syncGuestRpcDefaults();
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') {
+      return;
+    }
+
     void syncEvmKeyringFromServer().catch(() => undefined);
   }, [status]);
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { isClientAuthenticated } from '@/platform/auth/client-session-state';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 export type CosmosAddressTagItem = {
@@ -88,6 +89,13 @@ function ensureLoaded() {
 }
 
 export async function syncCosmosAddressTagsFromServer() {
+  if (!isClientAuthenticated()) {
+    cache = {};
+    loaded = true;
+    emitChange();
+    return;
+  }
+
   const response = await fetch('/api/workbench/cosmos/address-tags', {
     cache: 'no-store',
   });

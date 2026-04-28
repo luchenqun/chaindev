@@ -4,6 +4,7 @@ import { isAddress } from 'viem';
 import { z } from 'zod';
 import { analyzeContractArtifactAbi, parseContractAbiJson } from '@/domains/evm/client/abi-utils';
 import { getArtifactDefaultAddressByName } from '@/domains/evm/lib/precompile-artifact-default-addresses';
+import { isClientAuthenticated } from '@/platform/auth/client-session-state';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 import { SYSTEM_CONTRACT_ARTIFACTS } from '@/server/system/artifacts/system-contract-artifacts';
 
@@ -208,6 +209,15 @@ export function replaceEvmContractRegistryStore(value: { artifacts: EvmContractA
 }
 
 export async function syncEvmContractRegistryFromServer() {
+  if (!isClientAuthenticated()) {
+    writeRegistryStore({
+      artifacts: [],
+      bindings: [],
+    });
+    emitChange();
+    return;
+  }
+
   const response = await fetch('/api/workbench/evm/contract-registry', {
     cache: 'no-store',
   });

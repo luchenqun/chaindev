@@ -1,6 +1,7 @@
 'use client';
 
 import { isAddress } from 'viem';
+import { isClientAuthenticated } from '@/platform/auth/client-session-state';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 export type EvmAddressTagItem = {
@@ -87,6 +88,13 @@ function ensureLoaded() {
 }
 
 export async function syncEvmAddressTagsFromServer() {
+  if (!isClientAuthenticated()) {
+    cache = {};
+    loaded = true;
+    emitChange();
+    return;
+  }
+
   const response = await fetch('/api/workbench/evm/address-tags', {
     cache: 'no-store',
   });

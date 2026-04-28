@@ -170,7 +170,7 @@ function buildDerivedHomeSnapshot(input: {
 
 export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const activeMode = readActivePlatformModeCookie();
+  const [activeMode, setActiveMode] = useState(() => readActivePlatformModeCookie());
   const [snapshot, setSnapshot] = useState<EvmHomeSnapshot | null>(null);
   const [status, setStatus] = useState<EvmLiveStatus | null>(null);
   const [latestFeed, setLatestFeed] = useState<EvmLatestFeed | null>(null);
@@ -201,6 +201,22 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
 
     return () => {
       window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleModeChanged = () => {
+      setActiveMode(readActivePlatformModeCookie());
+    };
+
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
+    window.addEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
+    window.addEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
+
+    return () => {
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
+      window.removeEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
+      window.removeEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
     };
   }, []);
 

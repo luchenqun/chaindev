@@ -1,30 +1,42 @@
-import { cookies } from 'next/headers';
+'use client';
+
+import { useEffect, useState } from 'react';
 import { EvmHomeActivity } from '@/domains/evm/ui/home-activity';
 import { EvmHomeMetrics } from '@/domains/evm/ui/home-metrics';
 import { CosmosHomePage } from '@/domains/cosmos/ui/home-page';
 import { AppShell } from '@/platform/layout/app-shell';
-import { ACTIVE_PLATFORM_MODE_COOKIE_NAME, getDefaultActivePlatformMode } from '@/platform/workbench/rpc-profile';
+import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
+import type { PlatformMode } from '@/config/chains';
 
-export default async function HomePage() {
-  const cookieStore = await cookies();
-  const activeMode = cookieStore.get(ACTIVE_PLATFORM_MODE_COOKIE_NAME)?.value === 'cosmos' ? 'cosmos' : getDefaultActivePlatformMode();
-
-  if (activeMode === 'cosmos') {
-    return (
-      <AppShell mode="cosmos">
-        <CosmosHomePage />
-      </AppShell>
-    );
-  }
-
+function EvmHomePage() {
   return (
-    <AppShell mode="evm">
-      <main className="pb-10">
-        <section>
-          <EvmHomeMetrics />
-        </section>
-        <EvmHomeActivity />
-      </main>
-    </AppShell>
+    <main className="pb-10">
+      <section>
+        <EvmHomeMetrics />
+      </section>
+      <EvmHomeActivity />
+    </main>
   );
+}
+
+export default function HomePage() {
+  const [activeMode, setActiveMode] = useState<PlatformMode>(() => readActivePlatformModeCookie());
+
+  useEffect(() => {
+    const handleModeChanged = () => {
+      setActiveMode(readActivePlatformModeCookie());
+    };
+
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
+    window.addEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
+    window.addEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
+
+    return () => {
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
+      window.removeEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
+      window.removeEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
+    };
+  }, []);
+
+  return <AppShell mode={activeMode}>{activeMode === 'cosmos' ? <CosmosHomePage /> : <EvmHomePage />}</AppShell>;
 }

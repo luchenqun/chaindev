@@ -2,6 +2,7 @@
 
 import { type Hex } from 'viem';
 import { z } from 'zod';
+import { isClientAuthenticated } from '@/platform/auth/client-session-state';
 import { DEFAULT_EVM_PRIVATE_KEY_ID, DEFAULT_EVM_PRIVATE_KEY_NAME, DEFAULT_EVM_PRIVATE_KEY_VALUE, getDefaultAliceAddress } from '@/platform/workbench/defaults';
 
 const serverKeyItemSchema = z.object({
@@ -210,6 +211,10 @@ async function requestKeyring(input: RequestInfo | URL, init?: RequestInit) {
 }
 
 export async function syncEvmKeyringFromServer() {
+  if (!isClientAuthenticated()) {
+    return applyCache(getFallbackStore().items, 'guest');
+  }
+
   const response = await fetch('/api/workbench/evm/private-keys', {
     cache: 'no-store',
   });
