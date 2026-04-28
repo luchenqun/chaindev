@@ -209,6 +209,8 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       setActiveMode(readActivePlatformModeCookie());
     };
 
+    handleModeChanged();
+
     window.addEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
     window.addEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
     window.addEventListener('chaindev:active-platform-mode-changed', handleModeChanged);

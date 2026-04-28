@@ -184,7 +184,7 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
       setLoading(true);
 
       try {
-        const data = await fetchRpcProfiles();
+        const data = await fetchRpcProfiles({ authenticated: status === 'authenticated' });
 
         if (cancelled) {
           return;

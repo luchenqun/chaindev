@@ -234,7 +234,17 @@ export function deleteLocalRpcProfile(mode: PlatformMode, profileId: string) {
   return remaining.find((profile) => profile.mode === mode && profile.id === selected[mode]) ?? null;
 }
 
-export async function fetchRpcProfiles() {
+export async function fetchRpcProfiles(options: { authenticated?: boolean } = {}) {
+  if (options.authenticated === false) {
+    const guestDefaults = syncGuestRpcDefaults();
+
+    return {
+      source: 'guest' as const,
+      profiles: guestDefaults.profiles,
+      selected: guestDefaults.selected,
+    };
+  }
+
   const response = await fetch('/api/workbench/rpc-profiles', {
     cache: 'no-store',
   });
