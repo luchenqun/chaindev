@@ -16,6 +16,7 @@ import {
   hydrateEvmCachedTransactionInputData,
   getLatestCachedTransactionHash,
   rememberEvmTransactionCache,
+  validateEvmTransactionCacheShape,
   type EvmCachedTransactionItem,
 } from '@/domains/evm/client/transaction-cache';
 import { formatEvmAddressSummary, formatEvmBlock, formatEvmTransactionDetail } from '@/domains/evm/server/formatters';
@@ -1341,6 +1342,12 @@ export async function getEvmOverviewDirect() {
 
 export async function validateActiveEvmCacheDirect(): Promise<EvmCacheValidationResult> {
   const { client } = await getEvmClientWithProfile();
+  const shapeValidation = await validateEvmTransactionCacheShape();
+
+  if (shapeValidation.status !== 'valid') {
+    return shapeValidation;
+  }
+
   const latestCachedTransactionHash = await getLatestCachedTransactionHash().catch(() => null);
 
   if (!latestCachedTransactionHash) {

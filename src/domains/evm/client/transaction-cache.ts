@@ -352,6 +352,53 @@ function toPublicAccount(record: EvmObservedAccountRecord): EvmObservedAccountIt
   };
 }
 
+function hasObjectKey<Key extends PropertyKey>(value: object, key: Key): value is object & Record<Key, unknown> {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function isCurrentTransactionCacheRecord(value: unknown) {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const record = value as Partial<EvmCachedTransactionRecord>;
+
+  if (
+    typeof record.hash !== 'string' ||
+    typeof record.from !== 'string' ||
+    typeof record.fromLower !== 'string' ||
+    typeof record.blockNumber !== 'string' ||
+    typeof record.blockNumberValue !== 'number' ||
+    typeof record.sortTimestamp !== 'number' ||
+    typeof record.methodKey !== 'string' ||
+    typeof record.valueWeiSortKey !== 'string'
+  ) {
+    return false;
+  }
+
+  if (!hasObjectKey(value, 'toLower')) {
+    return false;
+  }
+
+  if (record.toLower != null && typeof record.toLower !== 'string') {
+    return false;
+  }
+
+  if (record.fromLower !== record.from.toLowerCase()) {
+    return false;
+  }
+
+  if (record.to && record.toLower !== record.to.toLowerCase()) {
+    return false;
+  }
+
+  if (!record.to && record.toLower !== null) {
+    return false;
+  }
+
+  return true;
+}
+
 function getAddressRecords(item: EvmCachedTransactionRecord) {
   const records: EvmAddressTransactionRecord[] = [];
   const fromLower = item.from.toLowerCase();
@@ -384,14 +431,7 @@ async function getDatabase() {
   if (!databasePromise) {
     databasePromise = new Promise<IDBDatabase>((resolve, reject) => {
       let settled = false;
-      const openTimeoutId = window.setTimeout(() => {
-        fail(new Error('IndexedDB open timed out.'));
-      }, 2500);
       let blockedTimeoutId: number | null = null;
-
-      function clearOpenTimeout() {
-        window.clearTimeout(openTimeoutId);
-      }
 
       function clearBlockedTimeout() {
         if (blockedTimeoutId != null) {
@@ -406,7 +446,6 @@ async function getDatabase() {
         }
 
         settled = true;
-        clearOpenTimeout();
         clearBlockedTimeout();
         reject(error);
       }
@@ -463,7 +502,6 @@ async function getDatabase() {
         }
 
         settled = true;
-        clearOpenTimeout();
         clearBlockedTimeout();
         request.result.onversionchange = () => {
           request.result.close();
@@ -856,12 +894,59 @@ export async function hydrateEvmCachedTransactionInputData(items: Array<{ hash: 
 
 export async function clearEvmTransactionCache() {
   const database = await getDatabase();
-  const transaction = database.transaction([TRANSACTIONS_STORE, ADDRESS_TRANSACTIONS_STORE, ADDRESS_SUMMARIES_STORE], 'readwrite');
-  transaction.objectStore(TRANSACTIONS_STORE).clear();
-  transaction.objectStore(ADDRESS_TRANSACTIONS_STORE).clear();
-  transaction.objectStore(ADDRESS_SUMMARIES_STORE).clear();
+  const storeNames = Array.from(database.objectStoreNames);
+  const transaction = database.transaction(storeNames, 'readwrite');
+
+  for (const storeName of storeNames) {
+    transaction.objectStore(storeName).clear();
+  }
+
   await waitForTransaction(transaction);
   emitChange();
+}
+
+export async function validateEvmTransactionCacheShape() {
+  const database = await getDatabase();
+  const transaction = database.transaction(TRANSACTIONS_STORE, 'readonly');
+  const store = transaction.objectStore(TRANSACTIONS_STORE);
+  const index = store.index(TRANSACTIONS_BY_TIMESTAMP_INDEX);
+  const latestRecord = await new Promise<EvmCachedTransactionRecord | null>((resolve, reject) => {
+    const request = index.openCursor(null, 'prev');
+
+    request.onerror = () => reject(request.error ?? new Error('Failed to inspect cached transactions.'));
+    request.onsuccess = () => {
+      const cursor = request.result;
+
+      if (!cursor) {
+        resolve(null);
+        return;
+      }
+
+      resolve(cursor.value as EvmCachedTransactionRecord);
+    };
+  });
+
+  await waitForTransaction(transaction);
+
+  if (!latestRecord) {
+    return {
+      status: 'empty' as const,
+      label: 'No cached transactions to validate',
+    };
+  }
+
+  if (isCurrentTransactionCacheRecord(latestRecord)) {
+    return {
+      status: 'valid' as const,
+      label: 'Cache schema verified',
+    };
+  }
+
+  await clearEvmTransactionCache();
+  return {
+    status: 'cleared' as const,
+    label: 'Cleared outdated transaction cache schema',
+  };
 }
 
 export async function hasEvmCachedTransaction(hash: string) {
