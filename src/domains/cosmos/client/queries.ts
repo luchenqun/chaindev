@@ -1,5 +1,7 @@
 'use client';
 
+import 'client-only';
+
 import { fromBech32, toBech32 } from '@cosmjs/encoding';
 import { formatCosmosBlock } from '@/domains/cosmos/server/formatters';
 import { getRecentCachedCosmosTransactions, rememberCosmosTransactionCache, type CosmosCachedTransactionItem } from '@/domains/cosmos/client/transaction-cache';

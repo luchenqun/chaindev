@@ -1,3 +1,5 @@
+import 'client-only';
+
 import { createPublicClient } from 'viem';
 import { createEvmTransport } from '@/domains/evm/lib/transport';
 

@@ -8,6 +8,7 @@ import type { PlatformMode } from '@/config/chains';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { resolveQueryTarget } from '@/platform/search/resolve-query';
 
 type GlobalSearchProps = {
   mode: PlatformMode;
@@ -36,15 +37,9 @@ export function GlobalSearch({ mode, placeholder = 'Search by block, tx, or addr
     setMessage('');
 
     try {
-      const params = new URLSearchParams({ q: query, mode });
-      const response = await fetch(`/api/search/resolve?${params.toString()}`);
-      const payload = (await response.json()) as {
-        ok: boolean;
-        target?: string;
-        message?: string;
-      };
+      const payload = resolveQueryTarget(query, mode);
 
-      if (!payload.ok || !payload.target) {
+      if (!payload.ok) {
         setMessage(payload.message ?? messages.search.unsupported);
         return;
       }

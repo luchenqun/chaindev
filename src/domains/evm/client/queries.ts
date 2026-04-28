@@ -1,9 +1,11 @@
 'use client';
 
+import 'client-only';
+
 import { formatEther, formatGwei, isAddress } from 'viem';
 import { getEvmCurrencyName } from '@/platform/workbench/rpc-profile';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
-import { createEvmClient } from '@/domains/evm/server/client';
+import { createEvmClient } from '@/domains/evm/client/rpc-client';
 import {
   clearEvmTransactionCache,
   formatEvmValueWeiSortKey,

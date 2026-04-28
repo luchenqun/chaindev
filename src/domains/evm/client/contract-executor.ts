@@ -1,5 +1,7 @@
 'use client';
 
+import 'client-only';
+
 import { createPublicClient, createWalletClient, encodeDeployData, encodeFunctionData, formatEther, formatGwei, parseEther, parseGwei, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { getContractConstructor, getContractFunctionBySignature, parseContractAbiJson, parseContractFunctionArgs } from '@/domains/evm/client/abi-utils';

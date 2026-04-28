@@ -1,5 +1,7 @@
 'use client';
 
+import 'client-only';
+
 import { rememberCosmosTransactionCache, type CosmosCachedTransactionItem } from '@/domains/cosmos/client/transaction-cache';
 import { decodeCosmosTransactionSummary, type DecodedCosmosTransactionSummary, type CosmosRestTxResponse } from '@/domains/cosmos/client/tx-helpers';
 import { getActiveCosmosProvider } from '@/domains/cosmos/client/queries';
