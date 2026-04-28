@@ -389,7 +389,7 @@ function CosmosTransactionsPageContent() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums">
-                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
+                        <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
                           {transaction.height}
                         </Link>
                       </td>
@@ -398,7 +398,7 @@ function CosmosTransactionsPageContent() {
                       </td>
                       <td className="px-5 py-3 text-sm">
                         {transaction.sender !== 'Unknown' ? (
-                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
+                          <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
                             {transaction.senderLabel}
                           </Link>
                         ) : (

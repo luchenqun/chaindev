@@ -145,7 +145,7 @@ function CosmosValidatorsPageContent() {
                     <tr key={validator.operatorAddress} className="border-t border-slate-200">
                       <td className="px-5 py-3 text-sm">
                         <div className="min-w-0">
-                          <Link className="block truncate font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/validator/${validator.operatorAddress}`}>
+                          <Link prefetch={false} className="block truncate font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/validator/${validator.operatorAddress}`}>
                             {validator.moniker}
                           </Link>
                         </div>

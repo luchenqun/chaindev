@@ -93,7 +93,7 @@ export function EvmHomeActivity() {
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">Latest Blocks</h2>
-            <Link className="text-sm font-medium text-sky-600" href="/evm/blocks">
+            <Link prefetch={false} className="text-sm font-medium text-sky-600" href="/evm/blocks">
               VIEW ALL BLOCKS
             </Link>
           </div>
@@ -108,7 +108,7 @@ export function EvmHomeActivity() {
                     <IconBox className="size-5" stroke={1.8} />
                   </div>
                   <div className="min-w-0">
-                    <Link className="block text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/block/${block.number}`}>
+                    <Link prefetch={false} className="block text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/block/${block.number}`}>
                       {block.numberLabel}
                     </Link>
                     <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(block.timestampMs, nowMs)}</p>
@@ -140,7 +140,7 @@ export function EvmHomeActivity() {
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">Latest Transactions</h2>
-            <Link className="text-sm font-medium text-sky-600" href="/evm/txs">
+            <Link prefetch={false} className="text-sm font-medium text-sky-600" href="/evm/txs">
               VIEW ALL TRANSACTIONS
             </Link>
           </div>
@@ -157,7 +157,7 @@ export function EvmHomeActivity() {
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-0.5">
                       {transaction.receiptStatus === 'reverted' ? <IconAlertCircle className="size-4 shrink-0 text-rose-500" stroke={2} /> : null}
-                      <Link className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
+                      <Link prefetch={false} className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
                         {transaction.hashLabel}
                       </Link>
                     </div>

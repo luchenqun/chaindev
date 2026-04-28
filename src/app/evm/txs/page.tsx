@@ -657,7 +657,7 @@ function EvmTransactionsPageContent() {
                 label="Latest Cached Transaction"
                 value={
                   cacheSummary?.latestSeenTransaction ? (
-                    <Link
+                    <Link prefetch={false}
                       className="block truncate text-[22px] leading-tight text-sky-600 hover:text-sky-700"
                       href={`/evm/tx/${cacheSummary.latestSeenTransaction.hash}`}
                       title={cacheSummary.latestSeenTransaction.hash}
@@ -784,7 +784,7 @@ function EvmTransactionsPageContent() {
                               <TransactionMethodBadge methodLabel={decodedMethodLabel} />
                             </td>
                             <td className="px-5 py-3 text-sm tabular-nums">
-                              <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
+                              <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
                                 {transaction.blockNumber}
                               </Link>
                             </td>

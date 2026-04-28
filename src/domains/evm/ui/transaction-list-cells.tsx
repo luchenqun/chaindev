@@ -63,7 +63,7 @@ export function TransactionHashCell(props: TransactionPreviewData) {
     <div className="flex items-center gap-0.5">
       {receiptStatus === 'reverted' ? <IconAlertCircle className="size-5 shrink-0 text-rose-500" stroke={1.9} /> : null}
       <div className="relative inline-flex items-center gap-1.5">
-        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${hash}`}>
+        <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${hash}`}>
           {hashLabel}
         </Link>
         <button
@@ -282,7 +282,7 @@ export function TransactionPreviewButton(props: { transaction: TransactionPrevie
               </div>
 
               <div className="border-t border-slate-200 pt-2">
-                <Link className="inline-flex items-center gap-1 text-sm font-medium text-sky-600 transition hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
+                <Link prefetch={false} className="inline-flex items-center gap-1 text-sm font-medium text-sky-600 transition hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
                   See more details
                   <IconArrowUpRight className="size-3.5 text-slate-400" stroke={1.8} />
                 </Link>

@@ -54,7 +54,7 @@ export function CosmosHomeActivity() {
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">Latest Blocks</h2>
-            <Link className="text-sm font-medium text-sky-600" href="/cosmos/blocks">
+            <Link prefetch={false} className="text-sm font-medium text-sky-600" href="/cosmos/blocks">
               VIEW ALL BLOCKS
             </Link>
           </div>
@@ -69,13 +69,13 @@ export function CosmosHomeActivity() {
                     <IconBox className="size-5" stroke={1.8} />
                   </div>
                   <div className="min-w-0">
-                    <Link className="block text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/cosmos/block/${block.height}`}>
+                    <Link prefetch={false} className="block text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/cosmos/block/${block.height}`}>
                       #{block.height}
                     </Link>
                     <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(block.timestampMs, nowMs)}</p>
                   </div>
                   <div className="min-w-0">
-                    <Link
+                    <Link prefetch={false}
                       className="block truncate text-sm text-sky-600 hover:text-sky-700"
                       href={block.proposerOperatorAddress ? `/cosmos/validator/${block.proposerOperatorAddress}` : '/cosmos/validators'}
                     >
@@ -97,7 +97,7 @@ export function CosmosHomeActivity() {
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-slate-900">Latest Transactions</h2>
-            <Link className="text-sm font-medium text-sky-600" href="/cosmos/txs">
+            <Link prefetch={false} className="text-sm font-medium text-sky-600" href="/cosmos/txs">
               VIEW ALL TRANSACTIONS
             </Link>
           </div>
@@ -114,7 +114,7 @@ export function CosmosHomeActivity() {
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-0.5">
                       {transaction.status === 'failed' ? <IconAlertCircle className="size-4 shrink-0 text-rose-500" stroke={2} /> : null}
-                      <Link className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${transaction.hash}`}>
+                      <Link prefetch={false} className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${transaction.hash}`}>
                         {transaction.hashLabel}
                       </Link>
                     </div>
@@ -123,7 +123,7 @@ export function CosmosHomeActivity() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-slate-700">{transaction.type}</p>
                     <p className="mt-1 truncate text-sm text-slate-500">
-                      <Link className="text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
+                      <Link prefetch={false} className="text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
                         {transaction.senderLabel}
                       </Link>{' '}
                       · {formatRelativeAge(transaction.timestampMs, nowMs)}

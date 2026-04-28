@@ -194,7 +194,7 @@ function CosmosAccountsPageContent() {
                     return (
                       <tr key={account.address} className="border-t border-slate-200">
                         <td className="px-5 py-3 text-sm" title={displayAddress.full}>
-                          <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${account.address}`}>
+                          <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${account.address}`}>
                             {displayAddress.label}
                           </Link>
                         </td>

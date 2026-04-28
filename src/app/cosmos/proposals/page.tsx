@@ -158,7 +158,7 @@ function CosmosProposalsPageContent() {
                   data.proposals.map((proposal) => (
                     <tr key={proposal.id} className="cursor-pointer border-t border-slate-200 hover:bg-slate-50/70" onClick={() => router.push(`/cosmos/proposals/${proposal.id}`)}>
                       <td className="w-full max-w-[360px] px-4 py-3 text-sm" title={`#${proposal.id}. ${proposal.title}`}>
-                        <Link className="inline-block max-w-[360px] truncate align-middle font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/proposals/${proposal.id}`}>
+                        <Link prefetch={false} className="inline-block max-w-[360px] truncate align-middle font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/proposals/${proposal.id}`}>
                           {`#${proposal.id}. ${proposal.title}`}
                         </Link>
                       </td>

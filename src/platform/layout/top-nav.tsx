@@ -130,20 +130,20 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
       <div className="border-t border-slate-100">
         <div className="mx-auto grid max-w-[1400px] gap-5 px-3 py-0.5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
           <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-3">
+            <Link prefetch={false} href="/" className="flex items-center gap-3">
               <Image alt="Chaindev" className="h-[52px] w-auto" height={52} src="/brand-lockup.svg" width={223} />
             </Link>
           </div>
 
           <nav className="flex flex-wrap items-center justify-end gap-8 text-[15px] font-[450] text-slate-950">
-            <Link className={pathname === '/' ? 'py-2.5 font-[450] text-[#1697ea]' : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'} href="/">
+            <Link prefetch={false} className={pathname === '/' ? 'py-2.5 font-[450] text-[#1697ea]' : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'} href="/">
               {messages.navigation.home}
             </Link>
             {primaryNavItems.map((item) => {
               const itemActive = matchesNavItem(pathname, item.href);
 
               return (
-                <Link key={item.href} href={item.href} className={itemActive ? 'py-2.5 font-[450] text-[#1697ea]' : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'}>
+                <Link prefetch={false} key={item.href} href={item.href} className={itemActive ? 'py-2.5 font-[450] text-[#1697ea]' : 'py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'}>
                   {item.label}
                 </Link>
               );
@@ -176,7 +176,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                             const itemActive = matchesNavItem(pathname, item.href);
 
                             return (
-                              <Link
+                              <Link prefetch={false}
                                 key={item.href}
                                 href={item.href}
                                 className={
@@ -218,7 +218,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 ) : null}
               </div>
             ) : (
-              <Link href="/login">
+              <Link prefetch={false} href="/login">
                 <Button variant="ghost" className="h-8 gap-2 px-0 text-[15px] font-normal text-slate-700">
                   <IconUserCircle className="size-4" stroke={2} />
                   {messages.navigation.signIn}

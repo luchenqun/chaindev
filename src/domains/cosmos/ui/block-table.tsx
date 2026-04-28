@@ -40,7 +40,7 @@ export function CosmosBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
           {blocks.map((block) => (
             <tr key={block.height} className="border-t border-slate-200">
               <td className="px-4 py-2.5 text-[14px] leading-6">
-                <Link href={`${hrefPrefix}/${block.height}`}>
+                <Link prefetch={false} href={`${hrefPrefix}/${block.height}`}>
                   <span className="font-medium text-sky-600 hover:text-sky-700">#{block.height}</span>
                 </Link>
               </td>
@@ -52,7 +52,7 @@ export function CosmosBlockTable({ blocks, hrefPrefix }: BlockTableProps) {
               </td>
               <td className="px-4 py-2.5 text-[14px] leading-6 font-medium text-sky-600 tabular-nums">{block.txCountLabel}</td>
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">
-                <Link
+                <Link prefetch={false}
                   className="font-medium text-sky-600 hover:text-sky-700"
                   href={block.proposerOperatorAddress ? `/cosmos/validator/${block.proposerOperatorAddress}` : '/cosmos/validators'}
                 >

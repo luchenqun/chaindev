@@ -24,7 +24,7 @@ export function CosmosTransactionHashCell({ hash, hashLabel, status }: Pick<Cosm
   return (
     <div className="flex items-center gap-0.5">
       {status === 'failed' ? <IconAlertCircle className="size-5 shrink-0 text-rose-500" stroke={1.9} /> : null}
-      <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${hash}`}>
+      <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${hash}`}>
         {hashLabel}
       </Link>
     </div>
@@ -164,7 +164,7 @@ export function CosmosTransactionPreviewButton({ transaction }: { transaction: C
               </div>
 
               <div className="border-t border-slate-200 pt-3">
-                <Link href={`/cosmos/tx/${transaction.hash}`} className="inline-flex items-center text-sm font-medium text-sky-600 transition hover:text-sky-700">
+                <Link prefetch={false} href={`/cosmos/tx/${transaction.hash}`} className="inline-flex items-center text-sm font-medium text-sky-600 transition hover:text-sky-700">
                   View Full Transaction
                 </Link>
               </div>

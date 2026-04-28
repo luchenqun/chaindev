@@ -811,19 +811,28 @@ type CachedCosmosValidatorMaps = {
 };
 
 const COSMOS_VALIDATOR_CACHE_TTL_MS = 60_000;
+const COSMOS_FETCH_TIMEOUT_MS = 8_000;
 let cachedCosmosValidatorMaps: CachedCosmosValidatorMaps | null = null;
 
 async function fetchJson<T>(url: string, init?: RequestInit) {
-  const response = await fetch(url, {
-    cache: 'no-store',
-    ...init,
-  });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), COSMOS_FETCH_TIMEOUT_MS);
 
-  if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+  try {
+    const response = await fetch(url, {
+      cache: 'no-store',
+      ...init,
+      signal: init?.signal ?? controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Request failed: ${response.status}`);
+    }
+
+    return (await response.json()) as T;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
-
-  return (await response.json()) as T;
 }
 
 function formatInteger(value: string | number | bigint | null | undefined, fallback = 'Unavailable') {
@@ -2865,16 +2874,16 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
       getUnconfirmedTxsDirect(profile).catch(() => ({
         result: { n_txs: '0', total: '0' },
       })),
-      getTxSearchDirect(profile, txLimit),
-      getRestValidatorsDirect(profile),
-      fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`),
-      fetchJson<CosmosCommunityPoolResponse>(`${profile.restUrl}/cosmos/distribution/v1beta1/community_pool`),
-      fetchJson<CosmosSupplyResponse>(`${profile.restUrl}/cosmos/bank/v1beta1/supply`),
+      getTxSearchDirect(profile, txLimit).catch(() => ({ result: { total_count: '0', txs: [] } })),
+      getRestValidatorsDirect(profile).catch(() => ({ validators: [], pagination: { total: '0' } })),
+      fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`).catch(() => ({ pool: { bonded_tokens: '0', not_bonded_tokens: '0' } })),
+      fetchJson<CosmosCommunityPoolResponse>(`${profile.restUrl}/cosmos/distribution/v1beta1/community_pool`).catch(() => ({ pool: [] })),
+      fetchJson<CosmosSupplyResponse>(`${profile.restUrl}/cosmos/bank/v1beta1/supply`).catch(() => ({ supply: [] })),
       getRecentCachedCosmosTransactions(txLimit).catch(() => []),
     ]);
   const latestHeight = Number(statusPayload.result?.sync_info?.latest_block_height ?? 0);
   const [blockchainPayload, rpcValidatorsPayload] = await Promise.all([
-    getBlockchainDirect(profile, latestHeight, Math.max(blockLimit, 10)),
+    getBlockchainDirect(profile, latestHeight, Math.max(blockLimit, 10)).catch(() => ({ result: { block_metas: [] } })),
     getRpcValidatorsDirect(profile, latestHeight).catch(() => ({
       result: { validators: [] },
     })),
