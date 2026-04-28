@@ -93,6 +93,18 @@ function notifyRpcProfilesChanged() {
   window.dispatchEvent(new CustomEvent('chaindev:rpc-profiles-changed'));
 }
 
+function areJsonValuesEqual(left: unknown, right: unknown) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function hasActiveRpcProfileCookie(mode: PlatformMode) {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+
+  return document.cookie.split('; ').some((item) => item.startsWith(`${getActiveRpcProfileCookieName(mode)}=`));
+}
+
 function createAuthRequiredError() {
   const error = new Error('AUTH_REQUIRED');
   error.name = 'AuthRequiredError';
@@ -112,13 +124,23 @@ export function getLocalSelectedRpcProfiles() {
 }
 
 export function replaceLocalRpcProfiles(profiles: RpcProfile[]) {
+  if (areJsonValuesEqual(listLocalRpcProfiles(), profiles)) {
+    return false;
+  }
+
   writeJsonStorage(LOCAL_RPC_PROFILES_STORAGE_KEY, profiles);
   notifyRpcProfilesChanged();
+  return true;
 }
 
 export function replaceLocalSelectedRpcProfiles(selected: SelectedRpcProfileMap) {
+  if (areJsonValuesEqual(getLocalSelectedRpcProfiles(), selected)) {
+    return false;
+  }
+
   writeJsonStorage(LOCAL_SELECTED_RPC_PROFILES_STORAGE_KEY, selected);
   notifyRpcProfilesChanged();
+  return true;
 }
 
 export function syncGuestRpcDefaults() {
@@ -345,8 +367,18 @@ export function writeActiveRpcProfileCookie(profile: RpcProfile | null) {
   const name = getActiveRpcProfileCookieName(profile?.mode ?? 'evm');
 
   if (!profile) {
+    if (!hasActiveRpcProfileCookie('evm')) {
+      return;
+    }
+
     document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
     notifyActiveRpcProfileChanged();
+    return;
+  }
+
+  const current = readActiveRpcProfileCookie(profile.mode);
+
+  if (areJsonValuesEqual(current, profile)) {
     return;
   }
 
