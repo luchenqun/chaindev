@@ -11,8 +11,9 @@ import {
   type CosmosHomeSnapshot,
 } from '@/domains/cosmos/client/queries';
 import { decodeCosmosHomeTransactionsByHashes } from '@/domains/cosmos/client/home-transactions';
+import { notifyCosmosTransactionsAvailable } from '@/domains/cosmos/ui/live-events';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
-import { isCosmosHomeRouteActive, isCosmosLiveBlockRouteActive, isCosmosRouteActive } from '@/platform/workbench/home-route-state';
+import { isCosmosBlocksRouteActive, isCosmosHomeRouteActive, isCosmosLiveBlockRouteActive, isCosmosRouteActive } from '@/platform/workbench/home-route-state';
 
 type CosmosHomeDataContextValue = {
   snapshot: CosmosHomeSnapshot | null;
@@ -109,6 +110,48 @@ function mergeLatestBlocks(current: CosmosHomeSnapshot['activity']['blocks'], ne
   return [next, ...current.filter((item) => item.height !== next.height)].slice(0, COSMOS_HOME_BLOCK_LIMIT);
 }
 
+function formatWsBlockTime(value: string | undefined) {
+  if (!value) {
+    return 'Unavailable';
+  }
+
+  const timestampMs = new Date(value).getTime();
+
+  if (!Number.isFinite(timestampMs)) {
+    return 'Unavailable';
+  }
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(new Date(timestampMs));
+}
+
+function formatCompactHash(value: string | undefined, start = 10, end = 8) {
+  if (!value) {
+    return 'Unavailable';
+  }
+
+  if (value.length <= start + end + 3) {
+    return value;
+  }
+
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
+}
+
+function parseWsBlockTimestampMs(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const timestampMs = new Date(value).getTime();
+  return Number.isFinite(timestampMs) ? timestampMs : null;
+}
+
 async function sha256HexFromBase64(input: string) {
   const raw = window.atob(input);
   const bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0));
@@ -178,6 +221,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
     const isHomeRoute = isCosmosHomeRouteActive(pathname, activeMode);
     const isCosmosRoute = isCosmosRouteActive(pathname, activeMode);
     const shouldSubscribeToLiveBlocks = isCosmosLiveBlockRouteActive(pathname, activeMode);
+    const shouldHydrateBlockDetails = isHomeRoute || isCosmosBlocksRouteActive(pathname);
 
     function clearTimers() {
       if (pollTimeoutRef.current != null) {
@@ -354,7 +398,47 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const txCount = Array.isArray(value?.block?.data?.txs) ? value.block.data.txs.length : 0;
+
+      if (txCount > 0) {
+        notifyCosmosTransactionsAvailable({
+          height,
+          txCount,
+        });
+      }
+
       if (liveBlockHydrationRef.current.requestedHeight === height || liveBlockHydrationRef.current.latestAppliedHeight === height) {
+        return;
+      }
+
+      if (!shouldHydrateBlockDetails) {
+        const timestampMs = parseWsBlockTimestampMs(header.time);
+
+        liveBlockHydrationRef.current.latestAppliedHeight = height;
+        setLatestFeed({
+          latestBlock: height,
+          latestBlockNumber: Number.parseInt(height, 10) || 0,
+          latestBlockTime: formatWsBlockTime(header.time),
+          latestBlockTimestampMs: timestampMs,
+          blockPageItem: {
+            height,
+            hash: value?.block_id?.hash ?? '',
+            hashLabel: formatCompactHash(value?.block_id?.hash),
+            proposer: header.proposer_address ?? 'Unknown',
+            proposerOperatorAddress: null,
+            proposerLabel: formatCompactHash(header.proposer_address),
+            proposerAddressLabel: formatCompactHash(header.proposer_address, 12, 8),
+            txCount,
+            txCountLabel: `${txCount} txs`,
+            blockSizeLabel: 'Unavailable',
+            appHash: header.app_hash ?? '',
+            appHashLabel: formatCompactHash(header.app_hash, 10, 8),
+            signaturesLabel: 'Unavailable',
+            timeLabel: formatWsBlockTime(header.time),
+            timestampMs,
+          },
+        });
+        setErrorMessage(null);
         return;
       }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { IconPlayerPause, IconPlayerPlay, IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconArrowsExchange, IconPlayerPause, IconPlayerPlay, IconRefresh, IconSearch } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -9,13 +9,15 @@ import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
-import { getCosmosTransactionsPageDirect } from '@/domains/cosmos/client/queries';
+import { getCosmosTransactionsByBlockDirect, getCosmosTransactionsPageDirect } from '@/domains/cosmos/client/queries';
+import { formatCosmosAddressForDisplay, type CosmosAddressDisplayMode } from '@/domains/cosmos/ui/address-display';
+import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
+import { COSMOS_TRANSACTIONS_AVAILABLE_EVENT, type CosmosTransactionsAvailableEventDetail } from '@/domains/cosmos/ui/live-events';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 10;
-const AUTO_REFRESH_INTERVAL_MS = 12_000;
 
 type CosmosTransactionSearchFormState = {
   hash: string;
@@ -197,8 +199,11 @@ function CosmosTransactionsPageContent() {
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [addressDisplayMode, setAddressDisplayMode] = useState<CosmosAddressDisplayMode>('bech32');
   const [loading, setLoading] = useState(true);
   const hasLoadedDataRef = useRef(false);
+  const liveBlockRefreshesRef = useRef<Set<string>>(new Set());
+  const liveProcessedBlockHeightsRef = useRef<Set<string>>(new Set());
   const currentQuery = useMemo(() => buildCosmosTransactionsSearchQuery(activeSearchFilters), [activeSearchFilters]);
   const activeFilterDescriptions = useMemo(() => describeActiveFilters(activeSearchFilters), [activeSearchFilters]);
 
@@ -296,12 +301,97 @@ function CosmosTransactionsPageContent() {
       return;
     }
 
-    const intervalId = window.setInterval(() => {
-      setRefreshVersion((current) => current + 1);
-    }, AUTO_REFRESH_INTERVAL_MS);
+    async function loadBlockTransactions(height: string) {
+      if (liveBlockRefreshesRef.current.has(height) || liveProcessedBlockHeightsRef.current.has(height)) {
+        return;
+      }
+
+      liveBlockRefreshesRef.current.add(height);
+
+      try {
+        const transactions = await getCosmosTransactionsByBlockDirect(height, PAGE_SIZE);
+
+        if (!transactions.length) {
+          liveProcessedBlockHeightsRef.current.add(height);
+          return;
+        }
+
+        setData((current) => {
+          if (!current) {
+            return current;
+          }
+
+          const existingHashes = new Set(current.transactions.map((transaction) => transaction.hash));
+          const nextTransactions = transactions.filter((transaction) => !existingHashes.has(transaction.hash));
+
+          if (!nextTransactions.length) {
+            return current;
+          }
+
+          const mergedTransactions = [...nextTransactions, ...current.transactions].slice(0, current.pageSize);
+          const totalTransactions = Math.max(current.totalTransactions + nextTransactions.length, mergedTransactions.length);
+          const totalPages = Math.max(1, Math.ceil(Math.max(totalTransactions, 1) / current.pageSize));
+          const topBlock = mergedTransactions[0]?.height ?? height;
+          const bottomBlock = mergedTransactions[mergedTransactions.length - 1]?.height ?? height;
+
+          return {
+            ...current,
+            totalTransactions,
+            totalPages,
+            hasNextPage: totalPages > current.page,
+            totalLabel: totalTransactions ? `${totalTransactions.toLocaleString('en-US')} transactions` : current.totalLabel,
+            summary: current.summary.map((item) => {
+              if (item.label === 'Latest Block') {
+                return {
+                  ...item,
+                  value: Number.parseInt(height, 10).toLocaleString('en-US'),
+                  note: 'Live head from the active Cosmos WebSocket subscription.',
+                };
+              }
+
+              if (item.label === 'Results') {
+                return {
+                  ...item,
+                  value: totalTransactions.toLocaleString('en-US'),
+                  note: `Showing page ${current.page} of ${totalPages}.`,
+                };
+              }
+
+              if (item.label === 'Current Range') {
+                return {
+                  ...item,
+                  value: `#${topBlock} - #${bottomBlock}`,
+                  note: `Loaded ${mergedTransactions.length} transactions on this page.`,
+                };
+              }
+
+              return item;
+            }),
+            transactions: mergedTransactions,
+          };
+        });
+        liveProcessedBlockHeightsRef.current.add(height);
+      } catch {
+        // Keep the existing page data. The next matching block notification can try again.
+      } finally {
+        liveBlockRefreshesRef.current.delete(height);
+      }
+    }
+
+    const handleTransactionsAvailable = (event: Event) => {
+      const detail = (event as CustomEvent<CosmosTransactionsAvailableEventDetail>).detail;
+
+      if (!detail?.txCount) {
+        return;
+      }
+
+      void loadBlockTransactions(detail.height);
+    };
+
+    window.addEventListener(COSMOS_TRANSACTIONS_AVAILABLE_EVENT, handleTransactionsAvailable);
 
     return () => {
-      window.clearInterval(intervalId);
+      window.removeEventListener(COSMOS_TRANSACTIONS_AVAILABLE_EVENT, handleTransactionsAvailable);
     };
   }, [activeSearchFilters.hasFilters, autoRefreshEnabled, currentPage]);
 
@@ -366,6 +456,13 @@ function CosmosTransactionsPageContent() {
                 <IconSearch className="size-4" stroke={1.8} />
               </ActionIconButton>
               <ActionIconButton
+                tooltip={addressDisplayMode === 'bech32' ? 'Switch to hex addresses' : 'Switch to bech32 addresses'}
+                className="text-slate-400 hover:text-slate-600"
+                onClick={() => setAddressDisplayMode((current) => (current === 'bech32' ? 'hex' : 'bech32'))}
+              >
+                <IconArrowsExchange className="size-4" stroke={1.8} />
+              </ActionIconButton>
+              <ActionIconButton
                 tooltip="Refresh transactions"
                 className="text-slate-400 hover:text-slate-600"
                 disabled={loading}
@@ -408,42 +505,44 @@ function CosmosTransactionsPageContent() {
               </thead>
               <tbody>
                 {data.transactions.length ? (
-                  data.transactions.map((transaction) => (
-                    <tr key={transaction.hash} className="border-t border-slate-200">
-                      <td className="px-5 py-3 text-sm">
-                        <div className="-ml-1 flex items-center gap-1.5">
-                          <CosmosTransactionPreviewButton transaction={transaction} />
-                          <CosmosTransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} status={transaction.status} />
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 text-sm">
-                        <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
-                          {transaction.type}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-sm tabular-nums">
-                        <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
-                          {transaction.height}
-                        </Link>
-                      </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">
-                        <RelativeTime timestampMs={transaction.timestampMs} />
-                      </td>
-                      <td className="px-5 py-3 text-sm">
-                        {transaction.sender !== 'Unknown' ? (
-                          <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
-                            {transaction.senderLabel}
+                  data.transactions.map((transaction) => {
+                    const displaySender = transaction.sender !== 'Unknown' ? formatCosmosAddressForDisplay(transaction.sender, addressDisplayMode) : null;
+
+                    return (
+                      <tr key={transaction.hash} className="border-t border-slate-200">
+                        <td className="px-5 py-3 text-sm">
+                          <div className="-ml-1 flex items-center gap-1.5">
+                            <CosmosTransactionPreviewButton transaction={transaction} />
+                            <CosmosTransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} status={transaction.status} />
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-sm">
+                          <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                            {transaction.type}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-sm tabular-nums">
+                          <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
+                            {transaction.height}
                           </Link>
-                        ) : (
-                          <span className="text-slate-500">Unknown</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
-                        {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
-                      </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{transaction.feeLabel}</td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          <RelativeTime timestampMs={transaction.timestampMs} />
+                        </td>
+                        <td className="px-5 py-3 text-sm" title={displaySender?.full}>
+                          {displaySender ? (
+                            <CosmosAddressLink prefetch={false} href={`/cosmos/account/${transaction.sender}`} label={displaySender.label} copyValue={displaySender.full} />
+                          ) : (
+                            <span className="text-slate-500">Unknown</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
+                          {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-700">{transaction.feeLabel}</td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">

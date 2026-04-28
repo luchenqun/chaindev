@@ -1,50 +1,18 @@
 'use client';
 
-import { fromBech32, toHex } from '@cosmjs/encoding';
 import { IconAdjustmentsHorizontal, IconArrowsExchange, IconCode, IconRefresh } from '@tabler/icons-react';
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosAccountsPageDirect } from '@/domains/cosmos/client/queries';
+import { formatCosmosAddressForDisplay, type CosmosAddressDisplayMode } from '@/domains/cosmos/ui/address-display';
+import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 20;
-
-function formatCompactValue(value: string, start = 14, end = 10) {
-  if (value.length <= start + end + 3) {
-    return value;
-  }
-
-  return `${value.slice(0, start)}...${value.slice(-end)}`;
-}
-
-function formatAccountAddressForDisplay(address: string, mode: 'bech32' | 'hex') {
-  if (mode === 'bech32') {
-    return {
-      full: address,
-      label: formatCompactValue(address, 14, 10),
-    };
-  }
-
-  try {
-    const { data } = fromBech32(address);
-    const hexAddress = `0x${toHex(data)}`;
-
-    return {
-      full: hexAddress,
-      label: hexAddress,
-    };
-  } catch {
-    return {
-      full: address,
-      label: formatCompactValue(address, 14, 10),
-    };
-  }
-}
 
 function CosmosAccountsPageContent() {
   const pathname = usePathname();
@@ -57,7 +25,7 @@ function CosmosAccountsPageContent() {
   const [loading, setLoading] = useState(true);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [balanceDisplayMode, setBalanceDisplayMode] = useState<'readable' | 'accurate'>('readable');
-  const [addressDisplayMode, setAddressDisplayMode] = useState<'bech32' | 'hex'>('bech32');
+  const [addressDisplayMode, setAddressDisplayMode] = useState<CosmosAddressDisplayMode>('bech32');
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -189,14 +157,12 @@ function CosmosAccountsPageContent() {
               <tbody>
                 {data.accounts.length ? (
                   data.accounts.map((account) => {
-                    const displayAddress = formatAccountAddressForDisplay(account.address, addressDisplayMode);
+                    const displayAddress = formatCosmosAddressForDisplay(account.address, addressDisplayMode);
 
                     return (
                       <tr key={account.address} className="border-t border-slate-200">
                         <td className="px-5 py-3 text-sm" title={displayAddress.full}>
-                          <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${account.address}`}>
-                            {displayAddress.label}
-                          </Link>
+                          <CosmosAddressLink prefetch={false} href={`/cosmos/account/${account.address}`} label={displayAddress.label} copyValue={displayAddress.full} />
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-700">{balanceDisplayMode === 'readable' ? account.readableBalancesLabel : account.balancesLabel}</td>
                         <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.sequenceLabel}</td>

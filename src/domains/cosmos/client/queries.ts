@@ -1983,6 +1983,41 @@ export async function getCosmosTransactionsPageDirect(input?: { requestedPage?: 
   };
 }
 
+export async function getCosmosTransactionsByBlockDirect(height: string | number, limit = 20) {
+  const profile = getActiveCosmosProvider();
+  const normalizedHeight = typeof height === 'number' ? height : Number.parseInt(height, 10);
+
+  if (!Number.isFinite(normalizedHeight) || normalizedHeight < 1) {
+    throw new Error('Invalid Cosmos block height.');
+  }
+
+  const txSearchPayload = await getTxSearchByHeightDirect(profile, normalizedHeight, 1, Math.max(1, Math.trunc(limit)));
+  const txs = txSearchPayload.result?.txs ?? [];
+
+  if (!txs.length) {
+    return [] as CosmosTransactionsPageItem[];
+  }
+
+  const blockTimeByHeight = await getBlockTimestampsByHeights(profile, [String(normalizedHeight)]);
+  const detailResults = await Promise.allSettled(
+    txs.map((tx) => {
+      if (!tx.hash) {
+        return Promise.resolve(null);
+      }
+
+      return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
+    }),
+  );
+
+  return txs.map((tx, index) =>
+    formatCosmosTransactionsPageItem({
+      tx,
+      detail: detailResults[index]?.status === 'fulfilled' ? detailResults[index].value : null,
+      timestamp: blockTimeByHeight.get(tx.height ?? String(normalizedHeight)) ?? null,
+    }),
+  );
+}
+
 export async function getCosmosLatestBlockFeedDirect(height: number | string) {
   const profile = getActiveCosmosProvider();
   const normalizedHeight = typeof height === 'number' ? height : Number.parseInt(height, 10);
