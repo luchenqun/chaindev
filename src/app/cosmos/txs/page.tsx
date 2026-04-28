@@ -1,6 +1,6 @@
 'use client';
 
-import { IconPlayerPause, IconPlayerPlay, IconSearch } from '@tabler/icons-react';
+import { IconRefresh, IconSearch } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -10,12 +10,11 @@ import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { getCosmosTransactionsPageDirect } from '@/domains/cosmos/client/queries';
-import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
 import { AppShell } from '@/platform/layout/app-shell';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
 
 type CosmosTransactionSearchFormState = {
   hash: string;
@@ -189,19 +188,17 @@ function CosmosTransactionsPageContent() {
   const searchParams = useSearchParams();
   const searchParamsText = searchParams.toString();
   const currentPage = parsePageParam(searchParams.get('page'));
-  const { latestFeed } = useCosmosHomeData();
   const [data, setData] = useState<Awaited<ReturnType<typeof getCosmosTransactionsPageDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchForm, setSearchForm] = useState<CosmosTransactionSearchFormState>(EMPTY_COSMOS_TRANSACTION_SEARCH_FORM);
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
   const [activeSearchFilters, setActiveSearchFilters] = useState<AppliedCosmosTransactionSearchFilters>(EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [loading, setLoading] = useState(true);
   const hasLoadedDataRef = useRef(false);
   const currentQuery = useMemo(() => buildCosmosTransactionsSearchQuery(activeSearchFilters), [activeSearchFilters]);
   const activeFilterDescriptions = useMemo(() => describeActiveFilters(activeSearchFilters), [activeSearchFilters]);
-  const liveBlockKey = autoRefreshEnabled && !activeSearchFilters.hasFilters && currentPage === 1 ? (latestFeed?.latestBlock ?? '') : '';
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -290,7 +287,7 @@ function CosmosTransactionsPageContent() {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
-  }, [currentPage, currentQuery, liveBlockKey, pathname, router, searchParamsText]);
+  }, [currentPage, currentQuery, pathname, refreshVersion, router, searchParamsText]);
 
   if (loading) {
     return (
@@ -353,19 +350,12 @@ function CosmosTransactionsPageContent() {
                 <IconSearch className="size-4" stroke={1.8} />
               </ActionIconButton>
               <ActionIconButton
-                tooltip={
-                  activeSearchFilters.hasFilters
-                    ? 'Auto refresh is unavailable while transaction filters are active.'
-                    : autoRefreshEnabled
-                      ? 'Disable auto refresh'
-                      : 'Enable auto refresh'
-                }
-                aria-pressed={autoRefreshEnabled}
-                className={`${autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'} ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
-                disabled={activeSearchFilters.hasFilters}
-                onClick={() => setAutoRefreshEnabled((current) => !current)}
+                tooltip="Refresh transactions"
+                className="text-slate-400 hover:text-slate-600"
+                disabled={loading}
+                onClick={() => setRefreshVersion((current) => current + 1)}
               >
-                {autoRefreshEnabled ? <IconPlayerPause className="size-4" stroke={1.8} /> : <IconPlayerPlay className="size-4" stroke={1.8} />}
+                <IconRefresh className="size-4" stroke={1.8} />
               </ActionIconButton>
             </div>
           </div>

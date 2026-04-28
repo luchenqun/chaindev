@@ -1304,13 +1304,16 @@ async function getBlockResultsDirect(profile: CosmosProvider, height: string) {
 
 async function getBlockTimestampsByHeights(profile: CosmosProvider, heights: string[]) {
   const uniqueHeights = [...new Set(heights.filter(Boolean))];
-  const entries = await Promise.all(
-    uniqueHeights.map(async (height) => {
-      const payload = await fetchJson<TendermintBlockResponse>(`${profile.rpcUrl}/block?height=${height}`);
+  const entries: Array<readonly [string, string | null]> = [];
 
-      return [height, payload.result?.block?.header?.time ?? null] as const;
-    }),
-  );
+  for (const height of uniqueHeights) {
+    try {
+      const payload = await fetchJson<TendermintBlockResponse>(`${profile.rpcUrl}/block?height=${height}`);
+      entries.push([height, payload.result?.block?.header?.time ?? null] as const);
+    } catch {
+      entries.push([height, null] as const);
+    }
+  }
 
   return new Map(entries);
 }
