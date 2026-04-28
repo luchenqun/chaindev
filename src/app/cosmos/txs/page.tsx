@@ -194,9 +194,9 @@ function CosmosTransactionsPageContent() {
   const [searchForm, setSearchForm] = useState<CosmosTransactionSearchFormState>(EMPTY_COSMOS_TRANSACTION_SEARCH_FORM);
   const [searchErrorMessage, setSearchErrorMessage] = useState<string | null>(null);
   const [activeSearchFilters, setActiveSearchFilters] = useState<AppliedCosmosTransactionSearchFilters>(EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH);
-  const [searchDialogOpen, setSearchDialogOpen] = useState(true);
+  const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const hasLoadedDataRef = useRef(false);
   const currentQuery = useMemo(() => buildCosmosTransactionsSearchQuery(activeSearchFilters), [activeSearchFilters]);
