@@ -1,10 +1,20 @@
 'use client';
 
 const FALLBACK_INDEXED_DB_NAMES = ['chaindev-evm-transaction-cache', 'chaindev-cosmos-transaction-cache'];
+const STORAGE_OPERATION_TIMEOUT_MS = 800;
 
 type IndexedDbFactoryWithDatabases = IDBFactory & {
   databases?: () => Promise<Array<{ name?: string | null }>>;
 };
+
+function withTimeout<T>(task: Promise<T>, timeoutMs = STORAGE_OPERATION_TIMEOUT_MS) {
+  return Promise.race([
+    task,
+    new Promise<T>((resolve) => {
+      window.setTimeout(() => resolve(undefined as T), timeoutMs);
+    }),
+  ]);
+}
 
 function getCookieClearPaths() {
   const segments = window.location.pathname.split('/').filter(Boolean);
@@ -53,16 +63,24 @@ function waitForTransaction(transaction: IDBTransaction) {
 }
 
 async function openIndexedDatabase(name: string) {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = window.indexedDB.open(name);
+  return withTimeout(
+    new Promise<IDBDatabase | null>((resolve) => {
+      const request = window.indexedDB.open(name);
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error(`Failed to open IndexedDB database ${name}.`));
-  });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+      request.onblocked = () => resolve(null);
+    }),
+  );
 }
 
 async function clearIndexedDatabase(name: string) {
   const database = await openIndexedDatabase(name);
+
+  if (!database) {
+    return;
+  }
+
   const storeNames = Array.from(database.objectStoreNames);
 
   if (!storeNames.length) {
@@ -77,20 +95,22 @@ async function clearIndexedDatabase(name: string) {
       transaction.objectStore(storeName).clear();
     }
 
-    await waitForTransaction(transaction);
+    await withTimeout(waitForTransaction(transaction));
   } finally {
     database.close();
   }
 }
 
 async function deleteIndexedDatabase(name: string) {
-  await new Promise<void>((resolve) => {
-    const request = window.indexedDB.deleteDatabase(name);
+  await withTimeout(
+    new Promise<void>((resolve) => {
+      const request = window.indexedDB.deleteDatabase(name);
 
-    request.onsuccess = () => resolve();
-    request.onerror = () => resolve();
-    request.onblocked = () => resolve();
-  });
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+      request.onblocked = () => resolve();
+    }),
+  );
 }
 
 async function clearIndexedDatabases() {
@@ -99,7 +119,7 @@ async function clearIndexedDatabases() {
   }
 
   const indexedDb = window.indexedDB as IndexedDbFactoryWithDatabases;
-  const listedDatabases = typeof indexedDb.databases === 'function' ? await indexedDb.databases().catch(() => []) : [];
+  const listedDatabases = (typeof indexedDb.databases === 'function' ? await withTimeout(indexedDb.databases().catch(() => []), 500) : []) ?? [];
   const databaseNames = new Set([...FALLBACK_INDEXED_DB_NAMES, ...listedDatabases.map((database) => database.name).filter((name): name is string => Boolean(name))]);
 
   for (const name of databaseNames) {
