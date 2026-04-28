@@ -1,12 +1,15 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { IconClockHour4, IconStack2 } from '@tabler/icons-react';
-import { useMemo } from 'react';
+import { IconClockHour4, IconStack2, IconTrash } from '@tabler/icons-react';
+import { useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { ModalDialog } from '@/components/ui/modal-dialog';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { type PlatformMode } from '@/config/chains';
 import { isCosmosRouteActive, type ActivePlatformMode } from '@/platform/workbench/home-route-state';
+import { clearAllChaindevBrowserStorage } from '@/platform/workbench/site-storage-reset';
 
 type StatusItem = {
   label: string;
@@ -25,6 +28,9 @@ function buildFallbackItem(reason: string): StatusItem {
 export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
   const pathname = usePathname();
   const activeMode = mode as ActivePlatformMode;
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearState, setClearState] = useState<'idle' | 'clearing' | 'done' | 'failed'>('idle');
+  const [clearMessage, setClearMessage] = useState<string | null>(null);
   const { status, pollIntervalMs } = useEvmHomeData();
   const { snapshot: cosmosSnapshot, latestFeed: cosmosLatestFeed } = useCosmosHomeData();
   const displayItem = useMemo<StatusItem>(() => {
@@ -59,13 +65,39 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
     return buildFallbackItem('Unavailable');
   }, [activeMode, cosmosLatestFeed, cosmosSnapshot, mode, pathname, status]);
 
+  async function handleClearBrowserStorage() {
+    setClearState('clearing');
+    setClearMessage(null);
+
+    try {
+      await clearAllChaindevBrowserStorage();
+      setClearState('done');
+      setClearMessage('Local storage has been cleared. The page will reload.');
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    } catch (error) {
+      setClearState('failed');
+      setClearMessage(error instanceof Error ? error.message : 'Failed to clear local storage.');
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-5">
       <span className="inline-flex items-start gap-2">
-        <span className="flex flex-col gap-0.5 pt-[1px]">
-          <IconStack2 className="size-3.5 text-slate-400" stroke={2} />
-          {mode === 'evm' ? <IconClockHour4 className="size-3 text-slate-400" stroke={1.8} /> : null}
-        </span>
+        <button
+          type="button"
+          aria-label="Clear local browser storage"
+          className="flex flex-col gap-0.5 rounded-md pt-[1px] text-slate-400 transition hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          onClick={() => {
+            setClearState('idle');
+            setClearMessage(null);
+            setClearDialogOpen(true);
+          }}
+        >
+          <IconStack2 className="size-3.5" stroke={2} />
+          {mode === 'evm' ? <IconClockHour4 className="size-3" stroke={1.8} /> : null}
+        </button>
         <span className="flex flex-col leading-tight">
           <span className="inline-flex items-center gap-1.5">
             <span>{displayItem.label}:</span>
@@ -79,6 +111,32 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
           ) : null}
         </span>
       </span>
+      <ModalDialog
+        open={clearDialogOpen}
+        onOpenChange={setClearDialogOpen}
+        title="Clear browser storage"
+        description="Clear all local Chaindev data stored in this browser for the current site."
+        maxWidthClassName="max-w-lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)} disabled={clearState === 'clearing'}>
+              Cancel
+            </Button>
+            <Button className="gap-2 bg-rose-600 hover:bg-rose-700" onClick={() => void handleClearBrowserStorage()} disabled={clearState === 'clearing'}>
+              <IconTrash className="size-4" stroke={1.8} />
+              {clearState === 'clearing' ? 'Clearing...' : 'Clear all'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 text-sm leading-6 text-slate-600">
+          <p>This clears localStorage, sessionStorage, IndexedDB databases, Cache Storage, and browser-accessible cookies for this site.</p>
+          <p>Provider defaults will be recreated after reload, and chain data will be fetched again from the active provider.</p>
+          {clearMessage ? (
+            <p className={clearState === 'failed' ? 'font-medium text-rose-600' : 'font-medium text-slate-800'}>{clearMessage}</p>
+          ) : null}
+        </div>
+      </ModalDialog>
     </div>
   );
 }
