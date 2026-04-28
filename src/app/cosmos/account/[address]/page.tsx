@@ -1,7 +1,7 @@
 'use client';
 
 import JsonView from '@uiw/react-json-view';
-import { IconAdjustmentsHorizontal, IconCode, IconInfoCircle, IconTag } from '@tabler/icons-react';
+import { IconAdjustmentsHorizontal, IconArrowBackUp, IconCode, IconInfoCircle, IconTag, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -15,23 +15,104 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { RelativeTime } from '@/components/relative-time';
 import { deleteCosmosAddressTag, getCosmosAddressTag, getCosmosAddressTags, subscribeCosmosAddressTags, upsertCosmosAddressTag } from '@/domains/cosmos/client/address-tags';
+import { getCosmosAccountPrefixFromValidatorAddress, undelegateCosmosTokens, type CosmosSigningAlgorithm } from '@/domains/cosmos/client/delegate-transaction';
 import { getCosmosAccountDetailDirect } from '@/domains/cosmos/client/queries';
 import { COSMOS_JSON_VIEW_STYLE as JSON_VIEW_STYLE } from '@/domains/cosmos/ui/detail-primitives';
-import { formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
+import { formatCompactHash, formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
+import { decodeCosmosAddressToEvmHexAddress } from '@/domains/cosmos/ui/address-display';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
+import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
+import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type AccountPageTab = 'transactions' | 'delegations' | 'json';
+const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
 
-function AccountMetric({
-  label,
+function scaleDecimalByPowerOfTen(rawValue: string, exponent: number) {
+  const value = rawValue.trim() || '1';
+
+  if (!/^\d+(?:\.\d+)?$/.test(value)) {
+    return null;
+  }
+
+  const [wholePart, fractionPart = ''] = value.split('.');
+  const digits = `${wholePart}${fractionPart}`.replace(/^0+(?=\d)/, '') || '0';
+  const decimalShift = exponent - fractionPart.length;
+
+  if (decimalShift >= 0) {
+    return `${digits}${'0'.repeat(decimalShift)}`;
+  }
+
+  const splitIndex = digits.length + decimalShift;
+
+  if (splitIndex > 0) {
+    return `${digits.slice(0, splitIndex)}.${digits.slice(splitIndex)}`.replace(/\.?0+$/, '');
+  }
+
+  return `0.${'0'.repeat(Math.abs(splitIndex))}${digits}`.replace(/\.?0+$/, '');
+}
+
+function ScaledInput({
+  id,
   value,
-  tooltip,
+  placeholder,
+  disabled,
+  inputMode = 'numeric',
+  onChange,
 }: {
-  label: string;
-  value: React.ReactNode;
-  tooltip?: React.ReactNode;
+  id: string;
+  value: string;
+  placeholder: string;
+  disabled?: boolean;
+  inputMode?: 'numeric' | 'decimal';
+  onChange: (value: string) => void;
 }) {
+  const [scaleSelectResetVersion, setScaleSelectResetVersion] = useState(0);
+  const hasValue = Boolean(value.trim());
+
+  function applyScale(exponent: number) {
+    const scaledValue = scaleDecimalByPowerOfTen(value, exponent);
+
+    if (scaledValue) {
+      onChange(scaledValue);
+    }
+
+    setScaleSelectResetVersion((current) => current + 1);
+  }
+
+  return (
+    <div className="relative">
+      <Input id={id} value={value} inputMode={inputMode} placeholder={placeholder} disabled={disabled} className="pr-[132px]" onChange={(event) => onChange(event.target.value)} />
+      {hasValue ? (
+        <button
+          type="button"
+          className="absolute right-[82px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
+          onClick={() => onChange('')}
+          aria-label="Clear input"
+          disabled={disabled}
+        >
+          <IconX className="size-4" stroke={1.8} />
+        </button>
+      ) : null}
+      <Select key={`scale-${id}-${scaleSelectResetVersion}`} disabled={disabled} onValueChange={(nextValue) => applyScale(Number(nextValue))}>
+        <SelectTrigger className="absolute right-1.5 top-1/2 h-[30px] w-[74px] -translate-y-1/2 rounded-xl border-slate-200 bg-slate-50 px-2.5 text-sm font-medium text-slate-700 shadow-none">
+          <SelectValue placeholder="Scale" />
+        </SelectTrigger>
+        <SelectContent align="end">
+          {INTEGER_SCALE_OPTIONS.map((option) => (
+            <SelectItem key={option} value={String(option)}>
+              {`x10^${option}`}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function AccountMetric({ label, value, tooltip }: { label: string; value: React.ReactNode; tooltip?: React.ReactNode }) {
   const tooltipTriggerRef = useRef<HTMLSpanElement | null>(null);
   const [tooltipOpen, setTooltipOpen] = useState(false);
 
@@ -52,11 +133,7 @@ function AccountMetric({
             <span className="inline-flex items-center justify-center text-slate-300 outline-none">
               <IconInfoCircle className="size-3.5" stroke={1.8} />
             </span>
-            <FloatingTooltip
-              open={tooltipOpen}
-              anchorRef={tooltipTriggerRef}
-              className="w-[260px] whitespace-normal bg-slate-800 leading-5 text-white"
-            >
+            <FloatingTooltip open={tooltipOpen} anchorRef={tooltipTriggerRef} className="w-[260px] whitespace-normal bg-slate-800 leading-5 text-white">
               {tooltip}
             </FloatingTooltip>
           </span>
@@ -64,6 +141,271 @@ function AccountMetric({
       </div>
       <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
     </div>
+  );
+}
+
+type AccountDetailData = Awaited<ReturnType<typeof getCosmosAccountDetailDirect>>;
+type AccountDelegationItem = AccountDetailData['delegations'][number];
+
+function UndelegateDialog({
+  delegation,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  delegation: AccountDelegationItem | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const { showToast } = useToast();
+  const [amount, setAmount] = useState('');
+  const [denom, setDenom] = useState('');
+  const [gasPriceAmount, setGasPriceAmount] = useState('');
+  const [gasPriceDenom, setGasPriceDenom] = useState('');
+  const [signingAlgorithm, setSigningAlgorithm] = useState<CosmosSigningAlgorithm>('ethsecp256k1');
+  const [memo, setMemo] = useState('');
+  const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+
+  const validatorAddress = delegation?.validatorAddress ?? '';
+  const validatorLabel = delegation?.validatorMoniker ?? 'Unknown';
+  const accountPrefix = useMemo(() => getCosmosAccountPrefixFromValidatorAddress(validatorAddress), [validatorAddress]);
+  const amountPlaceholder = delegation?.rawJson.balance?.amount ?? '1000000000000000000';
+  const denomPlaceholder = delegation?.rawJson.balance?.denom ?? 'uatom';
+
+  useEffect(() => {
+    function loadActiveKey() {
+      setActiveKey(getActiveEvmStoredPrivateKey());
+    }
+
+    loadActiveKey();
+    return subscribeEvmKeyring(loadActiveKey);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setFormError(null);
+      return;
+    }
+
+    setAmount('');
+    setDenom('');
+    setGasPriceAmount('');
+    setGasPriceDenom('');
+    setSigningAlgorithm('ethsecp256k1');
+    setMemo('');
+    setFormError(null);
+    setUnlockPassword('');
+    setUnlockError(null);
+  }, [open, delegation?.validatorAddress]);
+
+  async function submitUndelegate(password?: string) {
+    if (!delegation) {
+      return;
+    }
+
+    if (!activeKey) {
+      setFormError('Select a global private key first.');
+      return;
+    }
+
+    setSubmitting(true);
+    setFormError(null);
+
+    try {
+      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
+      const result = await undelegateCosmosTokens({
+        privateKey,
+        accountPrefix,
+        signingAlgorithm,
+        validatorAddress: delegation.validatorAddress,
+        amount,
+        denom,
+        gasPrice: `${gasPriceAmount.trim()}${gasPriceDenom.trim()}`,
+        memo,
+      });
+
+      showToast({
+        title: 'Undelegate transaction broadcasted',
+        description: (
+          <span className="block min-w-0 max-w-full">
+            <span className="block truncate font-mono text-xs text-slate-500" title={result.delegatorAddress}>
+              {formatCompactHash(result.delegatorAddress, 12, 8)}
+            </span>
+            <Link
+              className="mt-1 block truncate font-mono text-xs font-medium text-sky-600 hover:text-sky-700"
+              href={`/cosmos/tx/${result.transactionHash}`}
+              title={result.transactionHash}
+            >
+              {formatCompactHash(result.transactionHash, 14, 10)}
+            </Link>
+          </span>
+        ),
+        durationMs: 8000,
+      });
+      onSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to broadcast undelegate transaction.';
+
+      if (message === 'Password is required.') {
+        setUnlockPassword('');
+        setUnlockError(null);
+        setUnlockDialogOpen(true);
+        return;
+      }
+
+      setFormError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConfirmUnlock() {
+    if (!activeKey) {
+      return;
+    }
+
+    try {
+      setUnlockError(null);
+      await resolveEvmStoredPrivateKey(activeKey.id, unlockPassword);
+      setUnlockDialogOpen(false);
+      const password = unlockPassword;
+      setUnlockPassword('');
+      await submitUndelegate(password);
+    } catch (error) {
+      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+    }
+  }
+
+  return (
+    <>
+      <ModalDialog
+        open={open}
+        title="Undelegate Transaction"
+        description="Unstake tokens from the selected validator with the active private key."
+        maxWidthClassName="max-w-xl"
+        onOpenChange={onOpenChange}
+        footer={
+          <>
+            <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={submitting || !delegation} onClick={() => void submitUndelegate()}>
+              {submitting ? 'Undelegating...' : 'Undelegate'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-6">
+          <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Node</p>
+              <p className="mt-1 truncate text-sm font-semibold text-slate-900" title={validatorAddress}>
+                {validatorLabel}
+              </p>
+              <p className="mt-1 truncate font-mono text-xs text-slate-500" title={validatorAddress}>
+                {validatorAddress ? formatCompactHash(validatorAddress, 18, 12) : '-'}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Key</p>
+              <p className="mt-1 truncate text-sm font-medium text-slate-900" title={activeKey?.address ?? undefined}>
+                {activeKey ? activeKey.name : 'No active key'}
+              </p>
+              <p className="mt-1 truncate font-mono text-xs text-slate-500" title={activeKey?.address ?? undefined}>
+                {activeKey ? formatCompactHash(activeKey.address, 12, 8) : '-'}
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Undelegate Details</h3>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-amount">
+                Amount
+              </label>
+              <ScaledInput id="undelegate-amount" value={amount} placeholder={amountPlaceholder} disabled={submitting} onChange={setAmount} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-denom">
+                Staking denom
+              </label>
+              <Input id="undelegate-denom" value={denom} placeholder={denomPlaceholder} disabled={submitting} onChange={(event) => setDenom(event.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-gas-price">
+                Gas price
+              </label>
+              <ScaledInput id="undelegate-gas-price" value={gasPriceAmount} inputMode="decimal" placeholder="1000000000000000" disabled={submitting} onChange={setGasPriceAmount} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-gas-denom">
+                Gas denom
+              </label>
+              <Input id="undelegate-gas-denom" value={gasPriceDenom} placeholder="uatom" disabled={submitting} onChange={(event) => setGasPriceDenom(event.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-signing">
+                Signing
+              </label>
+              <Select value={signingAlgorithm} disabled={submitting} onValueChange={(value) => setSigningAlgorithm(value as CosmosSigningAlgorithm)}>
+                <SelectTrigger id="undelegate-signing" className="mt-0 h-10">
+                  {signingAlgorithm}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ethsecp256k1">ethsecp256k1</SelectItem>
+                  <SelectItem value="secp256k1">secp256k1</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-memo">
+                Memo
+              </label>
+              <Input id="undelegate-memo" value={memo} placeholder="Optional" disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
+            </div>
+          </div>
+
+          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
+        </div>
+      </ModalDialog>
+      <SecretInputDialog
+        open={unlockDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setUnlockDialogOpen(nextOpen);
+
+          if (!nextOpen) {
+            setUnlockPassword('');
+            setUnlockError(null);
+          }
+        }}
+        title="Unlock Private Key"
+        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the undelegate transaction.` : 'Enter the password to continue.'}
+        value={unlockPassword}
+        onValueChange={setUnlockPassword}
+        placeholder="Password"
+        confirmLabel="Unlock"
+        confirmDisabled={!unlockPassword.trim()}
+        errorMessage={unlockError}
+        onConfirm={() => void handleConfirmUnlock()}
+      />
+    </>
   );
 }
 
@@ -77,10 +419,12 @@ export default function CosmosAccountPage() {
   const [balanceDisplayMode, setBalanceDisplayMode] = useState<'readable' | 'accurate'>('readable');
   const [account, setAccount] = useState<Awaited<ReturnType<typeof getCosmosAccountDetailDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [nameTag, setNameTag] = useState<string | null>(null);
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [tagInput, setTagInput] = useState('');
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
+  const [selectedUndelegation, setSelectedUndelegation] = useState<AccountDelegationItem | null>(null);
   const isLikelyAddress = useMemo(() => Boolean(address?.trim()), [address]);
   const visibleAddresses = useMemo(
     () => [...new Set((account?.transactionsPage.items ?? []).map((transaction) => transaction.sender).filter((sender) => sender !== 'Unknown'))],
@@ -158,7 +502,7 @@ export default function CosmosAccountPage() {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
-  }, [address, currentTxPage, isLikelyAddress]);
+  }, [address, currentTxPage, isLikelyAddress, refreshVersion]);
 
   useEffect(() => {
     if (!account) {
@@ -227,6 +571,10 @@ export default function CosmosAccountPage() {
     setTagDialogOpen(true);
   }
 
+  function handleUndelegateSuccess() {
+    setRefreshVersion((current) => current + 1);
+  }
+
   if (!isLikelyAddress) {
     return (
       <AppShell>
@@ -260,7 +608,16 @@ export default function CosmosAccountPage() {
   const hasTransactions = account.transactionsPage.totalCount > 0;
   const hasDelegations = account.delegationsCount > 0;
   const resolvedActiveTab =
-    activeTab === 'delegations' && !hasDelegations ? (hasTransactions ? 'transactions' : 'json') : activeTab === 'transactions' && !hasTransactions ? (hasDelegations ? 'delegations' : 'json') : activeTab;
+    activeTab === 'delegations' && !hasDelegations
+      ? hasTransactions
+        ? 'transactions'
+        : 'json'
+      : activeTab === 'transactions' && !hasTransactions
+        ? hasDelegations
+          ? 'delegations'
+          : 'json'
+        : activeTab;
+  const evmHexAddress = decodeCosmosAddressToEvmHexAddress(account.address);
 
   return (
     <AppShell>
@@ -268,9 +625,7 @@ export default function CosmosAccountPage() {
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[1.171875rem] font-semibold text-slate-900">Account</h1>
-            <span className={`${nameTag ? 'text-sm font-semibold text-slate-900' : 'text-sm font-medium text-slate-500 mono'}`}>
-              {nameTag ?? account.address}
-            </span>
+            <span className={`${nameTag ? 'text-sm font-semibold text-slate-900' : 'text-sm font-medium text-slate-500 mono'}`}>{nameTag ?? account.address}</span>
             <ActionIconButton tooltip={nameTag ? 'Edit tag' : 'Add tag'} className="text-slate-400 hover:text-sky-600" onClick={openTagDialog}>
               <IconTag className="size-4" stroke={1.8} />
             </ActionIconButton>
@@ -295,6 +650,10 @@ export default function CosmosAccountPage() {
           </div>
 
           <div className="border-t border-slate-200">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">EVM Hex</p>
+              <p className="mt-2 break-all font-mono text-sm font-medium text-slate-900">{evmHexAddress ?? 'Unavailable'}</p>
+            </div>
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
               <div className="min-w-0">
                 <p className="text-base font-semibold text-slate-900">Balances</p>
@@ -321,10 +680,8 @@ export default function CosmosAccountPage() {
                   <tbody>
                     {account.balances.map((balance, index) => (
                       <tr key={`${balance.denom}-${index}`} className="border-t border-slate-200">
-                        <td className="px-5 py-3 text-sm text-slate-700 mono">{balance.denom}</td>
-                        <td className="px-5 py-3 text-sm text-slate-900 mono">
-                          {balanceDisplayMode === 'readable' ? formatReadableTokenAmount(balance.amount) : balance.amount}
-                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-700 mono">{balanceDisplayMode === 'readable' ? formatReadableDenom(balance.denom) : balance.denom}</td>
+                        <td className="px-5 py-3 text-sm text-slate-900 mono">{balanceDisplayMode === 'readable' ? formatReadableTokenAmount(balance.amount) : balance.amount}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -462,6 +819,7 @@ export default function CosmosAccountPage() {
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Validator Address</th>
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
                     <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Shares</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -479,6 +837,11 @@ export default function CosmosAccountPage() {
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">{delegation.amountLabel}</td>
                       <td className="px-5 py-3 text-sm text-slate-900 mono">{delegation.sharesLabel}</td>
+                      <td className="px-5 py-3 text-right text-sm">
+                        <ActionIconButton tooltip="Undelegate" className="text-slate-400 hover:text-sky-600" onClick={() => setSelectedUndelegation(delegation)}>
+                          <IconArrowBackUp className="size-4" stroke={1.8} />
+                        </ActionIconButton>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -486,6 +849,17 @@ export default function CosmosAccountPage() {
             </div>
           </section>
         ) : null}
+
+        <UndelegateDialog
+          delegation={selectedUndelegation}
+          open={Boolean(selectedUndelegation)}
+          onSuccess={handleUndelegateSuccess}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setSelectedUndelegation(null);
+            }
+          }}
+        />
 
         {resolvedActiveTab === 'json' ? (
           <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">

@@ -602,6 +602,12 @@ export type CosmosValidatorDetail = {
   commissionRateLabel: string;
   minSelfDelegationLabel: string;
   selfBondLabel: string;
+  accountBalances: Array<{
+    denom: string;
+    amount: string;
+  }>;
+  accountBalancesLabel: string;
+  accountReadableBalancesLabel: string;
   stakeRewardsLabel: string;
   commissionRewardsLabel: string;
   outstandingRewardsLabel: string;
@@ -625,6 +631,12 @@ export type CosmosValidatorDetail = {
   rawJson: {
     validator: CosmosValidatorResponse['validator'] | null;
     delegations: CosmosDelegationsResponse;
+    balances: {
+      balances?: Array<{
+        denom: string;
+        amount: string;
+      }>;
+    } | null;
     stakeRewards: CosmosValidatorDelegatorRewardsResponse | null;
     commissionRewards: CosmosValidatorCommissionResponse | null;
     outstandingRewards: CosmosValidatorOutstandingRewardsResponse | null;
@@ -2234,7 +2246,7 @@ export async function getCosmosTxByHashDirect(hash: string) {
     timestampLabel: formatLocalTimestamp(timestamp ?? undefined),
     timestampMs: decoded.timestampMs,
     feeLabel: decoded.feeLabel,
-    memo: payload.tx?.memo ?? '',
+    memo: payload.tx?.body?.memo ?? payload.tx?.memo ?? '',
     gasUsedLabel: formatInteger(decoded.gasUsed, '0'),
     gasWantedLabel: formatInteger(decoded.gasWanted, '0'),
     rawLog: tx.raw_log ?? '',
@@ -2634,7 +2646,8 @@ export async function getCosmosValidatorDetailDirect(input: { address: string; t
       timestamp: blockTimeByHeight.get(tx.height ?? '') ?? null,
     }),
   );
-  const [stakeRewardsPayload, commissionRewardsPayload, outstandingRewardsPayload] = await Promise.all([
+  const [balancesPayload, stakeRewardsPayload, commissionRewardsPayload, outstandingRewardsPayload] = await Promise.all([
+    accountAddress ? fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(`${profile.restUrl}/cosmos/bank/v1beta1/balances/${accountAddress}`).catch(() => null) : null,
     accountAddress
       ? fetchJson<CosmosValidatorDelegatorRewardsResponse>(
           `${profile.restUrl}/cosmos/distribution/v1beta1/delegators/${encodeURIComponent(accountAddress)}/rewards/${encodeURIComponent(validator.operator_address)}`,
@@ -2679,6 +2692,7 @@ export async function getCosmosValidatorDetailDirect(input: { address: string; t
       ])
     : '0';
   const bondedTokenTotal = BigInt(poolPayload.pool?.bonded_tokens ?? '0');
+  const accountBalances = balancesPayload?.balances ?? [];
 
   return {
     moniker: validator.description?.moniker ?? 'Unnamed',
@@ -2697,6 +2711,9 @@ export async function getCosmosValidatorDetailDirect(input: { address: string; t
     commissionRateLabel: formatCosmosCommissionRate(validator.commission?.commission_rates?.rate),
     minSelfDelegationLabel: formatDenomAmount(validator.min_self_delegation ?? '0'),
     selfBondLabel: selfBondAmount,
+    accountBalances,
+    accountBalancesLabel: formatDenomCollection(accountBalances),
+    accountReadableBalancesLabel: formatReadableDenomCollection(accountBalances),
     stakeRewardsLabel: formatReadableDecCoinCollection(stakeRewardsPayload?.rewards),
     commissionRewardsLabel: formatReadableDecCoinCollection(commissionRewardsPayload?.commission?.commission),
     outstandingRewardsLabel: formatReadableDecCoinCollection(outstandingRewardsPayload?.rewards?.rewards),
@@ -2720,6 +2737,7 @@ export async function getCosmosValidatorDetailDirect(input: { address: string; t
     rawJson: {
       validator,
       delegations: delegationsPayload,
+      balances: balancesPayload,
       stakeRewards: stakeRewardsPayload,
       commissionRewards: commissionRewardsPayload,
       outstandingRewards: outstandingRewardsPayload,

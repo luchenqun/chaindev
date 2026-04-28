@@ -33,3 +33,17 @@ export function formatCosmosAddressForDisplay(address: string, mode: CosmosAddre
     };
   }
 }
+
+export function decodeCosmosAddressToEvmHexAddress(address: string) {
+  try {
+    const { data } = fromBech32(address);
+
+    if (data.length !== 20) {
+      return null;
+    }
+
+    return `0x${toHex(data)}`;
+  } catch {
+    return null;
+  }
+}

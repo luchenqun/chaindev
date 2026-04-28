@@ -117,12 +117,8 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
         <div className="flex min-w-0 items-center justify-end gap-2">
           <div className="flex h-[34px] min-w-0 items-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
             <RpcProviderManager mode={mode} variant="topbar-context" />
-            {mode === 'evm' ? (
-              <>
-                <div className="h-3.5 w-px bg-slate-200" aria-hidden="true" />
-                <ActiveEvmKeySelector variant="topbar-context" />
-              </>
-            ) : null}
+            <div className="h-3.5 w-px bg-slate-200" aria-hidden="true" />
+            <ActiveEvmKeySelector variant="topbar-context" />
           </div>
         </div>
       </div>

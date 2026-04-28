@@ -26,7 +26,7 @@ export const accountMenuSections: AccountMenuSection[] = [
       {
         href: '/evm/settings/private-keys',
         label: 'Private Keys',
-        modes: ['evm'],
+        modes: ['evm', 'cosmos'],
       },
       { href: '/evm/settings/name-tags', label: 'Name Tags', modes: ['evm'] },
     ],

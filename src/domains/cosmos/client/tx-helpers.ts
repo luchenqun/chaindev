@@ -30,6 +30,7 @@ export type CosmosRestTxResponse = {
       };
     };
     body?: {
+      memo?: string;
       messages?: Array<Record<string, unknown>>;
     };
   };
