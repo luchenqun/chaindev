@@ -1,6 +1,6 @@
 'use client';
 
-import { IconRefresh, IconSearch } from '@tabler/icons-react';
+import { IconPlayerPause, IconPlayerPlay, IconRefresh, IconSearch } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,6 +15,7 @@ import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/dom
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = 10;
+const AUTO_REFRESH_INTERVAL_MS = 12_000;
 
 type CosmosTransactionSearchFormState = {
   hash: string;
@@ -195,6 +196,7 @@ function CosmosTransactionsPageContent() {
   const [activeSearchFilters, setActiveSearchFilters] = useState<AppliedCosmosTransactionSearchFilters>(EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH);
   const [searchDialogOpen, setSearchDialogOpen] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const hasLoadedDataRef = useRef(false);
   const currentQuery = useMemo(() => buildCosmosTransactionsSearchQuery(activeSearchFilters), [activeSearchFilters]);
@@ -289,6 +291,20 @@ function CosmosTransactionsPageContent() {
     };
   }, [currentPage, currentQuery, pathname, refreshVersion, router, searchParamsText]);
 
+  useEffect(() => {
+    if (!autoRefreshEnabled || activeSearchFilters.hasFilters || currentPage !== 1) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setRefreshVersion((current) => current + 1);
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeSearchFilters.hasFilters, autoRefreshEnabled, currentPage]);
+
   if (loading) {
     return (
       <AppShell>
@@ -356,6 +372,23 @@ function CosmosTransactionsPageContent() {
                 onClick={() => setRefreshVersion((current) => current + 1)}
               >
                 <IconRefresh className="size-4" stroke={1.8} />
+              </ActionIconButton>
+              <ActionIconButton
+                tooltip={
+                  activeSearchFilters.hasFilters
+                    ? 'Auto refresh is unavailable while transaction filters are active.'
+                    : currentPage !== 1
+                      ? 'Auto refresh is only available on the first page.'
+                      : autoRefreshEnabled
+                        ? 'Disable auto refresh'
+                        : 'Enable auto refresh'
+                }
+                aria-pressed={autoRefreshEnabled}
+                className={`${autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'} ${activeSearchFilters.hasFilters || currentPage !== 1 ? 'cursor-not-allowed opacity-40' : ''}`}
+                disabled={activeSearchFilters.hasFilters || currentPage !== 1}
+                onClick={() => setAutoRefreshEnabled((current) => !current)}
+              >
+                {autoRefreshEnabled ? <IconPlayerPause className="size-4" stroke={1.8} /> : <IconPlayerPlay className="size-4" stroke={1.8} />}
               </ActionIconButton>
             </div>
           </div>
