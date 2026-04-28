@@ -383,6 +383,34 @@ async function getDatabase() {
 
   if (!databasePromise) {
     databasePromise = new Promise<IDBDatabase>((resolve, reject) => {
+      let settled = false;
+      const openTimeoutId = window.setTimeout(() => {
+        fail(new Error('IndexedDB open timed out.'));
+      }, 2500);
+      let blockedTimeoutId: number | null = null;
+
+      function clearOpenTimeout() {
+        window.clearTimeout(openTimeoutId);
+      }
+
+      function clearBlockedTimeout() {
+        if (blockedTimeoutId != null) {
+          window.clearTimeout(blockedTimeoutId);
+          blockedTimeoutId = null;
+        }
+      }
+
+      function fail(error: Error) {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        clearOpenTimeout();
+        clearBlockedTimeout();
+        reject(error);
+      }
+
       const request = window.indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onupgradeneeded = () => {
@@ -422,8 +450,30 @@ async function getDatabase() {
         addressSummariesStore.createIndex(ADDRESS_SUMMARIES_BY_TX_COUNT_INDEX, ['totalTxCount', 'lastSeenSort', 'addressLower']);
       };
 
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error ?? new Error('Failed to open IndexedDB.'));
+      request.onblocked = () => {
+        blockedTimeoutId = window.setTimeout(() => {
+          fail(new Error('IndexedDB upgrade is blocked. Close other Chaindev tabs and reload.'));
+        }, 1500);
+      };
+
+      request.onsuccess = () => {
+        if (settled) {
+          request.result.close();
+          return;
+        }
+
+        settled = true;
+        clearOpenTimeout();
+        clearBlockedTimeout();
+        request.result.onversionchange = () => {
+          request.result.close();
+        };
+        resolve(request.result);
+      };
+      request.onerror = () => fail(request.error ?? new Error('Failed to open IndexedDB.'));
+    }).catch((error) => {
+      databasePromise = null;
+      throw error;
     });
   }
 

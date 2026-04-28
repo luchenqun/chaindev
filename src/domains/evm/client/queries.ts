@@ -210,6 +210,36 @@ const HOME_BLOCK_FETCH_BATCH_SIZE = 12;
 
 type EvmPublicClient = Awaited<ReturnType<typeof getEvmClientWithProfile>>['client'];
 
+const EMPTY_EVM_TRANSACTION_CACHE_SUMMARY = {
+  totalTransactions: 0,
+  totalObservedAccounts: 0,
+  latestSeenTransaction: null,
+} satisfies Awaited<ReturnType<typeof getEvmTransactionCacheSummary>>;
+
+function buildEmptyCachedTransactionsPage(page: number, pageSize: number) {
+  return {
+    page,
+    pageSize,
+    totalTransactions: 0,
+    totalPages: 1,
+    hasPreviousPage: false,
+    hasNextPage: false,
+    transactions: [],
+  } satisfies Awaited<ReturnType<typeof getEvmCachedTransactionsPage>>;
+}
+
+async function getEvmTransactionCacheSummarySafe() {
+  return getEvmTransactionCacheSummary().catch(() => EMPTY_EVM_TRANSACTION_CACHE_SUMMARY);
+}
+
+async function getEvmCachedTransactionsPageSafe(page: number, pageSize: number) {
+  return getEvmCachedTransactionsPage(page, pageSize).catch(() => buildEmptyCachedTransactionsPage(page, pageSize));
+}
+
+async function rememberEvmTransactionCacheSafe(items: EvmCachedTransactionItem[]) {
+  return rememberEvmTransactionCache(items).catch(() => items);
+}
+
 function buildDescendingBlockNumbers(start: bigint, limit: number) {
   const numbers: bigint[] = [];
 
@@ -335,7 +365,7 @@ function formatCachedHomeTransactions(transactions: EvmCachedTransactionItem[], 
 }
 
 export async function getEvmHomeCachedTransactionsDirect(txLimit = 6) {
-  const cachedTransactionsPage = await getEvmCachedTransactionsPage(1, txLimit);
+  const cachedTransactionsPage = await getEvmCachedTransactionsPageSafe(1, txLimit);
   return formatCachedHomeTransactions(cachedTransactionsPage.transactions, txLimit);
 }
 
@@ -596,7 +626,7 @@ export async function getEvmHomeMetricsSupplementDirect(includeChainId = false) 
         params: ['pending'] as never,
       })
       .catch(() => null),
-    getEvmTransactionCacheSummary(),
+    getEvmTransactionCacheSummarySafe(),
   ]);
   const pendingTransactionCount = parseHexQuantity(pendingTransactionCountHex);
 
@@ -620,9 +650,9 @@ export async function getEvmHomeBootstrapDirect(blockLimit = 6, txLimit = 6) {
   const latestNumber = await client.getBlockNumber();
   const blockCount = latestNumber >= BigInt(blockLimit - 1) ? blockLimit : Number(latestNumber + 1n);
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const [recentBlocks, cachedTransactionsPage] = await Promise.all([getRecentBlocksChunk(client, latestNumber, blockCount, true), getEvmCachedTransactionsPage(1, txLimit)]);
+  const [recentBlocks, cachedTransactionsPage] = await Promise.all([getRecentBlocksChunk(client, latestNumber, blockCount, true), getEvmCachedTransactionsPageSafe(1, txLimit)]);
   const cachedTransactions = formatCachedHomeTransactions(cachedTransactionsPage.transactions, txLimit);
-  const rememberedTransactions = await rememberEvmTransactionCache(recentBlocks.flatMap((block) => formatTransactionsPageItemsForBlock(block, currencyName)));
+  const rememberedTransactions = await rememberEvmTransactionCacheSafe(recentBlocks.flatMap((block) => formatTransactionsPageItemsForBlock(block, currencyName)));
   const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
 
   const latestBlock = recentBlocks[0];
@@ -738,7 +768,7 @@ export async function getEvmHomeActivityDirect(blockLimit = 4, txLimit = 4) {
     cursor = lastBlock.number - 1n;
   }
 
-  const rememberedTransactions = await rememberEvmTransactionCache(cacheCandidates);
+  const rememberedTransactions = await rememberEvmTransactionCacheSafe(cacheCandidates);
   const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
 
   return {
@@ -812,7 +842,7 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
     cursor = lastBlock.number - 1n;
   }
 
-  const rememberedTransactions = await rememberEvmTransactionCache(cacheCandidates);
+  const rememberedTransactions = await rememberEvmTransactionCacheSafe(cacheCandidates);
   const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
   const intervalSamples = timestamps
     .slice(0, 10)
@@ -834,7 +864,7 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
     })
     .catch(() => null);
   const pendingTransactionCount = parseHexQuantity(pendingTransactionCountHex);
-  const cacheSummary = await getEvmTransactionCacheSummary();
+  const cacheSummary = await getEvmTransactionCacheSummarySafe();
 
   return {
     header: {
@@ -907,7 +937,7 @@ export async function getEvmLatestBlockActivityDirect(txLimit = 6) {
     blockTag: 'latest',
     includeTransactions: true,
   });
-  const rememberedTransactions = await rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(latestBlock, currencyName));
+  const rememberedTransactions = await rememberEvmTransactionCacheSafe(formatTransactionsPageItemsForBlock(latestBlock, currencyName));
   const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
 
   return {
@@ -1048,7 +1078,7 @@ export async function getEvmTransactionsPageDirect(page = 1, limit = 20) {
 
     const blockTransactions = formatTransactionsPageItemsForBlock(block, currencyName, maxTransactions - collected.length);
     collected.push(...blockTransactions);
-    void rememberEvmTransactionCache(blockTransactions);
+    void rememberEvmTransactionCacheSafe(blockTransactions);
 
     if (collected.length >= maxTransactions || cursor === 0n) {
       break;
@@ -1131,7 +1161,7 @@ export async function syncLatestEvmTransactionsDirect(input?: { latestCachedBloc
     cursor = lastBlock.number - 1n;
   }
 
-  await rememberEvmTransactionCache(cacheCandidates);
+  await rememberEvmTransactionCacheSafe(cacheCandidates);
 
   return {
     latestBlockNumber: latestBlock.number.toString(),
@@ -1150,7 +1180,7 @@ export async function getLatestEvmTransactionsDirect(limit = 20) {
   });
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
   const transactions = formatTransactionsPageItemsForBlock(latestBlock, currencyName, limit);
-  void rememberEvmTransactionCache(transactions);
+  void rememberEvmTransactionCacheSafe(transactions);
 
   return {
     latestBlockNumber: latestBlock.number.toString(),
@@ -1227,7 +1257,7 @@ export async function getEvmOverviewDirect() {
     }
   }
 
-  const rememberedTransactions = await rememberEvmTransactionCache(cacheCandidates);
+  const rememberedTransactions = await rememberEvmTransactionCacheSafe(cacheCandidates);
   const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
 
   const activityBlocks = recentBlocks.slice(0, 5).map((block) => formatHomeBlockItem(block));
@@ -1257,7 +1287,7 @@ export async function getEvmOverviewDirect() {
     })
     .catch(() => null);
   const pendingTransactionCount = parseHexQuantity(pendingTransactionCountHex);
-  const cacheSummary = await getEvmTransactionCacheSummary();
+  const cacheSummary = await getEvmTransactionCacheSummarySafe();
 
   return {
     header: {
@@ -1311,7 +1341,7 @@ export async function getEvmOverviewDirect() {
 
 export async function validateActiveEvmCacheDirect(): Promise<EvmCacheValidationResult> {
   const { client } = await getEvmClientWithProfile();
-  const latestCachedTransactionHash = await getLatestCachedTransactionHash();
+  const latestCachedTransactionHash = await getLatestCachedTransactionHash().catch(() => null);
 
   if (!latestCachedTransactionHash) {
     return {
@@ -1328,7 +1358,7 @@ export async function validateActiveEvmCacheDirect(): Promise<EvmCacheValidation
     .catch(() => null);
 
   if (existingTransaction == null) {
-    await clearEvmTransactionCache();
+    await clearEvmTransactionCache().catch(() => undefined);
     return {
       status: 'cleared' as const,
       label: 'Cleared on provider mismatch',
@@ -1420,7 +1450,7 @@ export async function getEvmLatestFeedDirect(txLimit = 20, includePollSample = t
     }
   }
 
-  const rememberedTransactions = await rememberEvmTransactionCache(formatTransactionsPageItemsForBlock(latestBlock, currencyName));
+  const rememberedTransactions = await rememberEvmTransactionCacheSafe(formatTransactionsPageItemsForBlock(latestBlock, currencyName));
   const receiptStatusByHash = buildHomeReceiptStatusByHash(rememberedTransactions);
   const transactionsPageItems = rememberedTransactions.slice(0, txLimit);
 
@@ -1445,7 +1475,7 @@ export async function getEvmBlockByNumberDirect(number: bigint) {
     includeTransactions: true,
   });
   const pageItems = formatTransactionsPageItemsForBlock(block, currencyName);
-  await rememberEvmTransactionCache(pageItems);
+  await rememberEvmTransactionCacheSafe(pageItems);
   const cachedTransactionsByHash = await getEvmCachedTransactionsByHashes(pageItems.map((transaction) => transaction.hash));
   const formattedBlock = formatEvmBlock({
     ...block,

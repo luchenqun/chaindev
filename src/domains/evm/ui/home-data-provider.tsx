@@ -364,8 +364,8 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         }
 
         if (!hasValidatedCacheRef.current) {
-          await validateActiveEvmCacheDirect();
           hasValidatedCacheRef.current = true;
+          void validateActiveEvmCacheDirect().catch(() => undefined);
         }
 
         const needsHomeBootstrap = isHomePage && recentHomeBlocksRef.current.length < HOME_BLOCK_LIST_LIMIT;
