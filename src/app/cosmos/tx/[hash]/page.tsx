@@ -1,21 +1,19 @@
 'use client';
 
-import JsonView from '@uiw/react-json-view';
 import { IconArrowsExchange, IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { copyText } from '@/components/ui/copy-text';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { RelativeTime } from '@/components/relative-time';
 import { getCosmosTxByHashDirect } from '@/domains/cosmos/client/queries';
 import { formatCosmosAddressForDisplay, type CosmosAddressDisplayMode } from '@/domains/cosmos/ui/address-display';
-import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import {
   CosmosDetailGroup as DetailGroup,
   CosmosDetailRow as DetailRow,
-  COSMOS_JSON_VIEW_STYLE as JSON_VIEW_STYLE,
   formatTimestampWithSeconds,
 } from '@/domains/cosmos/ui/detail-primitives';
 import { AppShell } from '@/platform/layout/app-shell';
@@ -203,16 +201,22 @@ export default function CosmosTxPage() {
   const hash = params.hash;
   const isValid = useMemo(() => /^[A-Fa-f0-9]{64}$/.test(hash), [hash]);
   const [copiedHash, setCopiedHash] = useState(false);
+  const [copiedSender, setCopiedSender] = useState(false);
   const [transaction, setTransaction] = useState<Awaited<ReturnType<typeof getCosmosTxByHashDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'events' | 'json'>('overview');
   const [addressDisplayMode, setAddressDisplayMode] = useState<CosmosAddressDisplayMode>('bech32');
   const copyTimeoutRef = useRef<number | null>(null);
+  const senderCopyTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current != null) {
         window.clearTimeout(copyTimeoutRef.current);
+      }
+
+      if (senderCopyTimeoutRef.current != null) {
+        window.clearTimeout(senderCopyTimeoutRef.current);
       }
     };
   }, []);
@@ -298,6 +302,24 @@ export default function CosmosTxPage() {
     }, 1600);
   }
 
+  async function handleCopySenderAddress() {
+    if (!displaySender) {
+      return;
+    }
+
+    await copyText(displaySender.full);
+    setCopiedSender(true);
+
+    if (senderCopyTimeoutRef.current != null) {
+      window.clearTimeout(senderCopyTimeoutRef.current);
+    }
+
+    senderCopyTimeoutRef.current = window.setTimeout(() => {
+      setCopiedSender(false);
+      senderCopyTimeoutRef.current = null;
+    }, 1600);
+  }
+
   return (
     <AppShell>
       <main className="section-block">
@@ -331,13 +353,6 @@ export default function CosmosTxPage() {
           >
             JSON
           </button>
-          <ActionIconButton
-            tooltip={addressDisplayMode === 'bech32' ? 'Switch to hex addresses' : 'Switch to bech32 addresses'}
-            className="h-[30px] w-[30px] text-slate-400 hover:text-slate-600"
-            onClick={() => setAddressDisplayMode((current) => (current === 'bech32' ? 'hex' : 'bech32'))}
-          >
-            <IconArrowsExchange className="size-4" stroke={1.8} />
-          </ActionIconButton>
         </div>
 
         {resolvedActiveTab === 'overview' ? (
@@ -405,8 +420,34 @@ export default function CosmosTxPage() {
                       label="Sender"
                       value={
                         displaySender ? (
-                          <span className="inline-flex items-center gap-1.5" title={displaySender.full}>
-                            <CosmosAddressLink className="mono" href={`/cosmos/account/${transaction.sender}`} label={displaySender.label} copyValue={displaySender.full} />
+                          <span className="inline-flex max-w-full items-center gap-1.5" title={displaySender.full}>
+                            <Link className="mono break-all font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
+                              {displaySender.full}
+                            </Link>
+                            <ActionIconButton
+                              tooltip={addressDisplayMode === 'bech32' ? 'Switch to hex address' : 'Switch to bech32 address'}
+                              className="text-slate-400 hover:text-sky-600"
+                              onClick={() => setAddressDisplayMode((current) => (current === 'bech32' ? 'hex' : 'bech32'))}
+                            >
+                              <IconArrowsExchange className="size-4" stroke={1.8} />
+                            </ActionIconButton>
+                            <span className="relative inline-flex shrink-0">
+                              <button
+                                type="button"
+                                className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
+                                aria-label="Copy sender address"
+                                onClick={() => void handleCopySenderAddress()}
+                              >
+                                <IconCopy className="size-4" stroke={1.8} />
+                              </button>
+                              <span
+                                className={`pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-30 -translate-x-1/2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 shadow-[0_10px_30px_rgba(15,23,42,0.12)] transition-opacity ${
+                                  copiedSender ? 'opacity-100' : 'opacity-0'
+                                }`}
+                              >
+                                <span className="block whitespace-nowrap">Copied!</span>
+                              </span>
+                            </span>
                           </span>
                         ) : (
                           'Unknown'
@@ -434,27 +475,9 @@ export default function CosmosTxPage() {
         ) : resolvedActiveTab === 'events' ? (
           <TxEventsSection events={transaction.events} />
         ) : (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <JsonView
-              className="json-view-wrap"
-              value={transaction.rawJson as object}
-              collapsed={false}
-              shortenTextAfterLength={0}
-              enableClipboard={false}
-              displayDataTypes={false}
-              displayObjectSize={false}
-              style={JSON_VIEW_STYLE}
-            />
-          </section>
+          <JsonViewPanel value={transaction.rawJson as object} />
         )}
       </main>
-      <style jsx global>{`
-        .json-view-wrap .w-rjv-value {
-          white-space: pre-wrap;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-      `}</style>
     </AppShell>
   );
 }

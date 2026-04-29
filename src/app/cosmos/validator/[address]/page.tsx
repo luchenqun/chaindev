@@ -1,12 +1,12 @@
 'use client';
 
-import JsonView from '@uiw/react-json-view';
 import { IconReceiptRefund, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -25,7 +25,6 @@ import {
   CosmosDetailGroup as DetailGroup,
   CosmosDetailRow as DetailRow,
   CosmosDetailTag as DetailTag,
-  COSMOS_JSON_VIEW_STYLE as JSON_VIEW_STYLE,
   formatTimestampWithSeconds,
 } from '@/domains/cosmos/ui/detail-primitives';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
@@ -739,9 +738,7 @@ export default function CosmosValidatorPage() {
         ) : null}
 
         {resolvedActiveTab === 'json' ? (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <JsonView value={validator.rawJson} style={JSON_VIEW_STYLE} displayDataTypes={false} displayObjectSize={false} enableClipboard={false} collapsed={false} />
-          </section>
+          <JsonViewPanel value={validator.rawJson as object} />
         ) : null}
         <RewardWithdrawalDialog
           validator={validator}

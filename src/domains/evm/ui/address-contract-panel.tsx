@@ -1,8 +1,7 @@
 'use client';
 
-import JsonView from '@uiw/react-json-view';
 import { IconBrandTelegram, IconChevronDown, IconCopy, IconLoader2, IconPlayerPlay, IconRefresh, IconSparkles, IconX } from '@tabler/icons-react';
-import { type CSSProperties, type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from 'react';
+import { type Dispatch, type ReactNode, type SetStateAction, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { toFunctionSelector, type AbiParameter } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
@@ -10,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
 import { Input } from '@/components/ui/input';
 import { JsonInput } from '@/components/ui/json-input';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -65,26 +65,6 @@ type ManualWriteDialogState = {
 
 const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
 const CONTRACT_ARGUMENT_CACHE_KEY = 'evm-contract-arguments:v1';
-const jsonViewStyle = {
-  '--w-rjv-background-color': 'transparent',
-  '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
-  '--w-rjv-font-family': '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-  '--w-rjv-color': '#0f172a',
-  '--w-rjv-arrow-color': '#64748b',
-  '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
-  '--w-rjv-curlybraces-color': '#475569',
-  '--w-rjv-brackets-color': '#475569',
-  '--w-rjv-colon-color': '#94a3b8',
-  '--w-rjv-key-string': '#0369a1',
-  '--w-rjv-key-number': '#0369a1',
-  '--w-rjv-type-string-color': '#b45309',
-  '--w-rjv-type-int-color': '#7c3aed',
-  '--w-rjv-type-float-color': '#7c3aed',
-  '--w-rjv-type-bigint-color': '#7c3aed',
-  '--w-rjv-type-boolean-color': '#15803d',
-  '--w-rjv-type-null-color': '#b91c1c',
-  '--w-rjv-type-undefined-color': '#b91c1c',
-} as CSSProperties;
 
 function hasTupleComponents(parameter: AbiParameter): parameter is AbiParameter & { components: readonly AbiParameter[] } {
   return 'components' in parameter && Array.isArray(parameter.components);
@@ -363,25 +343,7 @@ function ValuePreview({ value }: { value: string }) {
     );
   }
 
-  return (
-    <div className="relative rounded-2xl border border-slate-200 bg-white p-4 pr-10">
-      <div className="absolute right-[6px] top-[6px] z-10">
-        <ActionIconButton className="text-slate-400 hover:text-slate-700" tooltip="Copy result" aria-label="Copy result" onClick={() => void handleCopy()}>
-          <IconCopy className="size-4" stroke={1.8} />
-        </ActionIconButton>
-      </div>
-      <JsonView
-        className="json-view-wrap"
-        value={parsedValue}
-        collapsed={false}
-        shortenTextAfterLength={0}
-        enableClipboard={false}
-        displayDataTypes={false}
-        displayObjectSize={false}
-        style={jsonViewStyle}
-      />
-    </div>
-  );
+  return <JsonViewPanel className="shadow-none" value={parsedValue as object} />;
 }
 
 function formatMiddleEllipsis(value: string, leading = 10, trailing = 8) {
@@ -1330,18 +1292,7 @@ export function AddressContractPanel({
                     <IconCopy className="size-4" stroke={1.8} />
                   </ActionIconButton>
                 </div>
-                <div className="mt-3 max-h-[420px] overflow-auto rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <JsonView
-                    className="json-view-wrap"
-                    value={abiJsonValue}
-                    collapsed={2}
-                    shortenTextAfterLength={0}
-                    enableClipboard={false}
-                    displayDataTypes={false}
-                    displayObjectSize={false}
-                    style={jsonViewStyle}
-                  />
-                </div>
+                <JsonViewPanel className="mt-3 max-h-[420px] overflow-auto bg-slate-50 shadow-none" value={abiJsonValue} />
               </div>
               <div>
                 <p className="text-sm font-semibold text-slate-900">Artifact Bytecode</p>
@@ -1688,13 +1639,6 @@ export function AddressContractPanel({
           </div>
         ) : null}
       </ModalDialog>
-      <style jsx global>{`
-        .json-view-wrap .w-rjv-value {
-          white-space: pre-wrap;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-      `}</style>
     </>
   );
 }

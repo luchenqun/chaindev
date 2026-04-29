@@ -1,6 +1,5 @@
 'use client';
 
-import JsonView from '@uiw/react-json-view';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -10,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { RelativeTime } from '@/components/relative-time';
@@ -1250,39 +1250,9 @@ export default function EvmTxPage() {
             </section>
 
             {transaction.logsCount ? (
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <section>
                 <h3 className="mb-4 text-sm font-semibold text-slate-900">Raw JSON</h3>
-                <JsonView
-                  className="json-view-wrap"
-                  value={transaction.logs as object}
-                  collapsed={2}
-                  shortenTextAfterLength={0}
-                  enableClipboard={false}
-                  displayDataTypes={false}
-                  displayObjectSize={false}
-                  style={
-                    {
-                      '--w-rjv-background-color': 'transparent',
-                      '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
-                      '--w-rjv-font-family': '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-                      '--w-rjv-color': '#0f172a',
-                      '--w-rjv-arrow-color': '#64748b',
-                      '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
-                      '--w-rjv-curlybraces-color': '#475569',
-                      '--w-rjv-brackets-color': '#475569',
-                      '--w-rjv-colon-color': '#94a3b8',
-                      '--w-rjv-key-string': '#0369a1',
-                      '--w-rjv-key-number': '#0369a1',
-                      '--w-rjv-type-string-color': '#b45309',
-                      '--w-rjv-type-int-color': '#7c3aed',
-                      '--w-rjv-type-float-color': '#7c3aed',
-                      '--w-rjv-type-bigint-color': '#7c3aed',
-                      '--w-rjv-type-boolean-color': '#15803d',
-                      '--w-rjv-type-null-color': '#b91c1c',
-                      '--w-rjv-type-undefined-color': '#b91c1c',
-                    } as React.CSSProperties
-                  }
-                />
+                <JsonViewPanel value={transaction.logs as object} />
               </section>
             ) : null}
           </div>
@@ -1306,39 +1276,7 @@ export default function EvmTxPage() {
             )}
           </section>
         ) : (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <JsonView
-              className="json-view-wrap"
-              value={transaction.rawJson as object}
-              collapsed={2}
-              shortenTextAfterLength={0}
-              enableClipboard={false}
-              displayDataTypes={false}
-              displayObjectSize={false}
-              style={
-                {
-                  '--w-rjv-background-color': 'transparent',
-                  '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
-                  '--w-rjv-font-family': '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-                  '--w-rjv-color': '#0f172a',
-                  '--w-rjv-arrow-color': '#64748b',
-                  '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
-                  '--w-rjv-curlybraces-color': '#475569',
-                  '--w-rjv-brackets-color': '#475569',
-                  '--w-rjv-colon-color': '#94a3b8',
-                  '--w-rjv-key-string': '#0369a1',
-                  '--w-rjv-key-number': '#0369a1',
-                  '--w-rjv-type-string-color': '#b45309',
-                  '--w-rjv-type-int-color': '#7c3aed',
-                  '--w-rjv-type-float-color': '#7c3aed',
-                  '--w-rjv-type-bigint-color': '#7c3aed',
-                  '--w-rjv-type-boolean-color': '#15803d',
-                  '--w-rjv-type-null-color': '#b91c1c',
-                  '--w-rjv-type-undefined-color': '#b91c1c',
-                } as React.CSSProperties
-              }
-            />
-          </section>
+          <JsonViewPanel value={transaction.rawJson as object} />
         )}
       </main>
       <ModalDialog
@@ -1572,13 +1510,6 @@ export default function EvmTxPage() {
         confirmDisabled={!rewriteUnlockPassword.trim()}
         onConfirm={() => void handleConfirmRewriteUnlock()}
       />
-      <style jsx global>{`
-        .json-view-wrap .w-rjv-value {
-          white-space: pre-wrap;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-      `}</style>
     </AppShell>
   );
 }

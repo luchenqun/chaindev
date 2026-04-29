@@ -1,6 +1,5 @@
 'use client';
 
-import JsonView from '@uiw/react-json-view';
 import { IconAdjustmentsHorizontal, IconArrowBackUp, IconCode, IconInfoCircle, IconTag, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -10,6 +9,7 @@ import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -17,7 +17,6 @@ import { RelativeTime } from '@/components/relative-time';
 import { deleteCosmosAddressTag, getCosmosAddressTag, getCosmosAddressTags, subscribeCosmosAddressTags, upsertCosmosAddressTag } from '@/domains/cosmos/client/address-tags';
 import { getCosmosAccountPrefixFromValidatorAddress, undelegateCosmosTokens, type CosmosSigningAlgorithm } from '@/domains/cosmos/client/delegate-transaction';
 import { getCosmosAccountDetailDirect } from '@/domains/cosmos/client/queries';
-import { COSMOS_JSON_VIEW_STYLE as JSON_VIEW_STYLE } from '@/domains/cosmos/ui/detail-primitives';
 import { formatCompactHash, formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
 import { decodeCosmosAddressToEvmHexAddress } from '@/domains/cosmos/ui/address-display';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
@@ -862,9 +861,7 @@ export default function CosmosAccountPage() {
         />
 
         {resolvedActiveTab === 'json' ? (
-          <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <JsonView value={account.rawJson} style={JSON_VIEW_STYLE} displayDataTypes={false} displayObjectSize={false} enableClipboard={false} collapsed={false} />
-          </section>
+          <JsonViewPanel className="mt-4" value={account.rawJson as object} />
         ) : null}
 
         <ModalDialog

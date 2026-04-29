@@ -1,11 +1,11 @@
 'use client';
 
-import JsonView from '@uiw/react-json-view';
 import { IconChevronLeft, IconChevronRight, IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { copyText } from '@/components/ui/copy-text';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { RelativeTime } from '@/components/relative-time';
@@ -14,7 +14,6 @@ import {
   CosmosDetailGroup as DetailGroup,
   CosmosDetailRow as DetailRow,
   CosmosDetailTag as DetailTag,
-  COSMOS_JSON_VIEW_STYLE as JSON_VIEW_STYLE,
   formatTimestampWithSeconds,
 } from '@/domains/cosmos/ui/detail-primitives';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
@@ -511,27 +510,9 @@ export default function CosmosBlockDetailPage() {
             )}
           </section>
         ) : (
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <JsonView
-              className="json-view-wrap"
-              value={block.rawJson as object}
-              collapsed={false}
-              shortenTextAfterLength={0}
-              enableClipboard={false}
-              displayDataTypes={false}
-              displayObjectSize={false}
-              style={JSON_VIEW_STYLE}
-            />
-          </section>
+          <JsonViewPanel value={block.rawJson as object} />
         )}
       </main>
-      <style jsx global>{`
-        .json-view-wrap .w-rjv-value {
-          white-space: pre-wrap;
-          overflow-wrap: anywhere;
-          word-break: break-word;
-        }
-      `}</style>
     </AppShell>
   );
 }

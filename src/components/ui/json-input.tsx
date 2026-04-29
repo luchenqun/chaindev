@@ -1,31 +1,10 @@
 'use client';
 
 import { IconBraces, IconCode } from '@tabler/icons-react';
-import JsonView from '@uiw/react-json-view';
-import { type CSSProperties, useMemo, useState } from 'react';
-import { ActionIconButton } from '@/components/ui/action-icon-button';
+import { useMemo, useState } from 'react';
 import { AutoGrowTextarea } from '@/components/ui/auto-grow-textarea';
-
-const jsonViewStyle = {
-  '--w-rjv-background-color': 'transparent',
-  '--w-rjv-border-left': '1px dashed rgba(148, 163, 184, 0.28)',
-  '--w-rjv-font-family': '"SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace',
-  '--w-rjv-color': '#0f172a',
-  '--w-rjv-arrow-color': '#64748b',
-  '--w-rjv-line-color': 'rgba(148, 163, 184, 0.24)',
-  '--w-rjv-curlybraces-color': '#475569',
-  '--w-rjv-brackets-color': '#475569',
-  '--w-rjv-colon-color': '#94a3b8',
-  '--w-rjv-key-string': '#0369a1',
-  '--w-rjv-key-number': '#0369a1',
-  '--w-rjv-type-string-color': '#b45309',
-  '--w-rjv-type-int-color': '#7c3aed',
-  '--w-rjv-type-float-color': '#7c3aed',
-  '--w-rjv-type-bigint-color': '#7c3aed',
-  '--w-rjv-type-boolean-color': '#15803d',
-  '--w-rjv-type-null-color': '#b91c1c',
-  '--w-rjv-type-undefined-color': '#b91c1c',
-} as CSSProperties;
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
+import { cn } from '@/lib/utils';
 
 type JsonInputProps = {
   value: string;
@@ -47,49 +26,44 @@ export function JsonInput({ value, onChange, placeholder, textareaClassName }: J
 
   const canRenderJson = parsedValue !== null;
   const activeMode = canRenderJson ? mode : 'raw';
+  const viewModeControls = (
+    <>
+      <button
+        type="button"
+        aria-label="JSON view"
+        className={cn(
+          'inline-flex size-5 items-center justify-center text-slate-400 transition hover:text-sky-600 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:text-slate-300',
+          activeMode === 'json' && 'text-sky-600',
+        )}
+        onClick={() => {
+          if (canRenderJson) {
+            setMode('json');
+          }
+        }}
+        disabled={!canRenderJson}
+      >
+        <IconBraces className="size-4" stroke={1.8} />
+      </button>
+      <button
+        type="button"
+        aria-label="Raw view"
+        className={cn('inline-flex size-5 items-center justify-center text-slate-400 transition hover:text-sky-600', activeMode === 'raw' && 'text-sky-600')}
+        onClick={() => setMode('raw')}
+      >
+        <IconCode className="size-4" stroke={1.8} />
+      </button>
+    </>
+  );
 
   return (
     <div className="relative">
-      <div className="absolute right-[6px] top-[6px] z-10 flex items-center gap-0.5">
-        <ActionIconButton
-          tooltip="JSON view"
-          aria-label="JSON view"
-          className={
-            activeMode === 'json' ? 'rounded-md text-sky-700' : canRenderJson ? 'rounded-md text-slate-400 hover:text-slate-700' : 'cursor-not-allowed rounded-md text-slate-300'
-          }
-          onClick={() => {
-            if (canRenderJson) {
-              setMode('json');
-            }
-          }}
-          disabled={!canRenderJson}
-        >
-          <IconBraces className="size-4" stroke={1.9} />
-        </ActionIconButton>
-        <ActionIconButton
-          tooltip="Raw view"
-          aria-label="Raw view"
-          className={activeMode === 'raw' ? 'rounded-md text-sky-700' : 'rounded-md text-slate-400 hover:text-slate-700'}
-          onClick={() => setMode('raw')}
-        >
-          <IconCode className="size-4" stroke={1.9} />
-        </ActionIconButton>
-      </div>
       {activeMode === 'json' && parsedValue ? (
-        <div className="rounded-lg border border-slate-200 bg-white p-4 pr-16">
-          <JsonView
-            className="json-view-wrap"
-            value={parsedValue}
-            collapsed={false}
-            shortenTextAfterLength={0}
-            enableClipboard={false}
-            displayDataTypes={false}
-            displayObjectSize={false}
-            style={jsonViewStyle}
-          />
-        </div>
+        <JsonViewPanel className="rounded-lg pr-28 shadow-none" value={parsedValue} trailingControls={viewModeControls} />
       ) : (
-        <AutoGrowTextarea className={`${textareaClassName} pr-16`} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+        <>
+          <div className="absolute right-2.5 top-2.5 z-10 flex items-center gap-2">{viewModeControls}</div>
+          <AutoGrowTextarea className={`${textareaClassName} pr-16`} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} />
+        </>
       )}
     </div>
   );

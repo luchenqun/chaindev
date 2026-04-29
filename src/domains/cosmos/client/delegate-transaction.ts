@@ -2,9 +2,11 @@
 
 import 'client-only';
 
-import { DirectEthSecp256k1Wallet, DirectSecp256k1Wallet, type EncodeObject } from '@cosmjs/proto-signing';
-import { GasPrice, SigningStargateClient } from '@cosmjs/stargate';
+import { DirectEthSecp256k1Wallet, DirectSecp256k1Wallet, Registry, type EncodeObject } from '@cosmjs/proto-signing';
+import { defaultRegistryTypes, GasPrice, SigningStargateClient } from '@cosmjs/stargate';
 import { MsgWithdrawValidatorCommission } from 'cosmjs-types/cosmos/distribution/v1beta1/tx';
+import { VoteOption } from 'cosmjs-types/cosmos/gov/v1/gov';
+import { MsgSubmitProposal, MsgVote } from 'cosmjs-types/cosmos/gov/v1/tx';
 import { getActiveCosmosProvider } from '@/domains/cosmos/client/queries';
 
 type TendermintStatusResponse = {
@@ -15,13 +17,21 @@ type TendermintStatusResponse = {
   };
 };
 
-export type CosmosSigningInput = {
+type CosmosBech32PrefixResponse = {
+  bech32_prefix?: string;
+  bech32Prefix?: string;
+};
+
+export type CosmosBaseSigningInput = {
   privateKey: string;
   accountPrefix: string;
   signingAlgorithm: CosmosSigningAlgorithm;
-  validatorAddress: string;
   gasPrice: string;
   memo?: string;
+};
+
+export type CosmosSigningInput = CosmosBaseSigningInput & {
+  validatorAddress: string;
 };
 
 export type CosmosDelegateInput = CosmosSigningInput & {
@@ -30,9 +40,26 @@ export type CosmosDelegateInput = CosmosSigningInput & {
 };
 
 export type CosmosRewardWithdrawalInput = CosmosSigningInput;
+export type CosmosProposalVoteOption = 'yes' | 'abstain' | 'no' | 'no_with_veto';
+export type CosmosProposalVoteInput = CosmosBaseSigningInput & {
+  proposalId: string;
+  option: CosmosProposalVoteOption;
+  metadata?: string;
+};
+export type CosmosSubmitGovProposalInput = CosmosBaseSigningInput & {
+  title: string;
+  summary: string;
+  metadata?: string;
+  messagesJson: string;
+  depositAmount: string;
+  depositDenom: string;
+};
 
 export type NormalizedCosmosDelegateInput = Required<CosmosDelegateInput>;
+export type NormalizedCosmosBaseSigningInput = Required<CosmosBaseSigningInput>;
 export type NormalizedCosmosSigningInput = Required<CosmosSigningInput>;
+export type NormalizedCosmosProposalVoteInput = Required<CosmosProposalVoteInput>;
+export type NormalizedCosmosSubmitGovProposalInput = Required<CosmosSubmitGovProposalInput>;
 
 export type CosmosSigningAlgorithm = 'ethsecp256k1' | 'secp256k1';
 
@@ -70,29 +97,16 @@ function normalizePrivateKey(privateKey: string) {
   return bytes;
 }
 
-export function getCosmosAccountPrefixFromValidatorAddress(validatorAddress: string) {
-  const value = validatorAddress.trim();
-  const markerIndex = value.indexOf('valoper');
-
-  if (markerIndex <= 0) {
-    return 'cosmos';
-  }
-
-  return value.slice(0, markerIndex);
-}
-
-export function normalizeCosmosSigningInput(input: CosmosSigningInput): NormalizedCosmosSigningInput {
+function normalizeCosmosBaseSigningInput(input: CosmosBaseSigningInput): NormalizedCosmosBaseSigningInput {
   const privateKey = normalizeRequiredText(input.privateKey);
   const accountPrefix = normalizeRequiredText(input.accountPrefix);
   const signingAlgorithm = input.signingAlgorithm;
-  const validatorAddress = normalizeRequiredText(input.validatorAddress);
   const gasPrice = normalizeRequiredText(input.gasPrice);
   const memo = normalizeRequiredText(input.memo);
 
   assertPresent(privateKey, 'Private key');
   assertPresent(accountPrefix, 'Account prefix');
   assertPresent(signingAlgorithm, 'Signing algorithm');
-  assertPresent(validatorAddress, 'Validator address');
   assertPresent(gasPrice, 'Gas price');
 
   if (signingAlgorithm !== 'ethsecp256k1' && signingAlgorithm !== 'secp256k1') {
@@ -109,9 +123,50 @@ export function normalizeCosmosSigningInput(input: CosmosSigningInput): Normaliz
     privateKey,
     accountPrefix,
     signingAlgorithm,
-    validatorAddress,
     gasPrice,
     memo,
+  };
+}
+
+export function getCosmosAccountPrefixFromValidatorAddress(validatorAddress: string) {
+  const value = validatorAddress.trim();
+  const markerIndex = value.indexOf('valoper');
+
+  if (markerIndex <= 0) {
+    return 'cosmos';
+  }
+
+  return value.slice(0, markerIndex);
+}
+
+export async function getActiveCosmosAccountPrefixDirect() {
+  const profile = getActiveCosmosProvider();
+
+  try {
+    const response = await fetch(`${profile.restUrl}/cosmos/auth/v1beta1/bech32`, { cache: 'no-store' });
+
+    if (!response.ok) {
+      return 'cosmos';
+    }
+
+    const payload = (await response.json()) as CosmosBech32PrefixResponse;
+    const prefix = (payload.bech32_prefix ?? payload.bech32Prefix ?? '').trim();
+
+    return prefix || 'cosmos';
+  } catch {
+    return 'cosmos';
+  }
+}
+
+export function normalizeCosmosSigningInput(input: CosmosSigningInput): NormalizedCosmosSigningInput {
+  const normalized = normalizeCosmosBaseSigningInput(input);
+  const validatorAddress = normalizeRequiredText(input.validatorAddress);
+
+  assertPresent(validatorAddress, 'Validator address');
+
+  return {
+    ...normalized,
+    validatorAddress,
   };
 }
 
@@ -138,6 +193,113 @@ export function normalizeCosmosDelegateInput(input: CosmosDelegateInput): Normal
   };
 }
 
+function normalizeCosmosProposalVoteInput(input: CosmosProposalVoteInput): NormalizedCosmosProposalVoteInput {
+  const normalized = normalizeCosmosBaseSigningInput(input);
+  const proposalId = normalizeRequiredText(input.proposalId);
+  const option = input.option;
+  const metadata = normalizeRequiredText(input.metadata);
+
+  assertPresent(proposalId, 'Proposal id');
+  assertPresent(option, 'Vote option');
+
+  if (!/^[1-9]\d*$/.test(proposalId)) {
+    throw new Error('Proposal id must be a positive integer.');
+  }
+
+  if (!['yes', 'abstain', 'no', 'no_with_veto'].includes(option)) {
+    throw new Error('Unsupported vote option.');
+  }
+
+  return {
+    ...normalized,
+    proposalId,
+    option,
+    metadata,
+  };
+}
+
+function normalizeCosmosSubmitGovProposalInput(input: CosmosSubmitGovProposalInput): NormalizedCosmosSubmitGovProposalInput {
+  const normalized = normalizeCosmosBaseSigningInput(input);
+  const title = normalizeRequiredText(input.title);
+  const summary = normalizeRequiredText(input.summary);
+  const metadata = normalizeRequiredText(input.metadata);
+  const messagesJson = normalizeRequiredText(input.messagesJson);
+  const depositAmount = normalizeRequiredText(input.depositAmount);
+  const depositDenom = normalizeRequiredText(input.depositDenom);
+
+  assertPresent(title, 'Title');
+  assertPresent(summary, 'Summary');
+  assertPresent(messagesJson, 'Messages JSON');
+  assertPresent(depositAmount, 'Deposit amount');
+  assertPresent(depositDenom, 'Deposit denom');
+
+  if (!/^[1-9]\d*$/.test(depositAmount)) {
+    throw new Error('Deposit amount must be a whole-number base unit amount.');
+  }
+
+  if (/\s/.test(depositDenom)) {
+    throw new Error('Deposit denom cannot contain whitespace.');
+  }
+
+  return {
+    ...normalized,
+    title,
+    summary,
+    metadata,
+    messagesJson,
+    depositAmount,
+    depositDenom,
+  };
+}
+
+function parseCosmosProposalMessages(messagesJson: string): EncodeObject[] {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(messagesJson);
+  } catch {
+    throw new Error('Messages JSON must be valid JSON.');
+  }
+
+  if (!Array.isArray(parsed) || !parsed.length) {
+    throw new Error('Messages JSON must be a non-empty array.');
+  }
+
+  return parsed.map((message, index) => {
+    if (!message || typeof message !== 'object') {
+      throw new Error(`Message #${index + 1} must be an object.`);
+    }
+
+    const candidate = message as { typeUrl?: unknown; value?: unknown };
+
+    if (typeof candidate.typeUrl !== 'string' || !candidate.typeUrl.trim()) {
+      throw new Error(`Message #${index + 1} is missing typeUrl.`);
+    }
+
+    if (!candidate.value || typeof candidate.value !== 'object') {
+      throw new Error(`Message #${index + 1} is missing value.`);
+    }
+
+    return {
+      typeUrl: candidate.typeUrl.trim(),
+      value: candidate.value,
+    };
+  });
+}
+
+function toCosmosGovVoteOption(option: CosmosProposalVoteOption) {
+  switch (option) {
+    case 'yes':
+      return VoteOption.VOTE_OPTION_YES;
+    case 'abstain':
+      return VoteOption.VOTE_OPTION_ABSTAIN;
+    case 'no':
+      return VoteOption.VOTE_OPTION_NO;
+    case 'no_with_veto':
+      return VoteOption.VOTE_OPTION_NO_WITH_VETO;
+  }
+}
+
 async function getCosmosChainId(rpcUrl: string) {
   const response = await fetch(`${rpcUrl}/status`, { cache: 'no-store' });
 
@@ -155,8 +317,8 @@ async function getCosmosChainId(rpcUrl: string) {
   return chainId;
 }
 
-async function createCosmosStakingClient(input: CosmosSigningInput) {
-  const normalized = normalizeCosmosSigningInput(input);
+async function createCosmosSigningClient(input: CosmosBaseSigningInput) {
+  const normalized = normalizeCosmosBaseSigningInput(input);
   const profile = getActiveCosmosProvider();
   await getCosmosChainId(profile.rpcUrl);
 
@@ -175,6 +337,17 @@ async function createCosmosStakingClient(input: CosmosSigningInput) {
   const client = await SigningStargateClient.connectWithSigner(profile.rpcUrl, signer, {
     gasPrice: GasPrice.fromString(normalized.gasPrice),
   });
+
+  return {
+    client,
+    delegatorAddress,
+    normalized,
+  };
+}
+
+async function createCosmosStakingClient(input: CosmosSigningInput) {
+  const normalized = normalizeCosmosSigningInput(input);
+  const { client, delegatorAddress } = await createCosmosSigningClient(normalized);
 
   return {
     client,
@@ -283,6 +456,80 @@ export async function withdrawCosmosValidatorCommission(input: CosmosRewardWithd
 
     if (result.code !== 0) {
       throw new Error(result.rawLog || `Withdraw commission transaction failed with code ${result.code}.`);
+    }
+
+    return {
+      delegatorAddress,
+      transactionHash: result.transactionHash,
+      height: result.height,
+      gasUsed: result.gasUsed,
+      gasWanted: result.gasWanted,
+    };
+  } finally {
+    client.disconnect();
+  }
+}
+
+export async function voteCosmosProposal(input: CosmosProposalVoteInput): Promise<CosmosDelegateResult> {
+  const normalized = normalizeCosmosProposalVoteInput(input);
+  const { client, delegatorAddress } = await createCosmosSigningClient(normalized);
+
+  try {
+    const message: EncodeObject = {
+      typeUrl: '/cosmos.gov.v1.MsgVote',
+      value: MsgVote.fromPartial({
+        proposalId: BigInt(normalized.proposalId),
+        voter: delegatorAddress,
+        option: toCosmosGovVoteOption(normalized.option),
+        metadata: normalized.metadata,
+      }),
+    };
+    const result = await client.signAndBroadcast(delegatorAddress, [message], 'auto', normalized.memo);
+
+    if (result.code !== 0) {
+      throw new Error(result.rawLog || `Vote transaction failed with code ${result.code}.`);
+    }
+
+    return {
+      delegatorAddress,
+      transactionHash: result.transactionHash,
+      height: result.height,
+      gasUsed: result.gasUsed,
+      gasWanted: result.gasWanted,
+    };
+  } finally {
+    client.disconnect();
+  }
+}
+
+export async function submitCosmosGovProposal(input: CosmosSubmitGovProposalInput): Promise<CosmosDelegateResult> {
+  const normalized = normalizeCosmosSubmitGovProposalInput(input);
+  const { client, delegatorAddress } = await createCosmosSigningClient(normalized);
+
+  try {
+    const registry = new Registry(defaultRegistryTypes);
+    const proposalMessages = parseCosmosProposalMessages(normalized.messagesJson).map((proposalMessage) => registry.encodeAsAny(proposalMessage));
+    const message: EncodeObject = {
+      typeUrl: '/cosmos.gov.v1.MsgSubmitProposal',
+      value: MsgSubmitProposal.fromPartial({
+        messages: proposalMessages,
+        initialDeposit: [
+          {
+            amount: normalized.depositAmount,
+            denom: normalized.depositDenom,
+          },
+        ],
+        proposer: delegatorAddress,
+        metadata: normalized.metadata,
+        title: normalized.title,
+        summary: normalized.summary,
+        expedited: false,
+      }),
+    };
+    const result = await client.signAndBroadcast(delegatorAddress, [message], 'auto', normalized.memo);
+
+    if (result.code !== 0) {
+      throw new Error(result.rawLog || `Submit proposal transaction failed with code ${result.code}.`);
     }
 
     return {
