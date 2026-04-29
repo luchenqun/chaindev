@@ -302,6 +302,10 @@ type CosmosGovProposalsResponse = {
     deposit_end_time?: string;
     voting_start_time?: string;
     voting_end_time?: string;
+    total_deposit?: Array<{
+      denom: string;
+      amount: string;
+    }>;
     final_tally_result?: CosmosGovTallyResult;
     messages?: Array<Record<string, unknown>>;
   }>;
@@ -722,6 +726,7 @@ export type CosmosProposalPageItem = {
   votingStartTimeLabel: string;
   votingEndTime: string | null;
   votingEndTimeLabel: string;
+  totalDepositLabel: string;
   tallyLabel: string;
   status: string;
   statusLabel: string;
@@ -765,6 +770,7 @@ export type CosmosProposalDetail = {
   votingStartTimeLabel: string;
   votingEndTime: string | null;
   votingEndTimeLabel: string;
+  totalDepositLabel: string;
   tallyLabel: string;
   votesPage: {
     page: number;
@@ -2827,6 +2833,7 @@ export async function getCosmosProposalsDirect(requestedPage = 1, pageSize = 15)
           votingStartTimeLabel: formatLocalTimestamp(proposal.voting_start_time),
           votingEndTime: proposal.voting_end_time ?? null,
           votingEndTimeLabel: formatLocalTimestamp(proposal.voting_end_time),
+          totalDepositLabel: formatReadableDenomCollection(proposal.total_deposit),
           tallyLabel: formatCosmosProposalTallyLabel(tally),
           status: proposal.status ?? 'Unknown',
           statusLabel: formatCosmosProposalStatusLabel(proposal.status),
@@ -2905,6 +2912,7 @@ export async function getCosmosProposalByIdDirect(id: string, requestedVotePage 
     votingStartTimeLabel: formatLocalTimestamp(proposal.voting_start_time),
     votingEndTime: proposal.voting_end_time ?? null,
     votingEndTimeLabel: formatLocalTimestamp(proposal.voting_end_time),
+    totalDepositLabel: formatReadableDenomCollection(proposal.total_deposit),
     tallyLabel: formatCosmosProposalTallyLabel(tallyPayload?.tally ?? proposal.final_tally_result),
     votesPage: {
       page,

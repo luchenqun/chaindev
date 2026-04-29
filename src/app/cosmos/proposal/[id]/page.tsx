@@ -156,6 +156,7 @@ export default function CosmosProposalPage() {
                 <DetailRow label="Vote End" value={formatTimestampWithSeconds(proposal.votingEndTime)} />
               </DetailGroup>
               <DetailGroup>
+                <DetailRow label="Total Deposit" value={proposal.totalDepositLabel} />
                 <DetailRow label="Tally" value={proposal.tallyLabel} />
                 <DetailRow label="Summary" value={proposal.summary} />
                 <DetailRow label="Metadata" value={proposal.metadataLabel} mono />

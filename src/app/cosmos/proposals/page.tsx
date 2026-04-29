@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCheckbox, IconFilePlus, IconRefresh, IconX } from '@tabler/icons-react';
+import { IconCoins, IconFilePlus, IconMessageUp, IconRefresh, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
@@ -17,6 +17,7 @@ import { useToast } from '@/components/ui/toast';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import {
   getActiveCosmosAccountPrefixDirect,
+  depositCosmosProposal,
   submitCosmosGovProposal,
   voteCosmosProposal,
   type CosmosProposalVoteOption,
@@ -140,6 +141,10 @@ function StatusBadge({ status, label }: { status: string; label: string }) {
 
 function isVotingProposal(proposal: ProposalItem) {
   return proposal.status === 'PROPOSAL_STATUS_VOTING_PERIOD' && /^[1-9]\d*$/.test(proposal.id);
+}
+
+function isDepositProposal(proposal: ProposalItem) {
+  return proposal.status === 'PROPOSAL_STATUS_DEPOSIT_PERIOD' && /^[1-9]\d*$/.test(proposal.id);
 }
 
 function SubmitProposalDialog({
@@ -470,6 +475,283 @@ function SubmitProposalDialog({
   );
 }
 
+function DepositProposalDialog({
+  proposal,
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  proposal: ProposalItem | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const { showToast } = useToast();
+  const [accountPrefix, setAccountPrefix] = useState('cosmos');
+  const [amount, setAmount] = useState('');
+  const [denom, setDenom] = useState('');
+  const [gasPriceAmount, setGasPriceAmount] = useState('');
+  const [gasPriceDenom, setGasPriceDenom] = useState('');
+  const [signingAlgorithm, setSigningAlgorithm] = useState<CosmosSigningAlgorithm>('ethsecp256k1');
+  const [memo, setMemo] = useState('');
+  const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+
+  useEffect(() => {
+    function loadActiveKey() {
+      setActiveKey(getActiveEvmStoredPrivateKey());
+    }
+
+    loadActiveKey();
+    return subscribeEvmKeyring(loadActiveKey);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setFormError(null);
+      return;
+    }
+
+    setAccountPrefix('cosmos');
+    setAmount('');
+    setDenom('');
+    setGasPriceAmount('');
+    setGasPriceDenom('');
+    setSigningAlgorithm('ethsecp256k1');
+    setMemo('');
+    setFormError(null);
+    setUnlockPassword('');
+    setUnlockError(null);
+    let cancelled = false;
+
+    async function loadAccountPrefix() {
+      const nextPrefix = await getActiveCosmosAccountPrefixDirect();
+
+      if (!cancelled) {
+        setAccountPrefix(nextPrefix);
+      }
+    }
+
+    void loadAccountPrefix();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, proposal?.id]);
+
+  async function submitDeposit(password?: string) {
+    if (!proposal) {
+      return;
+    }
+
+    if (!activeKey) {
+      setFormError('Select a global private key first.');
+      return;
+    }
+
+    setSubmitting(true);
+    setFormError(null);
+
+    try {
+      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
+      const result = await depositCosmosProposal({
+        privateKey,
+        accountPrefix,
+        signingAlgorithm,
+        proposalId: proposal.id,
+        amount,
+        denom,
+        gasPrice: `${gasPriceAmount.trim()}${gasPriceDenom.trim()}`,
+        memo,
+      });
+
+      showToast({
+        title: 'Deposit transaction broadcasted',
+        description: (
+          <span className="block min-w-0 max-w-full">
+            <span className="block truncate text-xs text-slate-500">
+              {`Proposal #${proposal.id} · ${amount.trim()}${denom.trim()}`}
+            </span>
+            <span className="block truncate font-mono text-xs text-slate-500" title={result.delegatorAddress}>
+              {formatCompactHash(result.delegatorAddress, 12, 8)}
+            </span>
+            <Link
+              className="mt-1 block truncate font-mono text-xs font-medium text-sky-600 hover:text-sky-700"
+              href={`/cosmos/tx/${result.transactionHash}`}
+              title={result.transactionHash}
+            >
+              {formatCompactHash(result.transactionHash, 14, 10)}
+            </Link>
+          </span>
+        ),
+        durationMs: 8000,
+      });
+      onSuccess();
+      onOpenChange(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to broadcast deposit transaction.';
+
+      if (message === 'Password is required.') {
+        setUnlockPassword('');
+        setUnlockError(null);
+        setUnlockDialogOpen(true);
+        return;
+      }
+
+      setFormError(message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleConfirmUnlock() {
+    if (!activeKey) {
+      return;
+    }
+
+    try {
+      setUnlockError(null);
+      await resolveEvmStoredPrivateKey(activeKey.id, unlockPassword);
+      setUnlockDialogOpen(false);
+      const password = unlockPassword;
+      setUnlockPassword('');
+      await submitDeposit(password);
+    } catch (error) {
+      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+    }
+  }
+
+  return (
+    <>
+      <ModalDialog
+        open={open}
+        title="Deposit to Proposal"
+        description="Broadcast a governance deposit with the active private key."
+        maxWidthClassName="max-w-xl"
+        onOpenChange={onOpenChange}
+        footer={
+          <>
+            <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={submitting || !proposal} onClick={() => void submitDeposit()}>
+              {submitting ? 'Depositing...' : 'Deposit'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-6">
+          <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Proposal</p>
+              <p className="mt-1 truncate text-sm font-semibold text-slate-900" title={proposal?.title ?? undefined}>
+                {proposal ? `#${proposal.id}. ${proposal.title}` : '-'}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">{proposal?.statusLabel ?? '-'}</p>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Key</p>
+              <p className="mt-1 truncate text-sm font-medium text-slate-900" title={activeKey?.address ?? undefined}>
+                {activeKey ? activeKey.name : 'No active key'}
+              </p>
+              <p className="mt-1 truncate font-mono text-xs text-slate-500" title={activeKey?.address ?? undefined}>
+                {activeKey ? formatCompactHash(activeKey.address, 12, 8) : '-'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-amount">
+                Deposit amount
+              </label>
+              <ScaledInput id="proposal-deposit-amount" value={amount} placeholder="10000000" disabled={submitting} onChange={setAmount} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-denom">
+                Deposit denom
+              </label>
+              <Input id="proposal-deposit-denom" value={denom} placeholder="uatom" disabled={submitting} onChange={(event) => setDenom(event.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-gas-price-amount">
+                Gas price amount
+              </label>
+              <ScaledInput
+                id="proposal-deposit-gas-price-amount"
+                value={gasPriceAmount}
+                inputMode="decimal"
+                placeholder="0.025"
+                disabled={submitting}
+                onChange={setGasPriceAmount}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-gas-denom">
+                Gas denom
+              </label>
+              <Input id="proposal-deposit-gas-denom" value={gasPriceDenom} placeholder="uatom" disabled={submitting} onChange={(event) => setGasPriceDenom(event.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-signing">
+                Signing
+              </label>
+              <Select value={signingAlgorithm} disabled={submitting} onValueChange={(value) => setSigningAlgorithm(value as CosmosSigningAlgorithm)}>
+                <SelectTrigger id="proposal-deposit-signing" className="mt-0 h-10">
+                  {signingAlgorithm}
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ethsecp256k1">ethsecp256k1</SelectItem>
+                  <SelectItem value="secp256k1">secp256k1</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-memo">
+                Memo
+              </label>
+              <Input id="proposal-deposit-memo" value={memo} placeholder="Optional" disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
+            </div>
+          </div>
+
+          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
+        </div>
+      </ModalDialog>
+      <SecretInputDialog
+        open={unlockDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setUnlockDialogOpen(nextOpen);
+
+          if (!nextOpen) {
+            setUnlockPassword('');
+            setUnlockError(null);
+          }
+        }}
+        title="Unlock Private Key"
+        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the deposit transaction.` : 'Enter the password to continue.'}
+        value={unlockPassword}
+        onValueChange={setUnlockPassword}
+        placeholder="Password"
+        confirmLabel="Unlock"
+        confirmDisabled={!unlockPassword.trim()}
+        errorMessage={unlockError}
+        onConfirm={() => void handleConfirmUnlock()}
+      />
+    </>
+  );
+}
+
 function VoteProposalDialog({
   proposal,
   open,
@@ -773,13 +1055,19 @@ function CosmosProposalsPageContent() {
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<ProposalItem | null>(null);
+  const [selectedDepositProposal, setSelectedDepositProposal] = useState<ProposalItem | null>(null);
   const voteDialogOpen = useMemo(() => Boolean(selectedProposal), [selectedProposal]);
+  const depositDialogOpen = useMemo(() => Boolean(selectedDepositProposal), [selectedDepositProposal]);
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
   }
 
   function handleVoteSuccess() {
+    setRefreshVersion((current) => current + 1);
+  }
+
+  function handleDepositSuccess() {
     setRefreshVersion((current) => current + 1);
   }
 
@@ -905,11 +1193,12 @@ function CosmosProposalsPageContent() {
                 {data.proposals.length ? (
                   data.proposals.map((proposal) => {
                     const canVote = isVotingProposal(proposal);
+                    const canDeposit = isDepositProposal(proposal);
 
                     return (
-                      <tr key={proposal.id} className="cursor-pointer border-t border-slate-200 hover:bg-slate-50/70" onClick={() => router.push(`/cosmos/proposals/${proposal.id}`)}>
+                      <tr key={proposal.id} className="cursor-pointer border-t border-slate-200 hover:bg-slate-50/70" onClick={() => router.push(`/cosmos/proposal/${proposal.id}`)}>
                         <td className="w-full max-w-[360px] px-4 py-3 text-sm" title={`#${proposal.id}. ${proposal.title}`}>
-                          <Link prefetch={false} className="inline-block max-w-[360px] truncate align-middle font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/proposals/${proposal.id}`}>
+                          <Link prefetch={false} className="inline-block max-w-[360px] truncate align-middle font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/proposal/${proposal.id}`}>
                             {`#${proposal.id}. ${proposal.title}`}
                           </Link>
                         </td>
@@ -945,14 +1234,24 @@ function CosmosProposalsPageContent() {
                           <StatusBadge status={proposal.status} label={proposal.statusLabel} />
                         </td>
                         <td className="px-4 py-3 text-right text-sm" onClick={(event) => event.stopPropagation()}>
-                          <ActionIconButton
-                            tooltip={canVote ? 'Vote' : 'Voting period only'}
-                            disabled={!canVote}
-                            className={canVote ? 'text-slate-400 hover:text-sky-600' : 'cursor-not-allowed text-slate-300'}
-                            onClick={() => setSelectedProposal(proposal)}
-                          >
-                            <IconCheckbox className="size-4" stroke={1.8} />
-                          </ActionIconButton>
+                          <span className="inline-flex items-center justify-end gap-0">
+                            <ActionIconButton
+                              tooltip={canDeposit ? 'Deposit' : 'Deposit period only'}
+                              disabled={!canDeposit}
+                              className={canDeposit ? 'text-slate-400 hover:text-sky-600' : 'cursor-not-allowed text-slate-300'}
+                              onClick={() => setSelectedDepositProposal(proposal)}
+                            >
+                              <IconCoins className="size-4" stroke={1.8} />
+                            </ActionIconButton>
+                            <ActionIconButton
+                              tooltip={canVote ? 'Vote' : 'Voting period only'}
+                              disabled={!canVote}
+                              className={canVote ? 'text-slate-400 hover:text-sky-600' : 'cursor-not-allowed text-slate-300'}
+                              onClick={() => setSelectedProposal(proposal)}
+                            >
+                              <IconMessageUp className="size-4" stroke={1.8} />
+                            </ActionIconButton>
+                          </span>
                         </td>
                       </tr>
                     );
@@ -975,6 +1274,16 @@ function CosmosProposalsPageContent() {
           onOpenChange={(open) => {
             if (!open) {
               setSelectedProposal(null);
+            }
+          }}
+        />
+        <DepositProposalDialog
+          proposal={selectedDepositProposal}
+          open={depositDialogOpen}
+          onSuccess={handleDepositSuccess}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedDepositProposal(null);
             }
           }}
         />

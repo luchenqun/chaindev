@@ -6,7 +6,7 @@ import { DirectEthSecp256k1Wallet, DirectSecp256k1Wallet, Registry, type EncodeO
 import { defaultRegistryTypes, GasPrice, SigningStargateClient } from '@cosmjs/stargate';
 import { MsgWithdrawValidatorCommission } from 'cosmjs-types/cosmos/distribution/v1beta1/tx';
 import { VoteOption } from 'cosmjs-types/cosmos/gov/v1/gov';
-import { MsgSubmitProposal, MsgVote } from 'cosmjs-types/cosmos/gov/v1/tx';
+import { MsgDeposit, MsgSubmitProposal, MsgVote } from 'cosmjs-types/cosmos/gov/v1/tx';
 import { getActiveCosmosProvider } from '@/domains/cosmos/client/queries';
 
 type TendermintStatusResponse = {
@@ -46,6 +46,11 @@ export type CosmosProposalVoteInput = CosmosBaseSigningInput & {
   option: CosmosProposalVoteOption;
   metadata?: string;
 };
+export type CosmosProposalDepositInput = CosmosBaseSigningInput & {
+  proposalId: string;
+  amount: string;
+  denom: string;
+};
 export type CosmosSubmitGovProposalInput = CosmosBaseSigningInput & {
   title: string;
   summary: string;
@@ -59,6 +64,7 @@ export type NormalizedCosmosDelegateInput = Required<CosmosDelegateInput>;
 export type NormalizedCosmosBaseSigningInput = Required<CosmosBaseSigningInput>;
 export type NormalizedCosmosSigningInput = Required<CosmosSigningInput>;
 export type NormalizedCosmosProposalVoteInput = Required<CosmosProposalVoteInput>;
+export type NormalizedCosmosProposalDepositInput = Required<CosmosProposalDepositInput>;
 export type NormalizedCosmosSubmitGovProposalInput = Required<CosmosSubmitGovProposalInput>;
 
 export type CosmosSigningAlgorithm = 'ethsecp256k1' | 'secp256k1';
@@ -215,6 +221,36 @@ function normalizeCosmosProposalVoteInput(input: CosmosProposalVoteInput): Norma
     proposalId,
     option,
     metadata,
+  };
+}
+
+function normalizeCosmosProposalDepositInput(input: CosmosProposalDepositInput): NormalizedCosmosProposalDepositInput {
+  const normalized = normalizeCosmosBaseSigningInput(input);
+  const proposalId = normalizeRequiredText(input.proposalId);
+  const amount = normalizeRequiredText(input.amount);
+  const denom = normalizeRequiredText(input.denom);
+
+  assertPresent(proposalId, 'Proposal id');
+  assertPresent(amount, 'Deposit amount');
+  assertPresent(denom, 'Deposit denom');
+
+  if (!/^[1-9]\d*$/.test(proposalId)) {
+    throw new Error('Proposal id must be a positive integer.');
+  }
+
+  if (!/^[1-9]\d*$/.test(amount)) {
+    throw new Error('Deposit amount must be a whole-number base unit amount.');
+  }
+
+  if (/\s/.test(denom)) {
+    throw new Error('Deposit denom cannot contain whitespace.');
+  }
+
+  return {
+    ...normalized,
+    proposalId,
+    amount,
+    denom,
   };
 }
 
@@ -488,6 +524,42 @@ export async function voteCosmosProposal(input: CosmosProposalVoteInput): Promis
 
     if (result.code !== 0) {
       throw new Error(result.rawLog || `Vote transaction failed with code ${result.code}.`);
+    }
+
+    return {
+      delegatorAddress,
+      transactionHash: result.transactionHash,
+      height: result.height,
+      gasUsed: result.gasUsed,
+      gasWanted: result.gasWanted,
+    };
+  } finally {
+    client.disconnect();
+  }
+}
+
+export async function depositCosmosProposal(input: CosmosProposalDepositInput): Promise<CosmosDelegateResult> {
+  const normalized = normalizeCosmosProposalDepositInput(input);
+  const { client, delegatorAddress } = await createCosmosSigningClient(normalized);
+
+  try {
+    const message: EncodeObject = {
+      typeUrl: '/cosmos.gov.v1.MsgDeposit',
+      value: MsgDeposit.fromPartial({
+        proposalId: BigInt(normalized.proposalId),
+        depositor: delegatorAddress,
+        amount: [
+          {
+            amount: normalized.amount,
+            denom: normalized.denom,
+          },
+        ],
+      }),
+    };
+    const result = await client.signAndBroadcast(delegatorAddress, [message], 'auto', normalized.memo);
+
+    if (result.code !== 0) {
+      throw new Error(result.rawLog || `Deposit transaction failed with code ${result.code}.`);
     }
 
     return {

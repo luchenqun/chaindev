@@ -67,7 +67,7 @@ function matchesNavItem(pathname: string, href: string) {
   }
 
   if (href.startsWith('/cosmos/proposals')) {
-    return pathname.startsWith('/cosmos/proposals') || pathname.startsWith('/cosmos/proposals/');
+    return pathname.startsWith('/cosmos/proposals') || pathname.startsWith('/cosmos/proposal/');
   }
 
   if (href.startsWith('/cosmos/validators')) {
