@@ -3,7 +3,7 @@
 import { IconReceiptRefund, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
@@ -21,12 +21,7 @@ import {
   type CosmosSigningAlgorithm,
 } from '@/domains/cosmos/client/delegate-transaction';
 import { getCosmosValidatorDetailDirect } from '@/domains/cosmos/client/queries';
-import {
-  CosmosDetailGroup as DetailGroup,
-  CosmosDetailRow as DetailRow,
-  CosmosDetailTag as DetailTag,
-  formatTimestampWithSeconds,
-} from '@/domains/cosmos/ui/detail-primitives';
+import { CosmosDetailGroup as DetailGroup, CosmosDetailRow as DetailRow, CosmosDetailTag as DetailTag, formatTimestampWithSeconds } from '@/domains/cosmos/ui/detail-primitives';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
 import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
 import { AppShell } from '@/platform/layout/app-shell';
@@ -118,7 +113,7 @@ function ScaledInput({
   );
 }
 
-function RewardSummaryRow({ label, value, actionLabel, onAction }: { label: string; value: string; actionLabel?: string; onAction?: () => void }) {
+function RewardSummaryRow({ label, value, actionLabel, onAction }: { label: string; value: ReactNode; actionLabel?: string; onAction?: () => void }) {
   return (
     <div className="grid gap-3 border-t border-slate-200 px-5 py-4 first:border-t-0 sm:grid-cols-[180px_minmax(0,1fr)_auto] sm:items-center">
       <p className="text-sm font-medium text-slate-500">{label}</p>
@@ -593,14 +588,14 @@ export default function CosmosValidatorPage() {
               <div>
                 <RewardSummaryRow
                   label="Account Address"
-                  value={validator.accountAddress ?? '-'}
-                  actionLabel={validator.accountAddress ? 'Open Account' : undefined}
-                  onAction={
-                    validator.accountAddress
-                      ? () => {
-                          window.location.href = `/cosmos/account/${validator.accountAddress}`;
-                        }
-                      : undefined
+                  value={
+                    validator.accountAddress ? (
+                      <Link className="font-mono text-sky-600 hover:text-sky-700" href={`/cosmos/account/${validator.accountAddress}`}>
+                        {validator.accountAddress}
+                      </Link>
+                    ) : (
+                      '-'
+                    )
                   }
                 />
                 <RewardSummaryRow label="Balances" value={validator.accountReadableBalancesLabel} />
@@ -737,9 +732,7 @@ export default function CosmosValidatorPage() {
           </section>
         ) : null}
 
-        {resolvedActiveTab === 'json' ? (
-          <JsonViewPanel value={validator.rawJson as object} />
-        ) : null}
+        {resolvedActiveTab === 'json' ? <JsonViewPanel value={validator.rawJson as object} /> : null}
         <RewardWithdrawalDialog
           validator={validator}
           kind={rewardWithdrawalKind}

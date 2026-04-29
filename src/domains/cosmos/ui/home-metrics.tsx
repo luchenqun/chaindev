@@ -37,7 +37,7 @@ export function CosmosHomeMetrics() {
   const { snapshot, errorMessage, connectionMode, autoRefreshEnabled, setAutoRefreshEnabled } = useCosmosHomeData();
 
   if (!snapshot && !errorMessage) {
-    return <MetricCardsSkeleton headerItems={4} metrics={11} />;
+    return <MetricCardsSkeleton headerItems={4} metrics={12} />;
   }
 
   const headerItems = snapshot
@@ -91,7 +91,7 @@ export function CosmosHomeMetrics() {
       ) : null}
       {thirdRow.length ? <div className="border-t border-slate-200" /> : null}
       {thirdRow.length ? (
-        <div className={`grid divide-y divide-slate-200 ${thirdRow.length >= 3 ? 'lg:grid-cols-3 lg:divide-x lg:divide-y-0' : 'lg:grid-cols-2 lg:divide-x lg:divide-y-0'}`}>
+        <div className={`grid divide-y divide-slate-200 ${thirdRow.length >= 4 ? 'lg:grid-cols-4 lg:divide-x lg:divide-y-0' : 'lg:grid-cols-2 lg:divide-x lg:divide-y-0'}`}>
           {thirdRow.map((metric) => (
             <MetricCard key={metric.label} {...metric} />
           ))}

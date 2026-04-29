@@ -133,17 +133,17 @@ export function formatReadableDenom(denom: string) {
   return READABLE_DENOM_ALIASES[shortened] ?? READABLE_DENOM_ALIASES[denom] ?? shortened;
 }
 
-export function formatReadableDenomCollection(items: Array<{ denom: string; amount: string }> | undefined) {
+export function formatReadableDenomCollection(items: Array<{ denom: string; amount: string }> | undefined, maxVisible = 2) {
   if (!items?.length) {
     return '0';
   }
 
-  const visible = items.slice(0, 2).map((item) => {
+  const visible = items.slice(0, maxVisible).map((item) => {
     return `${formatReadableTokenAmount(item.amount)} ${formatReadableDenom(item.denom)}`;
   });
 
-  if (items.length > 2) {
-    visible.push(`+${items.length - 2} more`);
+  if (items.length > maxVisible) {
+    visible.push(`+${items.length - maxVisible} more`);
   }
 
   return visible.join(', ');

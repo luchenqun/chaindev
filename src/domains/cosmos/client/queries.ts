@@ -888,6 +888,7 @@ function formatLocalTimestamp(value: string | undefined) {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   }).format(timestamp);
 }
@@ -937,7 +938,8 @@ function extractCosmosModuleAccountName(account: unknown): string | null {
     base_account?: unknown;
   };
 
-  const rawName = typeof value.name === 'string' && value.name.trim() ? value.name.trim() : typeof value.module_name === 'string' && value.module_name.trim() ? value.module_name.trim() : null;
+  const rawName =
+    typeof value.name === 'string' && value.name.trim() ? value.name.trim() : typeof value.module_name === 'string' && value.module_name.trim() ? value.module_name.trim() : null;
 
   if (rawName) {
     return rawName.replace(/_tokens_pool$/, '');
@@ -992,17 +994,17 @@ function formatBytes(value: string | number | null | undefined, fallback = 'Unav
   return `${(bytes / (1024 * 1024)).toFixed(1).replace(/\.0$/, '')} MB`;
 }
 
-function formatDenomCollection(items: Array<{ denom: string; amount: string }> | undefined) {
+function formatDenomCollection(items: Array<{ denom: string; amount: string }> | undefined, maxVisible = 2) {
   if (!items?.length) {
     return '0';
   }
 
-  const visible = items.slice(0, 2).map((item) => {
+  const visible = items.slice(0, maxVisible).map((item) => {
     return `${formatDenomAmount(item.amount)} ${item.denom}`;
   });
 
-  if (items.length > 2) {
-    visible.push(`+${items.length - 2} more`);
+  if (items.length > maxVisible) {
+    visible.push(`+${items.length - maxVisible} more`);
   }
 
   return visible.join(', ');
@@ -2675,7 +2677,9 @@ export async function getCosmosValidatorDetailDirect(input: { address: string; t
     }),
   );
   const [balancesPayload, stakeRewardsPayload, commissionRewardsPayload, outstandingRewardsPayload] = await Promise.all([
-    accountAddress ? fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(`${profile.restUrl}/cosmos/bank/v1beta1/balances/${accountAddress}`).catch(() => null) : null,
+    accountAddress
+      ? fetchJson<{ balances?: Array<{ denom: string; amount: string }> }>(`${profile.restUrl}/cosmos/bank/v1beta1/balances/${accountAddress}`).catch(() => null)
+      : null,
     accountAddress
       ? fetchJson<CosmosValidatorDelegatorRewardsResponse>(
           `${profile.restUrl}/cosmos/distribution/v1beta1/delegators/${encodeURIComponent(accountAddress)}/rewards/${encodeURIComponent(validator.operator_address)}`,
@@ -2740,8 +2744,8 @@ export async function getCosmosValidatorDetailDirect(input: { address: string; t
     minSelfDelegationLabel: formatDenomAmount(validator.min_self_delegation ?? '0'),
     selfBondLabel: selfBondAmount,
     accountBalances,
-    accountBalancesLabel: formatDenomCollection(accountBalances),
-    accountReadableBalancesLabel: formatReadableDenomCollection(accountBalances),
+    accountBalancesLabel: formatDenomCollection(accountBalances, accountBalances.length),
+    accountReadableBalancesLabel: formatReadableDenomCollection(accountBalances, accountBalances.length),
     stakeRewardsLabel: formatReadableDecCoinCollection(stakeRewardsPayload?.rewards),
     commissionRewardsLabel: formatReadableDecCoinCollection(commissionRewardsPayload?.commission?.commission),
     outstandingRewardsLabel: formatReadableDecCoinCollection(outstandingRewardsPayload?.rewards?.rewards),
@@ -2950,20 +2954,34 @@ export async function getCosmosProposalByIdDirect(id: string, requestedVotePage 
 
 export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): Promise<CosmosHomeSnapshot> {
   const profile = getActiveCosmosProvider();
-  const [statusPayload, netInfoPayload, unconfirmedPayload, txSearchPayload, restValidatorsPayload, poolPayload, communityPoolPayload, supplyPayload, cachedTransactions] =
-    await Promise.all([
-      getStatusDirect(profile),
-      getNetInfoDirect(profile).catch(() => ({ result: { n_peers: '0' } })),
-      getUnconfirmedTxsDirect(profile).catch(() => ({
-        result: { n_txs: '0', total: '0' },
-      })),
-      getTxSearchDirect(profile, txLimit).catch(() => ({ result: { total_count: '0', txs: [] } })),
-      getRestValidatorsDirect(profile).catch(() => ({ validators: [], pagination: { total: '0' } })),
-      fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`).catch(() => ({ pool: { bonded_tokens: '0', not_bonded_tokens: '0' } })),
-      fetchJson<CosmosCommunityPoolResponse>(`${profile.restUrl}/cosmos/distribution/v1beta1/community_pool`).catch(() => ({ pool: [] })),
-      fetchJson<CosmosSupplyResponse>(`${profile.restUrl}/cosmos/bank/v1beta1/supply`).catch(() => ({ supply: [] })),
-      getRecentCachedCosmosTransactions(txLimit).catch(() => []),
-    ]);
+  const [
+    statusPayload,
+    netInfoPayload,
+    unconfirmedPayload,
+    txSearchPayload,
+    restValidatorsPayload,
+    proposalsPayload,
+    poolPayload,
+    communityPoolPayload,
+    supplyPayload,
+    cachedTransactions,
+  ] = await Promise.all([
+    getStatusDirect(profile),
+    getNetInfoDirect(profile).catch(() => ({ result: { n_peers: '0' } })),
+    getUnconfirmedTxsDirect(profile).catch(() => ({
+      result: { n_txs: '0', total: '0' },
+    })),
+    getTxSearchDirect(profile, txLimit).catch(() => ({ result: { total_count: '0', txs: [] } })),
+    getRestValidatorsDirect(profile).catch(() => ({ validators: [], pagination: { total: '0' } })),
+    fetchJson<CosmosGovProposalsResponse>(`${profile.restUrl}/cosmos/gov/v1/proposals?pagination.count_total=true&pagination.limit=1`).catch(() => ({
+      proposals: [],
+      pagination: { total: '0' },
+    })),
+    fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`).catch(() => ({ pool: { bonded_tokens: '0', not_bonded_tokens: '0' } })),
+    fetchJson<CosmosCommunityPoolResponse>(`${profile.restUrl}/cosmos/distribution/v1beta1/community_pool`).catch(() => ({ pool: [] })),
+    fetchJson<CosmosSupplyResponse>(`${profile.restUrl}/cosmos/bank/v1beta1/supply`).catch(() => ({ supply: [] })),
+    getRecentCachedCosmosTransactions(txLimit).catch(() => []),
+  ]);
   const latestHeight = Number(statusPayload.result?.sync_info?.latest_block_height ?? 0);
   const [blockchainPayload, rpcValidatorsPayload] = await Promise.all([
     getBlockchainDirect(profile, latestHeight, Math.max(blockLimit, 10)).catch(() => ({ result: { block_metas: [] } })),
@@ -3083,6 +3101,10 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
       {
         label: 'Average Block Time',
         value: formatDurationSeconds(averageBlockTime),
+      },
+      {
+        label: 'Proposals',
+        value: formatInteger(proposalsPayload.pagination?.total ?? String(proposalsPayload.proposals?.length ?? 0), '0'),
       },
       {
         label: 'Bonded Tokens',
