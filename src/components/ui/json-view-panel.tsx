@@ -126,7 +126,28 @@ export function JsonViewPanel({
         displayDataTypes={false}
         displayObjectSize={false}
         style={style}
-      />
+      >
+        <JsonView.Colon
+          render={(props, { parentValue }) => {
+            if (Array.isArray(parentValue) && props.children === ':') {
+              return <span />;
+            }
+
+            return <span {...props} />;
+          }}
+        />
+        <JsonView.KeyName
+          render={(props, { parentValue }) => {
+            const { as: _as, render: _render, ...spanProps } = props;
+
+            if (Array.isArray(parentValue) && Number.isFinite(Number(props.children))) {
+              return <span />;
+            }
+
+            return <span {...spanProps} />;
+          }}
+        />
+      </JsonView>
       <style jsx global>{`
         .json-view-wrap .w-rjv-value {
           white-space: pre-wrap;
