@@ -78,7 +78,7 @@ function CosmosAccountsPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-24" metricCards={0} rows={8} columns={4} toolbarIcons={3} />
+        <ListPageSkeleton titleWidth="w-24" metricCards={0} columns={4} toolbarIcons={3} />
       </AppShell>
     );
   }
@@ -192,7 +192,7 @@ export default function CosmosAccountsPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-24" metricCards={0} rows={8} columns={4} toolbarIcons={3} />
+          <ListPageSkeleton titleWidth="w-24" metricCards={0} columns={4} toolbarIcons={3} />
         </AppShell>
       }
     >

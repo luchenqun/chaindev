@@ -12,6 +12,7 @@ import {
 } from '@/domains/cosmos/client/queries';
 import { decodeCosmosHomeTransactionsByHashes } from '@/domains/cosmos/client/home-transactions';
 import { notifyCosmosTransactionsAvailable } from '@/domains/cosmos/ui/live-events';
+import { HOME_ACTIVITY_LIST_LIMIT } from '@/config/pagination';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
 import { isCosmosBlocksRouteActive, isCosmosHomeRouteActive, isCosmosLiveBlockRouteActive, isCosmosRouteActive } from '@/platform/workbench/home-route-state';
 
@@ -27,8 +28,8 @@ type CosmosHomeDataContextValue = {
 
 const CosmosHomeDataContext = createContext<CosmosHomeDataContextValue | null>(null);
 const COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY = 'chaindev-cosmos-home-auto-refresh-enabled';
-const COSMOS_HOME_BLOCK_LIMIT = 6;
-const COSMOS_HOME_TX_LIMIT = 6;
+const COSMOS_HOME_BLOCK_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
+const COSMOS_HOME_TX_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
 
 type TendermintWsEnvelope = {
   result?: {

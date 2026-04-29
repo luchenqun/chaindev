@@ -134,7 +134,7 @@ function EvmBlocksPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-20" metricCards={4} rows={8} columns={7} />
+        <ListPageSkeleton titleWidth="w-20" metricCards={4} columns={7} />
       </AppShell>
     );
   }
@@ -212,7 +212,7 @@ export default function EvmBlocksPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-20" metricCards={4} rows={8} columns={7} />
+          <ListPageSkeleton titleWidth="w-20" metricCards={4} columns={7} />
         </AppShell>
       }
     >

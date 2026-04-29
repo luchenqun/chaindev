@@ -1,1 +1,2 @@
 export const DEFAULT_TABLE_PAGE_SIZE = 15;
+export const HOME_ACTIVITY_LIST_LIMIT = 6;

@@ -88,7 +88,7 @@ function CosmosProposalsPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-24" rows={8} columns={8} />
+        <ListPageSkeleton titleWidth="w-24" columns={8} />
       </AppShell>
     );
   }
@@ -197,7 +197,7 @@ export default function CosmosProposalsPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-24" rows={8} columns={8} />
+          <ListPageSkeleton titleWidth="w-24" columns={8} />
         </AppShell>
       }
     >

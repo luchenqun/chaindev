@@ -129,7 +129,7 @@ function CosmosBlocksPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-20" metricCards={4} rows={8} columns={8} />
+        <ListPageSkeleton titleWidth="w-20" metricCards={4} columns={8} />
       </AppShell>
     );
   }
@@ -204,7 +204,7 @@ export default function CosmosBlocksPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-20" metricCards={4} rows={8} columns={8} />
+          <ListPageSkeleton titleWidth="w-20" metricCards={4} columns={8} />
         </AppShell>
       }
     >

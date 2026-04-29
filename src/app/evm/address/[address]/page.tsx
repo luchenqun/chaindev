@@ -14,6 +14,7 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { deleteEvmAddressTag, getEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsertEvmAddressTag } from '@/domains/evm/client/address-tags';
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { getEvmAddressCacheSnapshot, MAX_CACHED_EVM_TRANSACTIONS, subscribeEvmTransactionCache } from '@/domains/evm/client/transaction-cache';
@@ -35,7 +36,7 @@ import { getActiveEvmCurrencyNameClient, getEvmAddressSummaryDirect, hydrateEvmC
 import { AppShell } from '@/platform/layout/app-shell';
 import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
 
-const VISIBLE_TRANSACTIONS = 25;
+const VISIBLE_TRANSACTIONS = DEFAULT_TABLE_PAGE_SIZE;
 type AddressPageTab = 'transactions' | 'contract';
 type ContractSubview = 'code' | 'read' | 'write';
 type ContractEnvironmentState = {
@@ -104,7 +105,7 @@ function AddressPageSkeleton() {
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: 6 }).map((_, rowIndex) => (
+              {Array.from({ length: VISIBLE_TRANSACTIONS }).map((_, rowIndex) => (
                 <tr key={rowIndex} className="border-t border-slate-200">
                   {Array.from({ length: 9 }).map((__, columnIndex) => (
                     <td key={columnIndex} className="px-5 py-3">

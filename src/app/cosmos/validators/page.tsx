@@ -443,7 +443,7 @@ function CosmosValidatorsPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-28" metricCards={4} rows={8} columns={8} />
+        <ListPageSkeleton titleWidth="w-28" metricCards={4} columns={8} />
       </AppShell>
     );
   }
@@ -586,7 +586,7 @@ export default function CosmosValidatorsPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-28" metricCards={4} rows={8} columns={8} />
+          <ListPageSkeleton titleWidth="w-28" metricCards={4} columns={8} />
         </AppShell>
       }
     >

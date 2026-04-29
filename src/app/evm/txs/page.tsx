@@ -593,7 +593,7 @@ function EvmTransactionsPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-28" rows={8} columns={8} />
+        <ListPageSkeleton titleWidth="w-28" columns={8} />
       </AppShell>
     );
   }
@@ -1001,7 +1001,7 @@ export default function EvmTransactionsPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-28" rows={8} columns={8} />
+          <ListPageSkeleton titleWidth="w-28" columns={8} />
         </AppShell>
       }
     >

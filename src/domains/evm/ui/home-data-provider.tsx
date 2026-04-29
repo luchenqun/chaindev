@@ -10,6 +10,7 @@ import {
   getEvmHomeSnapshotDirect,
   validateActiveEvmCacheDirect,
 } from '@/domains/evm/client/queries';
+import { HOME_ACTIVITY_LIST_LIMIT } from '@/config/pagination';
 import { subscribeEvmTransactionCache } from '@/domains/evm/client/transaction-cache';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
 import { isEvmRouteActive } from '@/platform/workbench/home-route-state';
@@ -33,8 +34,8 @@ type EvmHomeDataContextValue = {
 
 const EvmHomeDataContext = createContext<EvmHomeDataContextValue | null>(null);
 const RECENT_HOME_BLOCK_WINDOW = 10;
-const HOME_BLOCK_LIST_LIMIT = 6;
-const HOME_TRANSACTION_LIST_LIMIT = 6;
+const HOME_BLOCK_LIST_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
+const HOME_TRANSACTION_LIST_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
 
 function formatMetricInteger(value: number) {
   return new Intl.NumberFormat('en-US').format(value);

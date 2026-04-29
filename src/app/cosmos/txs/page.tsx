@@ -407,7 +407,7 @@ function CosmosTransactionsPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-28" rows={8} columns={9} />
+        <ListPageSkeleton titleWidth="w-28" columns={9} />
       </AppShell>
     );
   }
@@ -679,7 +679,7 @@ export default function CosmosTransactionsPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-28" rows={8} columns={9} />
+          <ListPageSkeleton titleWidth="w-28" columns={9} />
         </AppShell>
       }
     >

@@ -217,7 +217,7 @@ function EvmAccountsPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-24" rows={8} columns={7} />
+        <ListPageSkeleton titleWidth="w-24" columns={7} />
       </AppShell>
     );
   }
@@ -444,7 +444,7 @@ export default function EvmAccountsPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-24" rows={8} columns={7} />
+          <ListPageSkeleton titleWidth="w-24" columns={7} />
         </AppShell>
       }
     >

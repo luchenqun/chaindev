@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DEFAULT_TABLE_PAGE_SIZE, HOME_ACTIVITY_LIST_LIMIT } from '@/config/pagination';
 
 export function OverviewCardsSkeleton({ cards = 3, entries = 2 }: { cards?: number; entries?: number }) {
   return (
@@ -84,7 +85,7 @@ export function HomeActivitySkeleton() {
             <Skeleton className="h-4 w-28" />
           </div>
           <div className="grid border-t border-slate-200 pt-1">
-            {Array.from({ length: 4 }).map((_, rowIndex) => (
+            {Array.from({ length: HOME_ACTIVITY_LIST_LIMIT }).map((_, rowIndex) => (
               <div key={rowIndex} className={`grid grid-cols-[auto_130px_minmax(0,1fr)_auto] items-center gap-4 py-4 ${rowIndex ? 'border-t border-slate-200' : ''}`}>
                 <Skeleton className="size-10 rounded-xl" />
                 <div className="space-y-2">
@@ -109,7 +110,7 @@ export function HomeActivitySkeleton() {
             <Skeleton className="h-4 w-40" />
           </div>
           <div className="grid border-t border-slate-200 pt-1">
-            {Array.from({ length: 4 }).map((_, rowIndex) => (
+            {Array.from({ length: HOME_ACTIVITY_LIST_LIMIT }).map((_, rowIndex) => (
               <div key={rowIndex} className={`grid grid-cols-[auto_160px_minmax(0,1fr)_auto] items-center gap-3 py-4 ${rowIndex ? 'border-t border-slate-200' : ''}`}>
                 <Skeleton className="size-10 rounded-xl" />
                 <div className="space-y-2">
@@ -158,7 +159,7 @@ export function PendingTransactionsSkeleton() {
               </tr>
             </thead>
             <tbody>
-              {Array.from({ length: 8 }).map((_, rowIndex) => (
+              {Array.from({ length: DEFAULT_TABLE_PAGE_SIZE }).map((_, rowIndex) => (
                 <tr key={rowIndex} className="border-t border-slate-200">
                   <td className="px-5 py-3">
                     <Skeleton className="h-4 w-28" />
@@ -197,7 +198,7 @@ export function PendingTransactionsSkeleton() {
 export function ListPageSkeleton({
   titleWidth = 'w-28',
   metricCards = 0,
-  rows = 8,
+  rows = DEFAULT_TABLE_PAGE_SIZE,
   columns = 8,
   showToolbar = true,
   toolbarIcons = 2,

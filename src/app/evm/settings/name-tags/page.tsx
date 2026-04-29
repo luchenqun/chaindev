@@ -177,7 +177,7 @@ export default function EvmNameTagsPage() {
     return (
       <AppShell>
         <AccountWorkbenchShell mode="evm">
-          <ListPageSkeleton titleWidth="w-36" rows={8} columns={4} showToolbar={false} />
+          <ListPageSkeleton titleWidth="w-36" columns={4} showToolbar={false} />
         </AccountWorkbenchShell>
       </AppShell>
     );

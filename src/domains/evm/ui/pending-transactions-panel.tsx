@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getEvmPendingTransactionsDirect } from '@/domains/evm/client/queries';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
@@ -34,7 +35,7 @@ function PendingTransactionsPanelSkeleton({ className = '' }: { className?: stri
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: 6 }).map((_, rowIndex) => (
+            {Array.from({ length: DEFAULT_TABLE_PAGE_SIZE }).map((_, rowIndex) => (
               <tr key={rowIndex} className="border-t border-slate-200">
                 {Array.from({ length: 8 }).map((_, cellIndex) => (
                   <td key={cellIndex} className="px-5 py-3">
