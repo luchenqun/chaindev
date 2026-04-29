@@ -6,13 +6,14 @@ import { Suspense, useEffect, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getCosmosAccountsPageDirect } from '@/domains/cosmos/client/queries';
 import { formatCosmosAddressForDisplay, type CosmosAddressDisplayMode } from '@/domains/cosmos/ui/address-display';
 import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { AppShell } from '@/platform/layout/app-shell';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 function CosmosAccountsPageContent() {
   const pathname = usePathname();

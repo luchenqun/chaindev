@@ -3,21 +3,25 @@
 import { IconArrowsExchange, IconPlayerPause, IconPlayerPlay, IconRefresh, IconSearch } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RelativeTime } from '@/components/relative-time';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getCosmosTransactionsByBlockDirect, getCosmosTransactionsPageDirect } from '@/domains/cosmos/client/queries';
 import { formatCosmosAddressForDisplay, type CosmosAddressDisplayMode } from '@/domains/cosmos/ui/address-display';
 import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { COSMOS_TRANSACTIONS_AVAILABLE_EVENT, type CosmosTransactionsAvailableEventDetail } from '@/domains/cosmos/ui/live-events';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
+import { cn } from '@/lib/utils';
 import { AppShell } from '@/platform/layout/app-shell';
+import { useLiveInsertAnimationKey } from '@/platform/home/use-live-insert-animation-key';
+import { usePushedListItems } from '@/platform/home/use-pushed-list-items';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 type CosmosTransactionSearchFormState = {
   hash: string;
@@ -206,6 +210,11 @@ function CosmosTransactionsPageContent() {
   const liveProcessedBlockHeightsRef = useRef<Set<string>>(new Set());
   const currentQuery = useMemo(() => buildCosmosTransactionsSearchQuery(activeSearchFilters), [activeSearchFilters]);
   const activeFilterDescriptions = useMemo(() => describeActiveFilters(activeSearchFilters), [activeSearchFilters]);
+  const livePushEnabled = autoRefreshEnabled && !activeSearchFilters.hasFilters && currentPage === 1;
+  const liveTopTransactionKey = livePushEnabled && data?.transactions[0] ? data.transactions[0].hash : null;
+  const liveInsertAnimationKey = useLiveInsertAnimationKey(liveTopTransactionKey);
+  const getTransactionKey = useCallback((transaction: NonNullable<typeof data>['transactions'][number]) => transaction.hash, []);
+  const pushedTransactions = usePushedListItems(data?.transactions ?? [], getTransactionKey, livePushEnabled, PAGE_SIZE, false);
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -490,9 +499,12 @@ function CosmosTransactionsPageContent() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
+          <div
+            className={cn('overflow-x-auto overflow-y-hidden', (data.transactions.length >= PAGE_SIZE || pushedTransactions.length > data.transactions.length) && 'pushed-table-viewport')}
+            style={{ '--pushed-table-visible-rows': data.transactions.length, '--pushed-table-row-height': '3.25rem' } as React.CSSProperties}
+          >
+            <table className="data-table cosmos-transaction-table">
+              <thead className="relative z-10 bg-white">
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
@@ -503,43 +515,46 @@ function CosmosTransactionsPageContent() {
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Fee</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody
+                key={liveInsertAnimationKey}
+                className={cn(pushedTransactions.some((transaction) => transaction.phase !== 'stable') ? 'pushed-table-list-moving' : liveInsertAnimationKey > 0 && 'cosmos-transaction-table-live-insert')}
+              >
                 {data.transactions.length ? (
-                  data.transactions.map((transaction) => {
+                  pushedTransactions.map(({ item: transaction, key, phase }) => {
                     const displaySender = transaction.sender !== 'Unknown' ? formatCosmosAddressForDisplay(transaction.sender, addressDisplayMode) : null;
 
                     return (
-                      <tr key={transaction.hash} className="border-t border-slate-200">
-                        <td className="px-5 py-3 text-sm">
+                      <tr key={key} className={cn('cosmos-transaction-table-row', `pushed-table-row-${phase}`)}>
+                        <td className="px-5 py-2.5 text-sm leading-6">
                           <div className="-ml-1 flex items-center gap-1.5">
                             <CosmosTransactionPreviewButton transaction={transaction} />
                             <CosmosTransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} status={transaction.status} />
                           </div>
                         </td>
-                        <td className="px-5 py-3 text-sm">
-                          <span className="inline-flex min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700">
+                        <td className="px-5 py-2.5 text-sm leading-6">
+                          <span className="inline-flex h-7 min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-700">
                             {transaction.type}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-sm tabular-nums">
+                        <td className="px-5 py-2.5 text-sm leading-6 tabular-nums">
                           <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
                             {transaction.height}
                           </Link>
                         </td>
-                        <td className="px-5 py-3 text-sm text-slate-700">
+                        <td className="px-5 py-2.5 text-sm leading-6 text-slate-700">
                           <RelativeTime timestampMs={transaction.timestampMs} />
                         </td>
-                        <td className="px-5 py-3 text-sm" title={displaySender?.full}>
+                        <td className="px-5 py-2.5 text-sm leading-6" title={displaySender?.full}>
                           {displaySender ? (
                             <CosmosAddressLink prefetch={false} href={`/cosmos/account/${transaction.sender}`} label={displaySender.label} copyValue={displaySender.full} />
                           ) : (
                             <span className="text-slate-500">Unknown</span>
                           )}
                         </td>
-                        <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
+                        <td className="px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-700">
                           {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
                         </td>
-                        <td className="px-5 py-3 text-sm text-slate-700">{transaction.feeLabel}</td>
+                        <td className="px-5 py-2.5 text-sm leading-6 text-slate-700">{transaction.feeLabel}</td>
                       </tr>
                     );
                   })

@@ -6,13 +6,14 @@ import { Suspense, useEffect, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getCosmosBlocksPageDirect } from '@/domains/cosmos/client/queries';
 import { CosmosBlockTable } from '@/domains/cosmos/ui/block-table';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { AppShell } from '@/platform/layout/app-shell';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 function CosmosBlocksPageContent() {
   const pathname = usePathname();
@@ -24,6 +25,7 @@ function CosmosBlocksPageContent() {
   const [data, setData] = useState<Awaited<ReturnType<typeof getCosmosBlocksPageDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+  const [liveInsertAnimationKey, setLiveInsertAnimationKey] = useState(0);
   const [loading, setLoading] = useState(true);
 
   function handlePageChange(page: number) {
@@ -74,56 +76,55 @@ function CosmosBlocksPageContent() {
   }, [currentPage, pathname, router, searchParamsText]);
 
   useEffect(() => {
-    if (!latestFeed) {
+    if (!latestFeed || !data) {
       return;
     }
 
-    setData((current) => {
-      if (!current) {
-        return current;
-      }
+    const summary = data.summary.map((item) =>
+      item.label === 'Latest Block'
+        ? {
+            ...item,
+            value: latestFeed.latestBlock,
+            note: 'Live head from the active Cosmos WebSocket subscription.',
+          }
+        : item,
+    );
+    const summaryChanged = summary.some((item, index) => item.value !== data.summary[index]?.value || item.note !== data.summary[index]?.note);
 
-      const summary = current.summary.map((item) =>
-        item.label === 'Latest Block'
+    if (!autoRefreshEnabled || currentPage !== 1 || data.blocks[0]?.height === latestFeed.blockPageItem.height) {
+      if (summaryChanged) {
+        setData({
+          ...data,
+          summary,
+        });
+      }
+      return;
+    }
+
+    const mergedBlocks = [latestFeed.blockPageItem, ...data.blocks.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
+    const totalBlocks = latestFeed.latestBlockNumber || data.totalBlocks;
+    const totalPages = Math.max(1, Math.ceil(totalBlocks / data.pageSize));
+    const topBlock = mergedBlocks[0]?.height ?? latestFeed.latestBlock;
+    const bottomBlock = mergedBlocks[mergedBlocks.length - 1]?.height ?? latestFeed.latestBlock;
+
+    setLiveInsertAnimationKey((currentKey) => currentKey + 1);
+    setData({
+      ...data,
+      totalBlocks,
+      totalPages,
+      hasNextPage: totalPages > data.page,
+      summary: summary.map((item) =>
+        item.label === 'Current Range'
           ? {
               ...item,
-              value: latestFeed.latestBlock,
-              note: 'Live head from the active Cosmos WebSocket subscription.',
+              value: `#${topBlock} - #${bottomBlock}`,
+              note: `Showing page ${data.page} of ${totalPages}.`,
             }
           : item,
-      );
-
-      if (!autoRefreshEnabled || currentPage !== 1) {
-        return {
-          ...current,
-          summary,
-        };
-      }
-
-      const mergedBlocks = [latestFeed.blockPageItem, ...current.blocks.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
-      const totalBlocks = latestFeed.latestBlockNumber || current.totalBlocks;
-      const totalPages = Math.max(1, Math.ceil(totalBlocks / current.pageSize));
-      const topBlock = mergedBlocks[0]?.height ?? latestFeed.latestBlock;
-      const bottomBlock = mergedBlocks[mergedBlocks.length - 1]?.height ?? latestFeed.latestBlock;
-
-      return {
-        ...current,
-        totalBlocks,
-        totalPages,
-        hasNextPage: totalPages > current.page,
-        summary: summary.map((item) =>
-          item.label === 'Current Range'
-            ? {
-                ...item,
-                value: `#${topBlock} - #${bottomBlock}`,
-                note: `Showing page ${current.page} of ${totalPages}.`,
-              }
-            : item,
-        ),
-        blocks: mergedBlocks,
-      };
+      ),
+      blocks: mergedBlocks,
     });
-  }, [autoRefreshEnabled, currentPage, latestFeed]);
+  }, [autoRefreshEnabled, currentPage, data, latestFeed]);
 
   if (loading) {
     return (
@@ -162,8 +163,7 @@ function CosmosBlocksPageContent() {
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-lg font-semibold text-slate-900">{data.totalLabel}</p>
-              <p className="mt-1 text-sm text-slate-500">Showing {data.blocks.length} blocks from the selected Cosmos provider.</p>
+              <p className="text-sm text-slate-500">Showing {data.blocks.length} blocks from the selected Cosmos provider.</p>
             </div>
             <div className="flex items-center gap-0.5 lg:justify-end">
               <PaginationControls
@@ -186,7 +186,12 @@ function CosmosBlocksPageContent() {
             </div>
           </div>
           <div className="p-0">
-            <CosmosBlockTable blocks={data.blocks} hrefPrefix="/cosmos/block" />
+            <CosmosBlockTable
+              blocks={data.blocks}
+              hrefPrefix="/cosmos/block"
+              liveInsertAnimationKey={liveInsertAnimationKey}
+              pushAnimationEnabled={autoRefreshEnabled && currentPage === 1}
+            />
           </div>
         </section>
       </main>

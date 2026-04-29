@@ -6,12 +6,13 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getCosmosProposalsDirect } from '@/domains/cosmos/client/queries';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { formatTimestampWithSeconds } from '@/domains/cosmos/ui/detail-primitives';
 import { AppShell } from '@/platform/layout/app-shell';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 function StatusBadge({ status, label }: { status: string; label: string }) {
   const className =

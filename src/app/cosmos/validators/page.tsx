@@ -13,6 +13,7 @@ import { PaginationControls } from '@/components/ui/pagination-controls';
 import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { delegateCosmosTokens, getCosmosAccountPrefixFromValidatorAddress, type CosmosSigningAlgorithm } from '@/domains/cosmos/client/delegate-transaction';
 import { getCosmosValidatorsDirect } from '@/domains/cosmos/client/queries';
 import { formatCompactHash } from '@/domains/cosmos/client/tx-helpers';
@@ -20,7 +21,7 @@ import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmK
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { AppShell } from '@/platform/layout/app-shell';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
 
 function scaleDecimalByPowerOfTen(rawValue: string, exponent: number) {

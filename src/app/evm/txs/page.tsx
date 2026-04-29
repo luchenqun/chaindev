@@ -3,7 +3,7 @@
 import { IconPlayerPause, IconPlayerPlay, IconRefresh, IconSearch, IconShieldCheck, IconTrash } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isAddress, parseEther } from 'viem';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
@@ -12,6 +12,7 @@ import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
@@ -22,9 +23,12 @@ import { syncLatestEvmTransactionsDirect, validateActiveEvmCacheDirect } from '@
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { PendingTransactionsPanel } from '@/domains/evm/ui/pending-transactions-panel';
 import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
+import { cn } from '@/lib/utils';
 import { AppShell } from '@/platform/layout/app-shell';
+import { useLiveInsertAnimationKey } from '@/platform/home/use-live-insert-animation-key';
+import { usePushedListItems } from '@/platform/home/use-pushed-list-items';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 const RELOAD_CACHE_MAX_BLOCKS = 600;
 const RELOAD_CACHE_MAX_TRANSACTIONS = 1000;
 
@@ -339,6 +343,11 @@ function EvmTransactionsPageContent() {
       ]),
     );
   }, [data, decodeVersion]);
+  const livePushEnabled = autoRefreshEnabled && !activeSearchFilters.hasFilters && currentPage === 1;
+  const liveTopTransactionKey = livePushEnabled && data?.transactions[0] ? data.transactions[0].hash : null;
+  const liveInsertAnimationKey = useLiveInsertAnimationKey(liveTopTransactionKey);
+  const getTransactionKey = useCallback((transaction: NonNullable<typeof data>['transactions'][number]) => transaction.hash, []);
+  const pushedTransactions = usePushedListItems(data?.transactions ?? [], getTransactionKey, livePushEnabled, PAGE_SIZE, false);
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -690,8 +699,7 @@ function EvmTransactionsPageContent() {
             <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
-                  <p className="text-lg font-semibold text-slate-900">{data.title}</p>
-                  <p className="mt-1 text-sm text-slate-500">{data.subtitle}</p>
+                  <p className="text-sm text-slate-500">{data.subtitle}</p>
                 </div>
                 <div className="flex items-center gap-0.5 lg:justify-end">
                   <PaginationControls
@@ -753,9 +761,12 @@ function EvmTransactionsPageContent() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
+              <div
+                className={cn('overflow-x-auto overflow-y-hidden', (data.transactions.length >= PAGE_SIZE || pushedTransactions.length > data.transactions.length) && 'pushed-table-viewport')}
+                style={{ '--pushed-table-visible-rows': data.transactions.length, '--pushed-table-row-height': '3.25rem' } as React.CSSProperties}
+              >
+                <table className="data-table evm-transaction-table">
+                  <thead className="relative z-10 bg-white">
                     <tr>
                       <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
                       <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
@@ -767,31 +778,34 @@ function EvmTransactionsPageContent() {
                       <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Fee</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody
+                    key={liveInsertAnimationKey}
+                    className={cn(pushedTransactions.some((transaction) => transaction.phase !== 'stable') ? 'pushed-table-list-moving' : liveInsertAnimationKey > 0 && 'evm-transaction-table-live-insert')}
+                  >
                     {data.transactions.length ? (
-                      data.transactions.map((transaction) => {
+                      pushedTransactions.map(({ item: transaction, key, phase }) => {
                         const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
 
                         return (
-                          <tr key={transaction.hash} className="border-t border-slate-200">
-                            <td className="px-5 py-3 text-sm">
+                          <tr key={key} className={cn('evm-transaction-table-row', `pushed-table-row-${phase}`)}>
+                            <td className="px-5 py-2.5 text-sm leading-6">
                               <div className="flex items-center gap-3">
                                 <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
                                 <TransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} receiptStatus={transaction.receiptStatus} />
                               </div>
                             </td>
-                            <td className="px-5 py-3 text-sm">
+                            <td className="px-5 py-2.5 text-sm leading-6">
                               <TransactionMethodBadge methodLabel={decodedMethodLabel} />
                             </td>
-                            <td className="px-5 py-3 text-sm tabular-nums">
+                            <td className="px-5 py-2.5 text-sm leading-6 tabular-nums">
                               <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/block/${transaction.blockNumber}`}>
                                 {transaction.blockNumber}
                               </Link>
                             </td>
-                            <td className="px-5 py-3 text-sm text-slate-700">
+                            <td className="px-5 py-2.5 text-sm leading-6 text-slate-700">
                               <RelativeTime timestampMs={transaction.timestampMs} />
                             </td>
-                            <td className="px-5 py-3 text-sm">
+                            <td className="px-5 py-2.5 text-sm leading-6">
                               <AddressLink
                                 address={transaction.from}
                                 href={`/evm/address/${transaction.from}`}
@@ -802,7 +816,7 @@ function EvmTransactionsPageContent() {
                                 className="font-medium text-sky-600 hover:text-sky-700"
                               />
                             </td>
-                            <td className="px-5 py-3 text-sm">
+                            <td className="px-5 py-2.5 text-sm leading-6">
                               {transaction.to ? (
                                 <AddressLink
                                   address={transaction.to}
@@ -817,8 +831,8 @@ function EvmTransactionsPageContent() {
                                 <span className="text-slate-500">Contract Creation</span>
                               )}
                             </td>
-                            <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.amountLabel}</td>
-                            <td className="px-5 py-3 text-sm tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
+                            <td className="px-5 py-2.5 text-sm font-medium leading-6 tabular-nums text-slate-900">{transaction.amountLabel}</td>
+                            <td className="px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
                           </tr>
                         );
                       })

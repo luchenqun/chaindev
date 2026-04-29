@@ -12,13 +12,14 @@ import { Input } from '@/components/ui/input';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { deleteEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsertEvmAddressTag } from '@/domains/evm/client/address-tags';
 import { getEvmObservedAccountsPage } from '@/domains/evm/client/transaction-cache';
 import { getEvmAddressBalancesDirect } from '@/domains/evm/client/queries';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { AppShell } from '@/platform/layout/app-shell';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 function parsePageParam(rawPage: string | null) {
   const parsed = Number.parseInt(rawPage ?? '1', 10);

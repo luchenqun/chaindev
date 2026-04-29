@@ -6,12 +6,14 @@ import { Suspense, useEffect, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getEvmBlocksPageDirect } from '@/domains/evm/client/queries';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { EvmBlockTable } from '@/domains/evm/ui/block-table';
 import { AppShell } from '@/platform/layout/app-shell';
+import { useLiveInsertAnimationKey } from '@/platform/home/use-live-insert-animation-key';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 function parsePageParam(rawPage: string | null) {
   const parsed = Number.parseInt(rawPage ?? '1', 10);
@@ -47,6 +49,8 @@ function EvmBlocksPageContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
+  const liveTopBlockKey = autoRefreshEnabled && currentPage === 1 && data?.blocks[0] ? `${data.blocks[0].height}-${data.blocks[0].hash}` : null;
+  const liveInsertAnimationKey = useLiveInsertAnimationKey(liveTopBlockKey);
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -103,6 +107,13 @@ function EvmBlocksPageContent() {
     setData((current) => {
       if (!current) {
         return current;
+      }
+
+      if (current.blocks[0]?.height === latestFeed.blockPageItem.height) {
+        return {
+          ...current,
+          summary: current.summary.map((item) => (item.label === 'Latest Block' ? { ...item, value: latestFeed.latestBlock } : item)),
+        };
       }
 
       const mergedBlocks = [latestFeed.blockPageItem, ...current.blocks.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
@@ -183,7 +194,12 @@ function EvmBlocksPageContent() {
             </div>
           </div>
           <div className="p-0">
-            <EvmBlockTable blocks={data.blocks} hrefPrefix="/evm/block" />
+            <EvmBlockTable
+              blocks={data.blocks}
+              hrefPrefix="/evm/block"
+              liveInsertAnimationKey={liveInsertAnimationKey}
+              pushAnimationEnabled={autoRefreshEnabled && currentPage === 1}
+            />
           </div>
         </section>
       </main>

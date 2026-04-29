@@ -22,6 +22,8 @@ import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-cli
 
 type CosmosProvider = NonNullable<ReturnType<typeof readActiveRpcProfileCookie>>;
 
+const COSMOS_BLOCK_TIMESTAMP_CONCURRENCY = 10;
+
 type TendermintStatusResponse = {
   result?: {
     node_info?: {
@@ -1323,18 +1325,34 @@ async function getBlockResultsDirect(profile: CosmosProvider, height: string) {
   return fetchJson<TendermintBlockResultsResponse>(`${profile.rpcUrl}/block_results?height=${height}`);
 }
 
-async function getBlockTimestampsByHeights(profile: CosmosProvider, heights: string[]) {
-  const uniqueHeights = [...new Set(heights.filter(Boolean))];
-  const entries: Array<readonly [string, string | null]> = [];
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T, index: number) => Promise<R>) {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
 
-  for (const height of uniqueHeights) {
-    try {
-      const payload = await fetchJson<TendermintBlockResponse>(`${profile.rpcUrl}/block?height=${height}`);
-      entries.push([height, payload.result?.block?.header?.time ?? null] as const);
-    } catch {
-      entries.push([height, null] as const);
+  async function worker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
     }
   }
+
+  const workerCount = Math.min(Math.max(1, concurrency), items.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+  return results;
+}
+
+async function getBlockTimestampsByHeights(profile: CosmosProvider, heights: string[]) {
+  const uniqueHeights = [...new Set(heights.filter(Boolean))];
+  const entries = await mapWithConcurrency(uniqueHeights, COSMOS_BLOCK_TIMESTAMP_CONCURRENCY, async (height) => {
+    try {
+      const payload = await fetchJson<TendermintBlockResponse>(`${profile.rpcUrl}/block?height=${height}`);
+      return [height, payload.result?.block?.header?.time ?? null] as const;
+    } catch {
+      return [height, null] as const;
+    }
+  });
 
   return new Map(entries);
 }
@@ -1940,16 +1958,18 @@ export async function getCosmosTransactionsPageDirect(input?: { requestedPage?: 
   const searchPayload = page === requestedPage ? txSearchPayload : await getTxSearchWithQueryDirect(profile, query, page, pageSize);
   const txs = searchPayload.result?.txs ?? [];
   const heights = txs.map((tx) => tx.height ?? '').filter(Boolean);
-  const blockTimeByHeight = await getBlockTimestampsByHeights(profile, heights);
-  const detailResults = await Promise.allSettled(
-    txs.map((tx) => {
-      if (!tx.hash) {
-        return Promise.resolve(null);
-      }
+  const [blockTimeByHeight, detailResults] = await Promise.all([
+    getBlockTimestampsByHeights(profile, heights),
+    Promise.allSettled(
+      txs.map((tx) => {
+        if (!tx.hash) {
+          return Promise.resolve(null);
+        }
 
-      return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
-    }),
-  );
+        return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
+      }),
+    ),
+  ]);
   const transactions = txs.map((tx, index) =>
     formatCosmosTransactionsPageItem({
       tx,
@@ -2010,16 +2030,18 @@ export async function getCosmosTransactionsByBlockDirect(height: string | number
     return [] as CosmosTransactionsPageItem[];
   }
 
-  const blockTimeByHeight = await getBlockTimestampsByHeights(profile, [String(normalizedHeight)]);
-  const detailResults = await Promise.allSettled(
-    txs.map((tx) => {
-      if (!tx.hash) {
-        return Promise.resolve(null);
-      }
+  const [blockTimeByHeight, detailResults] = await Promise.all([
+    getBlockTimestampsByHeights(profile, [String(normalizedHeight)]),
+    Promise.allSettled(
+      txs.map((tx) => {
+        if (!tx.hash) {
+          return Promise.resolve(null);
+        }
 
-      return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
-    }),
-  );
+        return fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`);
+      }),
+    ),
+  ]);
 
   return txs.map((tx, index) =>
     formatCosmosTransactionsPageItem({
