@@ -15,7 +15,6 @@ type BlockTableProps = {
     proposerLabel: string;
     proposerAddressLabel: string;
     txCountLabel: string;
-    blockSizeLabel: string;
     appHash: string;
     appHashLabel: string;
     signaturesLabel: string;
@@ -54,14 +53,11 @@ export function CosmosBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 
             <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Txn</th>
             <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Proposer</th>
             <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Signatures</th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Size</th>
           </tr>
         </thead>
         <tbody
           key={liveInsertAnimationKey}
-          className={cn(
-            pushedBlocks.some((block) => block.phase !== 'stable') ? 'pushed-table-list-moving' : liveInsertAnimationKey > 0 && 'cosmos-block-table-live-insert',
-          )}
+          className={cn(pushedBlocks.some((block) => block.phase !== 'stable') ? 'pushed-table-list-moving' : liveInsertAnimationKey > 0 && 'cosmos-block-table-live-insert')}
         >
           {pushedBlocks.map(({ item: block, key, phase }) => (
             <tr key={key} className={cn('cosmos-block-table-row', `pushed-table-row-${phase}`)}>
@@ -78,7 +74,8 @@ export function CosmosBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 
               </td>
               <td className="px-4 py-2.5 text-[14px] leading-6 font-medium text-sky-600 tabular-nums">{block.txCountLabel}</td>
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">
-                <Link prefetch={false}
+                <Link
+                  prefetch={false}
                   className="font-medium text-sky-600 hover:text-sky-700"
                   href={block.proposerOperatorAddress ? `/cosmos/validator/${block.proposerOperatorAddress}` : '/cosmos/validators'}
                 >
@@ -86,7 +83,6 @@ export function CosmosBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 
                 </Link>
               </td>
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">{block.signaturesLabel}</td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700 tabular-nums">{block.blockSizeLabel}</td>
             </tr>
           ))}
         </tbody>

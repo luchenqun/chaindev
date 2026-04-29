@@ -375,6 +375,8 @@ export type CosmosLatestBlockFeed = {
   latestBlockTime: string;
   latestBlockTimestampMs: number | null;
   blockPageItem: CosmosBlocksPageItem;
+  lastCommitHeight?: string | null;
+  lastCommitSignaturesLabel?: string | null;
 };
 
 export type CosmosTransactionsPageItem = {
@@ -829,6 +831,8 @@ type CachedCosmosValidatorMaps = {
   proposerMonikerByAddress: Map<string, string>;
   proposerOperatorAddressByAddress: Map<string, string>;
 };
+
+export type CosmosValidatorMaps = Omit<CachedCosmosValidatorMaps, 'providerId' | 'cachedAt'>;
 
 const COSMOS_VALIDATOR_CACHE_TTL_MS = 60_000;
 const COSMOS_FETCH_TIMEOUT_MS = 8_000;
@@ -1325,6 +1329,18 @@ async function getCosmosValidatorMapsDirect(profile: CosmosProvider, height: num
   return nextCache;
 }
 
+export async function getCosmosValidatorMapsForHeightDirect(height: number | string): Promise<CosmosValidatorMaps> {
+  const profile = getActiveCosmosProvider();
+  const normalizedHeight = typeof height === 'number' ? height : Number.parseInt(height, 10);
+  const maps = await getCosmosValidatorMapsDirect(profile, Number.isFinite(normalizedHeight) ? normalizedHeight : 0);
+
+  return {
+    monikerByPubKey: maps.monikerByPubKey,
+    proposerMonikerByAddress: maps.proposerMonikerByAddress,
+    proposerOperatorAddressByAddress: maps.proposerOperatorAddressByAddress,
+  };
+}
+
 async function getCommitDirect(profile: CosmosProvider, height: string) {
   return fetchJson<TendermintCommitResponse>(`${profile.rpcUrl}/commit?height=${height}`);
 }
@@ -1815,6 +1831,7 @@ function formatCosmosBlocksPageItem(input: {
     validator_address?: string;
     signature?: string | null;
   }>;
+  commitCanonical?: boolean | null;
   proposerMonikerByAddress: Map<string, string>;
   proposerOperatorAddressByAddress: Map<string, string>;
 }) {
@@ -1841,7 +1858,7 @@ function formatCosmosBlocksPageItem(input: {
     blockSizeLabel: formatBytes(input.block.block_size),
     appHash,
     appHashLabel: formatCompactHash(appHash, 10, 8),
-    signaturesLabel: formatCosmosCommitSummary(input.signatures),
+    signaturesLabel: input.commitCanonical === false ? 'Pending' : formatCosmosCommitSummary(input.signatures),
     timeLabel: formatLocalTimestamp(timestamp),
     timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
   } satisfies CosmosBlocksPageItem;
@@ -1911,6 +1928,7 @@ export async function getCosmosBlocksPageDirect(requestedPage = 1, pageSize = 20
     return formatCosmosBlocksPageItem({
       block,
       signatures,
+      commitCanonical: commitResult?.status === 'fulfilled' ? commitResult.value.canonical : null,
       proposerMonikerByAddress: validatorMaps.proposerMonikerByAddress,
       proposerOperatorAddressByAddress: validatorMaps.proposerOperatorAddressByAddress,
     });
@@ -2060,9 +2078,41 @@ export async function getCosmosTransactionsByBlockDirect(height: string | number
   );
 }
 
-export async function getCosmosLatestBlockFeedDirect(height: number | string) {
+export async function getCosmosTransactionsByHashesDirect(hashes: string[]) {
+  const profile = getActiveCosmosProvider();
+  const uniqueHashes = [...new Set(hashes.map((hash) => hash.trim().toUpperCase()).filter(Boolean))];
+
+  if (!uniqueHashes.length) {
+    return [] as CosmosTransactionsPageItem[];
+  }
+
+  const detailResults = await Promise.allSettled(
+    uniqueHashes.map(async (hash) => {
+      const detail = await fetchJson<CosmosRestTxResponse>(`${profile.restUrl}/cosmos/tx/v1beta1/txs/${hash}`);
+
+      return formatCosmosTransactionsPageItem({
+        tx: {
+          hash,
+          height: detail.tx_response?.height,
+          tx_result: {
+            code: detail.tx_response?.code,
+            gas_used: detail.tx_response?.gas_used,
+            gas_wanted: detail.tx_response?.gas_wanted,
+          },
+        },
+        detail,
+        timestamp: detail.tx_response?.timestamp ?? null,
+      });
+    }),
+  );
+
+  return detailResults.flatMap((result) => (result.status === 'fulfilled' ? [result.value] : []));
+}
+
+export async function getCosmosLatestBlockFeedDirect(height: number | string, options: { includeCommit?: boolean } = {}) {
   const profile = getActiveCosmosProvider();
   const normalizedHeight = typeof height === 'number' ? height : Number.parseInt(height, 10);
+  const includeCommit = options.includeCommit ?? true;
 
   if (!Number.isFinite(normalizedHeight) || normalizedHeight < 0) {
     throw new Error('Invalid Cosmos block height.');
@@ -2070,9 +2120,12 @@ export async function getCosmosLatestBlockFeedDirect(height: number | string) {
 
   const [blockchainPayload, commitPayload, validatorMaps] = await Promise.all([
     getBlockchainRangeDirect(profile, normalizedHeight, normalizedHeight),
-    getCommitDirect(profile, String(normalizedHeight)).catch(() => ({
-      result: { signed_header: { commit: { signatures: [] } } },
-    })),
+    includeCommit
+      ? getCommitDirect(profile, String(normalizedHeight)).catch(() => ({
+          canonical: null,
+          result: { signed_header: { commit: { signatures: [] } } },
+        }))
+      : Promise.resolve(null),
     getCosmosValidatorMapsDirect(profile, normalizedHeight),
   ]);
   const blockMeta = blockchainPayload.result?.block_metas?.[0];
@@ -2083,7 +2136,8 @@ export async function getCosmosLatestBlockFeedDirect(height: number | string) {
 
   const blockPageItem = formatCosmosBlocksPageItem({
     block: blockMeta,
-    signatures: commitPayload.result?.signed_header?.commit?.signatures,
+    signatures: commitPayload?.result?.signed_header?.commit?.signatures,
+    commitCanonical: commitPayload?.canonical ?? null,
     proposerMonikerByAddress: validatorMaps.proposerMonikerByAddress,
     proposerOperatorAddressByAddress: validatorMaps.proposerOperatorAddressByAddress,
   });

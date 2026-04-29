@@ -10,7 +10,7 @@ import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
-import { getCosmosTransactionsByBlockDirect, getCosmosTransactionsPageDirect } from '@/domains/cosmos/client/queries';
+import { getCosmosTransactionsByHashesDirect, getCosmosTransactionsPageDirect } from '@/domains/cosmos/client/queries';
 import { formatCosmosAddressForDisplay, type CosmosAddressDisplayMode } from '@/domains/cosmos/ui/address-display';
 import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { COSMOS_TRANSACTIONS_AVAILABLE_EVENT, type CosmosTransactionsAvailableEventDetail } from '@/domains/cosmos/ui/live-events';
@@ -310,7 +310,7 @@ function CosmosTransactionsPageContent() {
       return;
     }
 
-    async function loadBlockTransactions(height: string) {
+    async function loadPushedTransactions(height: string, txHashes: string[]) {
       if (liveBlockRefreshesRef.current.has(height) || liveProcessedBlockHeightsRef.current.has(height)) {
         return;
       }
@@ -318,10 +318,9 @@ function CosmosTransactionsPageContent() {
       liveBlockRefreshesRef.current.add(height);
 
       try {
-        const transactions = await getCosmosTransactionsByBlockDirect(height, PAGE_SIZE);
+        const transactions = await getCosmosTransactionsByHashesDirect(txHashes);
 
         if (!transactions.length) {
-          liveProcessedBlockHeightsRef.current.add(height);
           return;
         }
 
@@ -394,7 +393,11 @@ function CosmosTransactionsPageContent() {
         return;
       }
 
-      void loadBlockTransactions(detail.height);
+      if (!detail.txHashes?.length) {
+        return;
+      }
+
+      void loadPushedTransactions(detail.height, detail.txHashes);
     };
 
     window.addEventListener(COSMOS_TRANSACTIONS_AVAILABLE_EVENT, handleTransactionsAvailable);
@@ -500,7 +503,10 @@ function CosmosTransactionsPageContent() {
           </div>
 
           <div
-            className={cn('overflow-x-auto overflow-y-hidden', (data.transactions.length >= PAGE_SIZE || pushedTransactions.length > data.transactions.length) && 'pushed-table-viewport')}
+            className={cn(
+              'overflow-x-auto overflow-y-hidden',
+              (data.transactions.length >= PAGE_SIZE || pushedTransactions.length > data.transactions.length) && 'pushed-table-viewport',
+            )}
             style={{ '--pushed-table-visible-rows': data.transactions.length, '--pushed-table-row-height': '3.25rem' } as React.CSSProperties}
           >
             <table className="data-table cosmos-transaction-table">
@@ -517,7 +523,11 @@ function CosmosTransactionsPageContent() {
               </thead>
               <tbody
                 key={liveInsertAnimationKey}
-                className={cn(pushedTransactions.some((transaction) => transaction.phase !== 'stable') ? 'pushed-table-list-moving' : liveInsertAnimationKey > 0 && 'cosmos-transaction-table-live-insert')}
+                className={cn(
+                  pushedTransactions.some((transaction) => transaction.phase !== 'stable')
+                    ? 'pushed-table-list-moving'
+                    : liveInsertAnimationKey > 0 && 'cosmos-transaction-table-live-insert',
+                )}
               >
                 {data.transactions.length ? (
                   pushedTransactions.map(({ item: transaction, key, phase }) => {

@@ -7,8 +7,10 @@ import {
   getCosmosHomeSnapshotDirect,
   getCosmosLatestBlockFeedDirect,
   getCosmosOverviewDirect,
+  getCosmosValidatorMapsForHeightDirect,
   type CosmosLatestBlockFeed,
   type CosmosHomeSnapshot,
+  type CosmosValidatorMaps,
 } from '@/domains/cosmos/client/queries';
 import { decodeCosmosHomeTransactionsByHashes } from '@/domains/cosmos/client/home-transactions';
 import { notifyCosmosTransactionsAvailable } from '@/domains/cosmos/ui/live-events';
@@ -31,6 +33,12 @@ const COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY = 'chaindev-cosmos-home-auto-refresh-
 const COSMOS_HOME_BLOCK_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
 const COSMOS_HOME_TX_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
 
+type TendermintWsCommitSignature = {
+  block_id_flag?: number | string;
+  validator_address?: string;
+  signature?: string | null;
+};
+
 type TendermintWsEnvelope = {
   result?: {
     query?: string;
@@ -47,25 +55,12 @@ type TendermintWsEnvelope = {
             txs?: unknown[];
           };
           last_commit?: {
-            signatures?: Array<{
-              block_id_flag?: number | string;
-              signature?: string | null;
-            }>;
+            height?: string;
+            signatures?: TendermintWsCommitSignature[];
           };
         };
         block_id?: {
           hash?: string;
-        };
-        TxResult?: {
-          height?: string | number;
-          tx?: string;
-          result?: {
-            code?: number;
-            events?: Array<{
-              type?: string;
-              attributes?: Array<{ key?: string; value?: string }>;
-            }>;
-          };
         };
       };
     };
@@ -109,6 +104,28 @@ function updateSnapshotMetric(metrics: CosmosHomeSnapshot['metrics'], label: str
 
 function mergeLatestBlocks(current: CosmosHomeSnapshot['activity']['blocks'], next: CosmosHomeSnapshot['activity']['blocks'][number]) {
   return [next, ...current.filter((item) => item.height !== next.height)].slice(0, COSMOS_HOME_BLOCK_LIMIT);
+}
+
+function formatWsCommitSummary(signatures: TendermintWsCommitSignature[] | undefined) {
+  if (!signatures?.length) {
+    return null;
+  }
+
+  const counts = new Map<number, number>();
+
+  signatures.forEach((signature) => {
+    const flag = Number.parseInt(String(signature.block_id_flag ?? 0), 10);
+    counts.set(flag, (counts.get(flag) ?? 0) + 1);
+  });
+
+  const labels = new Map<number, string>([
+    [1, 'Absent'],
+    [2, 'Commit'],
+    [3, 'Nil'],
+  ]);
+  const parts = [...counts.entries()].sort((left, right) => left[0] - right[0]).map(([flag, count]) => `${labels.get(flag) ?? `Flag ${flag}`}: ${count}`);
+
+  return parts.join(' · ');
 }
 
 function formatWsBlockTime(value: string | undefined) {
@@ -177,6 +194,8 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
   const refreshQueuedRef = useRef(false);
   const pendingTxHashesRef = useRef<Set<string>>(new Set());
   const decodeTimeoutRef = useRef<number | null>(null);
+  const liveBlockTxHashesRef = useRef<Map<string, string[]>>(new Map());
+  const validatorMapsRef = useRef<CosmosValidatorMaps | null>(null);
   const liveBlockHydrationRef = useRef<{
     requestedHeight: string | null;
     latestAppliedHeight: string | null;
@@ -219,6 +238,8 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let disposed = false;
+    let clearSnapshotTimeout: number | null = null;
+    let connectionModeTimeout: number | null = null;
     const isHomeRoute = isCosmosHomeRouteActive(pathname, activeMode);
     const isCosmosRoute = isCosmosRouteActive(pathname, activeMode);
     const shouldSubscribeToLiveBlocks = isCosmosLiveBlockRouteActive(pathname, activeMode);
@@ -250,6 +271,20 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       pollTimeoutRef.current = window.setTimeout(() => {
         void loadSnapshot();
       }, delayMs);
+    }
+
+    async function loadValidatorMaps(height: number | string) {
+      try {
+        const validatorMaps = await getCosmosValidatorMapsForHeightDirect(height);
+
+        if (!disposed) {
+          validatorMapsRef.current = validatorMaps;
+        }
+
+        return validatorMaps;
+      } catch {
+        return validatorMapsRef.current;
+      }
     }
 
     async function loadSnapshot() {
@@ -295,6 +330,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         }
 
         const nextFeed = await getCosmosLatestBlockFeedDirect(latestHeight);
+        await loadValidatorMaps(latestHeight);
 
         if (disposed) {
           return;
@@ -393,6 +429,8 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
     async function applyNewBlockFromWs(payload: TendermintWsEnvelope) {
       const value = payload.result?.data?.value;
       const header = value?.block?.header;
+      const lastCommit = value?.block?.last_commit;
+      const lastCommitSignaturesLabel = formatWsCommitSummary(lastCommit?.signatures);
       const height = header?.height;
 
       if (!height) {
@@ -400,6 +438,60 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       }
 
       const txCount = Array.isArray(value?.block?.data?.txs) ? value.block.data.txs.length : 0;
+      const validatorMaps = validatorMapsRef.current ?? (await loadValidatorMaps(height));
+      const proposer = header.proposer_address ?? 'Unknown';
+      const proposerMoniker = validatorMaps?.proposerMonikerByAddress.get(proposer) ?? null;
+      const proposerOperatorAddress = validatorMaps?.proposerOperatorAddressByAddress.get(proposer) ?? null;
+      const proposerLabel = proposerMoniker && proposerMoniker !== 'Unknown' ? proposerMoniker : formatCompactHash(proposer);
+      const rawTxs = Array.isArray(value?.block?.data?.txs) ? value.block.data.txs.filter((tx): tx is string => typeof tx === 'string' && tx.trim() !== '') : [];
+      const txHashResults = rawTxs.length
+        ? await Promise.all(
+            rawTxs.map(async (tx) => {
+              try {
+                return await sha256HexFromBase64(tx);
+              } catch {
+                return null;
+              }
+            }),
+          )
+        : [];
+      const txHashes = txHashResults.filter((hash): hash is string => hash != null);
+
+      if (txHashes.length) {
+        liveBlockTxHashesRef.current.set(height, txHashes);
+      }
+
+      if (lastCommit?.height) {
+        const committedTxHashes = liveBlockTxHashesRef.current.get(lastCommit.height);
+
+        if (committedTxHashes?.length) {
+          notifyCosmosTransactionsAvailable({
+            height: lastCommit.height,
+            txCount: committedTxHashes.length,
+            txHashes: committedTxHashes,
+          });
+
+          if (isHomeRoute) {
+            committedTxHashes.forEach((hash) => {
+              queueTransactionDecode(hash);
+            });
+          }
+
+          liveBlockTxHashesRef.current.delete(lastCommit.height);
+        }
+      }
+
+      if (liveBlockTxHashesRef.current.size > COSMOS_HOME_BLOCK_LIMIT * 3) {
+        const currentHeight = Number.parseInt(height, 10);
+
+        liveBlockTxHashesRef.current.forEach((_hashes, blockHeight) => {
+          const blockHeightNumber = Number.parseInt(blockHeight, 10);
+
+          if (Number.isFinite(currentHeight) && Number.isFinite(blockHeightNumber) && currentHeight - blockHeightNumber > COSMOS_HOME_BLOCK_LIMIT * 3) {
+            liveBlockTxHashesRef.current.delete(blockHeight);
+          }
+        });
+      }
 
       if (txCount > 0) {
         notifyCosmosTransactionsAvailable({
@@ -421,20 +513,22 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           latestBlockNumber: Number.parseInt(height, 10) || 0,
           latestBlockTime: formatWsBlockTime(header.time),
           latestBlockTimestampMs: timestampMs,
+          lastCommitHeight: lastCommit?.height ?? null,
+          lastCommitSignaturesLabel,
           blockPageItem: {
             height,
             hash: value?.block_id?.hash ?? '',
             hashLabel: formatCompactHash(value?.block_id?.hash),
-            proposer: header.proposer_address ?? 'Unknown',
-            proposerOperatorAddress: null,
-            proposerLabel: formatCompactHash(header.proposer_address),
-            proposerAddressLabel: formatCompactHash(header.proposer_address, 12, 8),
+            proposer,
+            proposerOperatorAddress,
+            proposerLabel,
+            proposerAddressLabel: formatCompactHash(proposer, 12, 8),
             txCount,
-            txCountLabel: `${txCount} txs`,
+            txCountLabel: formatMetricInteger(txCount),
             blockSizeLabel: 'Unavailable',
             appHash: header.app_hash ?? '',
             appHashLabel: formatCompactHash(header.app_hash, 10, 8),
-            signaturesLabel: 'Unavailable',
+            signaturesLabel: 'Pending',
             timeLabel: formatWsBlockTime(header.time),
             timestampMs,
           },
@@ -443,86 +537,85 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      liveBlockHydrationRef.current.requestedHeight = height;
+      const timestampMs = parseWsBlockTimestampMs(header.time);
+      const liveFeed = {
+        latestBlock: height,
+        latestBlockNumber: Number.parseInt(height, 10) || 0,
+        latestBlockTime: formatWsBlockTime(header.time),
+        latestBlockTimestampMs: timestampMs,
+        lastCommitHeight: lastCommit?.height ?? null,
+        lastCommitSignaturesLabel,
+        blockPageItem: {
+          height,
+          hash: value?.block_id?.hash ?? '',
+          hashLabel: formatCompactHash(value?.block_id?.hash),
+          proposer,
+          proposerOperatorAddress,
+          proposerLabel,
+          proposerAddressLabel: formatCompactHash(proposer, 12, 8),
+          txCount,
+          txCountLabel: formatMetricInteger(txCount),
+          blockSizeLabel: 'Unavailable',
+          appHash: header.app_hash ?? '',
+          appHashLabel: formatCompactHash(header.app_hash, 10, 8),
+          signaturesLabel: 'Pending',
+          timeLabel: formatWsBlockTime(header.time),
+          timestampMs,
+        },
+      } satisfies CosmosLatestBlockFeed;
 
-      try {
-        const nextFeed = await getCosmosLatestBlockFeedDirect(height);
-
-        if (disposed) {
-          return;
+      liveBlockHydrationRef.current.latestAppliedHeight = liveFeed.latestBlock;
+      setLatestFeed((current) => (current?.latestBlock === liveFeed.latestBlock ? current : liveFeed));
+      setSnapshot((current) => {
+        if (!current) {
+          return current;
         }
 
-        liveBlockHydrationRef.current.latestAppliedHeight = nextFeed.latestBlock;
-        setLatestFeed((current) => (current?.latestBlock === nextFeed.latestBlock ? current : nextFeed));
+        const txCountValue = liveFeed.blockPageItem.txCount;
+        const isNewerBlock = Number.isFinite(liveFeed.latestBlockNumber) && liveFeed.latestBlockNumber > current.latestHeight;
+        let nextMetrics = current.metrics;
+        let nextBlocks = current.activity.blocks;
 
-        setSnapshot((current) => {
-          if (!current) {
-            return current;
-          }
-
-          const txCountValue = nextFeed.blockPageItem.txCount;
-          const isNewerBlock = Number.isFinite(nextFeed.latestBlockNumber) && nextFeed.latestBlockNumber > current.latestHeight;
-          let nextMetrics = current.metrics;
-
-          if (isNewerBlock) {
-            nextMetrics = updateSnapshotMetric(nextMetrics, 'Block Height', formatMetricInteger(nextFeed.latestBlockNumber));
-            nextMetrics = updateSnapshotMetric(
-              nextMetrics,
-              'Confirmed Txs',
-              formatMetricInteger(parseMetricInteger(current.metrics.find((metric) => metric.label === 'Confirmed Txs')?.value ?? '0') + txCountValue),
-            );
-          }
-
-          return {
-            ...current,
-            header: {
-              ...current.header,
-              latestBlockTime: nextFeed.latestBlockTime,
-            },
-            metrics: nextMetrics,
-            latestHeight: isNewerBlock ? nextFeed.latestBlockNumber : current.latestHeight,
-            refreshedAt: Date.now(),
-            activity: {
-              ...current.activity,
-              blocks: mergeLatestBlocks(current.activity.blocks, {
-                height: nextFeed.blockPageItem.height,
-                hash: nextFeed.blockPageItem.hash,
-                hashLabel: nextFeed.blockPageItem.hashLabel,
-                proposer: nextFeed.blockPageItem.proposer,
-                proposerOperatorAddress: nextFeed.blockPageItem.proposerOperatorAddress,
-                proposerLabel: nextFeed.blockPageItem.proposerLabel,
-                txCount: nextFeed.blockPageItem.txCountLabel,
-                blockSizeLabel: nextFeed.blockPageItem.blockSizeLabel,
-                timeLabel: nextFeed.blockPageItem.timeLabel,
-                timestampMs: nextFeed.blockPageItem.timestampMs,
-              }),
-            },
-          };
-        });
-      } catch {
-        queueRefresh();
-      } finally {
-        if (liveBlockHydrationRef.current.requestedHeight === height) {
-          liveBlockHydrationRef.current.requestedHeight = null;
+        if (isNewerBlock) {
+          nextMetrics = updateSnapshotMetric(nextMetrics, 'Block Height', formatMetricInteger(liveFeed.latestBlockNumber));
+          nextMetrics = updateSnapshotMetric(
+            nextMetrics,
+            'Confirmed Txs',
+            formatMetricInteger(parseMetricInteger(current.metrics.find((metric) => metric.label === 'Confirmed Txs')?.value ?? '0') + txCountValue),
+          );
         }
-      }
-    }
 
-    async function applyTransactionFromWs(payload: TendermintWsEnvelope) {
-      const txResult = payload.result?.data?.value?.TxResult;
-      const rawTx = txResult?.tx;
+        if (liveFeed.lastCommitHeight && liveFeed.lastCommitSignaturesLabel) {
+          nextBlocks = nextBlocks.map((block) => (block.height === liveFeed.lastCommitHeight ? { ...block, signaturesLabel: liveFeed.lastCommitSignaturesLabel } : block));
+        }
 
-      if (!txResult?.height || !rawTx) {
-        return;
-      }
-
-      const hash = await sha256HexFromBase64(rawTx);
-
-      if (disposed) {
-        return;
-      }
-
-      queueTransactionDecode(hash);
+        return {
+          ...current,
+          header: {
+            ...current.header,
+            latestBlockTime: liveFeed.latestBlockTime,
+          },
+          metrics: nextMetrics,
+          latestHeight: isNewerBlock ? liveFeed.latestBlockNumber : current.latestHeight,
+          refreshedAt: Date.now(),
+          activity: {
+            ...current.activity,
+            blocks: mergeLatestBlocks(nextBlocks, {
+              height: liveFeed.blockPageItem.height,
+              hash: liveFeed.blockPageItem.hash,
+              hashLabel: liveFeed.blockPageItem.hashLabel,
+              proposer: liveFeed.blockPageItem.proposer,
+              proposerOperatorAddress: liveFeed.blockPageItem.proposerOperatorAddress,
+              proposerLabel: liveFeed.blockPageItem.proposerLabel,
+              txCount: liveFeed.blockPageItem.txCountLabel,
+              blockSizeLabel: liveFeed.blockPageItem.blockSizeLabel,
+              timeLabel: liveFeed.blockPageItem.timeLabel,
+              timestampMs: liveFeed.blockPageItem.timestampMs,
+            }),
+          },
+        };
+      });
+      setErrorMessage(null);
     }
 
     function setupWebSocket() {
@@ -560,19 +653,6 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
               },
             }),
           );
-
-          if (isHomeRoute) {
-            socket.send(
-              JSON.stringify({
-                jsonrpc: '2.0',
-                method: 'subscribe',
-                id: 'cosmos-home-tx',
-                params: {
-                  query: "tm.event='Tx'",
-                },
-              }),
-            );
-          }
         };
         socket.onmessage = async (event) => {
           try {
@@ -585,11 +665,6 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
 
             if (query.includes("tm.event='NewBlock'")) {
               void applyNewBlockFromWs(payload);
-              return;
-            }
-
-            if (query.includes("tm.event='Tx'")) {
-              await applyTransactionFromWs(payload);
             }
           } catch {
             if (autoRefreshEnabled) {
@@ -643,14 +718,31 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
     if (isHomeRoute) {
       void loadSnapshot();
     } else {
-      setSnapshot(null);
+      clearSnapshotTimeout = window.setTimeout(() => {
+        if (!disposed) {
+          setSnapshot(null);
+        }
+      }, 0);
     }
 
     if (shouldSubscribeToLiveBlocks) {
+      void getCosmosOverviewDirect()
+        .then((overview) => {
+          const latestHeight = Number.parseInt(String(overview.latestHeight ?? '0'), 10);
+
+          if (Number.isFinite(latestHeight) && latestHeight > 0) {
+            void loadValidatorMaps(latestHeight);
+          }
+        })
+        .catch(() => undefined);
       setupWebSocket();
     } else {
       closeSocket();
-      setConnectionMode('poll');
+      connectionModeTimeout = window.setTimeout(() => {
+        if (!disposed) {
+          setConnectionMode('poll');
+        }
+      }, 0);
       void loadLatestFeed();
     }
 
@@ -671,6 +763,12 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
 
     return () => {
       disposed = true;
+      if (clearSnapshotTimeout != null) {
+        window.clearTimeout(clearSnapshotTimeout);
+      }
+      if (connectionModeTimeout != null) {
+        window.clearTimeout(connectionModeTimeout);
+      }
       clearTimers();
       closeSocket();
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);

@@ -90,18 +90,28 @@ function CosmosBlocksPageContent() {
         : item,
     );
     const summaryChanged = summary.some((item, index) => item.value !== data.summary[index]?.value || item.note !== data.summary[index]?.note);
+    const lastCommitHeight = latestFeed.lastCommitHeight;
+    const lastCommitSignaturesLabel = latestFeed.lastCommitSignaturesLabel;
+    const blocksWithLastCommit =
+      lastCommitHeight && lastCommitSignaturesLabel
+        ? data.blocks.map((block) =>
+            block.height === lastCommitHeight && block.signaturesLabel !== lastCommitSignaturesLabel ? { ...block, signaturesLabel: lastCommitSignaturesLabel } : block,
+          )
+        : data.blocks;
+    const blocksChanged = blocksWithLastCommit.some((block, index) => block !== data.blocks[index]);
 
     if (!autoRefreshEnabled || currentPage !== 1 || data.blocks[0]?.height === latestFeed.blockPageItem.height) {
-      if (summaryChanged) {
+      if (summaryChanged || blocksChanged) {
         setData({
           ...data,
           summary,
+          blocks: blocksWithLastCommit,
         });
       }
       return;
     }
 
-    const mergedBlocks = [latestFeed.blockPageItem, ...data.blocks.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
+    const mergedBlocks = [latestFeed.blockPageItem, ...blocksWithLastCommit.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
     const totalBlocks = latestFeed.latestBlockNumber || data.totalBlocks;
     const totalPages = Math.max(1, Math.ceil(totalBlocks / data.pageSize));
     const topBlock = mergedBlocks[0]?.height ?? latestFeed.latestBlock;
@@ -129,7 +139,7 @@ function CosmosBlocksPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-20" metricCards={4} columns={8} />
+        <ListPageSkeleton titleWidth="w-20" metricCards={4} columns={6} />
       </AppShell>
     );
   }
@@ -204,7 +214,7 @@ export default function CosmosBlocksPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-20" metricCards={4} columns={8} />
+          <ListPageSkeleton titleWidth="w-20" metricCards={4} columns={6} />
         </AppShell>
       }
     >

@@ -5,6 +5,7 @@ export const COSMOS_TRANSACTIONS_AVAILABLE_EVENT = 'chaindev:cosmos-transactions
 export type CosmosTransactionsAvailableEventDetail = {
   height: string;
   txCount: number;
+  txHashes?: string[];
 };
 
 export function notifyCosmosTransactionsAvailable(detail: CosmosTransactionsAvailableEventDetail) {
