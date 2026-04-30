@@ -58,29 +58,16 @@ function PaginationNext({ className, ...props }: React.ComponentProps<typeof Pag
   );
 }
 
-type PaginationEllipsisProps = {
-  asButton?: boolean;
-} & React.ComponentProps<'button'>;
-
-function PaginationEllipsis({ className, asButton = false, ...props }: PaginationEllipsisProps) {
-  if (asButton) {
-    return (
-      <button
-        type="button"
-        aria-label="Jump to page"
-        className={cn('flex size-8 items-center justify-center rounded-md text-slate-900 hover:bg-slate-50 hover:text-sky-600 disabled:pointer-events-none disabled:opacity-50', className)}
-        {...props}
-      >
-        <IconDots className="size-4" stroke={2} />
-      </button>
-    );
-  }
-
+function PaginationEllipsis({ className, ...props }: React.ComponentProps<'button'>) {
   return (
-    <span aria-hidden className={cn('flex size-8 items-center justify-center text-slate-900', className)}>
+    <button
+      type="button"
+      aria-label="Jump to page"
+      className={cn('flex size-8 items-center justify-center rounded-md text-slate-900 hover:bg-slate-50 hover:text-sky-600 disabled:pointer-events-none disabled:opacity-50', className)}
+      {...props}
+    >
       <IconDots className="size-4" stroke={2} />
-      <span className="sr-only">More pages</span>
-    </span>
+    </button>
   );
 }
 

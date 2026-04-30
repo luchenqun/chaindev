@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
@@ -13,7 +13,6 @@ type PaginationControlsProps = {
   hasNextPage: boolean;
   disabled?: boolean;
   plain?: boolean;
-  jumpDialogEnabled?: boolean;
   onPageChange: (page: number) => void;
 };
 
@@ -24,10 +23,11 @@ export function PaginationControls({
   hasNextPage,
   disabled = false,
   plain = false,
-  jumpDialogEnabled = false,
   onPageChange,
 }: PaginationControlsProps) {
   const visiblePages = getVisiblePages(page, totalPages);
+  const formId = useId();
+  const inputId = useId();
   const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
   const [jumpPageText, setJumpPageText] = useState(String(page));
   const parsedJumpPage = Number.parseInt(jumpPageText, 10);
@@ -35,9 +35,9 @@ export function PaginationControls({
 
   useEffect(() => {
     if (jumpDialogOpen) {
-      setJumpPageText(String(page));
+      setJumpPageText('');
     }
-  }, [jumpDialogOpen, page]);
+  }, [jumpDialogOpen]);
 
   function handleJumpSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,10 +66,9 @@ export function PaginationControls({
             item === 'ellipsis' ? (
               <PaginationItem key={`ellipsis-${index}`}>
                 <PaginationEllipsis
-                  asButton={jumpDialogEnabled}
                   disabled={disabled}
                   className={plain ? 'flex h-8 items-center justify-center px-1 text-slate-500 hover:text-sky-600' : undefined}
-                  onClick={jumpDialogEnabled ? () => setJumpDialogOpen(true) : undefined}
+                  onClick={() => setJumpDialogOpen(true)}
                 />
               </PaginationItem>
             ) : (
@@ -113,18 +112,18 @@ export function PaginationControls({
             <Button type="button" variant="outline" onClick={() => setJumpDialogOpen(false)}>
               Cancel
             </Button>
-            <Button type="submit" form="pagination-jump-form" disabled={!Number.isFinite(parsedJumpPage)}>
+            <Button type="submit" form={formId} disabled={!Number.isFinite(parsedJumpPage)}>
               Go
             </Button>
           </>
         }
       >
-        <form id="pagination-jump-form" className="space-y-2" onSubmit={handleJumpSubmit}>
-          <label className="block text-sm font-medium text-slate-700" htmlFor="pagination-jump-page">
+        <form id={formId} className="space-y-2" onSubmit={handleJumpSubmit}>
+          <label className="block text-sm font-medium text-slate-700" htmlFor={inputId}>
             Page
           </label>
           <Input
-            id="pagination-jump-page"
+            id={inputId}
             type="number"
             min={1}
             max={totalPages}
@@ -132,7 +131,9 @@ export function PaginationControls({
             autoFocus
             onChange={(event) => setJumpPageText(event.target.value)}
           />
-          <p className="text-xs text-slate-500">Will open page {Number.isFinite(parsedJumpPage) ? normalizedJumpPage.toLocaleString('en-US') : page.toLocaleString('en-US')}.</p>
+          <p className="text-xs text-slate-500">
+            {Number.isFinite(parsedJumpPage) ? `Will open page ${normalizedJumpPage.toLocaleString('en-US')}.` : `Current page is ${page.toLocaleString('en-US')}.`}
+          </p>
         </form>
       </ModalDialog>
     </div>

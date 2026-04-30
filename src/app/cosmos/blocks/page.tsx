@@ -195,7 +195,6 @@ function CosmosBlocksPageContent() {
                 hasNextPage={data.hasNextPage}
                 disabled={loading}
                 plain
-                jumpDialogEnabled
                 onPageChange={handlePageChange}
               />
               <ActionIconButton
