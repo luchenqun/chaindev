@@ -477,7 +477,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       const lastCommit = value?.block?.last_commit;
       const lastCommitSignaturesLabel = formatWsCommitSummary(lastCommit?.signatures);
       const height = header?.height;
-      const blockGasLabel = getWsBlockGasLabel(payload);
+      let blockGasLabel = getWsBlockGasLabel(payload);
 
       if (!height) {
         return;
@@ -558,6 +558,19 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
 
       if (Number.isFinite(heightNumber) && heightNumber < liveBlockHydrationRef.current.latestAppliedHeightNumber) {
         return;
+      }
+
+      const hydratedBlockFeed =
+        shouldHydrateBlockDetails && blockGasLabel === '--'
+          ? await getCosmosLatestBlockFeedDirect(height, { includeCommit: false }).catch(() => null)
+          : null;
+
+      if (disposed) {
+        return;
+      }
+
+      if (hydratedBlockFeed?.blockPageItem.gasUsedLabel && hydratedBlockFeed.blockPageItem.gasUsedLabel !== '--') {
+        blockGasLabel = hydratedBlockFeed.blockPageItem.gasUsedLabel;
       }
 
       if (!shouldHydrateBlockDetails) {

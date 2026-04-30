@@ -1,5 +1,9 @@
 'use client';
 
+import { useEffect, useState, type FormEvent } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { ModalDialog } from '@/components/ui/modal-dialog';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 
 type PaginationControlsProps = {
@@ -9,11 +13,42 @@ type PaginationControlsProps = {
   hasNextPage: boolean;
   disabled?: boolean;
   plain?: boolean;
+  jumpDialogEnabled?: boolean;
   onPageChange: (page: number) => void;
 };
 
-export function PaginationControls({ page, totalPages, hasPreviousPage, hasNextPage, disabled = false, plain = false, onPageChange }: PaginationControlsProps) {
+export function PaginationControls({
+  page,
+  totalPages,
+  hasPreviousPage,
+  hasNextPage,
+  disabled = false,
+  plain = false,
+  jumpDialogEnabled = false,
+  onPageChange,
+}: PaginationControlsProps) {
   const visiblePages = getVisiblePages(page, totalPages);
+  const [jumpDialogOpen, setJumpDialogOpen] = useState(false);
+  const [jumpPageText, setJumpPageText] = useState(String(page));
+  const parsedJumpPage = Number.parseInt(jumpPageText, 10);
+  const normalizedJumpPage = Number.isFinite(parsedJumpPage) ? Math.min(Math.max(parsedJumpPage, 1), totalPages) : page;
+
+  useEffect(() => {
+    if (jumpDialogOpen) {
+      setJumpPageText(String(page));
+    }
+  }, [jumpDialogOpen, page]);
+
+  function handleJumpSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!Number.isFinite(parsedJumpPage)) {
+      return;
+    }
+
+    onPageChange(normalizedJumpPage);
+    setJumpDialogOpen(false);
+  }
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
@@ -30,7 +65,12 @@ export function PaginationControls({ page, totalPages, hasPreviousPage, hasNextP
           {visiblePages.map((item, index) =>
             item === 'ellipsis' ? (
               <PaginationItem key={`ellipsis-${index}`}>
-                <PaginationEllipsis className={plain ? 'flex h-8 items-center justify-center px-1 text-slate-500' : undefined} />
+                <PaginationEllipsis
+                  asButton={jumpDialogEnabled}
+                  disabled={disabled}
+                  className={plain ? 'flex h-8 items-center justify-center px-1 text-slate-500 hover:text-sky-600' : undefined}
+                  onClick={jumpDialogEnabled ? () => setJumpDialogOpen(true) : undefined}
+                />
               </PaginationItem>
             ) : (
               <PaginationItem key={item}>
@@ -62,6 +102,39 @@ export function PaginationControls({ page, totalPages, hasPreviousPage, hasNextP
           </PaginationItem>
         </PaginationContent>
       </Pagination>
+      <ModalDialog
+        open={jumpDialogOpen}
+        onOpenChange={setJumpDialogOpen}
+        title="Jump to page"
+        description={`Enter a page number from 1 to ${totalPages.toLocaleString('en-US')}.`}
+        maxWidthClassName="max-w-sm"
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={() => setJumpDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" form="pagination-jump-form" disabled={!Number.isFinite(parsedJumpPage)}>
+              Go
+            </Button>
+          </>
+        }
+      >
+        <form id="pagination-jump-form" className="space-y-2" onSubmit={handleJumpSubmit}>
+          <label className="block text-sm font-medium text-slate-700" htmlFor="pagination-jump-page">
+            Page
+          </label>
+          <Input
+            id="pagination-jump-page"
+            type="number"
+            min={1}
+            max={totalPages}
+            value={jumpPageText}
+            autoFocus
+            onChange={(event) => setJumpPageText(event.target.value)}
+          />
+          <p className="text-xs text-slate-500">Will open page {Number.isFinite(parsedJumpPage) ? normalizedJumpPage.toLocaleString('en-US') : page.toLocaleString('en-US')}.</p>
+        </form>
+      </ModalDialog>
     </div>
   );
 }

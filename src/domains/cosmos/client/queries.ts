@@ -3070,12 +3070,27 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
   const proposerOperatorAddressByAddress = new Map(
     (rpcValidatorsPayload.result?.validators ?? []).map((validator) => [validator.address ?? '', operatorAddressByPubKey.get(validator.pub_key?.value ?? '') ?? '']),
   );
-  const blocks: CosmosHomeBlockItem[] = blockMetas.slice(0, blockLimit).map((block) => {
+  const homeBlockMetas = blockMetas.slice(0, blockLimit);
+  const blockResultsEntries = await Promise.all(
+    homeBlockMetas.map(async (block) => {
+      const height = block.header?.height;
+
+      if (!height) {
+        return null;
+      }
+
+      const blockResults = await getBlockResultsDirect(profile, height).catch(() => null);
+      return [height, blockResults] as const;
+    }),
+  );
+  const blockResultsByHeight = new Map(blockResultsEntries.filter((entry): entry is NonNullable<typeof entry> => entry != null));
+  const blocks: CosmosHomeBlockItem[] = homeBlockMetas.map((block) => {
     const height = block.header?.height ?? '0';
     const timestamp = block.header?.time;
     const timestampMs = timestamp ? new Date(timestamp).getTime() : null;
     const proposer = block.header?.proposer_address ?? 'Unknown';
     const proposerMoniker = proposerMonikerByAddress.get(proposer) ?? statusPayload.result?.node_info?.moniker ?? proposer;
+    const blockGasLabel = formatCosmosGasLabel(getCosmosBlockGasAmount(blockResultsByHeight.get(height)));
 
     return {
       height,
@@ -3085,7 +3100,7 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
       proposerOperatorAddress: proposerOperatorAddressByAddress.get(proposer) ?? null,
       proposerLabel: proposerMoniker && proposerMoniker !== 'Unknown' ? proposerMoniker : formatCompactHash(proposer, 10, 6),
       txCount: formatInteger(block.num_txs ?? '0', '0'),
-      blockSizeLabel: `${formatCosmosGasLabel(null)} Gas`,
+      blockSizeLabel: `${blockGasLabel} Gas`,
       timeLabel: formatLocalTimestamp(timestamp),
       timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
     };

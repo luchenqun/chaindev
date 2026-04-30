@@ -104,18 +104,28 @@ function CosmosBlocksPageContent() {
               block.height === lastCommitHeight && block.signaturesLabel !== lastCommitSignaturesLabel ? { ...block, signaturesLabel: lastCommitSignaturesLabel } : block,
             )
           : current.blocks;
+      const totalBlocks = latestFeed.latestBlockNumber || current.totalBlocks;
+      const totalPages = Math.max(1, Math.ceil(totalBlocks / current.pageSize));
 
       if (!autoRefreshEnabled || currentPage !== 1 || current.blocks[0]?.height === latestFeed.blockPageItem.height) {
         return {
           ...current,
-          summary,
+          totalBlocks,
+          totalPages,
+          hasNextPage: totalPages > current.page,
+          summary: summary.map((item) =>
+            item.label === 'Current Range'
+              ? {
+                  ...item,
+                  note: `Showing page ${current.page} of ${totalPages}.`,
+                }
+              : item,
+          ),
           blocks: blocksWithLastCommit,
         };
       }
 
       const mergedBlocks = [latestFeed.blockPageItem, ...blocksWithLastCommit.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
-      const totalBlocks = latestFeed.latestBlockNumber || current.totalBlocks;
-      const totalPages = Math.max(1, Math.ceil(totalBlocks / current.pageSize));
       const topBlock = mergedBlocks[0]?.height ?? latestFeed.latestBlock;
       const bottomBlock = mergedBlocks[mergedBlocks.length - 1]?.height ?? latestFeed.latestBlock;
 
@@ -185,6 +195,7 @@ function CosmosBlocksPageContent() {
                 hasNextPage={data.hasNextPage}
                 disabled={loading}
                 plain
+                jumpDialogEnabled
                 onPageChange={handlePageChange}
               />
               <ActionIconButton
