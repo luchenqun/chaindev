@@ -215,6 +215,7 @@ function CosmosTransactionsPageContent() {
   const liveInsertAnimationKey = useLiveInsertAnimationKey(liveTopTransactionKey);
   const getTransactionKey = useCallback((transaction: NonNullable<typeof data>['transactions'][number]) => transaction.hash, []);
   const pushedTransactions = usePushedListItems(data?.transactions ?? [], getTransactionKey, livePushEnabled, PAGE_SIZE, false);
+  const pushedEnteringRows = pushedTransactions.filter((transaction) => transaction.phase === 'entering').length || 1;
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -507,7 +508,13 @@ function CosmosTransactionsPageContent() {
               'overflow-x-auto overflow-y-hidden',
               (data.transactions.length >= PAGE_SIZE || pushedTransactions.length > data.transactions.length) && 'pushed-table-viewport',
             )}
-            style={{ '--pushed-table-visible-rows': data.transactions.length, '--pushed-table-row-height': '3.25rem' } as React.CSSProperties}
+            style={
+              {
+                '--pushed-table-visible-rows': data.transactions.length,
+                '--pushed-table-row-height': '3.25rem',
+                '--pushed-table-entering-rows': pushedEnteringRows,
+              } as React.CSSProperties
+            }
           >
             <table className="data-table cosmos-transaction-table min-w-[1120px] table-fixed">
               <colgroup>

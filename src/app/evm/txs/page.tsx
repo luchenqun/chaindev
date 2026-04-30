@@ -348,6 +348,7 @@ function EvmTransactionsPageContent() {
   const liveInsertAnimationKey = useLiveInsertAnimationKey(liveTopTransactionKey);
   const getTransactionKey = useCallback((transaction: NonNullable<typeof data>['transactions'][number]) => transaction.hash, []);
   const pushedTransactions = usePushedListItems(data?.transactions ?? [], getTransactionKey, livePushEnabled, PAGE_SIZE, false);
+  const pushedEnteringRows = pushedTransactions.filter((transaction) => transaction.phase === 'entering').length || 1;
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -432,15 +433,38 @@ function EvmTransactionsPageContent() {
   }, [activeSearchFilters, cacheRefreshVersion, currentPage, pathname, router, searchParamsText]);
 
   function handleAutoRefreshFeed(latestFeed: NonNullable<ReturnType<typeof useEvmHomeData>['latestFeed']>) {
-    if (currentPage !== 1 || activeSearchFilters.hasFilters || !data) {
+    if (currentPage !== 1 || activeSearchFilters.hasFilters) {
       return;
     }
 
-    const hasNewTransactions = latestFeed.transactionsPageItems.some((transaction) => !data.transactions.some((item) => item.hash === transaction.hash));
+    setData((current) => {
+      if (!current) {
+        return current;
+      }
 
-    if (hasNewTransactions) {
-      setCacheRefreshVersion((version) => version + 1);
-    }
+      const existingHashes = new Set(current.transactions.map((transaction) => transaction.hash));
+      const nextTransactions = latestFeed.transactionsPageItems.filter((transaction) => !existingHashes.has(transaction.hash));
+
+      if (!nextTransactions.length) {
+        return current;
+      }
+
+      const mergedTransactions = [...nextTransactions, ...current.transactions].slice(0, current.pageSize);
+      const totalTransactions = Math.max(current.totalTransactions + nextTransactions.length, mergedTransactions.length);
+      const totalPages = Math.max(1, Math.ceil(Math.max(totalTransactions, 1) / current.pageSize));
+
+      return {
+        ...current,
+        totalTransactions,
+        totalPages,
+        hasNextPage: totalPages > current.page,
+        latestBlockNumber: latestFeed.latestBlock,
+        oldestBlockNumber: mergedTransactions[mergedTransactions.length - 1]?.blockNumber ?? current.oldestBlockNumber,
+        title: totalTransactions ? `${totalTransactions.toLocaleString('en-US')} cached recent transactions` : current.title,
+        subtitle: `Showing cached transactions up to block ${latestFeed.latestBlock}`,
+        transactions: mergedTransactions,
+      };
+    });
   }
 
   async function handleValidateCache() {
@@ -763,7 +787,13 @@ function EvmTransactionsPageContent() {
 
               <div
                 className={cn('overflow-x-auto overflow-y-hidden', (data.transactions.length >= PAGE_SIZE || pushedTransactions.length > data.transactions.length) && 'pushed-table-viewport')}
-                style={{ '--pushed-table-visible-rows': data.transactions.length, '--pushed-table-row-height': '3.25rem' } as React.CSSProperties}
+                style={
+                  {
+                    '--pushed-table-visible-rows': data.transactions.length,
+                    '--pushed-table-row-height': '3.25rem',
+                    '--pushed-table-entering-rows': pushedEnteringRows,
+                  } as React.CSSProperties
+                }
               >
                 <table className="data-table evm-transaction-table min-w-[1250px] table-fixed">
                   <colgroup>

@@ -99,20 +99,10 @@ function formatWsGasLabel(value: string | undefined) {
   const normalized = value?.trim();
 
   if (!normalized || !/^\d+$/.test(normalized)) {
-    return '-- Gas';
+    return '--';
   }
 
-  const gasUsed = Number(normalized);
-
-  if (gasUsed >= 1_000_000) {
-    return `${(gasUsed / 1_000_000).toFixed(2).replace(/\.?0+$/, '')} M Gas`;
-  }
-
-  if (gasUsed >= 1_000) {
-    return `${(gasUsed / 1_000).toFixed(1).replace(/\.?0+$/, '')} K Gas`;
-  }
-
-  return `${gasUsed} Gas`;
+  return BigInt(normalized).toLocaleString('en-US');
 }
 
 function getWsBlockGasLabel(payload: TendermintWsEnvelope) {
@@ -593,7 +583,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
             txCount,
             txCountLabel: formatMetricInteger(txCount),
             gasUsedLabel: blockGasLabel,
-            blockSizeLabel: blockGasLabel,
+            blockSizeLabel: blockGasLabel === '--' ? blockGasLabel : `${blockGasLabel} Gas`,
             appHash: header.app_hash ?? '',
             appHashLabel: formatCompactHash(header.app_hash, 10, 8),
             signaturesLabel: 'Pending',
@@ -624,7 +614,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           txCount,
           txCountLabel: formatMetricInteger(txCount),
           gasUsedLabel: blockGasLabel,
-          blockSizeLabel: blockGasLabel,
+          blockSizeLabel: blockGasLabel === '--' ? blockGasLabel : `${blockGasLabel} Gas`,
           appHash: header.app_hash ?? '',
           appHashLabel: formatCompactHash(header.app_hash, 10, 8),
           signaturesLabel: 'Pending',

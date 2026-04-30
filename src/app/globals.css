@@ -263,7 +263,7 @@
 
   @keyframes pushed-table-list-move {
     0% {
-      transform: translateY(calc(var(--pushed-table-row-height) * -1));
+      transform: translateY(calc(var(--pushed-table-row-height) * var(--pushed-table-entering-rows, 1) * -1));
     }
 
     100% {

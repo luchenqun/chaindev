@@ -105,17 +105,7 @@ function formatGasUsed(value: bigint | null | undefined) {
     return 'Unavailable';
   }
 
-  const gasUsed = Number(value);
-
-  if (gasUsed >= 1_000_000) {
-    return `${(gasUsed / 1_000_000).toFixed(2).replace(/\.?0+$/, '')} M Gas`;
-  }
-
-  if (gasUsed >= 1_000) {
-    return `${(gasUsed / 1_000).toFixed(1).replace(/\.?0+$/, '')} K Gas`;
-  }
-
-  return `${gasUsed} Gas`;
+  return `${value.toLocaleString('en-US')} Gas`;
 }
 
 function formatInteger(value: bigint | number | null | undefined) {
