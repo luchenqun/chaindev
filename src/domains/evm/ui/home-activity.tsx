@@ -15,6 +15,7 @@ import { usePushedListItems } from '@/platform/home/use-pushed-list-items';
 
 type HomeActivityViewportStyle = React.CSSProperties & {
   '--home-activity-visible-items': number;
+  '--home-activity-entering-rows'?: number;
 };
 
 const HOME_ACTIVITY_VISIBLE_ITEMS = 6;
@@ -37,6 +38,7 @@ export function EvmHomeActivity() {
   const getTransactionKey = useCallback((transaction: (typeof transactionItems)[number]) => transaction.hash, []);
   const pushedBlockItems = usePushedListItems(blockItems, getBlockKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
   const pushedTransactionItems = usePushedListItems(transactionItems, getTransactionKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
+  const pushedTransactionEnteringRows = pushedTransactionItems.filter((item) => item.phase === 'entering').length || 1;
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const visibleAddresses = useMemo(
     () => [
@@ -144,7 +146,12 @@ export function EvmHomeActivity() {
           </div>
           <div
             className="home-activity-push-viewport overflow-hidden border-t border-slate-200 pt-1"
-            style={{ '--home-activity-visible-items': transactionItems.length } as HomeActivityViewportStyle}
+            style={
+              {
+                '--home-activity-visible-items': transactionItems.length,
+                '--home-activity-entering-rows': pushedTransactionEnteringRows,
+              } as HomeActivityViewportStyle
+            }
           >
             {pushedTransactionItems.length ? (
               <div className={cn('grid', pushedTransactionItems.some((item) => item.phase !== 'stable') && 'home-activity-push-list-moving')}>

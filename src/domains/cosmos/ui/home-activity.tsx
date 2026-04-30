@@ -12,6 +12,7 @@ import { usePushedListItems } from '@/platform/home/use-pushed-list-items';
 
 type HomeActivityViewportStyle = React.CSSProperties & {
   '--home-activity-visible-items': number;
+  '--home-activity-entering-rows'?: number;
 };
 
 const HOME_ACTIVITY_VISIBLE_ITEMS = 6;
@@ -46,6 +47,7 @@ export function CosmosHomeActivity() {
   const getTransactionKey = useCallback((transaction: (typeof transactionItems)[number]) => transaction.hash, []);
   const pushedBlockItems = usePushedListItems(blockItems, getBlockKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
   const pushedTransactionItems = usePushedListItems(transactionItems, getTransactionKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
+  const pushedTransactionEnteringRows = pushedTransactionItems.filter((item) => item.phase === 'entering').length || 1;
 
   if (!snapshot && !errorMessage) {
     return <HomeActivitySkeleton />;
@@ -124,7 +126,12 @@ export function CosmosHomeActivity() {
           </div>
           <div
             className="home-activity-push-viewport overflow-hidden border-t border-slate-200 pt-1"
-            style={{ '--home-activity-visible-items': transactionVisibleItems } as HomeActivityViewportStyle}
+            style={
+              {
+                '--home-activity-visible-items': transactionVisibleItems,
+                '--home-activity-entering-rows': pushedTransactionEnteringRows,
+              } as HomeActivityViewportStyle
+            }
           >
             {pushedTransactionItems.length ? (
               <div className={cn('grid', pushedTransactionItems.some((item) => item.phase !== 'stable') && 'home-activity-push-list-moving')}>

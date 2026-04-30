@@ -220,13 +220,9 @@
     animation: home-activity-push-list-move 500ms ease-out;
   }
 
-  .home-activity-push-row-exiting {
-    animation: home-activity-push-row-exit 500ms ease-out forwards;
-  }
-
   @keyframes home-activity-push-list-move {
     0% {
-      transform: translateY(calc(var(--home-activity-row-height) * -1));
+      transform: translateY(calc(var(--home-activity-row-height) * var(--home-activity-entering-rows, 1) * -1));
     }
 
     100% {
@@ -234,21 +230,8 @@
     }
   }
 
-  @keyframes home-activity-push-row-exit {
-    0% {
-      grid-template-rows: 1fr;
-      opacity: 1;
-    }
-
-    100% {
-      grid-template-rows: 0fr;
-      opacity: 0;
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .home-activity-push-list-moving,
-    .home-activity-push-row-exiting {
+    .home-activity-push-list-moving {
       animation: none;
     }
   }
