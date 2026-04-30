@@ -22,7 +22,6 @@
 - `npm run start`：运行生产服务器
 - `npm run lint`：对应用和配置文件运行 ESLint
 - `npm run typecheck`：运行 TypeScript 类型检查，不输出文件
-- `npm run db:generate`：生成 Drizzle migration artifacts
 
 推送到 `main` 前，运行 `npm run typecheck` 和 `npm run build`。
 
@@ -67,10 +66,6 @@
 - `npm run build`
 
 以后添加测试时，将测试放在相关模块附近，或放在专门的测试目录中，并使用清晰的 `*.test.ts` 或 `*.test.tsx` 命名。
-
-## 数据库注意事项
-
-当前阶段，不要把数据库 migrations 当作常规功能开发的阻塞项。需要时更新 Drizzle schema 文件，但除非任务明确要求，不要花时间设计或验证 migration 工作流。
 
 ## Commit 与 Push 规范
 

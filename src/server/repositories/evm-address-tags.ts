@@ -2,7 +2,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { isAddress } from 'viem';
 import { db } from '@/db/client';
 import { evmAddressTags } from '@/db/schema/workbench';
-import type { ImportedEvmAddressTag } from '@/server/schemas/workbench-migration';
+import type { ImportedEvmAddressTag } from '@/server/schemas/workbench-import';
 
 function getScopedImportId(userId: string, localId: string) {
   return `${userId}:${localId}`;

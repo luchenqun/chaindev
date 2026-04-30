@@ -104,55 +104,6 @@ function ensureWorkbenchSchema() {
       updated_at INTEGER NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS request_history (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      method TEXT NOT NULL,
-      params_json TEXT NOT NULL,
-      result_json TEXT,
-      error_json TEXT,
-      duration_ms INTEGER NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS tx_drafts (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      title TEXT NOT NULL,
-      payload_json TEXT NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS decode_records (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      decoder TEXT NOT NULL,
-      input TEXT NOT NULL,
-      output_json TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS favorites (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      value TEXT NOT NULL,
-      label TEXT,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS recent_items (
-      id TEXT PRIMARY KEY NOT NULL,
-      user_id TEXT NOT NULL,
-      mode TEXT NOT NULL,
-      item_type TEXT NOT NULL,
-      value TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-
     CREATE TABLE IF NOT EXISTS evm_address_tags (
       id TEXT PRIMARY KEY NOT NULL,
       user_id TEXT NOT NULL,

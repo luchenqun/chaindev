@@ -38,7 +38,7 @@ export const en = {
     description: 'The search entry now lives in the top navigation. The home page itself stays focused on summary cards and data lists without a large hero block.',
     evmOverviewDescription: 'Block, transaction, and address detail pages follow an explorer-style information layout.',
     cosmosOverviewDescription: 'Accounts, validators, proposals, and block height views share the same shell and card system.',
-    savedWorkspaceDescription: 'Sign in to persist RPC profiles, drafts, favorites, and recent items.',
+    savedWorkspaceDescription: 'Sign in to persist RPC profiles, private keys, address tags, and contract registry entries.',
   },
   login: {
     chooseMethod: 'Choose a sign-in method',

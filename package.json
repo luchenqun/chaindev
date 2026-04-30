@@ -6,9 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint src next.config.ts drizzle.config.ts eslint.config.mjs",
-    "typecheck": "tsc --noEmit",
-    "db:generate": "drizzle-kit generate"
+    "lint": "eslint src next.config.ts eslint.config.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
@@ -38,7 +37,6 @@
     "@types/node": "^25.5.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.3",
     "prettier": "^3.8.3",

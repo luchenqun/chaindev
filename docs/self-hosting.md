@@ -4,7 +4,6 @@
 
 ```bash
 npm install
-npm run db:generate
 npm run build
 ```
 
@@ -40,3 +39,4 @@ npm run start
 - EVM Provider 需要填写 RPC URL。
 - Cosmos Provider 需要填写 RPC URL 和 REST URL。
 - 当前激活的 Provider 会被同步到 Cookie，用于驱动服务端页面和工具请求。
+- SQLite 表由应用启动时自动初始化，不再维护 Drizzle migration 文件。

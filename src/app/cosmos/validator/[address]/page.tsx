@@ -19,7 +19,7 @@ import {
   withdrawCosmosDelegatorRewards,
   withdrawCosmosValidatorCommission,
   type CosmosSigningAlgorithm,
-} from '@/domains/cosmos/client/delegate-transaction';
+} from '@/domains/cosmos/client/signing-transactions';
 import { getCosmosValidatorDetailDirect } from '@/domains/cosmos/client/queries';
 import { CosmosDetailGroup as DetailGroup, CosmosDetailRow as DetailRow, CosmosDetailTag as DetailTag, formatTimestampWithSeconds } from '@/domains/cosmos/ui/detail-primitives';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';

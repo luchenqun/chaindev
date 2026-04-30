@@ -14,7 +14,7 @@ import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
-import { delegateCosmosTokens, getCosmosAccountPrefixFromValidatorAddress, type CosmosSigningAlgorithm } from '@/domains/cosmos/client/delegate-transaction';
+import { delegateCosmosTokens, getCosmosAccountPrefixFromValidatorAddress, type CosmosSigningAlgorithm } from '@/domains/cosmos/client/signing-transactions';
 import { getCosmosValidatorsDirect } from '@/domains/cosmos/client/queries';
 import { formatCompactHash } from '@/domains/cosmos/client/tx-helpers';
 import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';

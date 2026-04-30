@@ -15,7 +15,7 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { RelativeTime } from '@/components/relative-time';
 import { deleteCosmosAddressTag, getCosmosAddressTag, getCosmosAddressTags, subscribeCosmosAddressTags, upsertCosmosAddressTag } from '@/domains/cosmos/client/address-tags';
-import { getCosmosAccountPrefixFromValidatorAddress, undelegateCosmosTokens, type CosmosSigningAlgorithm } from '@/domains/cosmos/client/delegate-transaction';
+import { getCosmosAccountPrefixFromValidatorAddress, undelegateCosmosTokens, type CosmosSigningAlgorithm } from '@/domains/cosmos/client/signing-transactions';
 import { getCosmosAccountDetailDirect } from '@/domains/cosmos/client/queries';
 import { formatCompactHash, formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
 import { decodeCosmosAddressToEvmHexAddress } from '@/domains/cosmos/ui/address-display';

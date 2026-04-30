@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { isAddress } from 'viem';
 import { db } from '@/db/client';
 import { evmContractArtifacts, evmContractBindings } from '@/db/schema/workbench';
-import type { ImportedEvmContractArtifact, ImportedEvmContractBinding } from '@/server/schemas/workbench-migration';
+import type { ImportedEvmContractArtifact, ImportedEvmContractBinding } from '@/server/schemas/workbench-import';
 
 function getScopedImportId(userId: string, localId: string) {
   return `${userId}:${localId}`;

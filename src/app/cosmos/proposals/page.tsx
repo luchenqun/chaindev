@@ -22,7 +22,7 @@ import {
   voteCosmosProposal,
   type CosmosProposalVoteOption,
   type CosmosSigningAlgorithm,
-} from '@/domains/cosmos/client/delegate-transaction';
+} from '@/domains/cosmos/client/signing-transactions';
 import { getCosmosProposalsDirect } from '@/domains/cosmos/client/queries';
 import { formatCompactHash } from '@/domains/cosmos/client/tx-helpers';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { PlatformMode } from '@/config/chains';
 import { db } from '@/db/client';
 import { rpcProfiles } from '@/db/schema/workbench';
-import type { ImportedRpcProfile } from '@/server/schemas/workbench-migration';
+import type { ImportedRpcProfile } from '@/server/schemas/workbench-import';
 
 type RpcProfileInput = {
   userId: string;

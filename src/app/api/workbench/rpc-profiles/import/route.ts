@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { importedRpcProfileSchema } from '@/server/schemas/workbench-migration';
+import { importedRpcProfileSchema } from '@/server/schemas/workbench-import';
 import { fail, ok } from '@/server/utils/api-response';
 import { normalizeApiError } from '@/server/utils/error-normalizer';
 import { requireSessionUserId } from '@/server/utils/auth-user';
