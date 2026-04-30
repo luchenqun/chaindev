@@ -11,6 +11,7 @@ import { getCosmosBlocksPageDirect } from '@/domains/cosmos/client/queries';
 import { CosmosBlockTable } from '@/domains/cosmos/ui/block-table';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
+import { useLiveInsertAnimationKey } from '@/platform/home/use-live-insert-animation-key';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
@@ -25,8 +26,9 @@ function CosmosBlocksPageContent() {
   const [data, setData] = useState<Awaited<ReturnType<typeof getCosmosBlocksPageDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
-  const [liveInsertAnimationKey, setLiveInsertAnimationKey] = useState(0);
   const [loading, setLoading] = useState(true);
+  const liveTopBlockKey = autoRefreshEnabled && currentPage === 1 && data?.blocks[0] ? `${data.blocks[0].height}-${data.blocks[0].hash}` : null;
+  const liveInsertAnimationKey = useLiveInsertAnimationKey(liveTopBlockKey);
 
   function handlePageChange(page: number) {
     router.push(buildPageHref(pathname, new URLSearchParams(searchParamsText), page));
@@ -76,65 +78,65 @@ function CosmosBlocksPageContent() {
   }, [currentPage, pathname, router, searchParamsText]);
 
   useEffect(() => {
-    if (!latestFeed || !data) {
+    if (!latestFeed) {
       return;
     }
 
-    const summary = data.summary.map((item) =>
-      item.label === 'Latest Block'
-        ? {
-            ...item,
-            value: latestFeed.latestBlock,
-            note: 'Live head from the active Cosmos WebSocket subscription.',
-          }
-        : item,
-    );
-    const summaryChanged = summary.some((item, index) => item.value !== data.summary[index]?.value || item.note !== data.summary[index]?.note);
-    const lastCommitHeight = latestFeed.lastCommitHeight;
-    const lastCommitSignaturesLabel = latestFeed.lastCommitSignaturesLabel;
-    const blocksWithLastCommit =
-      lastCommitHeight && lastCommitSignaturesLabel
-        ? data.blocks.map((block) =>
-            block.height === lastCommitHeight && block.signaturesLabel !== lastCommitSignaturesLabel ? { ...block, signaturesLabel: lastCommitSignaturesLabel } : block,
-          )
-        : data.blocks;
-    const blocksChanged = blocksWithLastCommit.some((block, index) => block !== data.blocks[index]);
-
-    if (!autoRefreshEnabled || currentPage !== 1 || data.blocks[0]?.height === latestFeed.blockPageItem.height) {
-      if (summaryChanged || blocksChanged) {
-        setData({
-          ...data,
-          summary,
-          blocks: blocksWithLastCommit,
-        });
+    setData((current) => {
+      if (!current) {
+        return current;
       }
-      return;
-    }
 
-    const mergedBlocks = [latestFeed.blockPageItem, ...blocksWithLastCommit.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
-    const totalBlocks = latestFeed.latestBlockNumber || data.totalBlocks;
-    const totalPages = Math.max(1, Math.ceil(totalBlocks / data.pageSize));
-    const topBlock = mergedBlocks[0]?.height ?? latestFeed.latestBlock;
-    const bottomBlock = mergedBlocks[mergedBlocks.length - 1]?.height ?? latestFeed.latestBlock;
-
-    setLiveInsertAnimationKey((currentKey) => currentKey + 1);
-    setData({
-      ...data,
-      totalBlocks,
-      totalPages,
-      hasNextPage: totalPages > data.page,
-      summary: summary.map((item) =>
-        item.label === 'Current Range'
+      const summary = current.summary.map((item) =>
+        item.label === 'Latest Block'
           ? {
               ...item,
-              value: `#${topBlock} - #${bottomBlock}`,
-              note: `Showing page ${data.page} of ${totalPages}.`,
+              value: latestFeed.latestBlock,
+              note: 'Live head from the active Cosmos WebSocket subscription.',
             }
           : item,
-      ),
-      blocks: mergedBlocks,
+      );
+      const lastCommitHeight = latestFeed.lastCommitHeight;
+      const lastCommitSignaturesLabel = latestFeed.lastCommitSignaturesLabel;
+      const blocksWithLastCommit =
+        lastCommitHeight && lastCommitSignaturesLabel
+          ? current.blocks.map((block) =>
+              block.height === lastCommitHeight && block.signaturesLabel !== lastCommitSignaturesLabel ? { ...block, signaturesLabel: lastCommitSignaturesLabel } : block,
+            )
+          : current.blocks;
+
+      if (!autoRefreshEnabled || currentPage !== 1 || current.blocks[0]?.height === latestFeed.blockPageItem.height) {
+        return {
+          ...current,
+          summary,
+          blocks: blocksWithLastCommit,
+        };
+      }
+
+      const mergedBlocks = [latestFeed.blockPageItem, ...blocksWithLastCommit.filter((block) => block.height !== latestFeed.blockPageItem.height)].slice(0, PAGE_SIZE);
+      const totalBlocks = latestFeed.latestBlockNumber || current.totalBlocks;
+      const totalPages = Math.max(1, Math.ceil(totalBlocks / current.pageSize));
+      const topBlock = mergedBlocks[0]?.height ?? latestFeed.latestBlock;
+      const bottomBlock = mergedBlocks[mergedBlocks.length - 1]?.height ?? latestFeed.latestBlock;
+
+      return {
+        ...current,
+        totalBlocks,
+        totalPages,
+        hasNextPage: totalPages > current.page,
+        summary: summary.map((item) =>
+          item.label === 'Current Range'
+            ? {
+                ...item,
+                value: `#${topBlock} - #${bottomBlock}`,
+                note: `Showing page ${current.page} of ${totalPages}.`,
+              }
+            : item,
+        ),
+        blocks: mergedBlocks,
+      };
     });
-  }, [autoRefreshEnabled, currentPage, data, latestFeed]);
+  }, [autoRefreshEnabled, currentPage, latestFeed]);
 
   if (loading) {
     return (

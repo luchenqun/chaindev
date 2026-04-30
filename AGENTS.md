@@ -73,6 +73,8 @@
 
 ## Commit 与 Push 规范
 
+除非用户明确说“提交”“commit”“推送”“push”或等价指令，否则不要执行 `git add`、`git commit`、`git push`。
+
 Commit message 使用英文 Conventional Commits，例如：
 
 - `feat: add rpc provider selector`

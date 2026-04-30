@@ -242,9 +242,11 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
   const liveBlockHydrationRef = useRef<{
     requestedHeight: string | null;
     latestAppliedHeight: string | null;
+    latestAppliedHeightNumber: number;
   }>({
     requestedHeight: null,
     latestAppliedHeight: null,
+    latestAppliedHeightNumber: 0,
   });
 
   useEffect(() => {
@@ -491,6 +493,12 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const heightNumber = Number.parseInt(height, 10);
+
+      if (Number.isFinite(heightNumber) && heightNumber < liveBlockHydrationRef.current.latestAppliedHeightNumber) {
+        return;
+      }
+
       const txCount = Array.isArray(value?.block?.data?.txs) ? value.block.data.txs.length : 0;
       const validatorMaps = validatorMapsRef.current ?? (await loadValidatorMaps(height));
       const proposer = header.proposer_address ?? 'Unknown';
@@ -558,13 +566,18 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (Number.isFinite(heightNumber) && heightNumber < liveBlockHydrationRef.current.latestAppliedHeightNumber) {
+        return;
+      }
+
       if (!shouldHydrateBlockDetails) {
         const timestampMs = parseWsBlockTimestampMs(header.time);
 
         liveBlockHydrationRef.current.latestAppliedHeight = height;
+        liveBlockHydrationRef.current.latestAppliedHeightNumber = Number.isFinite(heightNumber) ? heightNumber : liveBlockHydrationRef.current.latestAppliedHeightNumber;
         setLatestFeed({
           latestBlock: height,
-          latestBlockNumber: Number.parseInt(height, 10) || 0,
+          latestBlockNumber: heightNumber || 0,
           latestBlockTime: formatWsBlockTime(header.time),
           latestBlockTimestampMs: timestampMs,
           lastCommitHeight: lastCommit?.height ?? null,
@@ -621,6 +634,9 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       } satisfies CosmosLatestBlockFeed;
 
       liveBlockHydrationRef.current.latestAppliedHeight = liveFeed.latestBlock;
+      liveBlockHydrationRef.current.latestAppliedHeightNumber = Number.isFinite(liveFeed.latestBlockNumber)
+        ? liveFeed.latestBlockNumber
+        : liveBlockHydrationRef.current.latestAppliedHeightNumber;
       setLatestFeed((current) => (current?.latestBlock === liveFeed.latestBlock ? current : liveFeed));
       setSnapshot((current) => {
         if (!current) {
