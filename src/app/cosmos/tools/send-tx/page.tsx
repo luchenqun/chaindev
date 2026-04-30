@@ -4,6 +4,7 @@ import { IconX } from '@tabler/icons-react';
 import { fromHex, toBech32 } from '@cosmjs/encoding';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { AutoGrowTextarea } from '@/components/ui/auto-grow-textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
@@ -11,12 +12,11 @@ import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import {
-  delegateCosmosTokens,
+  broadcastCosmosGenericMessage,
+  COSMOS_GENERIC_MESSAGE_TYPES,
+  COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+  COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
   getActiveCosmosAccountPrefixDirect,
-  sendCosmosTokens,
-  undelegateCosmosTokens,
-  withdrawCosmosDelegatorRewards,
-  withdrawCosmosValidatorCommission,
   type CosmosBroadcastResult,
   type CosmosSigningAlgorithm,
 } from '@/domains/cosmos/client/signing-transactions';
@@ -25,15 +25,9 @@ import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmK
 import { AppShell } from '@/platform/layout/app-shell';
 
 const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
-const transactionTypes = [
-  { value: 'send', label: 'Send' },
-  { value: 'delegate', label: 'Delegate' },
-  { value: 'undelegate', label: 'Undelegate' },
-  { value: 'withdrawRewards', label: 'Withdraw Rewards' },
-  { value: 'withdrawCommission', label: 'Withdraw Commission' },
-] as const;
+const DEFAULT_TRANSACTION_TYPE = COSMOS_GENERIC_MESSAGE_TYPES[0]?.typeUrl ?? '';
 
-type CosmosTxType = (typeof transactionTypes)[number]['value'];
+type CosmosTxType = string;
 
 function scaleDecimalByPowerOfTen(rawValue: string, exponent: number) {
   const value = rawValue.trim() || '1';
@@ -118,19 +112,7 @@ function ScaledInput({
 }
 
 function getActionLabel(type: CosmosTxType) {
-  return transactionTypes.find((item) => item.value === type)?.label ?? 'Send';
-}
-
-function needsAmountFields(type: CosmosTxType) {
-  return type === 'send' || type === 'delegate' || type === 'undelegate';
-}
-
-function needsRecipient(type: CosmosTxType) {
-  return type === 'send';
-}
-
-function needsValidator(type: CosmosTxType) {
-  return type === 'delegate' || type === 'undelegate' || type === 'withdrawRewards' || type === 'withdrawCommission';
+  return COSMOS_GENERIC_MESSAGE_TYPES.find((item) => item.typeUrl === type)?.label ?? 'Transaction';
 }
 
 function resultToastDescription(result: CosmosBroadcastResult) {
@@ -152,7 +134,7 @@ function encodeJsonValue(value: unknown): unknown {
   }
 
   if (value instanceof Uint8Array) {
-    return Buffer.from(value).toString('base64');
+    return bytesToBase64(value);
   }
 
   if (Array.isArray(value)) {
@@ -166,16 +148,33 @@ function encodeJsonValue(value: unknown): unknown {
   return value;
 }
 
+function formatMessageTemplate(typeUrl: string, address = '', accountPrefix = 'cosmos') {
+  const template = COSMOS_GENERIC_MESSAGE_TYPES.find((item) => item.typeUrl === typeUrl)?.template ?? {};
+  const fallbackAddress = `${accountPrefix}1...`;
+  const fallbackValidatorAddress = `${accountPrefix}valoper1...`;
+
+  return JSON.stringify(template, null, 2)
+    .replaceAll(COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER, address || fallbackAddress)
+    .replaceAll(COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER, fallbackValidatorAddress);
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = '';
+
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return btoa(binary);
+}
+
 function CosmosSendTxContent() {
   const { showToast } = useToast();
-  const [transactionType, setTransactionType] = useState<CosmosTxType>('send');
+  const [transactionType, setTransactionType] = useState<CosmosTxType>(DEFAULT_TRANSACTION_TYPE);
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
   const [accountPrefix, setAccountPrefix] = useState('cosmos');
   const [activeCosmosAddress, setActiveCosmosAddress] = useState('');
-  const [recipientAddress, setRecipientAddress] = useState('');
-  const [validatorAddress, setValidatorAddress] = useState('');
-  const [amount, setAmount] = useState('');
-  const [denom, setDenom] = useState('');
+  const [messageJson, setMessageJson] = useState(() => formatMessageTemplate(DEFAULT_TRANSACTION_TYPE));
   const [gasPriceAmount, setGasPriceAmount] = useState('');
   const [gasPriceDenom, setGasPriceDenom] = useState('');
   const [gasLimit, setGasLimit] = useState('');
@@ -189,6 +188,13 @@ function CosmosSendTxContent() {
   const [unlockError, setUnlockError] = useState<string | null>(null);
 
   const actionLabel = getActionLabel(transactionType);
+
+  function handleTransactionTypeChange(nextType: string) {
+    setTransactionType(nextType);
+    setMessageJson(formatMessageTemplate(nextType, activeCosmosAddress, accountPrefix));
+    setFormError(null);
+    setBroadcastResult(null);
+  }
 
   useEffect(() => {
     function loadActiveKey() {
@@ -230,6 +236,15 @@ function CosmosSendTxContent() {
     }
   }, [accountPrefix, activeKey]);
 
+  useEffect(() => {
+    setMessageJson((current) => {
+      const defaultCosmosTemplate = formatMessageTemplate(transactionType, '', 'cosmos');
+      const defaultCurrentTemplate = formatMessageTemplate(transactionType, '', accountPrefix);
+
+      return current === defaultCosmosTemplate || current === defaultCurrentTemplate ? formatMessageTemplate(transactionType, activeCosmosAddress, accountPrefix) : current;
+    });
+  }, [accountPrefix, activeCosmosAddress, transactionType]);
+
   async function broadcast(password?: string) {
     if (!activeKey) {
       setFormError('Select a global private key first.');
@@ -250,40 +265,11 @@ function CosmosSendTxContent() {
         gasLimit,
         memo,
       };
-      let result: CosmosBroadcastResult;
-
-      if (transactionType === 'send') {
-        result = await sendCosmosTokens({
-          ...baseInput,
-          recipientAddress,
-          amount,
-          denom,
-        });
-      } else if (transactionType === 'delegate') {
-        result = await delegateCosmosTokens({
-          ...baseInput,
-          validatorAddress,
-          amount,
-          denom,
-        });
-      } else if (transactionType === 'undelegate') {
-        result = await undelegateCosmosTokens({
-          ...baseInput,
-          validatorAddress,
-          amount,
-          denom,
-        });
-      } else if (transactionType === 'withdrawRewards') {
-        result = await withdrawCosmosDelegatorRewards({
-          ...baseInput,
-          validatorAddress,
-        });
-      } else {
-        result = await withdrawCosmosValidatorCommission({
-          ...baseInput,
-          validatorAddress,
-        });
-      }
+      const result = await broadcastCosmosGenericMessage({
+        ...baseInput,
+        messageTypeUrl: transactionType,
+        messageJson,
+      });
 
       showToast({
         title: `${actionLabel} transaction broadcasted`,
@@ -325,10 +311,7 @@ function CosmosSendTxContent() {
   }
 
   function clearForm() {
-    setRecipientAddress('');
-    setValidatorAddress('');
-    setAmount('');
-    setDenom('');
+    setMessageJson(formatMessageTemplate(transactionType, activeCosmosAddress, accountPrefix));
     setGasPriceAmount('');
     setGasPriceDenom('');
     setGasLimit('');
@@ -368,19 +351,19 @@ function CosmosSendTxContent() {
           <div className="space-y-6 px-6 py-6">
             <div className="space-y-4">
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="grid items-end gap-3 sm:grid-cols-3">
+                <div className="grid items-end gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-slate-700" htmlFor="cosmos-tx-type">
                       Transaction type
                     </label>
-                    <Select value={transactionType} disabled={submitting} onValueChange={(value) => setTransactionType(value as CosmosTxType)}>
+                    <Select value={transactionType} disabled={submitting} onValueChange={handleTransactionTypeChange}>
                       <SelectTrigger id="cosmos-tx-type" className="mt-1 h-10">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        {transactionTypes.map((item) => (
-                          <SelectItem key={item.value} value={item.value}>
-                            {item.label}
+                      <SelectContent className="max-h-[420px]">
+                        {COSMOS_GENERIC_MESSAGE_TYPES.map((item) => (
+                          <SelectItem key={item.typeUrl} value={item.typeUrl}>
+                            {`${item.label} (${item.module})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -401,13 +384,6 @@ function CosmosSendTxContent() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700" htmlFor="tx-gas-limit">
-                      Gas limit
-                    </label>
-                    <Input id="tx-gas-limit" value={gasLimit} inputMode="numeric" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setGasLimit(event.target.value)} />
-                  </div>
                 </div>
 
                 <div>
@@ -422,42 +398,34 @@ function CosmosSendTxContent() {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-              {needsRecipient(transactionType) ? (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700" htmlFor="recipient-address">
-                    Recipient address
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="tx-gas-limit">
+                    Gas limit
                   </label>
-                  <Input id="recipient-address" value={recipientAddress} placeholder="cosmos1..." disabled={submitting} onChange={(event) => setRecipientAddress(event.target.value)} />
+                  <Input id="tx-gas-limit" value={gasLimit} inputMode="numeric" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setGasLimit(event.target.value)} />
                 </div>
-              ) : null}
 
-              {needsValidator(transactionType) ? (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700" htmlFor="validator-address">
-                    Validator address
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="tx-memo">
+                    Memo
                   </label>
-                  <Input id="validator-address" value={validatorAddress} placeholder={`${accountPrefix}valoper1...`} disabled={submitting} onChange={(event) => setValidatorAddress(event.target.value)} />
+                  <Input id="tx-memo" value={memo} placeholder="Optional" disabled={submitting} className="mt-1" onChange={(event) => setMemo(event.target.value)} />
                 </div>
-              ) : null}
 
-              {needsAmountFields(transactionType) ? (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700" htmlFor="tx-amount">
-                    Amount
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="message-json">
+                    Message value
                   </label>
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_100px]">
-                    <ScaledInput id="tx-amount" value={amount} placeholder="1000000000000000000" disabled={submitting} onChange={setAmount} />
-                    <Input id="tx-denom" value={denom} placeholder="uatom" disabled={submitting} onChange={(event) => setDenom(event.target.value)} />
-                  </div>
+                  <AutoGrowTextarea
+                    id="message-json"
+                    value={messageJson}
+                    disabled={submitting}
+                    spellCheck={false}
+                    rows={1}
+                    className="mt-1 min-h-10 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm leading-6 text-slate-800 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
+                    onChange={(event) => setMessageJson(event.target.value)}
+                  />
                 </div>
-              ) : null}
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700" htmlFor="tx-memo">
-                  Memo
-                </label>
-                <Input id="tx-memo" value={memo} placeholder="Optional" disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
-              </div>
 
                 {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-2">{formError}</p> : null}
               </div>

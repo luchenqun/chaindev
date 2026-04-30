@@ -2,11 +2,45 @@
 
 import 'client-only';
 
-import { DirectEthSecp256k1Wallet, DirectSecp256k1Wallet, Registry, type EncodeObject } from '@cosmjs/proto-signing';
+import { DirectEthSecp256k1Wallet, DirectSecp256k1Wallet, Registry, type EncodeObject, type GeneratedType } from '@cosmjs/proto-signing';
 import { calculateFee, defaultRegistryTypes, GasPrice, SigningStargateClient, type DeliverTxResponse } from '@cosmjs/stargate';
-import { MsgWithdrawValidatorCommission } from 'cosmjs-types/cosmos/distribution/v1beta1/tx';
+import { MsgExec, MsgGrant, MsgRevoke } from 'cosmjs-types/cosmos/authz/v1beta1/tx';
+import { MsgMultiSend, MsgSend as BankMsgSend, MsgSetSendEnabled } from 'cosmjs-types/cosmos/bank/v1beta1/tx';
+import {
+  MsgCommunityPoolSpend,
+  MsgDepositValidatorRewardsPool,
+  MsgFundCommunityPool,
+  MsgSetWithdrawAddress,
+  MsgWithdrawDelegatorReward,
+  MsgWithdrawValidatorCommission,
+} from 'cosmjs-types/cosmos/distribution/v1beta1/tx';
+import { MsgSubmitEvidence } from 'cosmjs-types/cosmos/evidence/v1beta1/tx';
+import { MsgGrantAllowance, MsgPruneAllowances, MsgRevokeAllowance } from 'cosmjs-types/cosmos/feegrant/v1beta1/tx';
 import { VoteOption } from 'cosmjs-types/cosmos/gov/v1/gov';
-import { MsgDeposit, MsgSubmitProposal, MsgVote } from 'cosmjs-types/cosmos/gov/v1/tx';
+import {
+  MsgCancelProposal,
+  MsgDeposit as GovV1MsgDeposit,
+  MsgExecLegacyContent,
+  MsgSubmitProposal as GovV1MsgSubmitProposal,
+  MsgVote as GovV1MsgVote,
+  MsgVoteWeighted as GovV1MsgVoteWeighted,
+} from 'cosmjs-types/cosmos/gov/v1/tx';
+import {
+  MsgDeposit as GovV1Beta1MsgDeposit,
+  MsgSubmitProposal as GovV1Beta1MsgSubmitProposal,
+  MsgVote as GovV1Beta1MsgVote,
+  MsgVoteWeighted as GovV1Beta1MsgVoteWeighted,
+} from 'cosmjs-types/cosmos/gov/v1beta1/tx';
+import { MsgUnjail } from 'cosmjs-types/cosmos/slashing/v1beta1/tx';
+import {
+  MsgBeginRedelegate,
+  MsgCancelUnbondingDelegation,
+  MsgCreateValidator,
+  MsgDelegate,
+  MsgEditValidator,
+  MsgUndelegate,
+} from 'cosmjs-types/cosmos/staking/v1beta1/tx';
+import { MsgCancelUpgrade, MsgSoftwareUpgrade } from 'cosmjs-types/cosmos/upgrade/v1beta1/tx';
 import { getActiveCosmosProvider } from '@/domains/cosmos/client/queries';
 
 type TendermintStatusResponse = {
@@ -67,6 +101,11 @@ export type CosmosSubmitGovProposalInput = CosmosBaseSigningInput & {
   depositDenom: string;
 };
 
+export type CosmosGenericMessageInput = CosmosBaseSigningInput & {
+  messageTypeUrl: string;
+  messageJson: string;
+};
+
 export type NormalizedCosmosDelegateInput = Required<CosmosDelegateInput>;
 export type NormalizedCosmosSendTokensInput = Required<CosmosSendTokensInput>;
 export type NormalizedCosmosBaseSigningInput = Required<CosmosBaseSigningInput>;
@@ -74,6 +113,7 @@ export type NormalizedCosmosSigningInput = Required<CosmosSigningInput>;
 export type NormalizedCosmosProposalVoteInput = Required<CosmosProposalVoteInput>;
 export type NormalizedCosmosProposalDepositInput = Required<CosmosProposalDepositInput>;
 export type NormalizedCosmosSubmitGovProposalInput = Required<CosmosSubmitGovProposalInput>;
+export type NormalizedCosmosGenericMessageInput = Required<CosmosGenericMessageInput>;
 
 export type CosmosSigningAlgorithm = 'ethsecp256k1' | 'secp256k1';
 
@@ -87,6 +127,403 @@ export type CosmosDelegateResult = {
 };
 
 export type CosmosBroadcastResult = CosmosDelegateResult;
+
+type CosmosGeneratedMessageType = {
+  typeUrl: string;
+  fromJSON(object: unknown): unknown;
+};
+
+type CosmosGenericMessageDescriptor = {
+  module: string;
+  label: string;
+  messageType: CosmosGeneratedMessageType;
+  template: Record<string, unknown>;
+};
+
+export const COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER = '__COSMOS_ADDRESS__';
+export const COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER = '__COSMOS_VALIDATOR__';
+const COIN_TEMPLATE = { denom: 'uatom', amount: '1' };
+const ANY_TEMPLATE = { typeUrl: '', value: '' };
+
+const COSMOS_GENERIC_MESSAGE_DESCRIPTORS: CosmosGenericMessageDescriptor[] = [
+  {
+    module: 'authz',
+    label: 'Authz Grant',
+    messageType: MsgGrant,
+    template: {
+      granter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      grantee: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      grant: {
+        authorization: { typeUrl: '/cosmos.bank.v1beta1.SendAuthorization', value: '' },
+        expiration: '2026-12-31T00:00:00Z',
+      },
+    },
+  },
+  {
+    module: 'authz',
+    label: 'Authz Exec',
+    messageType: MsgExec,
+    template: {
+      grantee: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      msgs: [{ typeUrl: '/cosmos.bank.v1beta1.MsgSend', value: '' }],
+    },
+  },
+  {
+    module: 'authz',
+    label: 'Authz Revoke',
+    messageType: MsgRevoke,
+    template: {
+      granter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      grantee: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      msgTypeUrl: '/cosmos.bank.v1beta1.MsgSend',
+    },
+  },
+  {
+    module: 'bank',
+    label: 'Bank Send',
+    messageType: BankMsgSend,
+    template: {
+      fromAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      toAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      amount: [COIN_TEMPLATE],
+    },
+  },
+  {
+    module: 'bank',
+    label: 'Bank Multi Send',
+    messageType: MsgMultiSend,
+    template: {
+      inputs: [{ address: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER, coins: [COIN_TEMPLATE] }],
+      outputs: [{ address: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER, coins: [COIN_TEMPLATE] }],
+    },
+  },
+  {
+    module: 'bank',
+    label: 'Bank Set Send Enabled',
+    messageType: MsgSetSendEnabled,
+    template: {
+      authority: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      sendEnabled: [{ denom: 'uatom', enabled: true }],
+      useDefaultFor: [],
+    },
+  },
+  {
+    module: 'distribution',
+    label: 'Set Withdraw Address',
+    messageType: MsgSetWithdrawAddress,
+    template: {
+      delegatorAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      withdrawAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'distribution',
+    label: 'Withdraw Delegator Reward',
+    messageType: MsgWithdrawDelegatorReward,
+    template: {
+      delegatorAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      validatorAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'distribution',
+    label: 'Withdraw Validator Commission',
+    messageType: MsgWithdrawValidatorCommission,
+    template: {
+      validatorAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'distribution',
+    label: 'Fund Community Pool',
+    messageType: MsgFundCommunityPool,
+    template: {
+      amount: [COIN_TEMPLATE],
+      depositor: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'distribution',
+    label: 'Community Pool Spend',
+    messageType: MsgCommunityPoolSpend,
+    template: {
+      authority: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      recipient: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      amount: [COIN_TEMPLATE],
+    },
+  },
+  {
+    module: 'distribution',
+    label: 'Deposit Validator Rewards Pool',
+    messageType: MsgDepositValidatorRewardsPool,
+    template: {
+      depositor: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      validatorAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+      amount: [COIN_TEMPLATE],
+    },
+  },
+  {
+    module: 'evidence',
+    label: 'Submit Evidence',
+    messageType: MsgSubmitEvidence,
+    template: {
+      submitter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      evidence: ANY_TEMPLATE,
+    },
+  },
+  {
+    module: 'feegrant',
+    label: 'Grant Allowance',
+    messageType: MsgGrantAllowance,
+    template: {
+      granter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      grantee: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      allowance: ANY_TEMPLATE,
+    },
+  },
+  {
+    module: 'feegrant',
+    label: 'Revoke Allowance',
+    messageType: MsgRevokeAllowance,
+    template: {
+      granter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      grantee: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'feegrant',
+    label: 'Prune Allowances',
+    messageType: MsgPruneAllowances,
+    template: {
+      pruner: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1 Submit Proposal',
+    messageType: GovV1MsgSubmitProposal,
+    template: {
+      messages: [ANY_TEMPLATE],
+      initialDeposit: [COIN_TEMPLATE],
+      proposer: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      metadata: '',
+      title: '',
+      summary: '',
+      expedited: false,
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1 Exec Legacy Content',
+    messageType: MsgExecLegacyContent,
+    template: {
+      content: ANY_TEMPLATE,
+      authority: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1 Vote',
+    messageType: GovV1MsgVote,
+    template: {
+      proposalId: '1',
+      voter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      option: 'VOTE_OPTION_YES',
+      metadata: '',
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1 Vote Weighted',
+    messageType: GovV1MsgVoteWeighted,
+    template: {
+      proposalId: '1',
+      voter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      options: [{ option: 'VOTE_OPTION_YES', weight: '1.000000000000000000' }],
+      metadata: '',
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1 Deposit',
+    messageType: GovV1MsgDeposit,
+    template: {
+      proposalId: '1',
+      depositor: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      amount: [COIN_TEMPLATE],
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1 Cancel Proposal',
+    messageType: MsgCancelProposal,
+    template: {
+      proposalId: '1',
+      proposer: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1beta1 Submit Proposal',
+    messageType: GovV1Beta1MsgSubmitProposal,
+    template: {
+      content: ANY_TEMPLATE,
+      initialDeposit: [COIN_TEMPLATE],
+      proposer: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1beta1 Vote',
+    messageType: GovV1Beta1MsgVote,
+    template: {
+      proposalId: '1',
+      voter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      option: 'VOTE_OPTION_YES',
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1beta1 Vote Weighted',
+    messageType: GovV1Beta1MsgVoteWeighted,
+    template: {
+      proposalId: '1',
+      voter: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      options: [{ option: 'VOTE_OPTION_YES', weight: '1.000000000000000000' }],
+    },
+  },
+  {
+    module: 'gov',
+    label: 'Gov v1beta1 Deposit',
+    messageType: GovV1Beta1MsgDeposit,
+    template: {
+      proposalId: '1',
+      depositor: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      amount: [COIN_TEMPLATE],
+    },
+  },
+  {
+    module: 'slashing',
+    label: 'Slashing Unjail',
+    messageType: MsgUnjail,
+    template: {
+      validatorAddr: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+    },
+  },
+  {
+    module: 'staking',
+    label: 'Create Validator',
+    messageType: MsgCreateValidator,
+    template: {
+      description: {
+        moniker: '',
+        identity: '',
+        website: '',
+        securityContact: '',
+        details: '',
+      },
+      commission: {
+        rate: '0.100000000000000000',
+        maxRate: '0.200000000000000000',
+        maxChangeRate: '0.010000000000000000',
+      },
+      minSelfDelegation: '1',
+      delegatorAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      validatorAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+      pubkey: { typeUrl: '/cosmos.crypto.ed25519.PubKey', value: '' },
+      value: COIN_TEMPLATE,
+    },
+  },
+  {
+    module: 'staking',
+    label: 'Edit Validator',
+    messageType: MsgEditValidator,
+    template: {
+      description: {
+        moniker: '',
+        identity: '',
+        website: '',
+        securityContact: '',
+        details: '',
+      },
+      validatorAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+      commissionRate: '0.100000000000000000',
+      minSelfDelegation: '1',
+    },
+  },
+  {
+    module: 'staking',
+    label: 'Delegate',
+    messageType: MsgDelegate,
+    template: {
+      delegatorAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      validatorAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+      amount: COIN_TEMPLATE,
+    },
+  },
+  {
+    module: 'staking',
+    label: 'Begin Redelegate',
+    messageType: MsgBeginRedelegate,
+    template: {
+      delegatorAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      validatorSrcAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+      validatorDstAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+      amount: COIN_TEMPLATE,
+    },
+  },
+  {
+    module: 'staking',
+    label: 'Undelegate',
+    messageType: MsgUndelegate,
+    template: {
+      delegatorAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      validatorAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+      amount: COIN_TEMPLATE,
+    },
+  },
+  {
+    module: 'staking',
+    label: 'Cancel Unbonding Delegation',
+    messageType: MsgCancelUnbondingDelegation,
+    template: {
+      delegatorAddress: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      validatorAddress: COSMOS_VALIDATOR_TEMPLATE_PLACEHOLDER,
+      amount: COIN_TEMPLATE,
+      creationHeight: '1',
+    },
+  },
+  {
+    module: 'upgrade',
+    label: 'Software Upgrade',
+    messageType: MsgSoftwareUpgrade,
+    template: {
+      authority: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+      plan: {
+        name: '',
+        time: '1970-01-01T00:00:00Z',
+        height: '1',
+        info: '',
+        upgradedClientState: ANY_TEMPLATE,
+      },
+    },
+  },
+  {
+    module: 'upgrade',
+    label: 'Cancel Upgrade',
+    messageType: MsgCancelUpgrade,
+    template: {
+      authority: COSMOS_ADDRESS_TEMPLATE_PLACEHOLDER,
+    },
+  },
+];
+
+export const COSMOS_GENERIC_MESSAGE_TYPES = COSMOS_GENERIC_MESSAGE_DESCRIPTORS.map((descriptor) => ({
+  module: descriptor.module,
+  label: descriptor.label,
+  typeUrl: descriptor.messageType.typeUrl,
+  template: descriptor.template,
+}));
 
 function assertPresent(value: string, label: string) {
   if (!value) {
@@ -331,6 +768,21 @@ function normalizeCosmosSubmitGovProposalInput(input: CosmosSubmitGovProposalInp
   };
 }
 
+function normalizeCosmosGenericMessageInput(input: CosmosGenericMessageInput): NormalizedCosmosGenericMessageInput {
+  const normalized = normalizeCosmosBaseSigningInput(input);
+  const messageTypeUrl = normalizeRequiredText(input.messageTypeUrl);
+  const messageJson = normalizeRequiredText(input.messageJson);
+
+  assertPresent(messageTypeUrl, 'Message type');
+  assertPresent(messageJson, 'Message JSON');
+
+  return {
+    ...normalized,
+    messageTypeUrl,
+    messageJson,
+  };
+}
+
 function parseCosmosProposalMessages(messagesJson: string): EncodeObject[] {
   let parsed: unknown;
 
@@ -366,6 +818,22 @@ function parseCosmosProposalMessages(messagesJson: string): EncodeObject[] {
   });
 }
 
+function parseCosmosMessageValue(messageJson: string) {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(messageJson);
+  } catch {
+    throw new Error('Message JSON must be valid JSON.');
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Message JSON must be an object.');
+  }
+
+  return parsed as Record<string, unknown>;
+}
+
 function toCosmosGovVoteOption(option: CosmosProposalVoteOption) {
   switch (option) {
     case 'yes':
@@ -396,7 +864,17 @@ async function getCosmosChainId(rpcUrl: string) {
   return chainId;
 }
 
-async function createCosmosSigningClient(input: CosmosBaseSigningInput) {
+function createCosmosSigningRegistry() {
+  const registry = new Registry(defaultRegistryTypes);
+
+  for (const descriptor of COSMOS_GENERIC_MESSAGE_DESCRIPTORS) {
+    registry.register(descriptor.messageType.typeUrl, descriptor.messageType as unknown as GeneratedType);
+  }
+
+  return registry;
+}
+
+async function createCosmosSigningClient(input: CosmosBaseSigningInput, registry = createCosmosSigningRegistry()) {
   const normalized = normalizeCosmosBaseSigningInput(input);
   const profile = getActiveCosmosProvider();
   await getCosmosChainId(profile.rpcUrl);
@@ -415,6 +893,7 @@ async function createCosmosSigningClient(input: CosmosBaseSigningInput) {
 
   const client = await SigningStargateClient.connectWithSigner(profile.rpcUrl, signer, {
     gasPrice: GasPrice.fromString(normalized.gasPrice),
+    registry,
   });
 
   return {
@@ -496,6 +975,47 @@ export async function sendCosmosTokens(input: CosmosSendTokensInput): Promise<Co
 
     if (result.code !== 0) {
       throw new Error(result.rawLog || `Send transaction failed with code ${result.code}.`);
+    }
+
+    return {
+      delegatorAddress,
+      transactionHash: result.transactionHash,
+      height: result.height,
+      gasUsed: result.gasUsed,
+      gasWanted: result.gasWanted,
+      response: result,
+    };
+  } finally {
+    client.disconnect();
+  }
+}
+
+export async function broadcastCosmosGenericMessage(input: CosmosGenericMessageInput): Promise<CosmosBroadcastResult> {
+  const normalized = normalizeCosmosGenericMessageInput(input);
+  const descriptor = COSMOS_GENERIC_MESSAGE_DESCRIPTORS.find((item) => item.messageType.typeUrl === normalized.messageTypeUrl);
+
+  if (!descriptor) {
+    throw new Error('Unsupported Cosmos message type.');
+  }
+
+  const messageValue = descriptor.messageType.fromJSON(parseCosmosMessageValue(normalized.messageJson));
+  const { client, delegatorAddress } = await createCosmosSigningClient(normalized);
+
+  try {
+    const result = await client.signAndBroadcast(
+      delegatorAddress,
+      [
+        {
+          typeUrl: descriptor.messageType.typeUrl,
+          value: messageValue,
+        },
+      ],
+      resolveCosmosFee(normalized),
+      normalized.memo,
+    );
+
+    if (result.code !== 0) {
+      throw new Error(result.rawLog || `${descriptor.label} transaction failed with code ${result.code}.`);
     }
 
     return {
@@ -603,7 +1123,7 @@ export async function voteCosmosProposal(input: CosmosProposalVoteInput): Promis
   try {
     const message: EncodeObject = {
       typeUrl: '/cosmos.gov.v1.MsgVote',
-      value: MsgVote.fromPartial({
+      value: GovV1MsgVote.fromPartial({
         proposalId: BigInt(normalized.proposalId),
         voter: delegatorAddress,
         option: toCosmosGovVoteOption(normalized.option),
@@ -636,7 +1156,7 @@ export async function depositCosmosProposal(input: CosmosProposalDepositInput): 
   try {
     const message: EncodeObject = {
       typeUrl: '/cosmos.gov.v1.MsgDeposit',
-      value: MsgDeposit.fromPartial({
+      value: GovV1MsgDeposit.fromPartial({
         proposalId: BigInt(normalized.proposalId),
         depositor: delegatorAddress,
         amount: [
@@ -675,7 +1195,7 @@ export async function submitCosmosGovProposal(input: CosmosSubmitGovProposalInpu
     const proposalMessages = parseCosmosProposalMessages(normalized.messagesJson).map((proposalMessage) => registry.encodeAsAny(proposalMessage));
     const message: EncodeObject = {
       typeUrl: '/cosmos.gov.v1.MsgSubmitProposal',
-      value: MsgSubmitProposal.fromPartial({
+      value: GovV1MsgSubmitProposal.fromPartial({
         messages: proposalMessages,
         initialDeposit: [
           {
