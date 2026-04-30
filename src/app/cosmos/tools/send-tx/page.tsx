@@ -1,12 +1,14 @@
 'use client';
 
-import { IconX } from '@tabler/icons-react';
+import { IconCopy, IconX } from '@tabler/icons-react';
 import { fromHex, toBech32 } from '@cosmjs/encoding';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { AutoGrowTextarea } from '@/components/ui/auto-grow-textarea';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { copyText } from '@/components/ui/copy-text';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
+import { JsonInput } from '@/components/ui/json-input';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -26,8 +28,18 @@ import { AppShell } from '@/platform/layout/app-shell';
 
 const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
 const DEFAULT_TRANSACTION_TYPE = COSMOS_GENERIC_MESSAGE_TYPES[0]?.typeUrl ?? '';
+const COSMOS_SEND_TX_FORM_CACHE_KEY = 'cosmos-send-tx-form:v1';
+const messageJsonTextareaClassName =
+  'min-h-10 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm leading-6 text-slate-800 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500';
 
 type CosmosTxType = string;
+type CosmosSendTxFormCache = {
+  messageTypeUrl?: string;
+  signingAlgorithm?: CosmosSigningAlgorithm;
+  gasPriceAmount?: string;
+  gasPriceDenom?: string;
+  messageJson?: string;
+};
 
 function scaleDecimalByPowerOfTen(rawValue: string, exponent: number) {
   const value = rawValue.trim() || '1';
@@ -168,6 +180,54 @@ function bytesToBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
+function isCosmosSigningAlgorithm(value: unknown): value is CosmosSigningAlgorithm {
+  return value === 'ethsecp256k1' || value === 'secp256k1';
+}
+
+function isSupportedCosmosMessageType(typeUrl: unknown): typeUrl is string {
+  return typeof typeUrl === 'string' && COSMOS_GENERIC_MESSAGE_TYPES.some((item) => item.typeUrl === typeUrl);
+}
+
+function readCosmosSendTxFormCache(): CosmosSendTxFormCache | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(COSMOS_SEND_TX_FORM_CACHE_KEY);
+
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(rawValue) as unknown;
+
+    if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+      return null;
+    }
+
+    const candidate = parsedValue as Record<string, unknown>;
+
+    return {
+      messageTypeUrl: isSupportedCosmosMessageType(candidate.messageTypeUrl) ? candidate.messageTypeUrl : undefined,
+      signingAlgorithm: isCosmosSigningAlgorithm(candidate.signingAlgorithm) ? candidate.signingAlgorithm : undefined,
+      gasPriceAmount: typeof candidate.gasPriceAmount === 'string' ? candidate.gasPriceAmount : undefined,
+      gasPriceDenom: typeof candidate.gasPriceDenom === 'string' ? candidate.gasPriceDenom : undefined,
+      messageJson: typeof candidate.messageJson === 'string' ? candidate.messageJson : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCosmosSendTxFormCache(cache: CosmosSendTxFormCache) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(COSMOS_SEND_TX_FORM_CACHE_KEY, JSON.stringify(cache));
+}
+
 function CosmosSendTxContent() {
   const { showToast } = useToast();
   const [transactionType, setTransactionType] = useState<CosmosTxType>(DEFAULT_TRANSACTION_TYPE);
@@ -186,6 +246,10 @@ function CosmosSendTxContent() {
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
+  const [formCacheLoaded, setFormCacheLoaded] = useState(false);
+  const [addressCopied, setAddressCopied] = useState(false);
+  const addressCopyTimeoutRef = useRef<number | null>(null);
+  const addressCopyButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const actionLabel = getActionLabel(transactionType);
 
@@ -204,6 +268,54 @@ function CosmosSendTxContent() {
     loadActiveKey();
     return subscribeEvmKeyring(loadActiveKey);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (addressCopyTimeoutRef.current != null) {
+        window.clearTimeout(addressCopyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const cache = readCosmosSendTxFormCache();
+
+    if (cache?.messageTypeUrl) {
+      setTransactionType(cache.messageTypeUrl);
+    }
+
+    if (cache?.signingAlgorithm) {
+      setSigningAlgorithm(cache.signingAlgorithm);
+    }
+
+    if (typeof cache?.gasPriceAmount === 'string') {
+      setGasPriceAmount(cache.gasPriceAmount);
+    }
+
+    if (typeof cache?.gasPriceDenom === 'string') {
+      setGasPriceDenom(cache.gasPriceDenom);
+    }
+
+    if (typeof cache?.messageJson === 'string') {
+      setMessageJson(cache.messageJson);
+    }
+
+    setFormCacheLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!formCacheLoaded) {
+      return;
+    }
+
+    writeCosmosSendTxFormCache({
+      messageTypeUrl: transactionType,
+      signingAlgorithm,
+      gasPriceAmount,
+      gasPriceDenom,
+      messageJson,
+    });
+  }, [formCacheLoaded, transactionType, signingAlgorithm, gasPriceAmount, gasPriceDenom, messageJson]);
 
   useEffect(() => {
     let disposed = false;
@@ -254,6 +366,13 @@ function CosmosSendTxContent() {
     setSubmitting(true);
     setFormError(null);
     setBroadcastResult(null);
+    writeCosmosSendTxFormCache({
+      messageTypeUrl: transactionType,
+      signingAlgorithm,
+      gasPriceAmount,
+      gasPriceDenom,
+      messageJson,
+    });
 
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
@@ -293,6 +412,26 @@ function CosmosSendTxContent() {
     }
   }
 
+  async function handleCopyActiveAddress() {
+    const copyValue = activeCosmosAddress || activeKey?.address;
+
+    if (!copyValue) {
+      return;
+    }
+
+    await copyText(copyValue);
+    setAddressCopied(true);
+
+    if (addressCopyTimeoutRef.current != null) {
+      window.clearTimeout(addressCopyTimeoutRef.current);
+    }
+
+    addressCopyTimeoutRef.current = window.setTimeout(() => {
+      setAddressCopied(false);
+      addressCopyTimeoutRef.current = null;
+    }, 1600);
+  }
+
   async function handleConfirmUnlock() {
     if (!activeKey) {
       return;
@@ -330,7 +469,7 @@ function CosmosSendTxContent() {
                 <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Send Transaction</h1>
                 <p className="min-w-0 truncate text-sm text-slate-500">Broadcast Cosmos transactions.</p>
               </div>
-              <span className="min-w-0 shrink-0 truncate text-sm font-medium text-slate-700" title={activeCosmosAddress || activeKey?.address || undefined}>
+              <span className="inline-flex min-w-0 shrink-0 items-center gap-1.5 truncate text-sm font-medium text-slate-700" title={activeCosmosAddress || activeKey?.address || undefined}>
                 {activeKey ? (
                   <>
                     {activeCosmosAddress ? (
@@ -340,6 +479,20 @@ function CosmosSendTxContent() {
                     ) : (
                       <span className="font-mono text-xs text-slate-500">{formatCompactHash(activeKey.address, 12, 8)}</span>
                     )}
+                    <span className="relative inline-flex shrink-0">
+                      <button
+                        ref={addressCopyButtonRef}
+                        type="button"
+                        className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
+                        aria-label="Copy address"
+                        onClick={() => void handleCopyActiveAddress()}
+                      >
+                        <IconCopy className="size-4" stroke={1.8} />
+                      </button>
+                      <FloatingTooltip open={addressCopied} anchorRef={addressCopyButtonRef} className="whitespace-nowrap border border-slate-200 bg-white text-slate-700">
+                        <span className="block whitespace-nowrap">Copied!</span>
+                      </FloatingTooltip>
+                    </span>
                   </>
                 ) : (
                   'No active address'
@@ -416,14 +569,11 @@ function CosmosSendTxContent() {
                   <label className="block text-sm font-medium text-slate-700" htmlFor="message-json">
                     Message value
                   </label>
-                  <AutoGrowTextarea
-                    id="message-json"
+                  <JsonInput
                     value={messageJson}
-                    disabled={submitting}
-                    spellCheck={false}
-                    rows={1}
-                    className="mt-1 min-h-10 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm leading-6 text-slate-800 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500"
-                    onChange={(event) => setMessageJson(event.target.value)}
+                    onChange={setMessageJson}
+                    placeholder={formatMessageTemplate(transactionType, activeCosmosAddress, accountPrefix)}
+                    textareaClassName={`mt-1 ${messageJsonTextareaClassName}`}
                   />
                 </div>
 
