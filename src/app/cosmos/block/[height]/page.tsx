@@ -2,7 +2,7 @@
 
 import { IconChevronLeft, IconChevronRight, IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { copyText } from '@/components/ui/copy-text';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
@@ -187,12 +187,14 @@ function CosmosBlockEventSection({
 export default function CosmosBlockDetailPage() {
   const router = useRouter();
   const params = useParams<{ height: string }>();
+  const searchParams = useSearchParams();
   const height = params.height;
   const isValid = useMemo(() => /^\d+$/.test(height), [height]);
+  const initialActiveTab = searchParams.get('tab') === 'transactions' ? 'transactions' : 'overview';
   const [currentTxPage, setCurrentTxPage] = useState(1);
   const [block, setBlock] = useState<Awaited<ReturnType<typeof getCosmosBlockByHeightDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'events' | 'commits' | 'json'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'events' | 'commits' | 'json'>(initialActiveTab);
 
   useEffect(() => {
     if (!isValid) {

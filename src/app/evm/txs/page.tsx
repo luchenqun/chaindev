@@ -682,7 +682,7 @@ function EvmTransactionsPageContent() {
                   cacheSummary?.latestSeenTransaction ? (
                     <span>
                       <RelativeTime timestampMs={cacheSummary.latestSeenTransaction.timestampMs} />
-                      {` - Block #${cacheSummary.latestSeenTransaction.blockNumber}`}
+                      {` - Block ${cacheSummary.latestSeenTransaction.blockNumber}`}
                     </span>
                   ) : (
                     'No cached transaction snapshot yet'

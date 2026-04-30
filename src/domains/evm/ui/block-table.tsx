@@ -106,7 +106,11 @@ export function EvmBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 0, 
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-600 tabular-nums">
                 <RelativeTime timestampMs={block.timestampMs} />
               </td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 font-medium text-sky-600 tabular-nums">{block.txCount}</td>
+              <td className="px-4 py-2.5 text-[14px] leading-6 font-medium tabular-nums">
+                <Link prefetch={false} className="text-sky-600 hover:text-sky-700" href={`${hrefPrefix}/${block.height}?tab=transactions`}>
+                  {block.txCount}
+                </Link>
+              </td>
               <td className="px-4 py-2.5 text-[14px] leading-6">
                 <AddressLink
                   address={block.miner}

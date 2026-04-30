@@ -42,6 +42,7 @@ type TendermintWsCommitSignature = {
 type TendermintWsEnvelope = {
   result?: {
     query?: string;
+    events?: Record<string, string[] | undefined>;
     data?: {
       value?: {
         block?: {
@@ -61,6 +62,15 @@ type TendermintWsEnvelope = {
         };
         block_id?: {
           hash?: string;
+        };
+        result_finalize_block?: {
+          events?: Array<{
+            type?: string;
+            attributes?: Array<{
+              key?: string;
+              value?: string;
+            }>;
+          }>;
         };
       };
     };
@@ -83,6 +93,39 @@ function readStoredAutoRefreshEnabled() {
 
 function formatMetricInteger(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
+}
+
+function formatWsGasLabel(value: string | undefined) {
+  const normalized = value?.trim();
+
+  if (!normalized || !/^\d+$/.test(normalized)) {
+    return '-- Gas';
+  }
+
+  const gasUsed = Number(normalized);
+
+  if (gasUsed >= 1_000_000) {
+    return `${(gasUsed / 1_000_000).toFixed(2).replace(/\.?0+$/, '')} M Gas`;
+  }
+
+  if (gasUsed >= 1_000) {
+    return `${(gasUsed / 1_000).toFixed(1).replace(/\.?0+$/, '')} K Gas`;
+  }
+
+  return `${gasUsed} Gas`;
+}
+
+function getWsBlockGasLabel(payload: TendermintWsEnvelope) {
+  const eventGasAmount = payload.result?.events?.['block_gas.amount']?.[0];
+
+  if (eventGasAmount != null) {
+    return formatWsGasLabel(eventGasAmount);
+  }
+
+  const blockGasEvent = payload.result?.data?.value?.result_finalize_block?.events?.find((event) => event.type === 'block_gas');
+  const blockGasAmount = blockGasEvent?.attributes?.find((attribute) => attribute.key === 'amount')?.value;
+
+  return formatWsGasLabel(blockGasAmount);
 }
 
 function parseMetricInteger(value: string) {
@@ -442,6 +485,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       const lastCommit = value?.block?.last_commit;
       const lastCommitSignaturesLabel = formatWsCommitSummary(lastCommit?.signatures);
       const height = header?.height;
+      const blockGasLabel = getWsBlockGasLabel(payload);
 
       if (!height) {
         return;
@@ -535,7 +579,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
             proposerAddressLabel: formatCompactHash(proposer, 12, 8),
             txCount,
             txCountLabel: formatMetricInteger(txCount),
-            blockSizeLabel: 'Unavailable',
+            blockSizeLabel: blockGasLabel,
             appHash: header.app_hash ?? '',
             appHashLabel: formatCompactHash(header.app_hash, 10, 8),
             signaturesLabel: 'Pending',
@@ -565,7 +609,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           proposerAddressLabel: formatCompactHash(proposer, 12, 8),
           txCount,
           txCountLabel: formatMetricInteger(txCount),
-          blockSizeLabel: 'Unavailable',
+          blockSizeLabel: blockGasLabel,
           appHash: header.app_hash ?? '',
           appHashLabel: formatCompactHash(header.app_hash, 10, 8),
           signaturesLabel: 'Pending',

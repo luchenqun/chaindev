@@ -76,18 +76,30 @@ export function CosmosHomeActivity() {
                         </div>
                         <div className="min-w-0">
                           <Link prefetch={false} className="block text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/cosmos/block/${block.height}`}>
-                            #{block.height}
+                            {block.height}
                           </Link>
                           <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(block.timestampMs, nowMs)}</p>
                         </div>
                         <div className="min-w-0">
-                          <Link prefetch={false}
-                            className="block truncate text-sm text-sky-600 hover:text-sky-700"
-                            href={block.proposerOperatorAddress ? `/cosmos/validator/${block.proposerOperatorAddress}` : '/cosmos/validators'}
-                          >
-                            {block.proposerLabel}
-                          </Link>
-                          <p className="mt-1 truncate text-sm text-slate-500">{block.txCount} txs</p>
+                          <p className="truncate text-sm font-medium text-slate-700">
+                            Validated By{' '}
+                            <Link
+                              prefetch={false}
+                              className="font-semibold text-sky-600 hover:text-sky-700"
+                              href={block.proposerOperatorAddress ? `/cosmos/validator/${block.proposerOperatorAddress}` : '/cosmos/validators'}
+                            >
+                              {block.proposerLabel}
+                            </Link>
+                          </p>
+                          <p className="mt-1 truncate text-sm text-slate-500">
+                            <Link
+                              prefetch={false}
+                              className="font-semibold text-sky-600 hover:text-sky-700"
+                              href={`/cosmos/block/${block.height}?tab=transactions`}
+                            >
+                              {block.txCount} txs
+                            </Link>
+                          </p>
                         </div>
                         <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{block.blockSizeLabel}</div>
                       </div>
@@ -131,7 +143,7 @@ export function CosmosHomeActivity() {
                             </Link>
                           </div>
                           <p className="mt-1 truncate text-sm text-slate-500">
-                            Height #{transaction.height} · {formatRelativeAge(transaction.timestampMs, nowMs)}
+                            Height {transaction.height} · {formatRelativeAge(transaction.timestampMs, nowMs)}
                           </p>
                         </div>
                         <div className="min-w-0">

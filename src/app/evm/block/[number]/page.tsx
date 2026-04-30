@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { IconChevronLeft, IconChevronRight, IconLanguage, IconMinus, IconPlus } from '@tabler/icons-react';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
@@ -114,12 +114,14 @@ function decodeHexToAscii(value: string) {
 export default function EvmBlockDetailPage() {
   const router = useRouter();
   const params = useParams<{ number: string }>();
+  const searchParams = useSearchParams();
   const number = params.number;
   const isValid = useMemo(() => /^\d+$/.test(number), [number]);
+  const initialActiveTab = searchParams.get('tab') === 'transactions' ? 'transactions' : 'overview';
   const [block, setBlock] = useState<Awaited<ReturnType<typeof getEvmBlockByNumberDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'json'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'transactions' | 'json'>(initialActiveTab);
   const [extraDataView, setExtraDataView] = useState<'hex' | 'ascii'>('hex');
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [decodeVersion, setDecodeVersion] = useState(0);
@@ -258,7 +260,7 @@ export default function EvmBlockDetailPage() {
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[1.171875rem] font-semibold text-slate-900">Block</h1>
-            <span className="text-sm font-medium text-slate-500">#{block.height}</span>
+            <span className="text-sm font-medium text-slate-500">{block.height}</span>
           </div>
         </div>
 

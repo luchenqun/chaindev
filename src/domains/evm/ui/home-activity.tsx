@@ -115,7 +115,11 @@ export function EvmHomeActivity() {
                               showCopyButton={false}
                             />
                           </p>
-                          <p className="mt-1 text-sm text-slate-500">{block.txCount}</p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            <Link prefetch={false} className="font-semibold text-sky-600 hover:text-sky-700" href={`/evm/block/${block.number}?tab=transactions`}>
+                              {block.txCount}
+                            </Link>
+                          </p>
                         </div>
                         <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{block.gasUsedLabel}</div>
                       </div>
@@ -159,7 +163,7 @@ export function EvmHomeActivity() {
                             </Link>
                           </div>
                           <p className="mt-1 truncate text-sm text-slate-500">
-                            Block #{transaction.blockNumber} · {formatRelativeAge(transaction.timestampMs, nowMs)}
+                            Block {transaction.blockNumber} · {formatRelativeAge(transaction.timestampMs, nowMs)}
                           </p>
                         </div>
                         <div className="min-w-0">

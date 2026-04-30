@@ -875,6 +875,30 @@ function formatInteger(value: string | number | bigint | null | undefined, fallb
   return `${negative ? '-' : ''}${grouped}`;
 }
 
+function formatCosmosGasLabel(value: string | number | bigint | null | undefined) {
+  if (value == null) {
+    return '-- Gas';
+  }
+
+  const normalized = String(value).trim();
+
+  if (!/^\d+$/.test(normalized)) {
+    return '-- Gas';
+  }
+
+  const gasUsed = Number(normalized);
+
+  if (gasUsed >= 1_000_000) {
+    return `${(gasUsed / 1_000_000).toFixed(2).replace(/\.?0+$/, '')} M Gas`;
+  }
+
+  if (gasUsed >= 1_000) {
+    return `${(gasUsed / 1_000).toFixed(1).replace(/\.?0+$/, '')} K Gas`;
+  }
+
+  return `${gasUsed} Gas`;
+}
+
 function formatLocalTimestamp(value: string | undefined) {
   if (!value) {
     return 'Unavailable';
@@ -3047,7 +3071,7 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
       proposerOperatorAddress: proposerOperatorAddressByAddress.get(proposer) ?? null,
       proposerLabel: proposerMoniker && proposerMoniker !== 'Unknown' ? proposerMoniker : formatCompactHash(proposer, 10, 6),
       txCount: formatInteger(block.num_txs ?? '0', '0'),
-      blockSizeLabel: formatBytes(block.block_size),
+      blockSizeLabel: formatCosmosGasLabel(null),
       timeLabel: formatLocalTimestamp(timestamp),
       timestampMs: Number.isNaN(timestampMs) ? null : timestampMs,
     };
