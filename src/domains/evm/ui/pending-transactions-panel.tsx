@@ -24,7 +24,17 @@ function PendingTransactionsPanelSkeleton({ className = '' }: { className?: stri
       </div>
 
       <div className="overflow-x-auto">
-        <table className="data-table">
+        <table className="data-table min-w-[1250px] table-fixed">
+          <colgroup>
+            <col className="w-[235px]" />
+            <col className="w-[150px]" />
+            <col className="w-[185px]" />
+            <col className="w-[185px]" />
+            <col className="w-[150px]" />
+            <col className="w-[95px]" />
+            <col className="w-[150px]" />
+            <col className="w-[150px]" />
+          </colgroup>
           <thead>
             <tr>
               {Array.from({ length: 8 }).map((_, index) => (
@@ -199,7 +209,17 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
       </div>
 
       <div className="overflow-x-auto">
-        <table className="data-table">
+        <table className="data-table min-w-[1250px] table-fixed">
+          <colgroup>
+            <col className="w-[235px]" />
+            <col className="w-[150px]" />
+            <col className="w-[185px]" />
+            <col className="w-[185px]" />
+            <col className="w-[150px]" />
+            <col className="w-[95px]" />
+            <col className="w-[150px]" />
+            <col className="w-[150px]" />
+          </colgroup>
           <thead>
             <tr>
               <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
@@ -216,15 +236,15 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
             {data.transactions.length ? (
               data.transactions.map((transaction) => (
                 <tr key={transaction.hash} className="border-t border-slate-200">
-                  <td className="px-5 py-3 text-sm">
+                  <td className="truncate px-5 py-3 text-sm">
                     <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
                       {transaction.hashLabel}
                     </Link>
                   </td>
-                  <td className="px-5 py-3 text-sm">
+                  <td className="truncate px-5 py-3 text-sm">
                     <TransactionMethodBadge methodLabel={decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel} />
                   </td>
-                  <td className="px-5 py-3 text-sm">
+                  <td className="truncate px-5 py-3 text-sm">
                     <AddressLink
                       address={transaction.from}
                       href={`/evm/address/${transaction.from}`}
@@ -235,7 +255,7 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
                       className="font-medium text-sky-600 hover:text-sky-700"
                     />
                   </td>
-                  <td className="px-5 py-3 text-sm text-slate-700">
+                  <td className="truncate px-5 py-3 text-sm text-slate-700">
                     {transaction.to ? (
                       <AddressLink
                         address={transaction.to}
@@ -250,10 +270,10 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
                       <span>{transaction.toLabel}</span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-sm font-medium text-slate-900">{transaction.amountLabel}</td>
-                  <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{transaction.nonceLabel}</td>
-                  <td className="px-5 py-3 text-sm text-slate-700">{transaction.gasPriceLabel}</td>
-                  <td className="px-5 py-3 text-sm font-medium text-slate-900">{transaction.maxTxCostLabel}</td>
+                  <td className="truncate px-5 py-3 text-sm font-medium text-slate-900">{transaction.amountLabel}</td>
+                  <td className="truncate px-5 py-3 text-sm tabular-nums text-slate-700">{transaction.nonceLabel}</td>
+                  <td className="truncate px-5 py-3 text-sm text-slate-700">{transaction.gasPriceLabel}</td>
+                  <td className="truncate px-5 py-3 text-sm font-medium text-slate-900">{transaction.maxTxCostLabel}</td>
                 </tr>
               ))
             ) : (

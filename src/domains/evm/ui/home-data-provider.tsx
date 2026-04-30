@@ -243,6 +243,10 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
     }
 
     async function refreshCachedHomeTransactions() {
+      if (recentHomeTransactionsRef.current.length > 0) {
+        return;
+      }
+
       const cachedTransactions = await getEvmHomeCachedTransactionsDirect(HOME_TRANSACTION_LIST_LIMIT);
 
       if (disposed) {
@@ -255,7 +259,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
 
       recentHomeTransactionsRef.current = cachedTransactions;
       setSnapshot((current) =>
-        current
+        current && current.activity.transactions.length === 0
           ? {
               ...current,
               activity: {
@@ -283,6 +287,23 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       recentHomeTransactionsRef.current = mergeRecentHomeTransactions(recentHomeTransactionsRef.current, nextFeed);
 
       setLatestFeed(nextFeed);
+      if (isHomePage) {
+        setSnapshot((current) =>
+          current
+            ? {
+                ...current,
+                activity: {
+                  ...current.activity,
+                  blocks: recentHomeBlocksRef.current.slice(0, HOME_BLOCK_LIST_LIMIT).map((item) => item.block),
+                  transactions: recentHomeTransactionsRef.current,
+                },
+                latestBlockNumber: nextFeed.latestBlockNumber,
+                latestBlockTimestamp: nextFeed.latestBlockTimestamp,
+                pollIntervalMs: resolvedPollIntervalMs,
+              }
+            : current,
+        );
+      }
       setStatus({
         ...nextFeed,
         pollIntervalMs: resolvedPollIntervalMs,
@@ -307,15 +328,22 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         homeChainIdRef.current = supplement.header.chainId;
       }
 
-      setSnapshot(
-        buildDerivedHomeSnapshot({
-          feed,
-          supplement,
-          recentBlocks: recentHomeBlocksRef.current,
-          chainId: homeChainIdRef.current,
-          pollIntervalMs: feed.pollIntervalMs,
-          activityTransactions: recentHomeTransactionsRef.current,
-        }),
+      const nextSnapshot = buildDerivedHomeSnapshot({
+        feed,
+        supplement,
+        recentBlocks: recentHomeBlocksRef.current,
+        chainId: homeChainIdRef.current,
+        pollIntervalMs: feed.pollIntervalMs,
+        activityTransactions: recentHomeTransactionsRef.current,
+      });
+
+      setSnapshot((current) =>
+        current
+          ? {
+              ...nextSnapshot,
+              activity: current.activity,
+            }
+          : nextSnapshot,
       );
     }
 

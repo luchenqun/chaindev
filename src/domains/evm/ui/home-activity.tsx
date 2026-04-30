@@ -34,6 +34,7 @@ export function EvmHomeActivity() {
   const activity = snapshot?.activity ?? null;
   const blockItems = activity?.blocks ?? [];
   const transactionItems = activity?.transactions ?? [];
+  const transactionVisibleItems = transactionItems.length || 1;
   const getBlockKey = useCallback((block: (typeof blockItems)[number]) => `${block.number}-${block.hash}`, []);
   const getTransactionKey = useCallback((transaction: (typeof transactionItems)[number]) => transaction.hash, []);
   const pushedBlockItems = usePushedListItems(blockItems, getBlockKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
@@ -148,7 +149,7 @@ export function EvmHomeActivity() {
             className="home-activity-push-viewport overflow-hidden border-t border-slate-200 pt-1"
             style={
               {
-                '--home-activity-visible-items': transactionItems.length,
+                '--home-activity-visible-items': transactionVisibleItems,
                 '--home-activity-entering-rows': pushedTransactionEnteringRows,
               } as HomeActivityViewportStyle
             }
