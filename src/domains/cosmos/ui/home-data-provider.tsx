@@ -24,12 +24,9 @@ type CosmosHomeDataContextValue = {
   errorMessage: string | null;
   nowMs: number;
   connectionMode: 'ws' | 'poll';
-  autoRefreshEnabled: boolean;
-  setAutoRefreshEnabled: (enabled: boolean) => void;
 };
 
 const CosmosHomeDataContext = createContext<CosmosHomeDataContextValue | null>(null);
-const COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY = 'chaindev-cosmos-home-auto-refresh-enabled';
 const COSMOS_HOME_BLOCK_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
 const COSMOS_HOME_TX_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
 
@@ -76,20 +73,6 @@ type TendermintWsEnvelope = {
     };
   };
 };
-
-function readStoredAutoRefreshEnabled() {
-  if (typeof window === 'undefined') {
-    return true;
-  }
-
-  const value = window.localStorage.getItem(COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY);
-
-  if (value == null) {
-    return true;
-  }
-
-  return value !== 'false';
-}
 
 function formatMetricInteger(value: number) {
   return new Intl.NumberFormat('en-US').format(value);
@@ -221,7 +204,6 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [connectionMode, setConnectionMode] = useState<'ws' | 'poll'>('poll');
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(() => readStoredAutoRefreshEnabled());
   const pollTimeoutRef = useRef<number | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const refreshQueuedRef = useRef(false);
@@ -266,10 +248,6 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
     };
   }, []);
-
-  useEffect(() => {
-    window.localStorage.setItem(COSMOS_HOME_AUTO_REFRESH_STORAGE_KEY, String(autoRefreshEnabled));
-  }, [autoRefreshEnabled]);
 
   useEffect(() => {
     let disposed = false;
@@ -347,7 +325,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         setSnapshot(nextSnapshot);
         setErrorMessage(null);
 
-        if (!websocketRef.current && autoRefreshEnabled) {
+        if (!websocketRef.current) {
           schedulePoll(12_000);
         }
       } catch (error) {
@@ -356,7 +334,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         }
 
         setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos homepage activity.');
-        if (!websocketRef.current && autoRefreshEnabled) {
+        if (!websocketRef.current) {
           schedulePoll(12_000);
         }
       }
@@ -393,10 +371,6 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
     }
 
     function queueRefresh() {
-      if (!autoRefreshEnabled) {
-        return;
-      }
-
       if (refreshQueuedRef.current) {
         return;
       }
@@ -705,9 +679,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
 
         if (!profile.wsUrl) {
           setConnectionMode('poll');
-          if (autoRefreshEnabled) {
-            schedulePoll(12_000);
-          }
+          schedulePoll(12_000);
           return;
         }
 
@@ -751,9 +723,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
               void applyNewBlockFromWs(payload);
             }
           } catch {
-            if (autoRefreshEnabled) {
-              queueRefresh();
-            }
+            queueRefresh();
           }
         };
         socket.onerror = () => {
@@ -763,9 +733,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
 
           closeSocket(socket);
           setConnectionMode('poll');
-          if (autoRefreshEnabled) {
-            schedulePoll(12_000);
-          }
+          schedulePoll(12_000);
         };
         socket.onclose = () => {
           if (disposed || websocketRef.current !== socket) {
@@ -774,15 +742,11 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
 
           websocketRef.current = null;
           setConnectionMode('poll');
-          if (autoRefreshEnabled) {
-            schedulePoll(12_000);
-          }
+          schedulePoll(12_000);
         };
       } catch {
         setConnectionMode('poll');
-        if (autoRefreshEnabled) {
-          schedulePoll(12_000);
-        }
+        schedulePoll(12_000);
       }
     }
 
@@ -861,7 +825,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       closeSocket();
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
-  }, [activeMode, autoRefreshEnabled, pathname]);
+  }, [activeMode, pathname]);
 
   const value = useMemo(
     () => ({
@@ -870,10 +834,8 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       errorMessage,
       nowMs,
       connectionMode,
-      autoRefreshEnabled,
-      setAutoRefreshEnabled,
     }),
-    [autoRefreshEnabled, connectionMode, errorMessage, latestFeed, nowMs, snapshot],
+    [connectionMode, errorMessage, latestFeed, nowMs, snapshot],
   );
 
   return <CosmosHomeDataContext.Provider value={value}>{children}</CosmosHomeDataContext.Provider>;

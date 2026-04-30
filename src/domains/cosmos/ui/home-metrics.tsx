@@ -1,7 +1,5 @@
 'use client';
 
-import { IconPlayerPause, IconRefresh } from '@tabler/icons-react';
-import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { MetricCardsSkeleton } from '@/components/ui/loading-placeholders';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 
@@ -34,7 +32,7 @@ function MetricCard({ label, value, subtext }: Metric) {
 }
 
 export function CosmosHomeMetrics() {
-  const { snapshot, errorMessage, connectionMode, autoRefreshEnabled, setAutoRefreshEnabled } = useCosmosHomeData();
+  const { snapshot, errorMessage, connectionMode } = useCosmosHomeData();
 
   if (!snapshot && !errorMessage) {
     return <MetricCardsSkeleton headerItems={4} metrics={12} />;
@@ -55,16 +53,6 @@ export function CosmosHomeMetrics() {
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
-      <div className="absolute right-4 top-3 z-10">
-        <ActionIconButton
-          className={autoRefreshEnabled ? 'text-sky-600 hover:text-sky-700' : 'text-slate-400 hover:text-slate-600'}
-          onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-          tooltip={autoRefreshEnabled ? 'Disable HTTP auto refresh' : 'Enable HTTP auto refresh'}
-          tooltipPlacement="bottom"
-        >
-          {autoRefreshEnabled ? <IconRefresh className="size-4" stroke={1.8} /> : <IconPlayerPause className="size-4" stroke={1.8} />}
-        </ActionIconButton>
-      </div>
       <div className="grid divide-y divide-slate-200 md:grid-cols-4 md:divide-x md:divide-y-0">
         {headerItems.map((item) => (
           <div key={item.label} className="bg-slate-50 px-5 py-3">
@@ -100,13 +88,7 @@ export function CosmosHomeMetrics() {
       {errorMessage ? <div className="border-t border-slate-200 bg-rose-50 px-5 py-3 text-sm text-rose-600">{errorMessage}</div> : null}
       {snapshot ? (
         <div className="border-t border-slate-200 bg-slate-50 px-5 py-2 text-xs text-slate-500">
-          {connectionMode === 'ws'
-            ? autoRefreshEnabled
-              ? 'Live updates via WebSocket. HTTP polling remains enabled as fallback.'
-              : 'Live updates via WebSocket. HTTP polling is paused.'
-            : autoRefreshEnabled
-              ? 'Auto refresh via HTTP polling'
-              : 'HTTP polling paused'}
+          {connectionMode === 'ws' ? 'Live updates via WebSocket. HTTP polling remains enabled as fallback.' : 'Auto refresh via HTTP polling.'}
         </div>
       ) : null}
     </section>
