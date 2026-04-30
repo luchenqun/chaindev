@@ -16,7 +16,7 @@ import { decodeCosmosHomeTransactionsByHashes } from '@/domains/cosmos/client/ho
 import { notifyCosmosTransactionsAvailable } from '@/domains/cosmos/ui/live-events';
 import { HOME_ACTIVITY_LIST_LIMIT } from '@/config/pagination';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
-import { isCosmosBlocksRouteActive, isCosmosHomeRouteActive, isCosmosLiveBlockRouteActive, isCosmosRouteActive } from '@/platform/workbench/home-route-state';
+import { isCosmosHomeRouteActive, isCosmosLiveBlockRouteActive, isCosmosRouteActive } from '@/platform/workbench/home-route-state';
 
 type CosmosHomeDataContextValue = {
   snapshot: CosmosHomeSnapshot | null;
@@ -286,7 +286,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
     const isHomeRoute = isCosmosHomeRouteActive(pathname, activeMode);
     const isCosmosRoute = isCosmosRouteActive(pathname, activeMode);
     const shouldSubscribeToLiveBlocks = isCosmosLiveBlockRouteActive(pathname, activeMode);
-    const shouldHydrateBlockDetails = isHomeRoute || isCosmosBlocksRouteActive(pathname);
+    const shouldHydrateBlockDetails = isHomeRoute;
 
     function clearTimers() {
       if (pollTimeoutRef.current != null) {
@@ -579,6 +579,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
             proposerAddressLabel: formatCompactHash(proposer, 12, 8),
             txCount,
             txCountLabel: formatMetricInteger(txCount),
+            gasUsedLabel: blockGasLabel,
             blockSizeLabel: blockGasLabel,
             appHash: header.app_hash ?? '',
             appHashLabel: formatCompactHash(header.app_hash, 10, 8),
@@ -609,6 +610,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           proposerAddressLabel: formatCompactHash(proposer, 12, 8),
           txCount,
           txCountLabel: formatMetricInteger(txCount),
+          gasUsedLabel: blockGasLabel,
           blockSizeLabel: blockGasLabel,
           appHash: header.app_hash ?? '',
           appHashLabel: formatCompactHash(header.app_hash, 10, 8),

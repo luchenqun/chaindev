@@ -360,6 +360,7 @@ export type CosmosBlocksPageItem = {
   proposerAddressLabel: string;
   txCount: number;
   txCountLabel: string;
+  gasUsedLabel: string;
   blockSizeLabel: string;
   appHash: string;
   appHashLabel: string;
@@ -1828,8 +1829,23 @@ function sumCosmosBlockGas(
   );
 }
 
+function getCosmosBlockGasAmount(blockResults: TendermintBlockResultsResponse | null | undefined) {
+  const result = blockResults?.result;
+  const blockGasEvent = [...(result?.finalize_block_events ?? []), ...(result?.end_block_events ?? []), ...(result?.begin_block_events ?? [])].find(
+    (event) => decodeCosmosEventField(event.type) === 'block_gas',
+  );
+  const blockGasAmount = blockGasEvent ? getCosmosEventAttributeValue(blockGasEvent, 'amount') : null;
+
+  if (blockGasAmount) {
+    return blockGasAmount;
+  }
+
+  return sumCosmosBlockGas(result?.txs_results).gasUsed;
+}
+
 function formatCosmosBlocksPageItem(input: {
   block: TendermintBlockMeta;
+  blockResults?: TendermintBlockResultsResponse | null;
   signatures?: Array<{
     block_id_flag?: number | string;
     validator_address?: string;
@@ -1859,6 +1875,7 @@ function formatCosmosBlocksPageItem(input: {
     proposerAddressLabel: proposer === 'Unknown' ? proposer : formatCompactHash(proposer, 12, 8),
     txCount: Number.parseInt(input.block.num_txs ?? '0', 10) || 0,
     txCountLabel: formatInteger(input.block.num_txs ?? '0', '0'),
+    gasUsedLabel: formatCosmosGasLabel(getCosmosBlockGasAmount(input.blockResults)),
     blockSizeLabel: formatBytes(input.block.block_size),
     appHash,
     appHashLabel: formatCompactHash(appHash, 10, 8),
@@ -1925,12 +1942,17 @@ export async function getCosmosBlocksPageDirect(requestedPage = 1, pageSize = 20
   const commitPayloads = await Promise.allSettled(
     blockMetas.map((block) => (block.header?.height ? getCommitDirect(profile, block.header.height) : Promise.reject(new Error('Missing block height.')))),
   );
+  const blockResultsPayloads = await Promise.allSettled(
+    blockMetas.map((block) => (block.header?.height ? getBlockResultsDirect(profile, block.header.height) : Promise.reject(new Error('Missing block height.')))),
+  );
   const blocks = blockMetas.map((block, index) => {
     const commitResult = commitPayloads[index];
+    const blockResultsResult = blockResultsPayloads[index];
     const signatures = commitResult?.status === 'fulfilled' ? commitResult.value.result?.signed_header?.commit?.signatures : undefined;
 
     return formatCosmosBlocksPageItem({
       block,
+      blockResults: blockResultsResult?.status === 'fulfilled' ? blockResultsResult.value : null,
       signatures,
       commitCanonical: commitResult?.status === 'fulfilled' ? commitResult.value.canonical : null,
       proposerMonikerByAddress: validatorMaps.proposerMonikerByAddress,
@@ -2122,7 +2144,7 @@ export async function getCosmosLatestBlockFeedDirect(height: number | string, op
     throw new Error('Invalid Cosmos block height.');
   }
 
-  const [blockchainPayload, commitPayload, validatorMaps] = await Promise.all([
+  const [blockchainPayload, commitPayload, blockResultsPayload, validatorMaps] = await Promise.all([
     getBlockchainRangeDirect(profile, normalizedHeight, normalizedHeight),
     includeCommit
       ? getCommitDirect(profile, String(normalizedHeight)).catch(() => ({
@@ -2130,6 +2152,7 @@ export async function getCosmosLatestBlockFeedDirect(height: number | string, op
           result: { signed_header: { commit: { signatures: [] } } },
         }))
       : Promise.resolve(null),
+    getBlockResultsDirect(profile, String(normalizedHeight)).catch(() => null),
     getCosmosValidatorMapsDirect(profile, normalizedHeight),
   ]);
   const blockMeta = blockchainPayload.result?.block_metas?.[0];
@@ -2140,6 +2163,7 @@ export async function getCosmosLatestBlockFeedDirect(height: number | string, op
 
   const blockPageItem = formatCosmosBlocksPageItem({
     block: blockMeta,
+    blockResults: blockResultsPayload,
     signatures: commitPayload?.result?.signed_header?.commit?.signatures,
     commitCanonical: commitPayload?.canonical ?? null,
     proposerMonikerByAddress: validatorMaps.proposerMonikerByAddress,
