@@ -71,7 +71,16 @@ export function EvmBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 0, 
         } as React.CSSProperties
       }
     >
-      <table className="data-table evm-block-table">
+      <table className="data-table evm-block-table min-w-[1040px] table-fixed">
+        <colgroup>
+          <col className="w-[105px]" />
+          <col className="w-[95px]" />
+          <col className="w-[75px]" />
+          <col className="w-[245px]" />
+          <col className="w-[180px]" />
+          <col className="w-[160px]" />
+          <col className="w-[180px]" />
+        </colgroup>
         <thead className="relative z-10 bg-white">
           <tr>
             <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Block</th>
@@ -106,11 +115,11 @@ export function EvmBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 0, 
                   className="font-medium text-sky-600 hover:text-sky-700"
                 />
               </td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700 tabular-nums">
+              <td className="truncate px-4 py-2.5 text-[14px] leading-6 tabular-nums text-slate-700">
                 {block.gasUsedLabel} <span className="text-slate-500">({block.gasUsedPercent})</span>
               </td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700 tabular-nums">{block.gasLimitLabel}</td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700 tabular-nums">{block.baseFeeLabel}</td>
+              <td className="truncate px-4 py-2.5 text-[14px] leading-6 tabular-nums text-slate-700">{block.gasLimitLabel}</td>
+              <td className="truncate px-4 py-2.5 text-[14px] leading-6 tabular-nums text-slate-700">{block.baseFeeLabel}</td>
             </tr>
           ))}
         </tbody>

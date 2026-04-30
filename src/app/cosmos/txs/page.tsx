@@ -509,7 +509,16 @@ function CosmosTransactionsPageContent() {
             )}
             style={{ '--pushed-table-visible-rows': data.transactions.length, '--pushed-table-row-height': '3.25rem' } as React.CSSProperties}
           >
-            <table className="data-table cosmos-transaction-table">
+            <table className="data-table cosmos-transaction-table min-w-[1120px] table-fixed">
+              <colgroup>
+                <col className="w-[230px]" />
+                <col className="w-[150px]" />
+                <col className="w-[100px]" />
+                <col className="w-[95px]" />
+                <col className="w-[220px]" />
+                <col className="w-[180px]" />
+                <col className="w-[145px]" />
+              </colgroup>
               <thead className="relative z-10 bg-white">
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
@@ -536,13 +545,13 @@ function CosmosTransactionsPageContent() {
                     return (
                       <tr key={key} className={cn('cosmos-transaction-table-row', `pushed-table-row-${phase}`)}>
                         <td className="px-5 py-2.5 text-sm leading-6">
-                          <div className="-ml-1 flex items-center gap-1.5">
+                          <div className="-ml-1 flex min-w-0 items-center gap-1.5">
                             <CosmosTransactionPreviewButton transaction={transaction} />
                             <CosmosTransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} status={transaction.status} />
                           </div>
                         </td>
                         <td className="px-5 py-2.5 text-sm leading-6">
-                          <span className="inline-flex h-7 min-w-[92px] items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-700">
+                          <span className="inline-flex h-7 w-full min-w-0 items-center justify-center truncate rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-700">
                             {transaction.type}
                           </span>
                         </td>
@@ -555,16 +564,18 @@ function CosmosTransactionsPageContent() {
                           <RelativeTime timestampMs={transaction.timestampMs} />
                         </td>
                         <td className="px-5 py-2.5 text-sm leading-6" title={displaySender?.full}>
-                          {displaySender ? (
-                            <CosmosAddressLink prefetch={false} href={`/cosmos/account/${transaction.sender}`} label={displaySender.label} copyValue={displaySender.full} />
-                          ) : (
-                            <span className="text-slate-500">Unknown</span>
-                          )}
+                          <div className="min-w-0 truncate">
+                            {displaySender ? (
+                              <CosmosAddressLink prefetch={false} href={`/cosmos/account/${transaction.sender}`} label={displaySender.label} copyValue={displaySender.full} />
+                            ) : (
+                              <span className="text-slate-500">Unknown</span>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-700">
+                        <td className="truncate px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-700">
                           {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
                         </td>
-                        <td className="px-5 py-2.5 text-sm leading-6 text-slate-700">{transaction.feeLabel}</td>
+                        <td className="truncate px-5 py-2.5 text-sm leading-6 text-slate-700">{transaction.feeLabel}</td>
                       </tr>
                     );
                   })

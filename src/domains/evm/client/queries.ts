@@ -293,6 +293,7 @@ function formatHomeBlockItem(block: { number: bigint; hash: string | null; miner
 type EvmHomeTransactionItem = {
   hash: string;
   hashLabel: string;
+  blockNumber: string;
   from: string;
   fromLabel: string;
   to: string | null;
@@ -308,6 +309,7 @@ function buildHomeReceiptStatusByHash(transactions: Array<Pick<EvmCachedTransact
 
 function formatHomeTransactions(
   transactions: readonly unknown[],
+  blockNumber: bigint | number | string,
   timestamp: bigint | null | undefined,
   currencyName: string,
   limit: number,
@@ -338,6 +340,7 @@ function formatHomeTransactions(
     items.push({
       hash: transaction.hash,
       hashLabel: shortenHash(transaction.hash, 14, 0),
+      blockNumber: blockNumber.toString(),
       from: transaction.from,
       fromLabel: shortenAddress(transaction.from),
       to: transaction.to ?? null,
@@ -355,6 +358,7 @@ function formatCachedHomeTransactions(transactions: EvmCachedTransactionItem[], 
   return transactions.slice(0, limit).map((transaction) => ({
     hash: transaction.hash,
     hashLabel: transaction.hashLabel,
+    blockNumber: transaction.blockNumber,
     from: transaction.from,
     fromLabel: transaction.fromLabel,
     to: transaction.to,
@@ -673,7 +677,7 @@ export async function getEvmHomeBootstrapDirect(blockLimit = 6, txLimit = 6) {
   }
 
   const fallbackTransactions = recentBlocks
-    .flatMap((block) => formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit, receiptStatusByHash))
+    .flatMap((block) => formatHomeTransactions(block.transactions, block.number, block.timestamp, currencyName, txLimit, receiptStatusByHash))
     .filter((transaction, index, transactions) => transactions.findIndex((candidate) => candidate.hash === transaction.hash) === index);
 
   return {
@@ -689,7 +693,7 @@ export async function getEvmHomeBootstrapDirect(blockLimit = 6, txLimit = 6) {
       timestampMs: block.timestamp ? Number(block.timestamp) * 1000 : null,
       txCount: block.transactions.length,
       block: formatHomeBlockItem(block),
-      transactions: formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit, receiptStatusByHash),
+      transactions: formatHomeTransactions(block.transactions, block.number, block.timestamp, currencyName, txLimit, receiptStatusByHash),
     })),
     transactions: [...cachedTransactions, ...fallbackTransactions]
       .filter((transaction, index, transactions) => transactions.findIndex((candidate) => candidate.hash === transaction.hash) === index)
@@ -750,7 +754,7 @@ export async function getEvmHomeActivityDirect(blockLimit = 4, txLimit = 4) {
       }
 
       if (transactions.length < txLimit) {
-        transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
+        transactions.push(...formatHomeTransactions(block.transactions, block.number, block.timestamp, currencyName, txLimit - transactions.length));
       }
 
       cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
@@ -824,7 +828,7 @@ export async function getEvmHomeSnapshotDirect(blockLimit = 6, txLimit = 6) {
       }
 
       if (transactions.length < txLimit) {
-        transactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, txLimit - transactions.length));
+        transactions.push(...formatHomeTransactions(block.transactions, block.number, block.timestamp, currencyName, txLimit - transactions.length));
       }
 
       cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
@@ -947,7 +951,7 @@ export async function getEvmLatestBlockActivityDirect(txLimit = 6) {
     latestBlockTime: formatLocalDateTime(latestBlock.timestamp),
     latestBlockTimestamp: latestBlock.timestamp ? Number(latestBlock.timestamp) : null,
     block: formatHomeBlockItem(latestBlock),
-    transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.timestamp, currencyName, txLimit, receiptStatusByHash),
+    transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.number, latestBlock.timestamp, currencyName, txLimit, receiptStatusByHash),
   };
 }
 
@@ -1253,7 +1257,7 @@ export async function getEvmOverviewDirect() {
     });
 
     if (recentTransactions.length < 5) {
-      recentTransactions.push(...formatHomeTransactions(block.transactions, block.timestamp, currencyName, 5 - recentTransactions.length));
+      recentTransactions.push(...formatHomeTransactions(block.transactions, block.number, block.timestamp, currencyName, 5 - recentTransactions.length));
       cacheCandidates.push(...formatTransactionsPageItemsForBlock(block, currencyName));
     }
   }
@@ -1469,7 +1473,7 @@ export async function getEvmLatestFeedDirect(txLimit = 20, includePollSample = t
     pollIntervalMs,
     block: formatHomeBlockItem(latestBlock),
     blockPageItem: formatBlocksPageItem(latestBlock),
-    transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.timestamp, currencyName, txLimit, receiptStatusByHash),
+    transactions: formatHomeTransactions(latestBlock.transactions, latestBlock.number, latestBlock.timestamp, currencyName, txLimit, receiptStatusByHash),
     transactionsPageItems,
   };
 }

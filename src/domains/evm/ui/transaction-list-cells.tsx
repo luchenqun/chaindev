@@ -60,10 +60,10 @@ export function TransactionHashCell(props: TransactionPreviewData) {
   }
 
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex min-w-0 items-center gap-0.5">
       {receiptStatus === 'reverted' ? <IconAlertCircle className="size-5 shrink-0 text-rose-500" stroke={1.9} /> : null}
-      <div className="relative inline-flex items-center gap-1.5">
-        <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${hash}`}>
+      <div className="relative inline-flex min-w-0 items-center gap-1.5">
+        <Link prefetch={false} className="truncate font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${hash}`}>
           {hashLabel}
         </Link>
         <button
@@ -132,7 +132,7 @@ export function TransactionMethodBadge({ methodLabel }: { methodLabel: string })
     <>
       <span
         ref={triggerRef}
-        className="inline-flex max-w-[150px] items-center justify-start rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
+        className="inline-flex w-full max-w-[150px] min-w-0 items-center justify-start rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
         aria-label={methodLabel}
         tabIndex={0}
         onBlur={handleHideTooltip}

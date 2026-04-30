@@ -9,6 +9,7 @@ import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { formatRelativeAge } from '@/lib/relative-time';
 import { cn } from '@/lib/utils';
 import { usePushedListItems } from '@/platform/home/use-pushed-list-items';
 
@@ -25,33 +26,6 @@ function EmptyState({ title, message }: { title: string; message: string }) {
       <p className="mt-1">{message}</p>
     </div>
   );
-}
-
-function formatRelativeAge(timestampMs: number | null, nowMs: number) {
-  if (!timestampMs) {
-    return 'Unavailable';
-  }
-
-  const seconds = Math.max(0, Math.floor((nowMs - timestampMs) / 1000));
-
-  if (seconds < 60) {
-    return `${seconds} secs ago`;
-  }
-
-  const minutes = Math.floor(seconds / 60);
-
-  if (minutes < 60) {
-    return `${minutes} mins ago`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) {
-    return `${hours} hrs ago`;
-  }
-
-  const days = Math.floor(hours / 24);
-  return `${days} days ago`;
 }
 
 export function EvmHomeActivity() {
@@ -120,7 +94,7 @@ export function EvmHomeActivity() {
                 {pushedBlockItems.map(({ item: block, key, phase }, index) => (
                   <div key={key} className={cn('home-activity-push-row', index ? 'border-t border-slate-200' : '', `home-activity-push-row-${phase}`)}>
                     <div className="home-activity-push-row-content">
-                      <div className="grid grid-cols-[auto_130px_minmax(0,1fr)_auto] items-center gap-4 py-4">
+                      <div className="grid grid-cols-[40px_minmax(120px,0.8fr)_minmax(0,1fr)_120px] items-center gap-4 py-4">
                         <div className="flex size-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
                           <IconBox className="size-5" stroke={1.8} />
                         </div>
@@ -143,7 +117,7 @@ export function EvmHomeActivity() {
                           </p>
                           <p className="mt-1 text-sm text-slate-500">{block.txCount}</p>
                         </div>
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">{block.gasUsedLabel}</div>
+                        <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{block.gasUsedLabel}</div>
                       </div>
                     </div>
                   </div>
@@ -173,7 +147,7 @@ export function EvmHomeActivity() {
                 {pushedTransactionItems.map(({ item: transaction, key, phase }, index) => (
                   <div key={key} className={cn('home-activity-push-row', index ? 'border-t border-slate-200' : '', `home-activity-push-row-${phase}`)}>
                     <div className="home-activity-push-row-content">
-                      <div className="grid grid-cols-[auto_160px_minmax(0,1fr)_auto] items-center gap-3 py-4">
+                      <div className="grid grid-cols-[40px_minmax(170px,1fr)_minmax(0,1fr)_120px] items-center gap-3 py-4">
                         <div className="flex size-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                           <IconFileText className="size-5" stroke={1.8} />
                         </div>
@@ -184,7 +158,9 @@ export function EvmHomeActivity() {
                               {transaction.hashLabel}
                             </Link>
                           </div>
-                          <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(transaction.timestampMs, nowMs)}</p>
+                          <p className="mt-1 truncate text-sm text-slate-500">
+                            Block #{transaction.blockNumber} · {formatRelativeAge(transaction.timestampMs, nowMs)}
+                          </p>
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm text-slate-600">
@@ -218,7 +194,7 @@ export function EvmHomeActivity() {
                             )}
                           </p>
                         </div>
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">{transaction.value}</div>
+                        <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{transaction.value}</div>
                       </div>
                     </div>
                   </div>

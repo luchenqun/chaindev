@@ -44,7 +44,15 @@ export function CosmosBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 
         } as React.CSSProperties
       }
     >
-      <table className="data-table cosmos-block-table">
+      <table className="data-table cosmos-block-table min-w-[920px] table-fixed">
+        <colgroup>
+          <col className="w-[105px]" />
+          <col className="w-[175px]" />
+          <col className="w-[95px]" />
+          <col className="w-[80px]" />
+          <col className="w-[245px]" />
+          <col className="w-[220px]" />
+        </colgroup>
         <thead className="relative z-10 bg-white">
           <tr>
             <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Block</th>
@@ -66,7 +74,7 @@ export function CosmosBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 
                   <span className="font-medium text-sky-600 hover:text-sky-700">#{block.height}</span>
                 </Link>
               </td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 font-mono text-slate-600" title={block.hash}>
+              <td className="truncate px-4 py-2.5 font-mono text-[14px] leading-6 text-slate-600" title={block.hash}>
                 {block.hashLabel}
               </td>
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-600 tabular-nums">
@@ -76,13 +84,13 @@ export function CosmosBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 
               <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">
                 <Link
                   prefetch={false}
-                  className="font-medium text-sky-600 hover:text-sky-700"
+                  className="block truncate font-medium text-sky-600 hover:text-sky-700"
                   href={block.proposerOperatorAddress ? `/cosmos/validator/${block.proposerOperatorAddress}` : '/cosmos/validators'}
                 >
                   {block.proposerLabel}
                 </Link>
               </td>
-              <td className="px-4 py-2.5 text-[14px] leading-6 text-slate-700">{block.signaturesLabel}</td>
+              <td className="truncate px-4 py-2.5 text-[14px] leading-6 text-slate-700">{block.signaturesLabel}</td>
             </tr>
           ))}
         </tbody>

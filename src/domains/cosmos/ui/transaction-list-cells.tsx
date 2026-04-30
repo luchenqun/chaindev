@@ -22,9 +22,9 @@ type CosmosTransactionPreviewData = {
 
 export function CosmosTransactionHashCell({ hash, hashLabel, status }: Pick<CosmosTransactionPreviewData, 'hash' | 'hashLabel' | 'status'>) {
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex min-w-0 items-center gap-0.5">
       {status === 'failed' ? <IconAlertCircle className="size-5 shrink-0 text-rose-500" stroke={1.9} /> : null}
-      <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${hash}`}>
+      <Link prefetch={false} className="truncate font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${hash}`}>
         {hashLabel}
       </Link>
     </div>

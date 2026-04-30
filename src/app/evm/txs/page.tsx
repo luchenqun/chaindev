@@ -765,7 +765,17 @@ function EvmTransactionsPageContent() {
                 className={cn('overflow-x-auto overflow-y-hidden', (data.transactions.length >= PAGE_SIZE || pushedTransactions.length > data.transactions.length) && 'pushed-table-viewport')}
                 style={{ '--pushed-table-visible-rows': data.transactions.length, '--pushed-table-row-height': '3.25rem' } as React.CSSProperties}
               >
-                <table className="data-table evm-transaction-table">
+                <table className="data-table evm-transaction-table min-w-[1250px] table-fixed">
+                  <colgroup>
+                    <col className="w-[235px]" />
+                    <col className="w-[150px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[95px]" />
+                    <col className="w-[185px]" />
+                    <col className="w-[185px]" />
+                    <col className="w-[150px]" />
+                    <col className="w-[150px]" />
+                  </colgroup>
                   <thead className="relative z-10 bg-white">
                     <tr>
                       <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
@@ -789,7 +799,7 @@ function EvmTransactionsPageContent() {
                         return (
                           <tr key={key} className={cn('evm-transaction-table-row', `pushed-table-row-${phase}`)}>
                             <td className="px-5 py-2.5 text-sm leading-6">
-                              <div className="flex items-center gap-3">
+                              <div className="flex min-w-0 items-center gap-3">
                                 <TransactionPreviewButton transaction={transaction} methodLabel={decodedMethodLabel} />
                                 <TransactionHashCell hash={transaction.hash} hashLabel={transaction.hashLabel} receiptStatus={transaction.receiptStatus} />
                               </div>
@@ -806,33 +816,37 @@ function EvmTransactionsPageContent() {
                               <RelativeTime timestampMs={transaction.timestampMs} />
                             </td>
                             <td className="px-5 py-2.5 text-sm leading-6">
-                              <AddressLink
-                                address={transaction.from}
-                                href={`/evm/address/${transaction.from}`}
-                                label={resolvePreferredAddressLabel(transaction.from, {
-                                  nameTagsByAddress,
-                                  fallbackLabel: transaction.fromLabel,
-                                })}
-                                className="font-medium text-sky-600 hover:text-sky-700"
-                              />
-                            </td>
-                            <td className="px-5 py-2.5 text-sm leading-6">
-                              {transaction.to ? (
+                              <div className="min-w-0 truncate">
                                 <AddressLink
-                                  address={transaction.to}
-                                  href={`/evm/address/${transaction.to}`}
-                                  label={resolvePreferredToAddressLabel(transaction.to, {
+                                  address={transaction.from}
+                                  href={`/evm/address/${transaction.from}`}
+                                  label={resolvePreferredAddressLabel(transaction.from, {
                                     nameTagsByAddress,
-                                    fallbackLabel: transaction.toLabel,
+                                    fallbackLabel: transaction.fromLabel,
                                   })}
                                   className="font-medium text-sky-600 hover:text-sky-700"
                                 />
-                              ) : (
-                                <span className="text-slate-500">Contract Creation</span>
-                              )}
+                              </div>
                             </td>
-                            <td className="px-5 py-2.5 text-sm font-medium leading-6 tabular-nums text-slate-900">{transaction.amountLabel}</td>
-                            <td className="px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
+                            <td className="px-5 py-2.5 text-sm leading-6">
+                              <div className="min-w-0 truncate">
+                                {transaction.to ? (
+                                  <AddressLink
+                                    address={transaction.to}
+                                    href={`/evm/address/${transaction.to}`}
+                                    label={resolvePreferredToAddressLabel(transaction.to, {
+                                      nameTagsByAddress,
+                                      fallbackLabel: transaction.toLabel,
+                                    })}
+                                    className="font-medium text-sky-600 hover:text-sky-700"
+                                  />
+                                ) : (
+                                  <span className="text-slate-500">Contract Creation</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="truncate px-5 py-2.5 text-sm font-medium leading-6 tabular-nums text-slate-900">{transaction.amountLabel}</td>
+                            <td className="truncate px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
                           </tr>
                         );
                       })

@@ -45,9 +45,9 @@ export function AddressLink({ address, href, label, className, tooltipClassName,
   }
 
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5">
-      <span className="group relative inline-flex max-w-full">
-        <Link className={className} href={href}>
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+      <span className="group relative inline-flex min-w-0 max-w-full">
+        <Link className={cn('min-w-0 truncate', className)} href={href}>
           {label}
         </Link>
       </span>

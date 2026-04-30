@@ -257,12 +257,22 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    function closeSocket() {
-      const socket = websocketRef.current;
-      websocketRef.current = null;
+    function closeSocket(socket = websocketRef.current) {
+      if (!socket) {
+        return;
+      }
 
-      if (socket && socket.readyState < WebSocket.CLOSING) {
+      if (websocketRef.current === socket) {
+        websocketRef.current = null;
+      }
+
+      if (socket.readyState === WebSocket.OPEN) {
         socket.close();
+        return;
+      }
+
+      if (socket.readyState === WebSocket.CONNECTING) {
+        socket.addEventListener('open', () => socket.close(), { once: true });
       }
     }
 
@@ -642,6 +652,11 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         websocketRef.current = socket;
 
         socket.onopen = () => {
+          if (disposed || websocketRef.current !== socket) {
+            closeSocket(socket);
+            return;
+          }
+
           clearTimers();
           socket.send(
             JSON.stringify({
@@ -655,6 +670,10 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           );
         };
         socket.onmessage = async (event) => {
+          if (websocketRef.current !== socket) {
+            return;
+          }
+
           try {
             const payload = JSON.parse(event.data) as TendermintWsEnvelope;
             const query = payload.result?.query ?? '';
@@ -673,18 +692,22 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           }
         };
         socket.onerror = () => {
-          closeSocket();
+          if (websocketRef.current !== socket) {
+            return;
+          }
+
+          closeSocket(socket);
           setConnectionMode('poll');
           if (autoRefreshEnabled) {
             schedulePoll(12_000);
           }
         };
         socket.onclose = () => {
-          if (disposed) {
+          if (disposed || websocketRef.current !== socket) {
             return;
           }
 
-          closeSocket();
+          websocketRef.current = null;
           setConnectionMode('poll');
           if (autoRefreshEnabled) {
             schedulePoll(12_000);

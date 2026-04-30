@@ -4,7 +4,6 @@ import 'client-only';
 
 import { fromBech32, toBech32 } from '@cosmjs/encoding';
 import { formatCosmosBlock } from '@/domains/cosmos/server/formatters';
-import { getRecentCachedCosmosTransactions, rememberCosmosTransactionCache, type CosmosCachedTransactionItem } from '@/domains/cosmos/client/transaction-cache';
 import {
   decodeCosmosTransactionSummary,
   extractSender,
@@ -1385,7 +1384,6 @@ async function getDecodedLatestTransactions(input: { profile: CosmosProvider; tx
   const txs = input.txs.slice(0, input.txLimit);
   const detailResults = await Promise.allSettled(txs.map((tx) => fetchJson<CosmosRestTxResponse>(`${input.profile.restUrl}/cosmos/tx/v1beta1/txs/${tx.hash}`)));
   const nextTransactions: CosmosHomeTransactionItem[] = [];
-  const cacheCandidates: CosmosCachedTransactionItem[] = [];
 
   detailResults.forEach((result, index) => {
     const tx = txs[index];
@@ -1430,25 +1428,7 @@ async function getDecodedLatestTransactions(input: { profile: CosmosProvider; tx
     };
 
     nextTransactions.push(item);
-    cacheCandidates.push({
-      providerProfileId: input.profile.id,
-      hash: item.hash,
-      height: item.height,
-      timestampMs: item.timestampMs,
-      typeLabel: item.type,
-      sender: item.sender,
-      senderLabel: item.senderLabel,
-      feeLabel: item.feeLabel,
-      gasUsed: decoded.gasUsed,
-      gasWanted: decoded.gasWanted,
-      status: item.status,
-      statusLabel: item.statusLabel,
-    });
   });
-
-  if (cacheCandidates.length) {
-    await rememberCosmosTransactionCache(cacheCandidates);
-  }
 
   return nextTransactions;
 }
@@ -3018,7 +2998,6 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
     poolPayload,
     communityPoolPayload,
     supplyPayload,
-    cachedTransactions,
   ] = await Promise.all([
     getStatusDirect(profile),
     getNetInfoDirect(profile).catch(() => ({ result: { n_peers: '0' } })),
@@ -3034,7 +3013,6 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
     fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`).catch(() => ({ pool: { bonded_tokens: '0', not_bonded_tokens: '0' } })),
     fetchJson<CosmosCommunityPoolResponse>(`${profile.restUrl}/cosmos/distribution/v1beta1/community_pool`).catch(() => ({ pool: [] })),
     fetchJson<CosmosSupplyResponse>(`${profile.restUrl}/cosmos/bank/v1beta1/supply`).catch(() => ({ supply: [] })),
-    getRecentCachedCosmosTransactions(txLimit).catch(() => []),
   ]);
   const latestHeight = Number(statusPayload.result?.sync_info?.latest_block_height ?? 0);
   const [blockchainPayload, rpcValidatorsPayload] = await Promise.all([
@@ -3093,30 +3071,6 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
     blockTimeByHeight,
     txLimit,
   });
-  const mergedTransactions = [...latestTransactions];
-
-  for (const cached of cachedTransactions) {
-    if (mergedTransactions.some((item) => item.hash === cached.hash)) {
-      continue;
-    }
-
-    mergedTransactions.push({
-      hash: cached.hash,
-      hashLabel: formatCompactHash(cached.hash),
-      height: cached.height,
-      type: cached.typeLabel,
-      sender: cached.sender,
-      senderLabel: cached.senderLabel,
-      feeLabel: cached.feeLabel ?? 'Unavailable',
-      status: cached.status,
-      statusLabel: cached.statusLabel,
-      timestampMs: cached.timestampMs,
-    });
-
-    if (mergedTransactions.length >= txLimit) {
-      break;
-    }
-  }
 
   const averageBlockTime = calculateAverageBlockTime(blocks);
 
@@ -3179,7 +3133,7 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
     ],
     activity: {
       blocks,
-      transactions: mergedTransactions.slice(0, txLimit),
+      transactions: latestTransactions.slice(0, txLimit),
     },
     latestHeight,
     refreshedAt: Date.now(),

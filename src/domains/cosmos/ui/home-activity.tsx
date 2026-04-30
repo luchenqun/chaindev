@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { HomeActivitySkeleton } from '@/components/ui/loading-placeholders';
+import { formatRelativeAge } from '@/lib/relative-time';
 import { cn } from '@/lib/utils';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { usePushedListItems } from '@/platform/home/use-pushed-list-items';
@@ -24,36 +25,23 @@ function EmptyState({ title, message }: { title: string; message: string }) {
   );
 }
 
-function formatRelativeAge(timestampMs: number | null, nowMs: number) {
-  if (!timestampMs) {
-    return 'Unavailable';
-  }
-
-  const seconds = Math.max(0, Math.floor((nowMs - timestampMs) / 1000));
-
-  if (seconds < 60) {
-    return `${seconds} secs ago`;
-  }
-
-  const minutes = Math.floor(seconds / 60);
-
-  if (minutes < 60) {
-    return `${minutes} mins ago`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) {
-    return `${hours} hrs ago`;
-  }
-
-  return `${Math.floor(hours / 24)} days ago`;
+function EmptyTransactionState() {
+  return (
+    <div className="flex h-full min-h-[8rem] flex-col items-center justify-center px-6 py-8 text-center">
+      <div className="flex size-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+        <IconFileText className="size-5" stroke={1.8} />
+      </div>
+      <p className="mt-3 text-sm font-semibold text-slate-700">No recent transactions</p>
+      <p className="mt-1 max-w-72 text-sm text-slate-500">The selected Cosmos provider returned no transaction data.</p>
+    </div>
+  );
 }
 
 export function CosmosHomeActivity() {
   const { snapshot, errorMessage, nowMs } = useCosmosHomeData();
   const blockItems = snapshot?.activity.blocks ?? [];
   const transactionItems = snapshot?.activity.transactions ?? [];
+  const transactionVisibleItems = transactionItems.length || 1;
   const getBlockKey = useCallback((block: (typeof blockItems)[number]) => `${block.height}-${block.hash}`, []);
   const getTransactionKey = useCallback((transaction: (typeof transactionItems)[number]) => transaction.hash, []);
   const pushedBlockItems = usePushedListItems(blockItems, getBlockKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
@@ -82,7 +70,7 @@ export function CosmosHomeActivity() {
                 {pushedBlockItems.map(({ item: block, key, phase }, index) => (
                   <div key={key} className={cn('home-activity-push-row', index ? 'border-t border-slate-200' : '', `home-activity-push-row-${phase}`)}>
                     <div className="home-activity-push-row-content">
-                      <div className="grid grid-cols-[auto_120px_minmax(0,1fr)_auto] items-center gap-4 py-4">
+                      <div className="grid grid-cols-[40px_minmax(110px,0.75fr)_minmax(0,1fr)_120px] items-center gap-4 py-4">
                         <div className="flex size-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
                           <IconBox className="size-5" stroke={1.8} />
                         </div>
@@ -101,7 +89,7 @@ export function CosmosHomeActivity() {
                           </Link>
                           <p className="mt-1 truncate text-sm text-slate-500">{block.txCount} txs</p>
                         </div>
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">{block.blockSizeLabel}</div>
+                        <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{block.blockSizeLabel}</div>
                       </div>
                     </div>
                   </div>
@@ -124,14 +112,14 @@ export function CosmosHomeActivity() {
           </div>
           <div
             className="home-activity-push-viewport overflow-hidden border-t border-slate-200 pt-1"
-            style={{ '--home-activity-visible-items': transactionItems.length } as HomeActivityViewportStyle}
+            style={{ '--home-activity-visible-items': transactionVisibleItems } as HomeActivityViewportStyle}
           >
             {pushedTransactionItems.length ? (
               <div className={cn('grid', pushedTransactionItems.some((item) => item.phase !== 'stable') && 'home-activity-push-list-moving')}>
                 {pushedTransactionItems.map(({ item: transaction, key, phase }, index) => (
                   <div key={key} className={cn('home-activity-push-row', index ? 'border-t border-slate-200' : '', `home-activity-push-row-${phase}`)}>
                     <div className="home-activity-push-row-content">
-                      <div className="grid grid-cols-[auto_145px_minmax(0,1fr)_auto] items-center gap-3 py-4">
+                      <div className="grid grid-cols-[40px_minmax(190px,1.15fr)_minmax(0,1fr)_130px] items-center gap-4 py-4">
                         <div className="flex size-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                           <IconFileText className="size-5" stroke={1.8} />
                         </div>
@@ -142,25 +130,26 @@ export function CosmosHomeActivity() {
                               {transaction.hashLabel}
                             </Link>
                           </div>
-                          <p className="mt-1 text-sm text-slate-500">Height #{transaction.height}</p>
+                          <p className="mt-1 truncate text-sm text-slate-500">
+                            Height #{transaction.height} · {formatRelativeAge(transaction.timestampMs, nowMs)}
+                          </p>
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium text-slate-700">{transaction.type}</p>
                           <p className="mt-1 truncate text-sm text-slate-500">
                             <Link prefetch={false} className="text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
                               {transaction.senderLabel}
-                            </Link>{' '}
-                            · {formatRelativeAge(transaction.timestampMs, nowMs)}
+                            </Link>
                           </p>
                         </div>
-                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">{transaction.feeLabel}</div>
+                        <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{transaction.feeLabel}</div>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState title="Latest Transactions" message={errorMessage ?? 'Transactions will appear here after the provider returns recent transaction data.'} />
+              <EmptyTransactionState />
             )}
           </div>
         </CardContent>
