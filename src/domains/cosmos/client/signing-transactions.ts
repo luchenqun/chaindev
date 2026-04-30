@@ -3,7 +3,7 @@
 import 'client-only';
 
 import { DirectEthSecp256k1Wallet, DirectSecp256k1Wallet, Registry, type EncodeObject } from '@cosmjs/proto-signing';
-import { defaultRegistryTypes, GasPrice, SigningStargateClient } from '@cosmjs/stargate';
+import { calculateFee, defaultRegistryTypes, GasPrice, SigningStargateClient, type DeliverTxResponse } from '@cosmjs/stargate';
 import { MsgWithdrawValidatorCommission } from 'cosmjs-types/cosmos/distribution/v1beta1/tx';
 import { VoteOption } from 'cosmjs-types/cosmos/gov/v1/gov';
 import { MsgDeposit, MsgSubmitProposal, MsgVote } from 'cosmjs-types/cosmos/gov/v1/tx';
@@ -27,6 +27,7 @@ export type CosmosBaseSigningInput = {
   accountPrefix: string;
   signingAlgorithm: CosmosSigningAlgorithm;
   gasPrice: string;
+  gasLimit?: string;
   memo?: string;
 };
 
@@ -35,6 +36,12 @@ export type CosmosSigningInput = CosmosBaseSigningInput & {
 };
 
 export type CosmosDelegateInput = CosmosSigningInput & {
+  amount: string;
+  denom: string;
+};
+
+export type CosmosSendTokensInput = CosmosBaseSigningInput & {
+  recipientAddress: string;
   amount: string;
   denom: string;
 };
@@ -61,6 +68,7 @@ export type CosmosSubmitGovProposalInput = CosmosBaseSigningInput & {
 };
 
 export type NormalizedCosmosDelegateInput = Required<CosmosDelegateInput>;
+export type NormalizedCosmosSendTokensInput = Required<CosmosSendTokensInput>;
 export type NormalizedCosmosBaseSigningInput = Required<CosmosBaseSigningInput>;
 export type NormalizedCosmosSigningInput = Required<CosmosSigningInput>;
 export type NormalizedCosmosProposalVoteInput = Required<CosmosProposalVoteInput>;
@@ -75,7 +83,10 @@ export type CosmosDelegateResult = {
   height: number;
   gasUsed: bigint;
   gasWanted: bigint;
+  response: DeliverTxResponse;
 };
+
+export type CosmosBroadcastResult = CosmosDelegateResult;
 
 function assertPresent(value: string, label: string) {
   if (!value) {
@@ -108,6 +119,7 @@ function normalizeCosmosBaseSigningInput(input: CosmosBaseSigningInput): Normali
   const accountPrefix = normalizeRequiredText(input.accountPrefix);
   const signingAlgorithm = input.signingAlgorithm;
   const gasPrice = normalizeRequiredText(input.gasPrice);
+  const gasLimit = normalizeRequiredText(input.gasLimit);
   const memo = normalizeRequiredText(input.memo);
 
   assertPresent(privateKey, 'Private key');
@@ -125,11 +137,16 @@ function normalizeCosmosBaseSigningInput(input: CosmosBaseSigningInput): Normali
     throw new Error('Gas price must look like 0.025uatom.');
   }
 
+  if (gasLimit && !/^[1-9]\d*$/.test(gasLimit)) {
+    throw new Error('Gas limit must be a positive integer.');
+  }
+
   return {
     privateKey,
     accountPrefix,
     signingAlgorithm,
     gasPrice,
+    gasLimit,
     memo,
   };
 }
@@ -194,6 +211,32 @@ export function normalizeCosmosDelegateInput(input: CosmosDelegateInput): Normal
 
   return {
     ...normalized,
+    amount,
+    denom,
+  };
+}
+
+export function normalizeCosmosSendTokensInput(input: CosmosSendTokensInput): NormalizedCosmosSendTokensInput {
+  const normalized = normalizeCosmosBaseSigningInput(input);
+  const recipientAddress = normalizeRequiredText(input.recipientAddress);
+  const amount = normalizeRequiredText(input.amount);
+  const denom = normalizeRequiredText(input.denom);
+
+  assertPresent(recipientAddress, 'Recipient address');
+  assertPresent(amount, 'Amount');
+  assertPresent(denom, 'Denom');
+
+  if (!/^[1-9]\d*$/.test(amount)) {
+    throw new Error('Amount must be a whole-number base unit amount.');
+  }
+
+  if (/\s/.test(denom)) {
+    throw new Error('Denom cannot contain whitespace.');
+  }
+
+  return {
+    ...normalized,
+    recipientAddress,
     amount,
     denom,
   };
@@ -381,6 +424,14 @@ async function createCosmosSigningClient(input: CosmosBaseSigningInput) {
   };
 }
 
+function resolveCosmosFee(input: NormalizedCosmosBaseSigningInput) {
+  if (!input.gasLimit) {
+    return 'auto';
+  }
+
+  return calculateFee(Number(input.gasLimit), input.gasPrice);
+}
+
 async function createCosmosStakingClient(input: CosmosSigningInput) {
   const normalized = normalizeCosmosSigningInput(input);
   const { client, delegatorAddress } = await createCosmosSigningClient(normalized);
@@ -404,7 +455,7 @@ export async function delegateCosmosTokens(input: CosmosDelegateInput): Promise<
         amount: normalized.amount,
         denom: normalized.denom,
       },
-      'auto',
+      resolveCosmosFee(normalized),
       normalized.memo,
     );
 
@@ -418,6 +469,42 @@ export async function delegateCosmosTokens(input: CosmosDelegateInput): Promise<
       height: result.height,
       gasUsed: result.gasUsed,
       gasWanted: result.gasWanted,
+      response: result,
+    };
+  } finally {
+    client.disconnect();
+  }
+}
+
+export async function sendCosmosTokens(input: CosmosSendTokensInput): Promise<CosmosBroadcastResult> {
+  const normalized = normalizeCosmosSendTokensInput(input);
+  const { client, delegatorAddress } = await createCosmosSigningClient(normalized);
+
+  try {
+    const result = await client.sendTokens(
+      delegatorAddress,
+      normalized.recipientAddress,
+      [
+        {
+          amount: normalized.amount,
+          denom: normalized.denom,
+        },
+      ],
+      resolveCosmosFee(normalized),
+      normalized.memo,
+    );
+
+    if (result.code !== 0) {
+      throw new Error(result.rawLog || `Send transaction failed with code ${result.code}.`);
+    }
+
+    return {
+      delegatorAddress,
+      transactionHash: result.transactionHash,
+      height: result.height,
+      gasUsed: result.gasUsed,
+      gasWanted: result.gasWanted,
+      response: result,
     };
   } finally {
     client.disconnect();
@@ -436,7 +523,7 @@ export async function undelegateCosmosTokens(input: CosmosDelegateInput): Promis
         amount: normalized.amount,
         denom: normalized.denom,
       },
-      'auto',
+      resolveCosmosFee(normalized),
       normalized.memo,
     );
 
@@ -450,6 +537,7 @@ export async function undelegateCosmosTokens(input: CosmosDelegateInput): Promis
       height: result.height,
       gasUsed: result.gasUsed,
       gasWanted: result.gasWanted,
+      response: result,
     };
   } finally {
     client.disconnect();
@@ -460,7 +548,7 @@ export async function withdrawCosmosDelegatorRewards(input: CosmosRewardWithdraw
   const { client, delegatorAddress, normalized } = await createCosmosStakingClient(input);
 
   try {
-    const result = await client.withdrawRewards(delegatorAddress, normalized.validatorAddress, 'auto', normalized.memo);
+    const result = await client.withdrawRewards(delegatorAddress, normalized.validatorAddress, resolveCosmosFee(normalized), normalized.memo);
 
     if (result.code !== 0) {
       throw new Error(result.rawLog || `Withdraw rewards transaction failed with code ${result.code}.`);
@@ -472,6 +560,7 @@ export async function withdrawCosmosDelegatorRewards(input: CosmosRewardWithdraw
       height: result.height,
       gasUsed: result.gasUsed,
       gasWanted: result.gasWanted,
+      response: result,
     };
   } finally {
     client.disconnect();
@@ -488,7 +577,7 @@ export async function withdrawCosmosValidatorCommission(input: CosmosRewardWithd
         validatorAddress: normalized.validatorAddress,
       }),
     };
-    const result = await client.signAndBroadcast(delegatorAddress, [message], 'auto', normalized.memo);
+    const result = await client.signAndBroadcast(delegatorAddress, [message], resolveCosmosFee(normalized), normalized.memo);
 
     if (result.code !== 0) {
       throw new Error(result.rawLog || `Withdraw commission transaction failed with code ${result.code}.`);
@@ -500,6 +589,7 @@ export async function withdrawCosmosValidatorCommission(input: CosmosRewardWithd
       height: result.height,
       gasUsed: result.gasUsed,
       gasWanted: result.gasWanted,
+      response: result,
     };
   } finally {
     client.disconnect();
@@ -520,7 +610,7 @@ export async function voteCosmosProposal(input: CosmosProposalVoteInput): Promis
         metadata: normalized.metadata,
       }),
     };
-    const result = await client.signAndBroadcast(delegatorAddress, [message], 'auto', normalized.memo);
+    const result = await client.signAndBroadcast(delegatorAddress, [message], resolveCosmosFee(normalized), normalized.memo);
 
     if (result.code !== 0) {
       throw new Error(result.rawLog || `Vote transaction failed with code ${result.code}.`);
@@ -532,6 +622,7 @@ export async function voteCosmosProposal(input: CosmosProposalVoteInput): Promis
       height: result.height,
       gasUsed: result.gasUsed,
       gasWanted: result.gasWanted,
+      response: result,
     };
   } finally {
     client.disconnect();
@@ -556,7 +647,7 @@ export async function depositCosmosProposal(input: CosmosProposalDepositInput): 
         ],
       }),
     };
-    const result = await client.signAndBroadcast(delegatorAddress, [message], 'auto', normalized.memo);
+    const result = await client.signAndBroadcast(delegatorAddress, [message], resolveCosmosFee(normalized), normalized.memo);
 
     if (result.code !== 0) {
       throw new Error(result.rawLog || `Deposit transaction failed with code ${result.code}.`);
@@ -568,6 +659,7 @@ export async function depositCosmosProposal(input: CosmosProposalDepositInput): 
       height: result.height,
       gasUsed: result.gasUsed,
       gasWanted: result.gasWanted,
+      response: result,
     };
   } finally {
     client.disconnect();
@@ -598,7 +690,7 @@ export async function submitCosmosGovProposal(input: CosmosSubmitGovProposalInpu
         expedited: false,
       }),
     };
-    const result = await client.signAndBroadcast(delegatorAddress, [message], 'auto', normalized.memo);
+    const result = await client.signAndBroadcast(delegatorAddress, [message], resolveCosmosFee(normalized), normalized.memo);
 
     if (result.code !== 0) {
       throw new Error(result.rawLog || `Submit proposal transaction failed with code ${result.code}.`);
@@ -610,6 +702,7 @@ export async function submitCosmosGovProposal(input: CosmosSubmitGovProposalInpu
       height: result.height,
       gasUsed: result.gasUsed,
       gasWanted: result.gasWanted,
+      response: result,
     };
   } finally {
     client.disconnect();
