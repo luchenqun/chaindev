@@ -15,6 +15,7 @@ const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 const API_SPECS = [
   { value: 'cosmos', label: 'Cosmos SDK', file: '/cosmos.yaml', baseUrl: 'rest' },
   { value: 'quarix', label: 'Quarix', file: '/quarix.yaml', baseUrl: 'rest' },
+  { value: 'evm', label: 'EVM', file: '/evm.yaml', baseUrl: 'rest' },
   { value: 'cometbft', label: 'CometBFT', file: '/cometbft.yaml', baseUrl: 'rpc' },
 ] as const;
 const bodyTextareaClassName =

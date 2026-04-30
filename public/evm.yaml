@@ -1,0 +1,460 @@
+swagger: "2.0"
+info:
+  title: Cosmos EVM REST API
+  version: "1.0"
+  description: REST query endpoints generated from Cosmos EVM query.proto files.
+schemes:
+  - http
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /cosmos/evm/vm/v1/account/{address}:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: Account
+      summary: Account queries an Ethereum account.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/cosmos_account/{address}:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: CosmosAccount
+      summary: CosmosAccount queries an Ethereum account's Cosmos address.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/validator_account/{cons_address}:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: ValidatorAccount
+      summary: ValidatorAccount queries an Ethereum account from a validator consensus address.
+      parameters:
+        - name: cons_address
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/balances/{address}:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: Balance
+      summary: Balance queries the EVM denomination balance for a single account.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/storage/{address}/{key}:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: Storage
+      summary: Storage queries the storage state for a single account.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          type: string
+        - name: key
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/codes/{address}:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: Code
+      summary: Code queries the EVM bytecode for an Ethereum address.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/params:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: Params
+      summary: Params queries the parameters of the x/vm module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/eth_call:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: EthCall
+      summary: EthCall implements the eth_call RPC API.
+      parameters:
+        - name: args
+          in: query
+          required: false
+          type: string
+        - name: gas_cap
+          in: query
+          required: false
+          type: string
+        - name: proposer_address
+          in: query
+          required: false
+          type: string
+        - name: chain_id
+          in: query
+          required: false
+          type: string
+        - name: overrides
+          in: query
+          required: false
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/estimate_gas:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: EstimateGas
+      summary: EstimateGas implements the eth_estimateGas RPC API.
+      parameters:
+        - name: args
+          in: query
+          required: false
+          type: string
+        - name: gas_cap
+          in: query
+          required: false
+          type: string
+        - name: proposer_address
+          in: query
+          required: false
+          type: string
+        - name: chain_id
+          in: query
+          required: false
+          type: string
+        - name: overrides
+          in: query
+          required: false
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/trace_tx:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: TraceTx
+      summary: TraceTx implements the debug_traceTransaction RPC API.
+      parameters:
+        - name: msg
+          in: query
+          required: false
+          type: string
+        - name: trace_config
+          in: query
+          required: false
+          type: string
+        - name: predecessors
+          in: query
+          required: false
+          type: string
+        - name: block_number
+          in: query
+          required: false
+          type: string
+        - name: block_hash
+          in: query
+          required: false
+          type: string
+        - name: block_time
+          in: query
+          required: false
+          type: string
+        - name: proposer_address
+          in: query
+          required: false
+          type: string
+        - name: chain_id
+          in: query
+          required: false
+          type: string
+        - name: block_max_gas
+          in: query
+          required: false
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/trace_block:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: TraceBlock
+      summary: TraceBlock implements the debug_traceBlockByNumber and debug_traceBlockByHash RPC APIs.
+      parameters:
+        - name: txs
+          in: query
+          required: false
+          type: string
+        - name: trace_config
+          in: query
+          required: false
+          type: string
+        - name: block_number
+          in: query
+          required: false
+          type: string
+        - name: block_hash
+          in: query
+          required: false
+          type: string
+        - name: block_time
+          in: query
+          required: false
+          type: string
+        - name: proposer_address
+          in: query
+          required: false
+          type: string
+        - name: chain_id
+          in: query
+          required: false
+          type: string
+        - name: block_max_gas
+          in: query
+          required: false
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/trace_call:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: TraceCall
+      summary: TraceCall implements the debug_traceCall RPC API.
+      parameters:
+        - name: args
+          in: query
+          required: false
+          type: string
+        - name: gas_cap
+          in: query
+          required: false
+          type: string
+        - name: proposer_address
+          in: query
+          required: false
+          type: string
+        - name: trace_config
+          in: query
+          required: false
+          type: string
+        - name: block_number
+          in: query
+          required: false
+          type: string
+        - name: block_hash
+          in: query
+          required: false
+          type: string
+        - name: block_time
+          in: query
+          required: false
+          type: string
+        - name: chain_id
+          in: query
+          required: false
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/base_fee:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: BaseFee
+      summary: BaseFee queries the base fee of the parent block of the current block.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/config:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: Config
+      summary: Config queries the EVM configuration.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/vm/v1/min_gas_price:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: GlobalMinGasPrice
+      summary: GlobalMinGasPrice queries the minimum gas price converted to 18 decimals.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/feemarket/v1/params:
+    get:
+      tags:
+        - cosmos.evm.feemarket.v1
+      operationId: Params
+      summary: Params queries the parameters of the x/feemarket module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/feemarket/v1/base_fee:
+    get:
+      tags:
+        - cosmos.evm.feemarket.v1
+      operationId: BaseFee
+      summary: BaseFee queries the base fee of the parent block of the current block.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/feemarket/v1/block_gas:
+    get:
+      tags:
+        - cosmos.evm.feemarket.v1
+      operationId: BlockGas
+      summary: BlockGas queries the gas used at a given block height.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/erc20/v1/token_pairs:
+    get:
+      tags:
+        - cosmos.evm.erc20.v1
+      operationId: TokenPairs
+      summary: TokenPairs retrieves registered token pairs.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/erc20/v1/token_pairs/{token}:
+    get:
+      tags:
+        - cosmos.evm.erc20.v1
+      operationId: TokenPair
+      summary: TokenPair retrieves a registered token pair.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /cosmos/evm/erc20/v1/params:
+    get:
+      tags:
+        - cosmos.evm.erc20.v1
+      operationId: Params
+      summary: Params retrieves the erc20 module params.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+parameters:
+  PaginationKey:
+    name: pagination.key
+    in: query
+    required: false
+    type: string
+  PaginationOffset:
+    name: pagination.offset
+    in: query
+    required: false
+    type: string
+  PaginationLimit:
+    name: pagination.limit
+    in: query
+    required: false
+    type: string
+  PaginationCountTotal:
+    name: pagination.count_total
+    in: query
+    required: false
+    type: boolean
+  PaginationReverse:
+    name: pagination.reverse
+    in: query
+    required: false
+    type: boolean
