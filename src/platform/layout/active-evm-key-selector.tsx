@@ -3,9 +3,11 @@
 import { IconKey, IconPlus } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import {
   getActiveEvmStoredPrivateKey,
   listEvmStoredPrivateKeys,
@@ -16,9 +18,18 @@ import {
 } from '@/domains/evm/client/keyring';
 import { DEFAULT_EVM_PRIVATE_KEY_ID, DEFAULT_EVM_PRIVATE_KEY_NAME, DEFAULT_EVM_PRIVATE_KEY_VALUE, getDefaultAliceAddress } from '@/platform/workbench/defaults';
 
+const ADD_KEY_ACTION_VALUE = '__chaindev_add_evm_key__';
+
 type ActiveEvmKeySelectorProps = {
   variant?: 'default' | 'topbar-context';
 };
+
+type ActiveEvmKeySelectorSnapshot = {
+  items: EvmStoredPrivateKey[];
+  activeItem: EvmStoredPrivateKey | null;
+};
+
+let cachedActiveEvmKeySelectorSnapshot: ActiveEvmKeySelectorSnapshot | null = null;
 
 function formatAddressLabel(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-4)}`;
@@ -45,13 +56,16 @@ function getTopbarFallbackKey(): EvmStoredPrivateKey {
 }
 
 export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelectorProps) {
+  const router = useRouter();
   const { status } = useSession();
+  const { showToast } = useToast();
   const isAuthenticated = status === 'authenticated';
-  const [items, setItems] = useState<EvmStoredPrivateKey[]>([]);
-  const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(null);
+  const [items, setItems] = useState<EvmStoredPrivateKey[]>(() => cachedActiveEvmKeySelectorSnapshot?.items ?? []);
+  const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(() => cachedActiveEvmKeySelectorSnapshot?.activeItem ?? null);
   const hasPersistedItems = items.length > 0;
   const topbarItems = isAuthenticated ? items : items.length ? items : [getTopbarFallbackKey()];
   const topbarActiveItem = isAuthenticated ? activeItem : (activeItem ?? topbarItems[0] ?? null);
+  const showLoadingKeys = status === 'loading' && cachedActiveEvmKeySelectorSnapshot == null;
 
   useEffect(() => {
     if (status === 'loading') {
@@ -65,8 +79,15 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
         return;
       }
 
-      setItems(listEvmStoredPrivateKeys());
-      setActiveItem(getActiveEvmStoredPrivateKey());
+      const nextItems = listEvmStoredPrivateKeys();
+      const nextActiveItem = getActiveEvmStoredPrivateKey();
+
+      cachedActiveEvmKeySelectorSnapshot = {
+        items: nextItems,
+        activeItem: nextActiveItem,
+      };
+      setItems(nextItems);
+      setActiveItem(nextActiveItem);
     }
 
     async function bootstrap() {
@@ -84,18 +105,39 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
     };
   }, [status]);
 
-  const manageHref = status === 'authenticated' ? '/evm/settings/private-keys' : '/login?callbackUrl=%2Fevm%2Fsettings%2Fprivate-keys';
+  const manageHref = status === 'authenticated' ? '/settings/private-keys' : '/login?callbackUrl=%2Fsettings%2Fprivate-keys';
+
+  function handleOpenKeySettings() {
+    if (!isAuthenticated) {
+      showToast({
+        title: 'Login required',
+        description: 'Sign in before adding a private key.',
+        tone: 'info',
+      });
+      return;
+    }
+
+    router.push('/settings/private-keys');
+  }
 
   if (!items.length) {
     if (variant === 'topbar-context') {
       return (
         <div className="min-w-0 shrink-0">
-          <Select value={topbarActiveItem?.id} disabled>
+          <Select
+            value={topbarActiveItem?.id}
+            disabled={showLoadingKeys}
+            onValueChange={(value) => {
+              if (value === ADD_KEY_ACTION_VALUE) {
+                handleOpenKeySettings();
+              }
+            }}
+          >
             <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] font-normal leading-none shadow-none focus:ring-0">
               <div className="flex min-w-0 items-center gap-1.5">
                 <IconKey className="size-3.5 shrink-0 text-slate-500" stroke={2} />
                 <span className="truncate">
-                  {status === 'loading' || isAuthenticated ? (topbarActiveItem?.name ?? 'Loading keys...') : (topbarActiveItem?.name ?? DEFAULT_EVM_PRIVATE_KEY_NAME)}
+                  {showLoadingKeys ? 'Loading keys...' : (topbarActiveItem?.name ?? (isAuthenticated ? 'No key' : DEFAULT_EVM_PRIVATE_KEY_NAME))}
                 </span>
               </div>
             </SelectTrigger>
@@ -105,13 +147,20 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
                   {`${item.name} · ${formatAddressLabel(item.address)}`}
                 </SelectItem>
               ))}
+              <SelectSeparator />
+              <SelectItem value={ADD_KEY_ACTION_VALUE} className="rounded-none py-2.5">
+                <span className="flex items-center gap-2">
+                  <IconPlus className="size-4" stroke={2} />
+                  <span>Add key</span>
+                </span>
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
       );
     }
 
-    if (status === 'loading' || isAuthenticated) {
+    if (showLoadingKeys) {
       return (
         <Button variant="ghost" disabled className="h-8 gap-1.5 px-2 text-[13px] font-normal text-slate-500">
           <IconKey className="size-4" stroke={2} />
@@ -121,7 +170,7 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
     }
 
     return (
-      <Link href="/evm/settings/private-keys">
+      <Link href="/settings/private-keys">
         <Button variant="ghost" className="h-8 gap-1.5 px-2 text-[13px] font-normal text-slate-700">
           <IconKey className="size-4" stroke={2} />
           No Key
@@ -135,8 +184,13 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
       <div className="min-w-0 shrink-0">
         <Select
           value={topbarActiveItem?.id}
-          disabled={!hasPersistedItems}
+          disabled={showLoadingKeys}
           onValueChange={(value) => {
+            if (value === ADD_KEY_ACTION_VALUE) {
+              handleOpenKeySettings();
+              return;
+            }
+
             setActiveEvmStoredPrivateKey(value);
           }}
         >
@@ -152,6 +206,13 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
                 {`${item.name} · ${formatAddressLabel(item.address)}`}
               </SelectItem>
             ))}
+            <SelectSeparator />
+            <SelectItem value={ADD_KEY_ACTION_VALUE} className="rounded-none py-2.5">
+              <span className="flex items-center gap-2">
+                <IconPlus className="size-4" stroke={2} />
+                <span>Add key</span>
+              </span>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>

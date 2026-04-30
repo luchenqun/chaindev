@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCurrencyEthereum, IconPencil, IconTrash, IconWorld } from '@tabler/icons-react';
+import { IconCurrencyEthereum, IconPencil, IconPlus, IconTrash, IconWorld } from '@tabler/icons-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
 import {
   clearActiveRpcProfileCookie,
   createRpcProfile,
@@ -26,10 +27,20 @@ import {
 import type { RpcProfile, RpcProfileDraft, SelectedRpcProfileMap } from '@/platform/workbench/rpc-profile';
 import { getDefaultGuestRpcProfiles, getDefaultGuestSelectedRpcProfiles } from '@/platform/workbench/defaults';
 
+const ADD_PROVIDER_ACTION_VALUE = '__chaindev_add_provider__';
+
 type RpcProviderManagerProps = {
   mode: PlatformMode;
   variant?: 'compact' | 'topbar-context' | 'page';
 };
+
+type RpcProviderManagerSnapshot = {
+  profiles: RpcProfile[];
+  selected: SelectedRpcProfileMap;
+  source: 'guest' | 'server';
+};
+
+let cachedRpcProviderManagerSnapshot: RpcProviderManagerSnapshot | null = null;
 
 type DraftState = {
   mode: PlatformMode;
@@ -125,17 +136,18 @@ function renderProviderOption(profile: RpcProfile) {
 export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderManagerProps) {
   const router = useRouter();
   const { status } = useSession();
+  const { showToast } = useToast();
   const isAuthenticated = status === 'authenticated';
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => cachedRpcProviderManagerSnapshot == null);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<RpcProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [profiles, setProfiles] = useState<RpcProfile[]>([]);
-  const [selected, setSelected] = useState<SelectedRpcProfileMap>({});
-  const [source, setSource] = useState<'guest' | 'server'>('guest');
+  const [profiles, setProfiles] = useState<RpcProfile[]>(() => cachedRpcProviderManagerSnapshot?.profiles ?? []);
+  const [selected, setSelected] = useState<SelectedRpcProfileMap>(() => cachedRpcProviderManagerSnapshot?.selected ?? {});
+  const [source, setSource] = useState<'guest' | 'server'>(() => cachedRpcProviderManagerSnapshot?.source ?? 'guest');
   const [draft, setDraft] = useState<DraftState>(getInitialDraft(mode));
   const hasPersistedProfiles = profiles.length > 0;
   const topbarProfiles = useMemo(() => (isAuthenticated ? profiles : profiles.length ? profiles : getDefaultGuestRpcProfiles()), [isAuthenticated, profiles]);
@@ -146,6 +158,7 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
 
   const activeProfile = useMemo(() => getPreferredProfile(mode, profiles, selected), [mode, profiles, selected]);
   const topbarActiveProfile = useMemo(() => getPreferredProfile(mode, topbarProfiles, topbarSelected), [mode, topbarProfiles, topbarSelected]);
+  const showLoadingProviders = (status === 'loading' || loading) && cachedRpcProviderManagerSnapshot == null;
   const sortedProfiles = useMemo(
     () =>
       [...profiles].sort((left, right) => {
@@ -181,7 +194,9 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
     let cancelled = false;
 
     async function load() {
-      setLoading(true);
+      if (!cachedRpcProviderManagerSnapshot && profiles.length === 0) {
+        setLoading(true);
+      }
 
       try {
         const data = await fetchRpcProfiles({ authenticated: status === 'authenticated' });
@@ -190,6 +205,11 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
           return;
         }
 
+        cachedRpcProviderManagerSnapshot = {
+          profiles: data.profiles,
+          selected: data.selected,
+          source: data.source === 'server' ? 'server' : 'guest',
+        };
         setProfiles(data.profiles);
         setSelected(data.selected);
         setSource(data.source === 'server' ? 'server' : 'guest');
@@ -248,6 +268,19 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
   function goToLogin() {
     const callbackUrl = encodeURIComponent(window.location.pathname);
     router.push(`/login?callbackUrl=${callbackUrl}`);
+  }
+
+  function handleOpenProviderSettings() {
+    if (status !== 'authenticated') {
+      showToast({
+        title: 'Login required',
+        description: 'Sign in before adding a provider.',
+        tone: 'info',
+      });
+      return;
+    }
+
+    router.push('/settings/providers');
   }
 
   function handleOpenCreate() {
@@ -635,8 +668,13 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
       <div className="min-w-0 shrink-0">
         <Select
           value={topbarActiveProfile?.id}
-          disabled={loading || !hasPersistedProfiles}
+          disabled={showLoadingProviders}
           onValueChange={(value) => {
+            if (value === ADD_PROVIDER_ACTION_VALUE) {
+              handleOpenProviderSettings();
+              return;
+            }
+
             const profile = topbarSortedProfiles.find((item) => item.id === value) ?? null;
             handleUse(profile);
           }}
@@ -648,7 +686,7 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
                 <span className="truncate">{`${getModeLabel(topbarActiveProfile.mode)} · ${topbarActiveProfile.name}`}</span>
               </span>
             ) : (
-              <span className="truncate">{loading ? 'Loading providers...' : 'No provider'}</span>
+              <span className="truncate">{showLoadingProviders ? 'Loading providers...' : 'No provider'}</span>
             )}
           </SelectTrigger>
           <SelectContent className="min-w-[26rem] max-w-[min(40rem,calc(100vw-2rem))]">
@@ -661,6 +699,13 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
                 {renderProviderOption(profile)}
               </SelectItem>
             ))}
+            <SelectSeparator />
+            <SelectItem value={ADD_PROVIDER_ACTION_VALUE} className="items-center rounded-none py-2.5">
+              <span className="flex items-center gap-2">
+                <IconPlus className="size-4" stroke={2} />
+                <span>Add provider</span>
+              </span>
+            </SelectItem>
           </SelectContent>
         </Select>
       </div>

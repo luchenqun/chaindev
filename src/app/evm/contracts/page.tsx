@@ -1572,7 +1572,7 @@ export default function EvmContractsRegistryPage() {
             {!activeKey ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                 Select a global private key first from{' '}
-                <Link href="/evm/settings/private-keys" className="font-semibold underline underline-offset-2">
+                <Link href="/settings/private-keys" className="font-semibold underline underline-offset-2">
                   Settings / Private Keys
                 </Link>
                 .

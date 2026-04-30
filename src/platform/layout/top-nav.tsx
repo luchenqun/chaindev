@@ -108,7 +108,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const userMenuActive = userMenuSections.some((section) => section.items.some((item) => matchesNavItem(pathname, item.href)));
 
   return (
-    <header className="mb-4 border-b border-slate-200 bg-white">
+    <header className="sticky top-0 z-40 mb-4 border-b border-slate-200 bg-white">
       <div className="mx-auto grid max-w-[1400px] gap-3 px-3 py-2 text-xs text-slate-500 lg:grid-cols-[auto_minmax(320px,1fr)_auto] lg:items-center">
         <ChainStatusStrip mode={mode} />
         <div className="flex justify-end">

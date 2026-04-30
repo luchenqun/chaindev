@@ -53,7 +53,7 @@ type ProtectedActionState = {
   item: EvmStoredPrivateKey;
 } | null;
 
-export default function EvmPrivateKeysPage() {
+export default function PrivateKeysPage() {
   const router = useRouter();
   const { status } = useSession();
   const { showToast } = useToast();
@@ -111,7 +111,7 @@ export default function EvmPrivateKeysPage() {
   const isUsingFallback = source !== 'server';
 
   function goToLogin() {
-    router.push('/login?callbackUrl=%2Fevm%2Fsettings%2Fprivate-keys');
+    router.push('/login?callbackUrl=%2Fsettings%2Fprivate-keys');
   }
 
   function resetImportForm() {
