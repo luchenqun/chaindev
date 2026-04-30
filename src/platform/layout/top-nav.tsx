@@ -1,6 +1,6 @@
 'use client';
 
-import { IconChevronDown, IconLogout, IconSend, IconUserCircle } from '@tabler/icons-react';
+import { IconChevronDown, IconCloudCode, IconLogout, IconSend, IconUserCircle } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -19,6 +19,7 @@ import { RpcProviderManager } from '@/platform/workbench/rpc-provider-manager';
 type NavItem = {
   href: string;
   label: string;
+  icon?: typeof IconSend;
 };
 
 function inferMode(pathname: string): PlatformMode {
@@ -106,7 +107,10 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
         ];
   const userMenuSections = getAccountMenuSections(mode);
   const userMenuActive = userMenuSections.some((section) => section.items.some((item) => matchesNavItem(pathname, item.href)));
-  const cosmosMoreItems: NavItem[] = [{ href: '/cosmos/tools/send-tx', label: 'Send Transaction' }];
+  const cosmosMoreItems: NavItem[] = [
+    { href: '/cosmos/tools/send-tx', label: 'Send Transaction', icon: IconSend },
+    { href: '/cosmos/tools/rest', label: 'REST API', icon: IconCloudCode },
+  ];
   const cosmosMoreActive = mode === 'cosmos' && cosmosMoreItems.some((item) => matchesNavItem(pathname, item.href));
 
   return (
@@ -168,6 +172,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                       <div className="mt-1.5 space-y-0.5">
                         {cosmosMoreItems.map((item) => {
                           const itemActive = matchesNavItem(pathname, item.href);
+                          const Icon = item.icon ?? IconSend;
 
                           return (
                             <Link
@@ -180,7 +185,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                                   : 'flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-[450] text-slate-700 hover:bg-slate-100 hover:text-[#1697ea]'
                               }
                             >
-                              <IconSend className="size-4 shrink-0" stroke={1.9} />
+                              <Icon className="size-4 shrink-0" stroke={1.9} />
                               {item.label}
                             </Link>
                           );

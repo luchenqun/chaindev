@@ -1,0 +1,334 @@
+swagger: "2.0"
+info:
+  title: Quarix REST API
+  version: "1.0"
+  description: REST query endpoints generated from Quarix query.proto files.
+schemes:
+  - http
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /quarix/staking/v1/investment_program_pools:
+    get:
+      tags:
+        - quarix.staking.v1
+      operationId: InvestmentProgramPools
+      summary: InvestmentProgramPools queries investment program pools.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/staking/v1/allocate_investment_program_pools:
+    get:
+      tags:
+        - quarix.staking.v1
+      operationId: AllocateInvestmentProgramPools
+      summary: AllocateInvestmentProgramPools queries allocated investment program pools.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/staking/v1/max_commission_rate_frequency:
+    get:
+      tags:
+        - quarix.staking.v1
+      operationId: MaxCommissionRateFrequency
+      summary: MaxCommissionRateFrequency queries the max commission rate update frequency.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gov/v1/veto_params:
+    get:
+      tags:
+        - quarix.gov.v1
+      operationId: VetoParams
+      summary: VetoParams queries veto parameters.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gov/v1/penalty_pool:
+    get:
+      tags:
+        - quarix.gov.v1
+      operationId: PenaltyPool
+      summary: PenaltyPool queries the penalty pool address.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gov/v1/proposals/{proposal_id}/veto:
+    get:
+      tags:
+        - quarix.gov.v1
+      operationId: ProposalVeto
+      summary: ProposalVeto queries proposal veto information.
+      parameters:
+        - name: proposal_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gov/v1/proposals/{proposal_id}/details:
+    get:
+      tags:
+        - quarix.gov.v1
+      operationId: ProposalDetails
+      summary: ProposalDetails queries proposal details and custom status.
+      parameters:
+        - name: proposal_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gaswaiver/v1/params:
+    get:
+      tags:
+        - quarix.gaswaiver.v1
+      operationId: Params
+      summary: Params queries gaswaiver parameters.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gaswaiver/v1/gas_waiver_granter_info:
+    get:
+      tags:
+        - quarix.gaswaiver.v1
+      operationId: GasWaiverGranterInfo
+      summary: GasWaiverGranterInfo queries gas waiver granter info for a contract.
+      parameters:
+        - name: contract
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gaswaiver/v1/normal_gas_waiver:
+    get:
+      tags:
+        - quarix.gaswaiver.v1
+      operationId: NormalGasWaiver
+      summary: NormalGasWaiver queries the normal gas waiver for a contract.
+      parameters:
+        - name: contract
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gaswaiver/v1/normal_gas_waiver_meter:
+    get:
+      tags:
+        - quarix.gaswaiver.v1
+      operationId: NormalGasWaiverMeter
+      summary: NormalGasWaiverMeter queries the normal gas waiver meter for an account and contract.
+      parameters:
+        - name: grantee
+          in: query
+          required: true
+          type: string
+        - name: contract
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gaswaiver/v1/gas_waiver_applications:
+    get:
+      tags:
+        - quarix.gaswaiver.v1
+      operationId: GasWaiverApplications
+      summary: GasWaiverApplications queries gas waiver application items.
+      parameters:
+        - name: granter
+          in: query
+          required: false
+          type: string
+        - name: owner
+          in: query
+          required: false
+          type: string
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gaswaiver/v1/premium_gas_waiver:
+    get:
+      tags:
+        - quarix.gaswaiver.v1
+      operationId: PremiumGasWaiver
+      summary: PremiumGasWaiver queries the premium gas waiver for a contract and account.
+      parameters:
+        - name: contract
+          in: query
+          required: true
+          type: string
+        - name: grantee
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gaswaiver/v1/premium_gas_waiver_meter:
+    get:
+      tags:
+        - quarix.gaswaiver.v1
+      operationId: PremiumGasWaiverMeter
+      summary: PremiumGasWaiverMeter queries the premium gas waiver meter for an account and contract.
+      parameters:
+        - name: grantee
+          in: query
+          required: true
+          type: string
+        - name: contract
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/gaswaiver/v1/normal_gas_waivers:
+    get:
+      tags:
+        - quarix.gaswaiver.v1
+      operationId: NormalGasWaivers
+      summary: NormalGasWaivers queries normal gas waiver items.
+      parameters:
+        - name: owner
+          in: query
+          required: false
+          type: string
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/distribution/v1/royalty_fee:
+    get:
+      tags:
+        - quarix.distribution.v1
+      operationId: RoyaltyFee
+      summary: RoyaltyFee queries royalty fee.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/blacklist/v1/in_blacklist/{address}:
+    get:
+      tags:
+        - quarix.blacklist.v1
+      operationId: InBlacklist
+      summary: InBlacklist checks whether an address is blacklisted.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /quarix/blacklist/v1/blacklists:
+    get:
+      tags:
+        - quarix.blacklist.v1
+      operationId: Blacklists
+      summary: Blacklists queries all blacklisted addresses.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+parameters:
+  PaginationKey:
+    name: pagination.key
+    in: query
+    required: false
+    type: string
+    format: byte
+  PaginationOffset:
+    name: pagination.offset
+    in: query
+    required: false
+    type: string
+    format: uint64
+  PaginationLimit:
+    name: pagination.limit
+    in: query
+    required: false
+    type: string
+    format: uint64
+  PaginationCountTotal:
+    name: pagination.count_total
+    in: query
+    required: false
+    type: boolean
+  PaginationReverse:
+    name: pagination.reverse
+    in: query
+    required: false
+    type: boolean
