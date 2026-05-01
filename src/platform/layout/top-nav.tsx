@@ -4,15 +4,15 @@ import { IconChevronDown, IconCloudCode, IconLogout, IconRepeat, IconSend, IconU
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { type PlatformMode } from '@/config/chains';
 import { getMessages } from '@/i18n';
 import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 import { getAccountMenuSections } from '@/platform/layout/account-menu-config';
-import { ChainStatusStrip } from '@/platform/layout/chain-status-strip';
 import { ActiveEvmKeySelector } from '@/platform/layout/active-evm-key-selector';
+import { ChainStatusStrip } from '@/platform/layout/chain-status-strip';
 import { GlobalSearch } from '@/platform/search/global-search';
 import { RpcProviderManager } from '@/platform/workbench/rpc-provider-manager';
 
@@ -27,6 +27,8 @@ type NavGroup = {
   label: string;
   items: NavItem[];
 };
+
+const NAV_CLOSE_DELAY_MS = 300;
 
 function inferMode(pathname: string): PlatformMode {
   return pathname.startsWith('/cosmos') ? 'cosmos' : 'evm';
@@ -98,8 +100,10 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const router = useRouter();
   const mode = modeOverride ?? inferMode(pathname);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
   const { data: session, status } = useSession();
   const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? session?.user?.email ?? 'Account';
+
   const primaryNavItems: NavItem[] =
     mode === 'cosmos'
       ? [
@@ -116,8 +120,10 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           { href: '/evm/accounts', label: 'Accounts' },
           { href: '/evm/contracts', label: messages.navigation.contracts },
         ];
+
   const userMenuSections = getAccountMenuSections(mode);
   const userMenuActive = userMenuSections.some((section) => section.items.some((item) => matchesNavItem(pathname, item.href)));
+
   const moreGroups: NavGroup[] =
     mode === 'cosmos'
       ? [
@@ -132,9 +138,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           {
             id: 'tools',
             label: 'Tools',
-            items: [
-              { href: '/cosmos/tools/bech32', label: 'Bech32', icon: IconRepeat },
-            ],
+            items: [{ href: '/cosmos/tools/bech32', label: 'Bech32', icon: IconRepeat }],
           },
         ]
       : [
@@ -151,12 +155,42 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             label: 'Tools',
             items: [
               { href: '/evm/tools/decode', label: 'Input Data Decoder', icon: IconRepeat },
+              { href: '/evm/tools/unit-converter', label: 'Unit Converter', icon: IconRepeat },
               { href: '/evm/tools/bech32', label: 'Bech32', icon: IconRepeat },
             ],
           },
         ];
+
   const moreItems = moreGroups.flatMap((group) => group.items);
   const moreActive = moreItems.some((item) => matchesNavItem(pathname, item.href));
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function cancelScheduledClose() {
+    if (closeTimeoutRef.current !== null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+  }
+
+  function openMenu(groupId: string) {
+    cancelScheduledClose();
+    setOpenGroup(groupId);
+  }
+
+  function scheduleClose(groupId: string) {
+    cancelScheduledClose();
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setOpenGroup((current) => (current === groupId ? null : current));
+      closeTimeoutRef.current = null;
+    }, NAV_CLOSE_DELAY_MS);
+  }
 
   return (
     <header className="sticky top-0 z-40 mb-4 border-b border-slate-200 bg-white">
@@ -195,7 +229,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 </Link>
               );
             })}
-            <div className="relative" onMouseEnter={() => setOpenGroup('tools-more')} onMouseLeave={() => setOpenGroup((current) => (current === 'tools-more' ? null : current))}>
+            <div className="relative" onMouseEnter={() => openMenu('tools-more')} onMouseLeave={() => scheduleClose('tools-more')}>
               <button
                 type="button"
                 className={
@@ -209,43 +243,44 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 <IconChevronDown className="size-3.5" stroke={2.2} />
               </button>
               {openGroup === 'tools-more' ? (
-                <div className="absolute right-0 top-full z-20 w-[720px] overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
-                  <div className="border-t-[3px] border-[#19a7f2]" />
-                  <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-0">
-                    <div className="bg-slate-50 px-6 py-6">
-                      <div className="text-[15px] font-semibold text-slate-950">More</div>
-                      <p className="mt-3 text-[14px] leading-6 text-slate-600">
-                        Discover chain actions and utility tools in one place.
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-8 px-6 py-6">
-                      {moreGroups.map((group) => (
-                        <div key={group.id} className="min-w-0">
-                          <div className="text-[15px] font-semibold text-slate-950">{group.label}</div>
-                          <div className="mt-3 space-y-1">
-                            {group.items.map((item) => {
-                              const itemActive = matchesNavItem(pathname, item.href);
-                              const Icon = item.icon ?? IconSend;
+                <div className="absolute right-0 top-full z-20 pt-2" onMouseEnter={cancelScheduledClose} onMouseLeave={() => scheduleClose('tools-more')}>
+                  <div className="absolute inset-x-0 top-0 h-2" aria-hidden="true" />
+                  <div className="w-[720px] overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                    <div className="border-t-[3px] border-[#19a7f2]" />
+                    <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-0">
+                      <div className="bg-slate-50 px-6 py-6">
+                        <div className="text-[15px] font-semibold text-slate-950">More</div>
+                        <p className="mt-3 text-[14px] leading-6 text-slate-600">Discover chain actions and utility tools in one place.</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-5 px-6 py-5">
+                        {moreGroups.map((group) => (
+                          <div key={group.id} className="min-w-0">
+                            <div className="text-[15px] font-semibold text-slate-950">{group.label}</div>
+                            <div className="mt-2 space-y-0.5">
+                              {group.items.map((item) => {
+                                const itemActive = matchesNavItem(pathname, item.href);
+                                const Icon = item.icon ?? IconSend;
 
-                              return (
-                                <Link
-                                  prefetch={false}
-                                  key={item.href}
-                                  href={item.href}
-                                  className={
-                                    itemActive
-                                      ? 'flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-[450] text-[#1697ea]'
-                                      : 'flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-[450] text-slate-700 hover:bg-slate-100 hover:text-[#1697ea]'
-                                  }
-                                >
-                                  <Icon className="size-4 shrink-0" stroke={1.9} />
-                                  {item.label}
-                                </Link>
-                              );
-                            })}
+                                return (
+                                  <Link
+                                    prefetch={false}
+                                    key={item.href}
+                                    href={item.href}
+                                    className={
+                                      itemActive
+                                        ? 'flex items-center gap-2 rounded-lg px-2 py-1 text-[14px] font-[450] text-[#1697ea]'
+                                        : 'flex items-center gap-2 rounded-lg px-2 py-1 text-[14px] font-[450] text-slate-700 hover:bg-slate-100 hover:text-[#1697ea]'
+                                    }
+                                  >
+                                    <Icon className="size-4 shrink-0" stroke={1.9} />
+                                    {item.label}
+                                  </Link>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -255,7 +290,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
 
           <div className="relative flex flex-wrap items-center justify-end gap-3 pl-[8px] before:absolute before:left-[-8px] before:top-1/2 before:h-[14px] before:w-[1.5px] before:-translate-y-1/2 before:bg-slate-300">
             {status === 'authenticated' ? (
-              <div className="relative" onMouseEnter={() => setOpenGroup('user-menu')} onMouseLeave={() => setOpenGroup((current) => (current === 'user-menu' ? null : current))}>
+              <div className="relative" onMouseEnter={() => openMenu('user-menu')} onMouseLeave={() => scheduleClose('user-menu')}>
                 <button
                   type="button"
                   className={
@@ -270,51 +305,55 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                   <IconChevronDown className="size-3.5" stroke={2.2} />
                 </button>
                 {openGroup === 'user-menu' ? (
-                  <div className="absolute right-0 top-full z-20 min-w-[248px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
-                    <div className="border-t-[3px] border-[#19a7f2]" />
-                    <div className="px-3 pt-2 pb-0">
-                      {userMenuSections.map((section, sectionIndex) => (
-                        <div key={section.id} className={sectionIndex === 0 ? '' : 'border-t border-slate-200'}>
-                          {section.items.map((item) => {
-                            const itemActive = matchesNavItem(pathname, item.href);
+                  <div className="absolute right-0 top-full z-20 pt-2" onMouseEnter={cancelScheduledClose} onMouseLeave={() => scheduleClose('user-menu')}>
+                    <div className="absolute inset-x-0 top-0 h-2" aria-hidden="true" />
+                    <div className="min-w-[248px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                      <div className="border-t-[3px] border-[#19a7f2]" />
+                      <div className="px-3 pb-0 pt-2">
+                        {userMenuSections.map((section, sectionIndex) => (
+                          <div key={section.id} className={sectionIndex === 0 ? '' : 'border-t border-slate-200'}>
+                            {section.items.map((item) => {
+                              const itemActive = matchesNavItem(pathname, item.href);
 
-                            return (
-                              <Link prefetch={false}
-                                key={item.href}
-                                href={item.href}
-                                className={
-                                  itemActive
-                                    ? 'block rounded-lg px-3 py-2.5 text-[15px] font-[450] text-[#1697ea]'
-                                    : 'block rounded-lg px-3 py-2.5 text-[15px] font-[450] text-slate-950 hover:bg-slate-100 hover:text-black'
-                                }
-                              >
-                                {item.label}
-                              </Link>
-                            );
-                          })}
+                              return (
+                                <Link
+                                  prefetch={false}
+                                  key={item.href}
+                                  href={item.href}
+                                  className={
+                                    itemActive
+                                      ? 'block rounded-lg px-3 py-2.5 text-[15px] font-[450] text-[#1697ea]'
+                                      : 'block rounded-lg px-3 py-2.5 text-[15px] font-[450] text-slate-950 hover:bg-slate-100 hover:text-black'
+                                  }
+                                >
+                                  {item.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="px-3 pb-3">
+                        <div className="border-t border-slate-200 pt-3">
+                          <Button
+                            variant="outline"
+                            className="h-11 w-full gap-2 rounded-xl border-sky-300 text-[15px] font-semibold text-[#1697ea] hover:border-sky-400 hover:bg-sky-50 hover:text-[#1697ea]"
+                            onClick={() =>
+                              void (async () => {
+                                const callbackUrl = resolveAbsoluteCallbackUrl('/');
+                                const result = await signOut({
+                                  redirect: false,
+                                  callbackUrl,
+                                });
+                                router.push(resolveClientRedirectUrl(result.url, callbackUrl));
+                                router.refresh();
+                              })()
+                            }
+                          >
+                            <IconLogout className="size-4" stroke={2} />
+                            Sign Out
+                          </Button>
                         </div>
-                      ))}
-                    </div>
-                    <div className="px-3 pb-3">
-                      <div className="border-t border-slate-200 pt-3">
-                        <Button
-                          variant="outline"
-                          className="h-11 w-full gap-2 rounded-xl border-sky-300 text-[15px] font-semibold text-[#1697ea] hover:border-sky-400 hover:bg-sky-50 hover:text-[#1697ea]"
-                          onClick={() =>
-                            void (async () => {
-                              const callbackUrl = resolveAbsoluteCallbackUrl('/');
-                              const result = await signOut({
-                                redirect: false,
-                                callbackUrl,
-                              });
-                              router.push(resolveClientRedirectUrl(result.url, callbackUrl));
-                              router.refresh();
-                            })()
-                          }
-                        >
-                          <IconLogout className="size-4" stroke={2} />
-                          Sign Out
-                        </Button>
                       </div>
                     </div>
                   </div>
