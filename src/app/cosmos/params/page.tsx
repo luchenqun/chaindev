@@ -295,6 +295,49 @@ function formatDistributionModule(module: CosmosParamsModuleResult): FormattedMo
   ];
 }
 
+function formatMintModule(module: CosmosParamsModuleResult): FormattedModuleSection[] | null {
+  const params = (module.data.params as Record<string, unknown> | undefined) ?? null;
+
+  if (!params) {
+    return null;
+  }
+
+  return [
+    {
+      fields: [
+        {
+          label: 'Mint Denom',
+          value: typeof params.mint_denom === 'string' ? formatReadableDenom(params.mint_denom) : '--',
+        },
+        {
+          label: 'Inflation Rate Change',
+          value: formatPercentText(typeof params.inflation_rate_change === 'string' ? params.inflation_rate_change : undefined),
+        },
+        {
+          label: 'Inflation Max',
+          value: formatPercentText(typeof params.inflation_max === 'string' ? params.inflation_max : undefined),
+        },
+        {
+          label: 'Inflation Min',
+          value: formatPercentText(typeof params.inflation_min === 'string' ? params.inflation_min : undefined),
+        },
+        {
+          label: 'Goal Bonded',
+          value: formatPercentText(typeof params.goal_bonded === 'string' ? params.goal_bonded : undefined),
+        },
+        {
+          label: 'Blocks Per Year',
+          value: formatIntegerText(typeof params.blocks_per_year === 'string' ? params.blocks_per_year : undefined),
+        },
+        {
+          label: 'Max Supply',
+          value: typeof params.max_supply === 'string' ? formatIntegerText(params.max_supply) : '--',
+        },
+      ],
+    },
+  ];
+}
+
 function getGovParamsObject(value: unknown) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return null;
@@ -631,6 +674,8 @@ function formatModule(module: CosmosParamsModuleResult) {
       return formatConsensusModule(module);
     case 'distribution':
       return formatDistributionModule(module);
+    case 'mint':
+      return formatMintModule(module);
     case 'gov':
       return formatGovernanceModule(module);
     case 'evm-feemarket':
