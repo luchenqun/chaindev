@@ -3,6 +3,7 @@
 import { IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { parseEther } from 'viem';
 import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
@@ -27,8 +28,11 @@ type BroadcastProgress = {
 };
 
 type EvmSendTxFormCache = {
+  toMode?: 'fixed' | 'random';
   toAddress?: string;
+  valueMode?: 'fixed' | 'random';
   value?: string;
+  maxValue?: string;
   gasLimit?: string;
   repeatCount?: string;
   receiptPollIntervalMs?: string;
@@ -82,6 +86,71 @@ function normalizeTransactionData(value: string) {
   return trimmedValue;
 }
 
+function createRandomEvmAddress() {
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  return `0x${[...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function randomBigIntBetween(min: bigint, max: bigint) {
+  if (max < min) {
+    throw new Error('Max value must be greater than or equal to min value.');
+  }
+
+  if (max === min) {
+    return min;
+  }
+
+  const range = max - min + 1n;
+  const bitLength = range.toString(2).length;
+  const byteLength = Math.ceil(bitLength / 8);
+
+  while (true) {
+    const bytes = new Uint8Array(byteLength);
+    crypto.getRandomValues(bytes);
+
+    let candidate = 0n;
+
+    for (const byte of bytes) {
+      candidate = (candidate << 8n) + BigInt(byte);
+    }
+
+    if (candidate < range) {
+      return min + candidate;
+    }
+  }
+}
+
+function normalizeRandomValueRange(maxValue: string) {
+  const normalizedMaxValue = maxValue.trim();
+
+  if (!normalizedMaxValue) {
+    throw new Error('Max value is required for random value mode.');
+  }
+
+  const maxWei = parseEther(normalizedMaxValue);
+  const minWei = maxWei / 100n;
+
+  if (maxWei < minWei) {
+    throw new Error('Max value must be greater than or equal to min value.');
+  }
+
+  return {
+    minWei,
+    maxWei,
+  };
+}
+
+function formatRandomValueForSend(maxValue: string) {
+  const { minWei, maxWei } = normalizeRandomValueRange(maxValue);
+  const nextWei = randomBigIntBetween(minWei, maxWei);
+  const integerPart = nextWei / 10n ** 18n;
+  const fractionalPart = nextWei % 10n ** 18n;
+  const fractionalText = fractionalPart.toString().padStart(18, '0').replace(/0+$/, '');
+
+  return fractionalText ? `${integerPart}.${fractionalText}` : integerPart.toString();
+}
+
 function formatCompactHash(value: string, start = 10, end = 8) {
   if (value.length <= start + end + 3) {
     return value;
@@ -96,6 +165,36 @@ function resultToastDescription(hash: string) {
       {formatCompactHash(hash, 14, 10)}
     </Link>
   );
+}
+
+function InlineModeSelect({
+  value,
+  disabled,
+  onValueChange,
+}: {
+  value: 'fixed' | 'random';
+  disabled?: boolean;
+  onValueChange: (value: 'fixed' | 'random') => void;
+}) {
+  return (
+    <Select value={value} disabled={disabled} onValueChange={(nextValue) => onValueChange(nextValue as 'fixed' | 'random')}>
+      <SelectTrigger className="absolute left-1.5 top-1/2 h-[30px] w-[92px] -translate-y-1/2 border-0 bg-transparent px-2 text-xs font-medium text-slate-700 shadow-none ring-0 focus:ring-0 focus-visible:ring-0">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="fixed">Fixed</SelectItem>
+        <SelectItem value="random">Random</SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+function handleToModeChange(nextValue: 'fixed' | 'random', setToMode: (value: 'fixed' | 'random') => void, setToAddress: (value: string) => void) {
+  setToMode(nextValue);
+
+  if (nextValue === 'random') {
+    setToAddress('');
+  }
 }
 
 function readEvmSendTxFormCache(): EvmSendTxFormCache | null {
@@ -118,10 +217,15 @@ function readEvmSendTxFormCache(): EvmSendTxFormCache | null {
 
     const candidate = parsedValue as Record<string, unknown>;
     const transactionType = candidate.transactionType === 'LEGACY' || candidate.transactionType === 'EIP1559' ? candidate.transactionType : undefined;
+    const toMode = candidate.toMode === 'fixed' || candidate.toMode === 'random' ? candidate.toMode : undefined;
+    const valueMode = candidate.valueMode === 'fixed' || candidate.valueMode === 'random' ? candidate.valueMode : undefined;
 
     return {
+      toMode,
       toAddress: typeof candidate.toAddress === 'string' ? candidate.toAddress : undefined,
+      valueMode,
       value: typeof candidate.value === 'string' ? candidate.value : undefined,
+      maxValue: typeof candidate.maxValue === 'string' ? candidate.maxValue : undefined,
       gasLimit: typeof candidate.gasLimit === 'string' ? candidate.gasLimit : undefined,
       repeatCount: typeof candidate.repeatCount === 'string' ? candidate.repeatCount : undefined,
       receiptPollIntervalMs: typeof candidate.receiptPollIntervalMs === 'string' ? candidate.receiptPollIntervalMs : undefined,
@@ -149,8 +253,11 @@ function EvmSendTxContent() {
   const { showToast } = useToast();
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
   const [fromAddressCopied, setFromAddressCopied] = useState(false);
+  const [toMode, setToMode] = useState<'fixed' | 'random'>('fixed');
   const [toAddress, setToAddress] = useState('');
+  const [valueMode, setValueMode] = useState<'fixed' | 'random'>('fixed');
   const [value, setValue] = useState('');
+  const [maxValue, setMaxValue] = useState('');
   const [gasLimit, setGasLimit] = useState('');
   const [repeatCount, setRepeatCount] = useState('');
   const [receiptPollIntervalMs, setReceiptPollIntervalMs] = useState('');
@@ -195,12 +302,24 @@ function EvmSendTxContent() {
   useEffect(() => {
     const cache = readEvmSendTxFormCache();
 
+    if (cache?.toMode) {
+      setToMode(cache.toMode);
+    }
+
     if (typeof cache?.toAddress === 'string') {
       setToAddress(cache.toAddress);
     }
 
+    if (cache?.valueMode) {
+      setValueMode(cache.valueMode);
+    }
+
     if (typeof cache?.value === 'string') {
       setValue(cache.value);
+    }
+
+    if (typeof cache?.maxValue === 'string') {
+      setMaxValue(cache.maxValue);
     }
 
     if (typeof cache?.gasLimit === 'string') {
@@ -248,8 +367,11 @@ function EvmSendTxContent() {
     }
 
     writeEvmSendTxFormCache({
+      toMode,
       toAddress,
+      valueMode,
       value,
+      maxValue,
       gasLimit,
       repeatCount,
       receiptPollIntervalMs,
@@ -260,7 +382,7 @@ function EvmSendTxContent() {
       nonce,
       data,
     });
-  }, [data, formCacheLoaded, gasLimit, gasPrice, maxFeePerGas, maxPriorityFeePerGas, nonce, receiptPollIntervalMs, repeatCount, toAddress, transactionType, value]);
+  }, [data, formCacheLoaded, gasLimit, gasPrice, maxFeePerGas, maxPriorityFeePerGas, maxValue, nonce, receiptPollIntervalMs, repeatCount, toAddress, toMode, transactionType, value, valueMode]);
 
   async function handleCopyFromAddress() {
     if (!activeKey?.address) {
@@ -326,11 +448,14 @@ function EvmSendTxContent() {
 
         setBroadcastProgress((current) => (current ? { ...current, current: index + 1 } : current));
 
+        const nextToAddress = toMode === 'random' ? createRandomEvmAddress() : toAddress;
+        const nextValue = valueMode === 'random' ? formatRandomValueForSend(maxValue) : value;
+
         const result = await forceSendEvmTransactionDirect({
-          to: toAddress,
+          to: nextToAddress,
           privateKey,
           transactionType,
-          value,
+          value: nextValue,
           gasLimit,
           gasPrice,
           maxFeePerGas,
@@ -422,8 +547,11 @@ function EvmSendTxContent() {
   }
 
   function clearForm() {
+    setToMode('fixed');
     setToAddress('');
+    setValueMode('fixed');
     setValue('');
+    setMaxValue('');
     setGasLimit('');
     setRepeatCount('');
     setReceiptPollIntervalMs('');
@@ -568,7 +696,17 @@ function EvmSendTxContent() {
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-to">
                     To
                   </label>
-                  <Input id="evm-tx-to" value={toAddress} placeholder="0x..." disabled={submitting} className="mt-1" onChange={(event) => setToAddress(event.target.value)} />
+                  <div className="relative mt-1">
+                    <InlineModeSelect value={toMode} disabled={submitting} onValueChange={(nextValue) => handleToModeChange(nextValue, setToMode, setToAddress)} />
+                    <Input
+                      id="evm-tx-to"
+                      value={toAddress}
+                      placeholder={toMode === 'random' ? 'Generate a random address per send' : '0x...'}
+                      disabled={submitting}
+                      className="min-w-0 pl-[104px]"
+                      onChange={(event) => setToAddress(event.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="sm:col-span-2">
@@ -584,7 +722,25 @@ function EvmSendTxContent() {
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-value">
                     Value ({currencyName})
                   </label>
-                  <Input id="evm-tx-value" value={value} inputMode="decimal" placeholder="0" disabled={submitting} className="mt-1" onChange={(event) => setValue(event.target.value)} />
+                  {valueMode === 'fixed' ? (
+                    <div className="relative mt-1">
+                      <InlineModeSelect value={valueMode} disabled={submitting} onValueChange={setValueMode} />
+                      <Input
+                        id="evm-tx-value"
+                        value={value}
+                        inputMode="decimal"
+                        placeholder="0"
+                        disabled={submitting}
+                        className="min-w-0 pl-[104px]"
+                        onChange={(event) => setValue(event.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="relative mt-1">
+                      <InlineModeSelect value={valueMode} disabled={submitting} onValueChange={setValueMode} />
+                      <Input value={maxValue} inputMode="decimal" placeholder="Max" disabled={submitting} className="min-w-0 pl-[104px]" onChange={(event) => setMaxValue(event.target.value)} />
+                    </div>
+                  )}
                 </div>
 
                 <div>
