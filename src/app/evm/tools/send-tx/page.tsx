@@ -1,33 +1,731 @@
 'use client';
 
+import { IconCopy } from '@tabler/icons-react';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { copyText } from '@/components/ui/copy-text';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
+import { Input } from '@/components/ui/input';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
+import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/components/ui/toast';
+import { forceSendEvmTransactionDirect } from '@/domains/evm/client/contract-executor';
+import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
 import { AppShell } from '@/platform/layout/app-shell';
-import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 import { getEvmCurrencyName } from '@/platform/workbench/rpc-profile';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
-export default function EvmSendTxPage() {
+const EVM_SEND_TX_FORM_CACHE_KEY = 'evm-send-tx-form:v1';
+
+type BroadcastProgress = {
+  total: number;
+  completed: number;
+  current: number;
+  status: 'running' | 'cancel-requested' | 'stopped' | 'completed';
+};
+
+type EvmSendTxFormCache = {
+  toAddress?: string;
+  value?: string;
+  gasLimit?: string;
+  repeatCount?: string;
+  receiptPollIntervalMs?: string;
+  transactionType?: 'LEGACY' | 'EIP1559';
+  gasPrice?: string;
+  maxFeePerGas?: string;
+  maxPriorityFeePerGas?: string;
+  nonce?: string;
+  data?: string;
+};
+
+function parseRepeatCount(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return 1;
+  }
+
+  if (!/^\d+$/.test(trimmedValue)) {
+    throw new Error('Repeat count must be a positive integer.');
+  }
+
+  const parsedValue = Number.parseInt(trimmedValue, 10);
+
+  if (!Number.isSafeInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error('Repeat count must be a positive integer.');
+  }
+
+  return parsedValue;
+}
+
+function waitForUiRefresh() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.setTimeout(resolve, 0);
+    });
+  });
+}
+
+function normalizeTransactionData(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  if (!/^0x[0-9a-fA-F]*$/.test(trimmedValue) || trimmedValue.length % 2 !== 0) {
+    throw new Error('Transaction data must be a valid hex string.');
+  }
+
+  return trimmedValue;
+}
+
+function formatCompactHash(value: string, start = 10, end = 8) {
+  if (value.length <= start + end + 3) {
+    return value;
+  }
+
+  return `${value.slice(0, start)}...${value.slice(-end)}`;
+}
+
+function resultToastDescription(hash: string) {
+  return (
+    <Link className="block truncate font-mono text-xs font-medium text-sky-600 hover:text-sky-700" href={`/evm/tx/${hash}`} title={hash}>
+      {formatCompactHash(hash, 14, 10)}
+    </Link>
+  );
+}
+
+function readEvmSendTxFormCache(): EvmSendTxFormCache | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(EVM_SEND_TX_FORM_CACHE_KEY);
+
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(rawValue) as unknown;
+
+    if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+      return null;
+    }
+
+    const candidate = parsedValue as Record<string, unknown>;
+    const transactionType = candidate.transactionType === 'LEGACY' || candidate.transactionType === 'EIP1559' ? candidate.transactionType : undefined;
+
+    return {
+      toAddress: typeof candidate.toAddress === 'string' ? candidate.toAddress : undefined,
+      value: typeof candidate.value === 'string' ? candidate.value : undefined,
+      gasLimit: typeof candidate.gasLimit === 'string' ? candidate.gasLimit : undefined,
+      repeatCount: typeof candidate.repeatCount === 'string' ? candidate.repeatCount : undefined,
+      receiptPollIntervalMs: typeof candidate.receiptPollIntervalMs === 'string' ? candidate.receiptPollIntervalMs : undefined,
+      transactionType,
+      gasPrice: typeof candidate.gasPrice === 'string' ? candidate.gasPrice : undefined,
+      maxFeePerGas: typeof candidate.maxFeePerGas === 'string' ? candidate.maxFeePerGas : undefined,
+      maxPriorityFeePerGas: typeof candidate.maxPriorityFeePerGas === 'string' ? candidate.maxPriorityFeePerGas : undefined,
+      nonce: typeof candidate.nonce === 'string' ? candidate.nonce : undefined,
+      data: typeof candidate.data === 'string' ? candidate.data : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeEvmSendTxFormCache(cache: EvmSendTxFormCache) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(EVM_SEND_TX_FORM_CACHE_KEY, JSON.stringify(cache));
+}
+
+function EvmSendTxContent() {
+  const { showToast } = useToast();
+  const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
+  const [fromAddressCopied, setFromAddressCopied] = useState(false);
+  const [toAddress, setToAddress] = useState('');
+  const [value, setValue] = useState('');
+  const [gasLimit, setGasLimit] = useState('');
+  const [repeatCount, setRepeatCount] = useState('');
+  const [receiptPollIntervalMs, setReceiptPollIntervalMs] = useState('');
+  const [transactionType, setTransactionType] = useState<'LEGACY' | 'EIP1559'>('EIP1559');
+  const [gasPrice, setGasPrice] = useState('');
+  const [maxFeePerGas, setMaxFeePerGas] = useState('');
+  const [maxPriorityFeePerGas, setMaxPriorityFeePerGas] = useState('');
+  const [nonce, setNonce] = useState('');
+  const [data, setData] = useState('0x');
+  const [txResult, setTxResult] = useState<unknown>(null);
+  const [txResultVersion, setTxResultVersion] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [broadcastProgress, setBroadcastProgress] = useState<BroadcastProgress | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockError, setUnlockError] = useState<string | null>(null);
+  const copyButtonRef = useRef<HTMLButtonElement | null>(null);
+  const copyTimeoutRef = useRef<number | null>(null);
+  const stopRequestedRef = useRef(false);
+  const [formCacheLoaded, setFormCacheLoaded] = useState(false);
+
   const currencyName = getEvmCurrencyName(readActiveRpcProfileCookie('evm')?.nativeCurrencySymbol);
 
+  useEffect(() => {
+    function loadActiveKey() {
+      setActiveKey(getActiveEvmStoredPrivateKey());
+    }
+
+    loadActiveKey();
+    return subscribeEvmKeyring(loadActiveKey);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current != null) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const cache = readEvmSendTxFormCache();
+
+    if (typeof cache?.toAddress === 'string') {
+      setToAddress(cache.toAddress);
+    }
+
+    if (typeof cache?.value === 'string') {
+      setValue(cache.value);
+    }
+
+    if (typeof cache?.gasLimit === 'string') {
+      setGasLimit(cache.gasLimit);
+    }
+
+    if (typeof cache?.repeatCount === 'string') {
+      setRepeatCount(cache.repeatCount);
+    }
+
+    if (typeof cache?.receiptPollIntervalMs === 'string') {
+      setReceiptPollIntervalMs(cache.receiptPollIntervalMs);
+    }
+
+    if (cache?.transactionType) {
+      setTransactionType(cache.transactionType);
+    }
+
+    if (typeof cache?.gasPrice === 'string') {
+      setGasPrice(cache.gasPrice);
+    }
+
+    if (typeof cache?.maxFeePerGas === 'string') {
+      setMaxFeePerGas(cache.maxFeePerGas);
+    }
+
+    if (typeof cache?.maxPriorityFeePerGas === 'string') {
+      setMaxPriorityFeePerGas(cache.maxPriorityFeePerGas);
+    }
+
+    if (typeof cache?.nonce === 'string') {
+      setNonce(cache.nonce);
+    }
+
+    if (typeof cache?.data === 'string') {
+      setData(cache.data);
+    }
+
+    setFormCacheLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!formCacheLoaded) {
+      return;
+    }
+
+    writeEvmSendTxFormCache({
+      toAddress,
+      value,
+      gasLimit,
+      repeatCount,
+      receiptPollIntervalMs,
+      transactionType,
+      gasPrice,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+      nonce,
+      data,
+    });
+  }, [data, formCacheLoaded, gasLimit, gasPrice, maxFeePerGas, maxPriorityFeePerGas, nonce, receiptPollIntervalMs, repeatCount, toAddress, transactionType, value]);
+
+  async function handleCopyFromAddress() {
+    if (!activeKey?.address) {
+      return;
+    }
+
+    await copyText(activeKey.address);
+    setFromAddressCopied(true);
+
+    if (copyTimeoutRef.current != null) {
+      window.clearTimeout(copyTimeoutRef.current);
+    }
+
+    copyTimeoutRef.current = window.setTimeout(() => {
+      setFromAddressCopied(false);
+      copyTimeoutRef.current = null;
+    }, 1600);
+  }
+
+  async function submit(password?: string) {
+    if (!activeKey) {
+      setFormError('Select a global private key first.');
+      return;
+    }
+
+    setSubmitting(true);
+    setFormError(null);
+    setTxResult(null);
+    setTxResultVersion(0);
+    stopRequestedRef.current = false;
+
+    try {
+      const totalCount = parseRepeatCount(repeatCount);
+      setBroadcastProgress(
+        totalCount > 1
+          ? {
+              total: totalCount,
+              completed: 0,
+              current: 1,
+              status: 'running',
+            }
+          : null,
+      );
+
+      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
+      const normalizedData = normalizeTransactionData(data);
+      const results: Array<{
+        hash: string;
+        receipt: {
+          status: string;
+          blockNumber: string;
+          blockTimestamp: number;
+          gasUsed: string;
+          effectiveGasPrice: string;
+        };
+      }> = [];
+
+      for (let index = 0; index < totalCount; index += 1) {
+        if (stopRequestedRef.current) {
+          setBroadcastProgress((current) => (current ? { ...current, status: 'stopped' } : current));
+          break;
+        }
+
+        setBroadcastProgress((current) => (current ? { ...current, current: index + 1 } : current));
+
+        const result = await forceSendEvmTransactionDirect({
+          to: toAddress,
+          privateKey,
+          transactionType,
+          value,
+          gasLimit,
+          gasPrice,
+          maxFeePerGas,
+          maxPriorityFeePerGas,
+          nonce,
+          data: normalizedData,
+          receiptPollIntervalMs,
+        });
+
+        const encodedResult = {
+          hash: result.hash,
+          receipt: {
+            status: result.receipt.status,
+            blockNumber: result.receipt.blockNumber,
+            blockTimestamp: result.receipt.blockTimestamp,
+            gasUsed: result.receipt.gasUsed,
+            effectiveGasPrice: result.receipt.effectiveGasPrice,
+          },
+        };
+
+        results.push(encodedResult);
+        setTxResult(encodedResult);
+        setTxResultVersion(index + 1);
+        setBroadcastProgress((current) => (current ? { ...current, completed: index + 1 } : current));
+
+        if (stopRequestedRef.current) {
+          setBroadcastProgress((current) => (current ? { ...current, status: 'stopped' } : current));
+          break;
+        }
+
+        if (index < totalCount - 1) {
+          await waitForUiRefresh();
+        }
+      }
+
+      if (results.length === 0) {
+        return;
+      }
+
+      if (totalCount > 1 && !stopRequestedRef.current) {
+        setBroadcastProgress((current) => (current ? { ...current, status: 'completed' } : current));
+      }
+
+      const latestResult = results[results.length - 1];
+
+      showToast({
+        title:
+          totalCount > 1
+            ? stopRequestedRef.current
+              ? 'Transactions stopped'
+              : 'Transactions sent'
+            : 'Transaction sent',
+        description: resultToastDescription(latestResult.hash),
+        tone: latestResult.receipt.status === 'success' ? 'success' : 'info',
+        durationMs: 8000,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to send transaction.';
+
+      if (message === 'Password is required.') {
+        setUnlockPassword('');
+        setUnlockError(null);
+        setUnlockDialogOpen(true);
+        return;
+      }
+
+      setFormError(message);
+    } finally {
+      setSubmitting(false);
+      stopRequestedRef.current = false;
+    }
+  }
+
+  async function handleConfirmUnlock() {
+    if (!activeKey) {
+      return;
+    }
+
+    try {
+      await resolveEvmStoredPrivateKey(activeKey.id, unlockPassword);
+      setUnlockDialogOpen(false);
+      const password = unlockPassword;
+      setUnlockPassword('');
+      setUnlockError(null);
+      await submit(password);
+    } catch (error) {
+      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+    }
+  }
+
+  function clearForm() {
+    setToAddress('');
+    setValue('');
+    setGasLimit('');
+    setRepeatCount('');
+    setReceiptPollIntervalMs('');
+    setTransactionType('EIP1559');
+    setGasPrice('');
+    setMaxFeePerGas('');
+    setMaxPriorityFeePerGas('');
+    setNonce('');
+    setData('0x');
+    setTxResult(null);
+    setBroadcastProgress(null);
+    setFormError(null);
+  }
+
+  function handleStopBroadcast() {
+    stopRequestedRef.current = true;
+    setBroadcastProgress((current) => (current ? { ...current, status: 'cancel-requested' } : current));
+  }
+
+  const latestTxHash =
+    txResult && typeof txResult === 'object' && 'hash' in txResult && typeof txResult.hash === 'string' ? txResult.hash : null;
+  const txResultRenderKey = latestTxHash ? `single:${txResultVersion}:${latestTxHash}` : `single:${txResultVersion}:empty`;
+  const progressPercent = broadcastProgress ? Math.min(100, Math.round((broadcastProgress.completed / broadcastProgress.total) * 100)) : 0;
+
   return (
-    <AppShell>
-      <main className="tool-card">
-        <span className="kicker">EVM Workbench</span>
-        <h1>Send Transaction Draft</h1>
-        <p>The first version provides a draft form that future signing, gas estimation, and persistence can build on.</p>
-        <form className="tool-form">
-          <div className="tool-form-grid">
-            <input placeholder="From Address" />
-            <input placeholder="To Address" />
+    <>
+      <main className="mx-auto max-w-[1400px] px-3 pb-10">
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
+          <div className="border-b border-slate-200 px-6 py-4">
+            <div className="flex min-w-0 items-center justify-between gap-4">
+              <div className="flex min-w-0 items-baseline gap-3">
+                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Send Transaction</h1>
+                <p className="min-w-0 truncate text-sm text-slate-500">Send EVM transactions with the selected provider.</p>
+              </div>
+              <span className="inline-flex min-w-0 shrink-0 items-center gap-1.5 truncate text-sm font-medium text-slate-700" title={activeKey?.address || undefined}>
+                {activeKey ? (
+                  <>
+                    <span className="font-mono text-xs text-sky-600">{formatCompactHash(activeKey.address, 12, 8)}</span>
+                    <span className="relative inline-flex shrink-0">
+                      <button
+                        ref={copyButtonRef}
+                        type="button"
+                        className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
+                        aria-label="Copy address"
+                        onClick={() => void handleCopyFromAddress()}
+                      >
+                        <IconCopy className="size-4" stroke={1.8} />
+                      </button>
+                      <FloatingTooltip open={fromAddressCopied} anchorRef={copyButtonRef} className="whitespace-nowrap border border-slate-200 bg-white text-slate-700">
+                        <span className="block whitespace-nowrap">Copied!</span>
+                      </FloatingTooltip>
+                    </span>
+                  </>
+                ) : (
+                  'No active address'
+                )}
+              </span>
+            </div>
           </div>
-          <div className="tool-form-grid">
-            <input placeholder={`Value in ${currencyName}`} />
-            <input placeholder="Gas Limit" />
+
+          <div className="space-y-6 px-6 py-6">
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-type">
+                      Transaction type
+                    </label>
+                    <Select value={transactionType} disabled={submitting} onValueChange={(value) => setTransactionType(value as 'LEGACY' | 'EIP1559')}>
+                      <SelectTrigger id="evm-tx-type" className="mt-1 h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EIP1559">EIP1559</SelectItem>
+                        <SelectItem value="LEGACY">Legacy</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-repeat-count">
+                    Repeat broadcasts
+                  </label>
+                  <Input
+                    id="evm-tx-repeat-count"
+                    value={repeatCount}
+                    inputMode="numeric"
+                    placeholder="e.g. 10"
+                    disabled={submitting}
+                    className="mt-1"
+                    onChange={(event) => setRepeatCount(event.target.value)}
+                  />
+                </div>
+
+                {transactionType === 'LEGACY' ? (
+                  <>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-gas-price">
+                        Gas price (Gwei)
+                      </label>
+                      <Input id="evm-tx-gas-price" value={gasPrice} inputMode="decimal" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setGasPrice(event.target.value)} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-max-fee">
+                        Max fee per gas (Gwei)
+                      </label>
+                      <Input
+                        id="evm-tx-max-fee"
+                        value={maxFeePerGas}
+                        inputMode="decimal"
+                        placeholder="Auto"
+                        disabled={submitting}
+                        className="mt-1"
+                        onChange={(event) => setMaxFeePerGas(event.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-max-priority-fee">
+                        Max priority fee (Gwei)
+                      </label>
+                      <Input
+                        id="evm-tx-max-priority-fee"
+                        value={maxPriorityFeePerGas}
+                        inputMode="decimal"
+                        placeholder="Auto"
+                        disabled={submitting}
+                        className="mt-1"
+                        onChange={(event) => setMaxPriorityFeePerGas(event.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-to">
+                    To
+                  </label>
+                  <Input id="evm-tx-to" value={toAddress} placeholder="0x..." disabled={submitting} className="mt-1" onChange={(event) => setToAddress(event.target.value)} />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-data">
+                    Data
+                  </label>
+                  <Input id="evm-tx-data" value={data} placeholder="0x" disabled={submitting} className="mt-1" onChange={(event) => setData(event.target.value)} />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-value">
+                    Value ({currencyName})
+                  </label>
+                  <Input id="evm-tx-value" value={value} inputMode="decimal" placeholder="0" disabled={submitting} className="mt-1" onChange={(event) => setValue(event.target.value)} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-gas-limit">
+                    Gas limit
+                  </label>
+                  <Input id="evm-tx-gas-limit" value={gasLimit} inputMode="numeric" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setGasLimit(event.target.value)} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-receipt-poll-interval">
+                    Receipt poll interval (ms)
+                  </label>
+                  <Input
+                    id="evm-tx-receipt-poll-interval"
+                    value={receiptPollIntervalMs}
+                    inputMode="numeric"
+                    placeholder="Optional"
+                    disabled={submitting}
+                    className="mt-1"
+                    onChange={(event) => setReceiptPollIntervalMs(event.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-nonce">
+                    Nonce
+                  </label>
+                  <Input id="evm-tx-nonce" value={nonce} inputMode="numeric" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setNonce(event.target.value)} />
+                </div>
+
+                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{formError}</p> : null}
+              </div>
+
+              {broadcastProgress ? (
+                <div className="space-y-2 border-t border-slate-200 pt-4">
+                  <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+                    <span>
+                      {broadcastProgress.status === 'cancel-requested'
+                        ? `Cancel requested at ${broadcastProgress.completed}/${broadcastProgress.total}`
+                        : broadcastProgress.status === 'stopped'
+                          ? `Stopped at ${broadcastProgress.completed}/${broadcastProgress.total}`
+                          : broadcastProgress.status === 'completed'
+                            ? `Completed ${broadcastProgress.completed}/${broadcastProgress.total}`
+                            : `Progress ${broadcastProgress.completed}/${broadcastProgress.total}`}
+                    </span>
+                    <span>
+                      {broadcastProgress.status === 'cancel-requested'
+                        ? 'Waiting for current tx'
+                        : broadcastProgress.status === 'stopped'
+                          ? 'Stopped'
+                          : broadcastProgress.completed < broadcastProgress.total && submitting
+                            ? `Sending ${Math.min(broadcastProgress.current, broadcastProgress.total)}/${broadcastProgress.total}`
+                            : `${progressPercent}%`}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-200 ${
+                        broadcastProgress.status === 'cancel-requested' ? 'bg-amber-500' : broadcastProgress.status === 'stopped' ? 'bg-slate-400' : 'bg-sky-600'
+                      }`}
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3 pt-4">
+                <div className="min-w-0">
+                  {typeof latestTxHash === 'string' ? (
+                    <span className="inline-flex min-w-0 max-w-full items-center text-sm leading-5 text-slate-700">
+                      <span className="shrink-0 font-medium leading-5">View tx&nbsp;</span>
+                      <Link className="translate-y-[1px] truncate text-sm font-semibold leading-5 text-sky-600 hover:text-sky-700" href={`/evm/tx/${latestTxHash}`}>
+                        {formatCompactHash(latestTxHash, 10, 8)}
+                      </Link>
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 justify-end gap-2">
+                  <Button type="button" variant="outline" disabled={submitting} onClick={clearForm}>
+                    Clear
+                  </Button>
+                  {submitting && broadcastProgress?.status === 'running' ? (
+                    <Button type="button" variant="outline" onClick={handleStopBroadcast}>
+                      Stop
+                    </Button>
+                  ) : null}
+                  {submitting && broadcastProgress?.status === 'cancel-requested' ? (
+                    <Button type="button" variant="outline" disabled>
+                      Cancel requested
+                    </Button>
+                  ) : null}
+                  <Button type="button" disabled={submitting} onClick={() => void submit()}>
+                    {submitting ? (broadcastProgress?.status === 'cancel-requested' ? 'Stopping...' : 'Broadcasting...') : 'Broadcast'}
+                  </Button>
+                </div>
+              </div>
+
+              {txResult ? (
+                <div className="border-t border-slate-200 pt-4">
+                  <JsonViewPanel
+                    key={txResultRenderKey}
+                    className="max-h-[1080px] overflow-y-auto overflow-x-hidden bg-slate-50 shadow-none"
+                    jsonClassName="whitespace-pre-wrap break-all"
+                    value={txResult as object}
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
-          <textarea placeholder='{"data":"0x"}' />
-          <button className="primary-button" type="button">
-            Save Draft
-          </button>
-        </form>
+        </section>
       </main>
+
+      <SecretInputDialog
+        open={unlockDialogOpen}
+        onOpenChange={(nextOpen) => {
+          setUnlockDialogOpen(nextOpen);
+
+          if (!nextOpen) {
+            setUnlockPassword('');
+            setUnlockError(null);
+          }
+        }}
+        title="Unlock Private Key"
+        description={activeKey ? `Enter the password for "${activeKey.name}" to continue sending the transaction.` : 'Enter the password to continue.'}
+        value={unlockPassword}
+        onValueChange={setUnlockPassword}
+        placeholder="Password"
+        confirmLabel="Unlock"
+        confirmDisabled={!unlockPassword.trim()}
+        errorMessage={unlockError}
+        onConfirm={() => void handleConfirmUnlock()}
+      />
+    </>
+  );
+}
+
+export default function EvmSendTxPage() {
+  return (
+    <AppShell mode="evm">
+      <EvmSendTxContent />
     </AppShell>
   );
 }

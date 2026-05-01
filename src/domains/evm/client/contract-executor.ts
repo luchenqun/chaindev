@@ -56,10 +56,6 @@ function parseNativeValue(value: string) {
 function parseGasLimit(gasLimit: string) {
   const value = gasLimit.trim();
 
-  if (!value) {
-    throw new Error('Gas limit is required for force send.');
-  }
-
   if (!/^\d+$/.test(value)) {
     throw new Error('Gas limit must be a positive integer.');
   }
@@ -71,6 +67,43 @@ function parseGasLimit(gasLimit: string) {
   }
 
   return normalizedValue;
+}
+
+async function resolveGasLimit(input: {
+  gasLimit: string;
+  publicClient: ReturnType<typeof getActiveEvmClients>['publicClient'];
+  account: ReturnType<typeof privateKeyToAccount>;
+  to: `0x${string}`;
+  value?: bigint;
+  data?: Hex;
+  nonce?: number;
+  feeParameters:
+    | {
+        type: 'legacy';
+        gasPrice?: bigint;
+      }
+    | {
+        type: 'eip1559';
+        maxFeePerGas?: bigint;
+        maxPriorityFeePerGas?: bigint;
+      };
+}) {
+  const normalizedGasLimit = input.gasLimit.trim();
+
+  if (normalizedGasLimit) {
+    return parseGasLimit(normalizedGasLimit);
+  }
+
+  const estimatedGas = await input.publicClient.estimateGas({
+    account: input.account,
+    to: input.to,
+    value: input.value,
+    data: input.data,
+    nonce: input.nonce,
+    ...input.feeParameters,
+  });
+
+  return applyGasLimitMultiplier(estimatedGas);
 }
 
 function applyGasLimitMultiplier(gasLimit: bigint) {
@@ -539,6 +572,7 @@ export async function forceSendEvmTransactionDirect(input: {
   maxPriorityFeePerGas?: string;
   nonce?: string;
   data?: string;
+  receiptPollIntervalMs?: string;
 }) {
   const { profile, publicClient } = getActiveEvmClients();
   const normalizedPrivateKey = normalizePrivateKey(input.privateKey);
@@ -548,9 +582,9 @@ export async function forceSendEvmTransactionDirect(input: {
     transport: createEvmTransport(profile.rpcUrl),
   });
   const value = parseNativeValue(input.value);
-  const gas = parseGasLimit(input.gasLimit);
   const nonce = isAutoTransactionFieldValue(input.nonce) ? undefined : parseNonce(input.nonce ?? '');
   const data = normalizeTransactionData(input.data);
+  const receiptPollIntervalMs = parseOptionalPollIntervalMs(input.receiptPollIntervalMs);
   const feeParameters =
     input.transactionType === 'LEGACY'
       ? {
@@ -577,6 +611,16 @@ export async function forceSendEvmTransactionDirect(input: {
             maxPriorityFeePerGas,
           };
         })();
+  const gas = await resolveGasLimit({
+    gasLimit: input.gasLimit,
+    publicClient,
+    account,
+    to: input.to as `0x${string}`,
+    value: value > 0n ? value : undefined,
+    data,
+    nonce,
+    feeParameters,
+  });
 
   const hash = await walletClient.sendTransaction({
     chain: undefined,
@@ -588,7 +632,10 @@ export async function forceSendEvmTransactionDirect(input: {
     nonce,
     ...feeParameters,
   });
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash,
+    ...(receiptPollIntervalMs ? { pollingInterval: receiptPollIntervalMs } : {}),
+  });
   const blockTimestamp = await getReceiptBlockTimestamp(publicClient, receipt.blockNumber);
 
   return {
@@ -606,6 +653,26 @@ export async function forceSendEvmTransactionDirect(input: {
           : 'Unavailable',
     },
   };
+}
+
+function parseOptionalPollIntervalMs(value: string | undefined) {
+  const normalizedValue = value?.trim();
+
+  if (!normalizedValue) {
+    return undefined;
+  }
+
+  if (!/^\d+$/.test(normalizedValue)) {
+    throw new Error('Receipt poll interval must be a positive integer.');
+  }
+
+  const parsedValue = Number.parseInt(normalizedValue, 10);
+
+  if (!Number.isSafeInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error('Receipt poll interval must be a positive integer.');
+  }
+
+  return parsedValue;
 }
 
 export async function prepareEvmContractDeployDirect(input: { abiJson: string; bytecode: string; rawArgs: string[]; privateKey: string; value: string }) {
