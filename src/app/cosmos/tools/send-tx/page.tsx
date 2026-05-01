@@ -188,6 +188,34 @@ function isSupportedCosmosMessageType(typeUrl: unknown): typeUrl is string {
   return typeof typeUrl === 'string' && COSMOS_GENERIC_MESSAGE_TYPES.some((item) => item.typeUrl === typeUrl);
 }
 
+function parseRepeatCount(value: string) {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return 1;
+  }
+
+  if (!/^\d+$/.test(trimmedValue)) {
+    throw new Error('Repeat count must be a positive integer.');
+  }
+
+  const parsedValue = Number.parseInt(trimmedValue, 10);
+
+  if (!Number.isSafeInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error('Repeat count must be a positive integer.');
+  }
+
+  return parsedValue;
+}
+
+function waitForUiRefresh() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => {
+      window.setTimeout(resolve, 0);
+    });
+  });
+}
+
 function readCosmosSendTxFormCache(): CosmosSendTxFormCache | null {
   if (typeof window === 'undefined') {
     return null;
@@ -228,6 +256,13 @@ function writeCosmosSendTxFormCache(cache: CosmosSendTxFormCache) {
   window.localStorage.setItem(COSMOS_SEND_TX_FORM_CACHE_KEY, JSON.stringify(cache));
 }
 
+type BroadcastProgress = {
+  total: number;
+  completed: number;
+  current: number;
+  status: 'running' | 'cancel-requested' | 'stopped' | 'completed';
+};
+
 function CosmosSendTxContent() {
   const { showToast } = useToast();
   const [transactionType, setTransactionType] = useState<CosmosTxType>(DEFAULT_TRANSACTION_TYPE);
@@ -238,10 +273,14 @@ function CosmosSendTxContent() {
   const [gasPriceAmount, setGasPriceAmount] = useState('');
   const [gasPriceDenom, setGasPriceDenom] = useState('');
   const [gasLimit, setGasLimit] = useState('');
+  const [repeatCount, setRepeatCount] = useState('');
+  const [receiptPollIntervalMs, setReceiptPollIntervalMs] = useState('');
   const [signingAlgorithm, setSigningAlgorithm] = useState<CosmosSigningAlgorithm>('ethsecp256k1');
   const [memo, setMemo] = useState('');
-  const [broadcastResult, setBroadcastResult] = useState<Record<string, unknown> | null>(null);
+  const [broadcastResult, setBroadcastResult] = useState<unknown>(null);
+  const [broadcastResultVersion, setBroadcastResultVersion] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [broadcastProgress, setBroadcastProgress] = useState<BroadcastProgress | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
   const [unlockPassword, setUnlockPassword] = useState('');
@@ -250,6 +289,7 @@ function CosmosSendTxContent() {
   const [addressCopied, setAddressCopied] = useState(false);
   const addressCopyTimeoutRef = useRef<number | null>(null);
   const addressCopyButtonRef = useRef<HTMLButtonElement | null>(null);
+  const stopRequestedRef = useRef(false);
 
   const actionLabel = getActionLabel(transactionType);
 
@@ -304,20 +344,6 @@ function CosmosSendTxContent() {
   }, []);
 
   useEffect(() => {
-    if (!formCacheLoaded) {
-      return;
-    }
-
-    writeCosmosSendTxFormCache({
-      messageTypeUrl: transactionType,
-      signingAlgorithm,
-      gasPriceAmount,
-      gasPriceDenom,
-      messageJson,
-    });
-  }, [formCacheLoaded, transactionType, signingAlgorithm, gasPriceAmount, gasPriceDenom, messageJson]);
-
-  useEffect(() => {
     let disposed = false;
 
     void getActiveCosmosAccountPrefixDirect().then((prefix) => {
@@ -366,6 +392,8 @@ function CosmosSendTxContent() {
     setSubmitting(true);
     setFormError(null);
     setBroadcastResult(null);
+    setBroadcastResultVersion(0);
+    stopRequestedRef.current = false;
     writeCosmosSendTxFormCache({
       messageTypeUrl: transactionType,
       signingAlgorithm,
@@ -375,6 +403,17 @@ function CosmosSendTxContent() {
     });
 
     try {
+      const totalCount = parseRepeatCount(repeatCount);
+      setBroadcastProgress(
+        totalCount > 1
+          ? {
+              total: totalCount,
+              completed: 0,
+              current: 1,
+              status: 'running',
+            }
+          : null,
+      );
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
       const baseInput = {
         privateKey,
@@ -382,20 +421,95 @@ function CosmosSendTxContent() {
         signingAlgorithm,
         gasPrice: `${gasPriceAmount.trim()}${gasPriceDenom.trim()}`,
         gasLimit,
+        broadcastPollIntervalMs: receiptPollIntervalMs,
         memo,
       };
-      const result = await broadcastCosmosGenericMessage({
-        ...baseInput,
-        messageTypeUrl: transactionType,
-        messageJson,
-      });
+      const results: CosmosBroadcastResult[] = [];
+
+      for (let index = 0; index < totalCount; index += 1) {
+        if (stopRequestedRef.current) {
+          setBroadcastProgress((current) =>
+            current
+              ? {
+                  ...current,
+                  status: 'stopped',
+                }
+              : current,
+          );
+          break;
+        }
+
+        setBroadcastProgress((current) =>
+          current
+            ? {
+                ...current,
+                current: index + 1,
+              }
+            : current,
+        );
+
+        const result = await broadcastCosmosGenericMessage({
+          ...baseInput,
+          messageTypeUrl: transactionType,
+          messageJson,
+        });
+
+        results.push(result);
+        setBroadcastResult(encodeJsonValue(result.response));
+        setBroadcastResultVersion(index + 1);
+        setBroadcastProgress((current) =>
+          current
+            ? {
+                ...current,
+                completed: index + 1,
+              }
+            : current,
+        );
+
+        if (stopRequestedRef.current) {
+          setBroadcastProgress((current) =>
+            current
+              ? {
+                  ...current,
+                  status: 'stopped',
+                }
+              : current,
+          );
+          break;
+        }
+
+        if (index < totalCount - 1) {
+          await waitForUiRefresh();
+        }
+      }
+
+      if (results.length === 0) {
+        return;
+      }
+
+      if (totalCount > 1 && !stopRequestedRef.current) {
+        setBroadcastProgress((current) =>
+          current
+            ? {
+                ...current,
+                status: 'completed',
+              }
+            : current,
+        );
+      }
+
+      const latestResult = results[results.length - 1];
 
       showToast({
-        title: `${actionLabel} transaction broadcasted`,
-        description: resultToastDescription(result),
+        title:
+          totalCount > 1
+            ? stopRequestedRef.current
+              ? `${actionLabel} broadcast stopped`
+              : `${actionLabel} transactions broadcasted`
+            : `${actionLabel} transaction broadcasted`,
+        description: resultToastDescription(latestResult),
         durationMs: 8000,
       });
-      setBroadcastResult(encodeJsonValue(result.response) as Record<string, unknown>);
     } catch (error) {
       const message = error instanceof Error ? error.message : `Failed to broadcast ${actionLabel.toLowerCase()} transaction.`;
 
@@ -409,6 +523,7 @@ function CosmosSendTxContent() {
       setFormError(message);
     } finally {
       setSubmitting(false);
+      stopRequestedRef.current = false;
     }
   }
 
@@ -454,10 +569,35 @@ function CosmosSendTxContent() {
     setGasPriceAmount('');
     setGasPriceDenom('');
     setGasLimit('');
+    setRepeatCount('');
+    setReceiptPollIntervalMs('');
     setMemo('');
     setBroadcastResult(null);
+    setBroadcastProgress(null);
     setFormError(null);
   }
+
+  function handleStopBroadcast() {
+    stopRequestedRef.current = true;
+    setBroadcastProgress((current) =>
+      current
+        ? {
+            ...current,
+            status: 'cancel-requested',
+          }
+        : current,
+    );
+  }
+
+  const latestBroadcastResult = broadcastResult;
+  const latestTransactionHash =
+    latestBroadcastResult && typeof latestBroadcastResult === 'object' && 'transactionHash' in latestBroadcastResult && typeof latestBroadcastResult.transactionHash === 'string'
+      ? latestBroadcastResult.transactionHash
+      : null;
+  const broadcastResultRenderKey = latestTransactionHash
+    ? `single:${broadcastResultVersion}:${latestTransactionHash}`
+    : `single:${broadcastResultVersion}:empty`;
+  const progressPercent = broadcastProgress ? Math.min(100, Math.round((broadcastProgress.completed / broadcastProgress.total) * 100)) : 0;
 
   return (
     <>
@@ -550,12 +690,42 @@ function CosmosSendTxContent() {
                 </div>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="tx-gas-limit">
                     Gas limit
                   </label>
                   <Input id="tx-gas-limit" value={gasLimit} inputMode="numeric" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setGasLimit(event.target.value)} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="tx-repeat-count">
+                    Repeat broadcasts
+                  </label>
+                  <Input
+                    id="tx-repeat-count"
+                    value={repeatCount}
+                    inputMode="numeric"
+                    placeholder="e.g. 10"
+                    disabled={submitting}
+                    className="mt-1"
+                    onChange={(event) => setRepeatCount(event.target.value)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700" htmlFor="tx-receipt-poll-interval">
+                    Receipt poll interval (ms)
+                  </label>
+                  <Input
+                    id="tx-receipt-poll-interval"
+                    value={receiptPollIntervalMs}
+                    inputMode="numeric"
+                    placeholder="Optional"
+                    disabled={submitting}
+                    className="mt-1"
+                    onChange={(event) => setReceiptPollIntervalMs(event.target.value)}
+                  />
                 </div>
 
                 <div>
@@ -565,7 +735,7 @@ function CosmosSendTxContent() {
                   <Input id="tx-memo" value={memo} placeholder="Optional" disabled={submitting} className="mt-1" onChange={(event) => setMemo(event.target.value)} />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-4">
                   <label className="block text-sm font-medium text-slate-700" htmlFor="message-json">
                     Message value
                   </label>
@@ -577,16 +747,49 @@ function CosmosSendTxContent() {
                   />
                 </div>
 
-                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-2">{formError}</p> : null}
+                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{formError}</p> : null}
               </div>
 
-              <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+              {broadcastProgress ? (
+                <div className="space-y-2 border-t border-slate-200 pt-4">
+                  <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+                    <span>
+                      {broadcastProgress.status === 'cancel-requested'
+                        ? `Cancel requested at ${broadcastProgress.completed}/${broadcastProgress.total}`
+                        : broadcastProgress.status === 'stopped'
+                          ? `Stopped at ${broadcastProgress.completed}/${broadcastProgress.total}`
+                          : broadcastProgress.status === 'completed'
+                            ? `Completed ${broadcastProgress.completed}/${broadcastProgress.total}`
+                            : `Progress ${broadcastProgress.completed}/${broadcastProgress.total}`}
+                    </span>
+                    <span>
+                      {broadcastProgress.status === 'cancel-requested'
+                        ? 'Waiting for current tx'
+                        : broadcastProgress.status === 'stopped'
+                          ? 'Stopped'
+                          : broadcastProgress.completed < broadcastProgress.total && submitting
+                            ? `Sending ${Math.min(broadcastProgress.current, broadcastProgress.total)}/${broadcastProgress.total}`
+                            : `${progressPercent}%`}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-200 ${
+                        broadcastProgress.status === 'cancel-requested' ? 'bg-amber-500' : broadcastProgress.status === 'stopped' ? 'bg-slate-400' : 'bg-sky-600'
+                      }`}
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between gap-3 pt-4">
                 <div className="min-w-0">
-                  {typeof broadcastResult?.transactionHash === 'string' ? (
+                  {typeof latestTransactionHash === 'string' ? (
                     <span className="inline-flex min-w-0 max-w-full items-center text-sm leading-5 text-slate-700">
                       <span className="shrink-0 font-medium leading-5">View tx&nbsp;</span>
-                      <Link className="translate-y-[1px] truncate text-sm font-semibold leading-5 text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${broadcastResult.transactionHash}`}>
-                        {formatCompactHash(broadcastResult.transactionHash, 10, 8)}
+                      <Link className="translate-y-[1px] truncate text-sm font-semibold leading-5 text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${latestTransactionHash}`}>
+                        {formatCompactHash(latestTransactionHash, 10, 8)}
                       </Link>
                     </span>
                   ) : null}
@@ -595,15 +798,30 @@ function CosmosSendTxContent() {
                   <Button type="button" variant="outline" disabled={submitting} onClick={clearForm}>
                     Clear
                   </Button>
+                  {submitting && broadcastProgress?.status === 'running' ? (
+                    <Button type="button" variant="outline" onClick={handleStopBroadcast}>
+                      Stop
+                    </Button>
+                  ) : null}
+                  {submitting && broadcastProgress?.status === 'cancel-requested' ? (
+                    <Button type="button" variant="outline" disabled>
+                      Cancel requested
+                    </Button>
+                  ) : null}
                   <Button type="button" disabled={submitting} onClick={() => void broadcast()}>
-                    {submitting ? 'Broadcasting...' : 'Broadcast'}
+                    {submitting ? (broadcastProgress?.status === 'cancel-requested' ? 'Stopping...' : 'Broadcasting...') : 'Broadcast'}
                   </Button>
                 </div>
               </div>
 
               {broadcastResult ? (
                 <div className="border-t border-slate-200 pt-4">
-                  <JsonViewPanel className="max-h-[1080px] overflow-y-auto overflow-x-hidden bg-slate-50 shadow-none" jsonClassName="whitespace-pre-wrap break-all" value={broadcastResult} />
+                  <JsonViewPanel
+                    key={broadcastResultRenderKey}
+                    className="max-h-[1080px] overflow-y-auto overflow-x-hidden bg-slate-50 shadow-none"
+                    jsonClassName="whitespace-pre-wrap break-all"
+                    value={broadcastResult as object}
+                  />
                 </div>
               ) : null}
             </div>

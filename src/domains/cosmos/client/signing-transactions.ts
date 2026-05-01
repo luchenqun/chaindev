@@ -62,6 +62,7 @@ export type CosmosBaseSigningInput = {
   signingAlgorithm: CosmosSigningAlgorithm;
   gasPrice: string;
   gasLimit?: string;
+  broadcastPollIntervalMs?: string;
   memo?: string;
 };
 
@@ -557,6 +558,7 @@ function normalizeCosmosBaseSigningInput(input: CosmosBaseSigningInput): Normali
   const signingAlgorithm = input.signingAlgorithm;
   const gasPrice = normalizeRequiredText(input.gasPrice);
   const gasLimit = normalizeRequiredText(input.gasLimit);
+  const broadcastPollIntervalMs = normalizeRequiredText(input.broadcastPollIntervalMs);
   const memo = normalizeRequiredText(input.memo);
 
   assertPresent(privateKey, 'Private key');
@@ -584,6 +586,7 @@ function normalizeCosmosBaseSigningInput(input: CosmosBaseSigningInput): Normali
     signingAlgorithm,
     gasPrice,
     gasLimit,
+    broadcastPollIntervalMs,
     memo,
   };
 }
@@ -892,6 +895,7 @@ async function createCosmosSigningClient(input: CosmosBaseSigningInput, registry
   }
 
   const client = await SigningStargateClient.connectWithSigner(profile.rpcUrl, signer, {
+    broadcastPollIntervalMs: resolveBroadcastPollIntervalMs(input),
     gasPrice: GasPrice.fromString(normalized.gasPrice),
     registry,
   });
@@ -909,6 +913,26 @@ function resolveCosmosFee(input: NormalizedCosmosBaseSigningInput) {
   }
 
   return calculateFee(Number(input.gasLimit), input.gasPrice);
+}
+
+function resolveBroadcastPollIntervalMs(input: CosmosBaseSigningInput) {
+  const trimmedValue = input.broadcastPollIntervalMs?.trim();
+
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  if (!/^\d+$/.test(trimmedValue)) {
+    throw new Error('Receipt poll interval must be a positive integer.');
+  }
+
+  const parsedValue = Number.parseInt(trimmedValue, 10);
+
+  if (!Number.isSafeInteger(parsedValue) || parsedValue <= 0) {
+    throw new Error('Receipt poll interval must be a positive integer.');
+  }
+
+  return parsedValue;
 }
 
 async function createCosmosStakingClient(input: CosmosSigningInput) {
