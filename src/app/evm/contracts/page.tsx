@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isAddress, type AbiParameter } from 'viem';
+import { isAddress, toEventSelector, toFunctionSelector, type Abi, type AbiEvent, type AbiParameter } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -16,7 +16,7 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
-import { getContractConstructor, getContractFunctions } from '@/domains/evm/client/abi-utils';
+import { getContractConstructor, getContractFunctions, parseContractAbiJson } from '@/domains/evm/client/abi-utils';
 import {
   createEvmContractArtifact,
   createEvmContractBinding,
@@ -70,8 +70,44 @@ type DeployDialogState = {
   nonce: string;
 };
 
+type ArtifactDetailsCategory = 'read' | 'write' | 'event';
+
+type ArtifactDetailsItem = {
+  category: ArtifactDetailsCategory;
+  signature: string;
+  methodId: string;
+  badgeLabel: string;
+};
+
 function hasTupleComponents(parameter: AbiParameter): parameter is AbiParameter & { components: readonly AbiParameter[] } {
   return 'components' in parameter && Array.isArray(parameter.components);
+}
+
+function getCanonicalAbiParameterType(parameter: AbiParameter): string {
+  if (!parameter.type.endsWith(']')) {
+    if (parameter.type !== 'tuple') {
+      return parameter.type;
+    }
+
+    const components = hasTupleComponents(parameter) ? parameter.components : [];
+    return `(${components.map(getCanonicalAbiParameterType).join(',')})`;
+  }
+
+  const arraySuffix = parameter.type.slice(parameter.type.indexOf('['));
+  const baseParameter = {
+    ...parameter,
+    type: parameter.type.slice(0, parameter.type.indexOf('[')),
+  } satisfies AbiParameter;
+
+  return `${getCanonicalAbiParameterType(baseParameter)}${arraySuffix}`;
+}
+
+function isAbiEventItem(item: Abi[number] | unknown): item is AbiEvent {
+  return typeof item === 'object' && item !== null && 'type' in item && item.type === 'event' && 'name' in item;
+}
+
+function getEventSignature(event: AbiEvent) {
+  return `${event.name}(${event.inputs.map(getCanonicalAbiParameterType).join(',')})`;
 }
 
 function createComplexParameterTemplateValue(parameter: AbiParameter): unknown {
@@ -427,7 +463,57 @@ export default function EvmContractsRegistryPage() {
   const myArtifacts = useMemo(() => artifacts.filter((artifact) => artifact.scope === 'user'), [artifacts]);
   const systemArtifacts = useMemo(() => artifacts.filter((artifact) => artifact.scope === 'system'), [artifacts]);
   const deployArtifact = useMemo(() => (deployArtifactId ? (artifacts.find((artifact) => artifact.id === deployArtifactId) ?? null) : null), [artifacts, deployArtifactId]);
-  const artifactDetailsFunctions = useMemo(() => (artifactDetailsTarget ? getContractFunctions(artifactDetailsTarget.abiJson) : []), [artifactDetailsTarget]);
+  const artifactDetailsGroups = useMemo(() => {
+    if (!artifactDetailsTarget) {
+      return {
+        read: [] as ArtifactDetailsItem[],
+        write: [] as ArtifactDetailsItem[],
+        event: [] as ArtifactDetailsItem[],
+      };
+    }
+
+    const functions = getContractFunctions(artifactDetailsTarget.abiJson);
+    const abi = parseContractAbiJson(artifactDetailsTarget.abiJson);
+
+    const read = functions
+      .filter((fn) => fn.stateMutability === 'view' || fn.stateMutability === 'pure')
+      .map(
+        (fn): ArtifactDetailsItem => ({
+          category: 'read',
+          signature: fn.signature,
+          methodId: toFunctionSelector(`function ${fn.signature}`),
+          badgeLabel: fn.stateMutability,
+        }),
+      );
+
+    const write = functions
+      .filter((fn) => fn.stateMutability === 'nonpayable' || fn.stateMutability === 'payable')
+      .map(
+        (fn): ArtifactDetailsItem => ({
+          category: 'write',
+          signature: fn.signature,
+          methodId: toFunctionSelector(`function ${fn.signature}`),
+          badgeLabel: fn.stateMutability,
+        }),
+      );
+
+    const event = abi
+      .filter(isAbiEventItem)
+      .map(
+        (abiEvent): ArtifactDetailsItem => ({
+          category: 'event',
+          signature: getEventSignature(abiEvent),
+          methodId: toEventSelector(getEventSignature(abiEvent)),
+          badgeLabel: abiEvent.anonymous ? 'anonymous' : 'event',
+        }),
+      );
+
+    return {
+      read,
+      write,
+      event,
+    };
+  }, [artifactDetailsTarget]);
   const deployConstructor = useMemo(() => (deployArtifact ? getContractConstructor(deployArtifact.abiJson) : null), [deployArtifact]);
   const deploySimulationKey = useMemo(
     () =>
@@ -1284,18 +1370,53 @@ export default function EvmContractsRegistryPage() {
           maxWidthClassName="max-w-3xl"
         >
           <div className="grid gap-3">
-            {artifactDetailsFunctions.length ? (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <ul className="divide-y divide-slate-200">
-                  {artifactDetailsFunctions.map((fn) => (
-                    <li key={fn.signature} className="flex items-center justify-between gap-4 px-4 py-3">
-                      <span className="min-w-0 truncate font-mono text-sm text-slate-900">{fn.signature}</span>
-                      <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-600">
-                        {fn.stateMutability}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+            {artifactDetailsGroups.read.length || artifactDetailsGroups.write.length || artifactDetailsGroups.event.length ? (
+              <div className="grid gap-3">
+                {[
+                  {
+                    key: 'read',
+                    title: 'Read',
+                    items: artifactDetailsGroups.read,
+                    emptyText: 'No read methods.',
+                  },
+                  {
+                    key: 'write',
+                    title: 'Write',
+                    items: artifactDetailsGroups.write,
+                    emptyText: 'No write methods.',
+                  },
+                  {
+                    key: 'event',
+                    title: 'Event',
+                    items: artifactDetailsGroups.event,
+                    emptyText: 'No events.',
+                  },
+                ].map((group) => (
+                  <div key={group.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                      <p className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-700">{group.title}</p>
+                    </div>
+                    {group.items.length ? (
+                      <ul className="divide-y divide-slate-200">
+                        {group.items.map((item) => (
+                          <li key={`${item.category}-${item.signature}`} className="flex items-center justify-between gap-4 px-4 py-3">
+                            <div className="min-w-0">
+                              <p className="truncate font-mono text-sm text-slate-900">
+                                {item.signature}
+                                <span className="ml-2 text-slate-500">({item.methodId})</span>
+                              </p>
+                            </div>
+                            <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-600">
+                              {item.badgeLabel}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="px-4 py-5 text-sm text-slate-500">{group.emptyText}</div>
+                    )}
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
