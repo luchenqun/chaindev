@@ -5,7 +5,6 @@ import { type KeyboardEvent, useMemo, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type OperationId = 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'mod' | 'and' | 'or' | 'xor';
@@ -446,23 +445,37 @@ export default function BigNumberPage() {
       <main className="mx-auto max-w-[1400px] px-3 pb-10">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
           <div className="border-b border-slate-200 px-6 py-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-semibold text-slate-950">Big Number Calculator</h1>
-                <p className="mt-2 max-w-[1100px] text-sm leading-6 text-slate-600">
-                  Perform large integer arithmetic directly in the browser, including modular and bitwise operations.
-                </p>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-baseline gap-3">
+                  <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Big Number Calculator</h1>
+                  <p className="min-w-0 truncate text-sm text-slate-500">Large integer math in the browser.</p>
+                </div>
               </div>
-              <div className="w-auto shrink-0">
-                <Select value={mode} onValueChange={(value) => handleModeChange(value as CalculatorMode)}>
-                  <SelectTrigger className="h-9 w-auto gap-1 rounded-none border-0 bg-transparent px-0 pr-0 text-sm font-medium text-slate-700 shadow-none focus:ring-0 focus-visible:ring-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="operands">Operands Mode</SelectItem>
-                    <SelectItem value="expression">Expression Mode</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-0.5">
+                <button
+                  type="button"
+                  className={
+                    mode === 'operands'
+                      ? 'min-w-[96px] rounded-[14px] bg-white px-4 py-1.5 text-sm font-semibold text-slate-950 shadow-[0_6px_14px_rgba(15,23,42,0.06)]'
+                      : 'min-w-[96px] rounded-[14px] px-4 py-1.5 text-sm font-semibold text-slate-500'
+                  }
+                  onClick={() => handleModeChange('operands')}
+                >
+                  Operands
+                </button>
+                <button
+                  type="button"
+                  className={
+                    mode === 'expression'
+                      ? 'min-w-[96px] rounded-[14px] bg-white px-4 py-1.5 text-sm font-semibold text-slate-950 shadow-[0_6px_14px_rgba(15,23,42,0.06)]'
+                      : 'min-w-[96px] rounded-[14px] px-4 py-1.5 text-sm font-semibold text-slate-500'
+                  }
+                  onClick={() => handleModeChange('expression')}
+                >
+                  Expression
+                </button>
               </div>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { ripemd160, Secp256k1, sha256 } from '@cosmjs/crypto';
 import { fromBech32, fromHex, toBech32, toHex } from '@cosmjs/encoding';
 import { DirectSecp256k1HdWallet, DirectSecp256k1Wallet } from '@cosmjs/proto-signing';
 import { IconCopy, IconEye, IconEyeOff } from '@tabler/icons-react';
-import { mnemonicToAccount, privateKeyToAccount, publicKeyToAddress } from 'viem/accounts';
+import { generatePrivateKey, mnemonicToAccount, privateKeyToAccount, publicKeyToAddress } from 'viem/accounts';
 import { getAddress, hexToBytes, type Hex } from 'viem';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -223,12 +223,15 @@ export function Bech32ToolPage() {
   const [crypto, setCrypto] = useState<Bech32Crypto>('ethsecp256k1');
   const [prefix, setPrefix] = useState('cosmos');
   const [input, setInput] = useState('');
+  const [generatedPrivateKey, setGeneratedPrivateKey] = useState<string | null>(null);
   const [showSecretInput, setShowSecretInput] = useState(false);
   const [result, setResult] = useState<Bech32Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  const inputIsSecret = action === 'encode' && (isMnemonic(input) || isPrivateKeyLike(input));
+  const inputIsSecret = action === 'encode' && (Boolean(generatedPrivateKey) || isMnemonic(input) || isPrivateKeyLike(input));
+  const inputDisplayValue = generatedPrivateKey ? '*'.repeat(64) : input;
+  const resolvedInputValue = generatedPrivateKey ? (showSecretInput ? generatedPrivateKey : inputDisplayValue) : input;
 
   async function handleCopy(field: string, value: string) {
     await copyText(value);
@@ -244,18 +247,27 @@ export function Bech32ToolPage() {
     setResult(null);
 
     try {
+      let resolvedInput = action === 'encode' ? generatedPrivateKey ?? input : input;
+
+      if (action === 'encode' && !resolvedInput.trim()) {
+        resolvedInput = generatePrivateKey();
+        setGeneratedPrivateKey(resolvedInput);
+        setInput('');
+        setShowSecretInput(false);
+      }
+
       const payload =
         action === 'decode'
-          ? decodeBech32Address(input)
+          ? decodeBech32Address(resolvedInput)
           : crypto === 'ethsecp256k1'
-            ? createEthResult(input, prefix)
-            : await createSecp256k1Result(input, prefix);
+            ? createEthResult(resolvedInput, prefix)
+            : await createSecp256k1Result(resolvedInput, prefix);
 
       setResult({
         action,
         crypto: action === 'encode' ? crypto : undefined,
         prefix: action === 'encode' ? prefix : undefined,
-        origin: input,
+        origin: resolvedInput,
         ...payload,
       });
     } catch (submitError) {
@@ -268,9 +280,20 @@ export function Bech32ToolPage() {
   function handleActionChange(value: Bech32Action) {
     setAction(value);
     setInput('');
+    setGeneratedPrivateKey(null);
     setShowSecretInput(false);
     setResult(null);
     setError(null);
+  }
+
+  function handleInputChange(value: string) {
+    if (generatedPrivateKey) {
+      setGeneratedPrivateKey(null);
+      setInput(value.replace(/\*/g, ''));
+      return;
+    }
+
+    setInput(value);
   }
 
   function renderResultRow(label: string, value?: string) {
@@ -306,30 +329,44 @@ export function Bech32ToolPage() {
       <main className="mx-auto max-w-[1400px] px-3 pb-10">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
           <div className="border-b border-slate-200 px-6 py-4">
-            <div className="flex min-w-0 items-baseline gap-3">
-              <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Bech32</h1>
-              <p className="min-w-0 truncate text-sm text-slate-500">Convert Bech32, hex addresses, private keys, public keys, and mnemonics.</p>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-baseline gap-3">
+                  <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Bech32</h1>
+                  <p className="min-w-0 truncate text-sm text-slate-500">Convert Bech32, addresses, keys, and mnemonics.</p>
+                </div>
+              </div>
+
+              <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-0.5">
+                <button
+                  type="button"
+                  className={
+                    action === 'encode'
+                      ? 'min-w-[96px] rounded-[14px] bg-white px-4 py-1.5 text-sm font-semibold text-slate-950 shadow-[0_6px_14px_rgba(15,23,42,0.06)]'
+                      : 'min-w-[96px] rounded-[14px] px-4 py-1.5 text-sm font-semibold text-slate-500'
+                  }
+                  onClick={() => handleActionChange('encode')}
+                >
+                  Encode
+                </button>
+                <button
+                  type="button"
+                  className={
+                    action === 'decode'
+                      ? 'min-w-[96px] rounded-[14px] bg-white px-4 py-1.5 text-sm font-semibold text-slate-950 shadow-[0_6px_14px_rgba(15,23,42,0.06)]'
+                      : 'min-w-[96px] rounded-[14px] px-4 py-1.5 text-sm font-semibold text-slate-500'
+                  }
+                  onClick={() => handleActionChange('decode')}
+                >
+                  Decode
+                </button>
+              </div>
             </div>
           </div>
 
           <div className="space-y-5 px-6 py-6">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-              <div className={action === 'decode' ? 'grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_120px] lg:items-end' : 'grid gap-4 lg:grid-cols-3 lg:items-end'}>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700" htmlFor="bech32-action">
-                    Action
-                  </label>
-                  <Select value={action} onValueChange={(value) => handleActionChange(value as Bech32Action)}>
-                    <SelectTrigger id="bech32-action" className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="encode">Encode</SelectItem>
-                      <SelectItem value="decode">Decode</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
+            <div>
+              <div className={action === 'decode' ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_120px] lg:items-end' : 'grid gap-4 lg:grid-cols-2 lg:items-end'}>
                 {action === 'encode' ? (
                   <>
                     <div>
@@ -388,21 +425,38 @@ export function Bech32ToolPage() {
                     <div className="relative mt-1">
                       <Input
                         id="bech32-input"
-                        type={inputIsSecret && !showSecretInput ? 'password' : 'text'}
-                        value={input}
-                        className={inputIsSecret ? 'pr-11 font-mono text-sm' : 'font-mono text-sm'}
+                        type={inputIsSecret && !showSecretInput && !generatedPrivateKey ? 'password' : 'text'}
+                        value={resolvedInputValue}
+                        className={inputIsSecret ? 'pr-20 font-mono text-sm' : 'font-mono text-sm'}
                         placeholder="hex address / private key / public key / mnemonic"
-                        onChange={(event) => setInput(event.target.value)}
+                        onChange={(event) => handleInputChange(event.target.value)}
                       />
                       {inputIsSecret ? (
-                        <button
-                          type="button"
-                          className="absolute right-2 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"
-                          aria-label={showSecretInput ? 'Hide input' : 'Show input'}
-                          onClick={() => setShowSecretInput((current) => !current)}
-                        >
-                          {showSecretInput ? <IconEyeOff className="size-4.5" stroke={1.8} /> : <IconEye className="size-4.5" stroke={1.8} />}
-                        </button>
+                        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+                          <button
+                            type="button"
+                            className="relative inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"
+                            aria-label={copiedField === 'secret-input' ? 'Input copied' : 'Copy input'}
+                            onClick={() => void handleCopy('secret-input', generatedPrivateKey ?? input)}
+                          >
+                            <IconCopy className="size-4.5" stroke={1.8} />
+                            <span
+                              className={`pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-10 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 shadow-sm transition-opacity ${
+                                copiedField === 'secret-input' ? 'opacity-100' : 'opacity-0'
+                              }`}
+                            >
+                              Copied
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"
+                            aria-label={showSecretInput ? 'Hide input' : 'Show input'}
+                            onClick={() => setShowSecretInput((current) => !current)}
+                          >
+                            {showSecretInput ? <IconEyeOff className="size-4.5" stroke={1.8} /> : <IconEye className="size-4.5" stroke={1.8} />}
+                          </button>
+                        </div>
                       ) : null}
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconLogout, IconSend, IconUserCircle } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLogout, IconSend, IconUserCircle } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -145,6 +145,11 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
             ],
           },
+          {
+            id: 'security',
+            label: 'Security',
+            items: [{ href: '/tools/keystore', label: 'Keystore', icon: IconKey }],
+          },
         ]
       : [
           {
@@ -166,6 +171,11 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
               { href: '/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
             ],
+          },
+          {
+            id: 'security',
+            label: 'Security',
+            items: [{ href: '/tools/keystore', label: 'Keystore', icon: IconKey }],
           },
         ];
 
@@ -253,14 +263,14 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               {openGroup === 'tools-more' ? (
                 <div className="absolute right-0 top-full z-20 pt-2" onMouseEnter={cancelScheduledClose} onMouseLeave={() => scheduleClose('tools-more')}>
                   <div className="absolute inset-x-0 top-0 h-2" aria-hidden="true" />
-                  <div className="w-[720px] overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                  <div className="w-[960px] overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
                     <div className="border-t-[3px] border-[#19a7f2]" />
                     <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-0">
                       <div className="bg-slate-50 px-6 py-6">
                         <div className="text-[15px] font-semibold text-slate-950">More</div>
                         <p className="mt-3 text-[14px] leading-6 text-slate-600">Discover chain actions and utility tools in one place.</p>
                       </div>
-                      <div className="grid grid-cols-2 gap-5 px-6 py-5">
+                      <div className="grid grid-cols-3 gap-5 px-6 py-5">
                         {moreGroups.map((group) => (
                           <div key={group.id} className="min-w-0">
                             <div className="text-[15px] font-semibold text-slate-950">{group.label}</div>
