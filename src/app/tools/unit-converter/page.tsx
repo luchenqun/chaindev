@@ -72,7 +72,7 @@ function buildInitialWeiValue() {
   return parseUnitValueToWei('1', UNIT_DEFINITIONS[UNIT_DEFINITIONS.length - 1]);
 }
 
-export default function EvmUnitConverterPage() {
+export default function UnitConverterPage() {
   const [activeUnitId, setActiveUnitId] = useState<UnitDefinition['id']>('eth');
   const [draftValue, setDraftValue] = useState('1');
   const [weiValue, setWeiValue] = useState<string | null>(buildInitialWeiValue);
@@ -129,7 +129,7 @@ export default function EvmUnitConverterPage() {
   }
 
   return (
-    <AppShell mode="evm">
+    <AppShell>
       <main className="mx-auto max-w-[1400px] px-3 pb-10">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
           <div className="border-b border-slate-200 px-6 py-5">
@@ -148,16 +148,16 @@ export default function EvmUnitConverterPage() {
                 return (
                   <div key={unit.id} className="flex h-[45px] items-stretch overflow-hidden rounded-xl border border-slate-200 bg-white">
                     <div className="flex w-16 shrink-0 items-center justify-center border-r border-slate-200 bg-slate-50">
-                        <ActionIconButton
-                          tooltip={copied ? 'Copied' : 'Copy value'}
-                          aria-label={copied ? `${unit.label} copied` : `Copy ${unit.label} value`}
-                          className={currentValue ? 'text-slate-400 hover:text-sky-600' : 'text-slate-300 hover:text-slate-300'}
-                          disabled={!currentValue}
-                          onClick={() => void handleCopy(unit.id, currentValue)}
-                        >
-                          <IconCopy className="size-5" stroke={1.8} />
-                        </ActionIconButton>
-                      </div>
+                      <ActionIconButton
+                        tooltip={copied ? 'Copied' : 'Copy value'}
+                        aria-label={copied ? `${unit.label} copied` : `Copy ${unit.label} value`}
+                        className={currentValue ? 'text-slate-400 hover:text-sky-600' : 'text-slate-300 hover:text-slate-300'}
+                        disabled={!currentValue}
+                        onClick={() => void handleCopy(unit.id, currentValue)}
+                      >
+                        <IconCopy className="size-5" stroke={1.8} />
+                      </ActionIconButton>
+                    </div>
                     <input
                       value={currentValue}
                       inputMode="decimal"

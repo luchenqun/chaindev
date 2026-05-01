@@ -138,7 +138,10 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           {
             id: 'tools',
             label: 'Tools',
-            items: [{ href: '/cosmos/tools/bech32', label: 'Bech32', icon: IconArrowsExchange }],
+            items: [
+              { href: '/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
+              { href: '/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
+            ],
           },
         ]
       : [
@@ -157,8 +160,8 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             label: 'Tools',
             items: [
               { href: '/evm/tools/decode', label: 'Input Data Decoder', icon: IconCode },
-              { href: '/evm/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
-              { href: '/evm/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
+              { href: '/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
+              { href: '/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
             ],
           },
         ];
