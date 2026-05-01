@@ -22,6 +22,12 @@ type NavItem = {
   icon?: typeof IconSend;
 };
 
+type NavGroup = {
+  id: string;
+  label: string;
+  items: NavItem[];
+};
+
 function inferMode(pathname: string): PlatformMode {
   return pathname.startsWith('/cosmos') ? 'cosmos' : 'evm';
 }
@@ -112,17 +118,44 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
         ];
   const userMenuSections = getAccountMenuSections(mode);
   const userMenuActive = userMenuSections.some((section) => section.items.some((item) => matchesNavItem(pathname, item.href)));
-  const moreItems: NavItem[] =
+  const moreGroups: NavGroup[] =
     mode === 'cosmos'
       ? [
-          { href: '/cosmos/tools/send-tx', label: 'Send Transaction', icon: IconSend },
-          { href: '/cosmos/tools/rest', label: 'REST API', icon: IconCloudCode },
-          { href: '/cosmos/tools/bech32', label: 'Bech32', icon: IconRepeat },
+          {
+            id: 'chain',
+            label: 'Chain',
+            items: [
+              { href: '/cosmos/tools/send-tx', label: 'Send Transaction', icon: IconSend },
+              { href: '/cosmos/tools/rest', label: 'REST API', icon: IconCloudCode },
+            ],
+          },
+          {
+            id: 'tools',
+            label: 'Tools',
+            items: [
+              { href: '/cosmos/tools/bech32', label: 'Bech32', icon: IconRepeat },
+            ],
+          },
         ]
       : [
-          { href: '/evm/tools/rpc', label: 'RPC API', icon: IconCloudCode },
-          { href: '/evm/tools/bech32', label: 'Bech32', icon: IconRepeat },
+          {
+            id: 'chain',
+            label: 'Chain',
+            items: [
+              { href: '/evm/tools/send-tx', label: 'Send Transaction', icon: IconSend },
+              { href: '/evm/tools/rpc', label: 'RPC API', icon: IconCloudCode },
+            ],
+          },
+          {
+            id: 'tools',
+            label: 'Tools',
+            items: [
+              { href: '/evm/tools/decode', label: 'Input Data Decoder', icon: IconRepeat },
+              { href: '/evm/tools/bech32', label: 'Bech32', icon: IconRepeat },
+            ],
+          },
         ];
+  const moreItems = moreGroups.flatMap((group) => group.items);
   const moreActive = moreItems.some((item) => matchesNavItem(pathname, item.href));
 
   return (
@@ -176,31 +209,43 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 <IconChevronDown className="size-3.5" stroke={2.2} />
               </button>
               {openGroup === 'tools-more' ? (
-                <div className="absolute right-0 top-full z-20 w-[260px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                <div className="absolute right-0 top-full z-20 w-[720px] overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
                   <div className="border-t-[3px] border-[#19a7f2]" />
-                  <div className="px-4 py-3">
-                    <div className="text-[14px] font-semibold text-slate-950">Tools</div>
-                    <div className="mt-1.5 space-y-0.5">
-                      {moreItems.map((item) => {
-                        const itemActive = matchesNavItem(pathname, item.href);
-                        const Icon = item.icon ?? IconSend;
+                  <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-0">
+                    <div className="bg-slate-50 px-6 py-6">
+                      <div className="text-[15px] font-semibold text-slate-950">More</div>
+                      <p className="mt-3 text-[14px] leading-6 text-slate-600">
+                        Discover chain actions and utility tools in one place.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-8 px-6 py-6">
+                      {moreGroups.map((group) => (
+                        <div key={group.id} className="min-w-0">
+                          <div className="text-[15px] font-semibold text-slate-950">{group.label}</div>
+                          <div className="mt-3 space-y-1">
+                            {group.items.map((item) => {
+                              const itemActive = matchesNavItem(pathname, item.href);
+                              const Icon = item.icon ?? IconSend;
 
-                        return (
-                          <Link
-                            prefetch={false}
-                            key={item.href}
-                            href={item.href}
-                            className={
-                              itemActive
-                                ? 'flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-[450] text-[#1697ea]'
-                                : 'flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-[450] text-slate-700 hover:bg-slate-100 hover:text-[#1697ea]'
-                            }
-                          >
-                            <Icon className="size-4 shrink-0" stroke={1.9} />
-                            {item.label}
-                          </Link>
-                        );
-                      })}
+                              return (
+                                <Link
+                                  prefetch={false}
+                                  key={item.href}
+                                  href={item.href}
+                                  className={
+                                    itemActive
+                                      ? 'flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-[450] text-[#1697ea]'
+                                      : 'flex items-center gap-2 rounded-lg px-2 py-2 text-[14px] font-[450] text-slate-700 hover:bg-slate-100 hover:text-[#1697ea]'
+                                  }
+                                >
+                                  <Icon className="size-4 shrink-0" stroke={1.9} />
+                                  {item.label}
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
