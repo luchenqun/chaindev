@@ -35,9 +35,23 @@ export function OverviewCardsSkeleton({ cards = 3, entries = 2 }: { cards?: numb
   );
 }
 
-export function MetricCardsSkeleton({ headerItems = 4, metrics = 8 }: { headerItems?: number; metrics?: number }) {
-  const firstRowMetrics = Math.min(4, metrics);
-  const secondRowMetrics = Math.max(0, metrics - firstRowMetrics);
+export function MetricCardsSkeleton({
+  headerItems = 4,
+  metrics = 8,
+  metricRows,
+  showFooter = false,
+}: {
+  headerItems?: number;
+  metrics?: number;
+  metricRows?: number[];
+  showFooter?: boolean;
+}) {
+  const resolvedMetricRows =
+    metricRows?.filter((count) => count > 0) ??
+    Array.from({ length: Math.ceil(metrics / 4) }, (_, rowIndex) => {
+      const start = rowIndex * 4;
+      return Math.min(4, Math.max(0, metrics - start));
+    }).filter((count) => count > 0);
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
@@ -49,27 +63,26 @@ export function MetricCardsSkeleton({ headerItems = 4, metrics = 8 }: { headerIt
           </div>
         ))}
       </div>
-      <div className="border-t border-slate-200" />
-      <div className="grid divide-y divide-slate-200 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
-        {Array.from({ length: firstRowMetrics }).map((_, index) => (
-          <div key={index} className="px-5 py-4">
-            <Skeleton className="mb-2 h-3.5 w-24" />
-            <Skeleton className="h-8 w-32" />
-            <Skeleton className="mt-2 h-4 w-28" />
+      {resolvedMetricRows.map((count, rowIndex) => (
+        <div key={rowIndex}>
+          <div className="border-t border-slate-200" />
+          <div className="grid divide-y divide-slate-200 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+            {Array.from({ length: count }).map((_, index) => (
+              <div key={index} className="px-5 py-4">
+                <Skeleton className="mb-2 h-3.5 w-24" />
+                <Skeleton className="h-8 w-32" />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {secondRowMetrics > 0 ? <div className="border-t border-slate-200" /> : null}
-      {secondRowMetrics > 0 ? (
-        <div className="grid divide-y divide-slate-200 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
-          {Array.from({ length: secondRowMetrics }).map((_, index) => (
-            <div key={index} className="px-5 py-4">
-              <Skeleton className="mb-2 h-3.5 w-24" />
-              <Skeleton className="h-8 w-32" />
-              <Skeleton className="mt-2 h-4 w-28" />
-            </div>
-          ))}
         </div>
+      ))}
+      {showFooter ? (
+        <>
+          <div className="border-t border-slate-200" />
+          <div className="bg-slate-50 px-5 py-2">
+            <Skeleton className="h-4 w-80" />
+          </div>
+        </>
       ) : null}
     </div>
   );

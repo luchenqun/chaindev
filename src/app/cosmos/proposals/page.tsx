@@ -1176,11 +1176,20 @@ function CosmosProposalsPageContent() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="data-table">
+          <div className="overflow-x-auto lg:overflow-x-hidden">
+            <table className="data-table w-full table-fixed whitespace-normal">
+              <colgroup>
+                <col className="w-[22%]" />
+                <col className="w-[10%]" />
+                <col className="w-[16%]" />
+                <col className="w-[12%]" />
+                <col className="w-[25%]" />
+                <col className="w-[6%]" />
+                <col className="w-[7%]" />
+              </colgroup>
               <thead>
                 <tr>
-                  <th className="w-full max-w-[360px] border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Proposal</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Proposal</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Submission</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Voting</th>
@@ -1197,43 +1206,45 @@ function CosmosProposalsPageContent() {
 
                     return (
                       <tr key={proposal.id} className="cursor-pointer border-t border-slate-200 hover:bg-slate-50/70" onClick={() => router.push(`/cosmos/proposal/${proposal.id}`)}>
-                        <td className="w-full max-w-[360px] px-4 py-3 text-sm" title={`#${proposal.id}. ${proposal.title}`}>
-                          <Link prefetch={false} className="inline-block max-w-[360px] truncate align-middle font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/proposal/${proposal.id}`}>
-                            {`#${proposal.id}. ${proposal.title}`}
-                          </Link>
+                        <td className="overflow-hidden px-4 py-3 text-sm" title={`#${proposal.id}. ${proposal.title}`}>
+                          <div className="min-w-0 truncate">
+                            <Link prefetch={false} className="inline-block max-w-full truncate align-middle font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/proposal/${proposal.id}`}>
+                              {`#${proposal.id}. ${proposal.title}`}
+                            </Link>
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-700">{proposal.typeLabel}</td>
-                        <td className="px-4 py-3 text-xs text-slate-700 tabular-nums">
+                        <td className="overflow-hidden truncate px-4 py-3 text-sm text-slate-700">{proposal.typeLabel}</td>
+                        <td className="overflow-hidden px-4 py-3 text-xs text-slate-700 tabular-nums">
                           <div className="space-y-1">
-                            <div className="whitespace-nowrap">
-                              <span className="mr-2 font-medium text-slate-500">Submit</span>
-                              {formatTimestampWithSeconds(proposal.submitTime)}
+                            <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                              <span className="shrink-0 font-medium text-slate-500">Submit</span>
+                              <span className="truncate">{formatTimestampWithSeconds(proposal.submitTime)}</span>
                             </div>
-                            <div className="whitespace-nowrap">
-                              <span className="mr-2 font-medium text-slate-500">Deposit End</span>
-                              {formatTimestampWithSeconds(proposal.depositEndTime)}
+                            <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                              <span className="shrink-0 font-medium text-slate-500">Deposit End</span>
+                              <span className="truncate">{formatTimestampWithSeconds(proposal.depositEndTime)}</span>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-700 tabular-nums">
+                        <td className="overflow-hidden px-4 py-3 text-xs text-slate-700 tabular-nums">
                           <div className="space-y-1">
-                            <div className="whitespace-nowrap">
-                              <span className="mr-2 font-medium text-slate-500">Start</span>
-                              {formatTimestampWithSeconds(proposal.votingStartTime)}
+                            <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                              <span className="shrink-0 font-medium text-slate-500">Start</span>
+                              <span className="truncate">{formatTimestampWithSeconds(proposal.votingStartTime)}</span>
                             </div>
-                            <div className="whitespace-nowrap">
-                              <span className="mr-2 font-medium text-slate-500">End</span>
-                              {formatTimestampWithSeconds(proposal.votingEndTime)}
+                            <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                              <span className="shrink-0 font-medium text-slate-500">End</span>
+                              <span className="truncate">{formatTimestampWithSeconds(proposal.votingEndTime)}</span>
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-700" title={proposal.tallyLabel}>
-                          <div className="min-w-[280px] truncate">{proposal.tallyLabel}</div>
+                        <td className="overflow-hidden px-4 py-3 text-sm text-slate-700" title={proposal.tallyLabel}>
+                          <div className="truncate">{proposal.tallyLabel}</div>
                         </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="whitespace-nowrap px-3 py-3 text-sm">
                           <StatusBadge status={proposal.status} label={proposal.statusLabel} />
                         </td>
-                        <td className="px-4 py-3 text-right text-sm" onClick={(event) => event.stopPropagation()}>
+                        <td className="whitespace-nowrap px-3 py-3 text-right text-sm" onClick={(event) => event.stopPropagation()}>
                           <span className="inline-flex items-center justify-end gap-0">
                             <ActionIconButton
                               tooltip={canDeposit ? 'Deposit' : 'Deposit period only'}

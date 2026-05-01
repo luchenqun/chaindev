@@ -1,6 +1,6 @@
 'use client';
 
-import { MetricCardsSkeleton } from '@/components/ui/loading-placeholders';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 
 type HeaderItem = {
@@ -21,6 +21,40 @@ const fallbackHeader: HeaderItem[] = [
   { label: 'Latest Block Time', value: 'Unavailable' },
 ];
 
+function CosmosHomeMetricsSkeleton() {
+  return (
+    <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
+      <div className="grid divide-y divide-slate-200 md:grid-cols-4 md:divide-x md:divide-y-0">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={`header-${index}`} className="bg-slate-50 px-5 py-3">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="mt-2 h-4 w-28" />
+          </div>
+        ))}
+      </div>
+
+      {Array.from({ length: 3 }).map((_, rowIndex) => (
+        <div key={`row-${rowIndex}`}>
+          <div className="border-t border-slate-200" />
+          <div className="grid divide-y divide-slate-200 lg:grid-cols-4 lg:divide-x lg:divide-y-0">
+            {Array.from({ length: 4 }).map((__, columnIndex) => (
+              <div key={`row-${rowIndex}-col-${columnIndex}`} className="px-5 py-4">
+                <Skeleton className="mb-2 h-3.5 w-24" />
+                <Skeleton className={`h-8 ${rowIndex === 2 && columnIndex >= 2 ? 'w-44' : 'w-32'}`} />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <div className="border-t border-slate-200" />
+      <div className="bg-slate-50 px-5 py-2">
+        <Skeleton className="h-4 w-80" />
+      </div>
+    </section>
+  );
+}
+
 function MetricCard({ label, value, subtext }: Metric) {
   return (
     <div className="px-5 py-4">
@@ -35,7 +69,7 @@ export function CosmosHomeMetrics() {
   const { snapshot, errorMessage, connectionMode } = useCosmosHomeData();
 
   if (!snapshot && !errorMessage) {
-    return <MetricCardsSkeleton headerItems={4} metrics={12} />;
+    return <CosmosHomeMetricsSkeleton />;
   }
 
   const headerItems = snapshot

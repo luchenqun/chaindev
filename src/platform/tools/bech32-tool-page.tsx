@@ -221,7 +221,7 @@ function decodeBech32Address(input: string) {
 export function Bech32ToolPage() {
   const [action, setAction] = useState<Bech32Action>('encode');
   const [crypto, setCrypto] = useState<Bech32Crypto>('ethsecp256k1');
-  const [prefix, setPrefix] = useState('quarix');
+  const [prefix, setPrefix] = useState('cosmos');
   const [input, setInput] = useState('');
   const [showSecretInput, setShowSecretInput] = useState(false);
   const [result, setResult] = useState<Bech32Result | null>(null);

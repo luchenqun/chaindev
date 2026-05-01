@@ -101,12 +101,6 @@ function getWsBlockGasLabel(payload: TendermintWsEnvelope) {
   return formatWsGasLabel(blockGasAmount);
 }
 
-function parseMetricInteger(value: string) {
-  const normalized = value.replace(/,/g, '').trim();
-  const parsed = Number.parseInt(normalized, 10);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function updateSnapshotMetric(metrics: CosmosHomeSnapshot['metrics'], label: string, nextValue: string) {
   return metrics.map((metric) =>
     metric.label === label
@@ -620,18 +614,12 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           return current;
         }
 
-        const txCountValue = liveFeed.blockPageItem.txCount;
         const isNewerBlock = Number.isFinite(liveFeed.latestBlockNumber) && liveFeed.latestBlockNumber > current.latestHeight;
         let nextMetrics = current.metrics;
         let nextBlocks = current.activity.blocks;
 
         if (isNewerBlock) {
           nextMetrics = updateSnapshotMetric(nextMetrics, 'Block Height', formatMetricInteger(liveFeed.latestBlockNumber));
-          nextMetrics = updateSnapshotMetric(
-            nextMetrics,
-            'Confirmed Txs',
-            formatMetricInteger(parseMetricInteger(current.metrics.find((metric) => metric.label === 'Confirmed Txs')?.value ?? '0') + txCountValue),
-          );
         }
 
         if (liveFeed.lastCommitHeight && liveFeed.lastCommitSignaturesLabel) {
@@ -664,6 +652,9 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           },
         };
       });
+      if (isHomeRoute) {
+        queueRefresh();
+      }
       setErrorMessage(null);
     }
 

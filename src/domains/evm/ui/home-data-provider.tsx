@@ -185,6 +185,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   const recentHomeBlocksRef = useRef<RecentHomeBlock[]>([]);
   const recentHomeTransactionsRef = useRef<RecentHomeTransaction[]>([]);
   const homeChainIdRef = useRef<string | null>(null);
+  const statusRef = useRef<EvmLiveStatus | null>(null);
 
   function resolvePollInterval(nextPollIntervalMs: number) {
     if (!hasResolvedPollIntervalRef.current) {
@@ -204,6 +205,10 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       window.clearInterval(intervalId);
     };
   }, []);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   useEffect(() => {
     const handleModeChanged = () => {
@@ -243,29 +248,23 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
     }
 
     async function refreshCachedHomeTransactions() {
-      if (recentHomeTransactionsRef.current.length > 0) {
-        return;
-      }
-
       const cachedTransactions = await getEvmHomeCachedTransactionsDirect(HOME_TRANSACTION_LIST_LIMIT);
 
       if (disposed) {
         return;
       }
 
-      if (!cachedTransactions.length) {
-        return;
-      }
-
       recentHomeTransactionsRef.current = cachedTransactions;
       setSnapshot((current) =>
-        current && current.activity.transactions.length === 0
+        current
           ? {
               ...current,
-              activity: {
-                ...current.activity,
-                transactions: cachedTransactions,
-              },
+              activity: current.activity.transactions.length === 0
+                ? {
+                    ...current.activity,
+                    transactions: cachedTransactions,
+                  }
+                : current.activity,
             }
           : current,
       );
@@ -344,6 +343,46 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
               activity: current.activity,
             }
           : nextSnapshot,
+      );
+    }
+
+    async function refreshHomeMetricsOnly() {
+      if (!isHomePage) {
+        return;
+      }
+
+      const currentStatus = statusRef.current;
+
+      if (!currentStatus) {
+        return;
+      }
+
+      const supplement = await getEvmHomeMetricsSupplementDirect(homeChainIdRef.current == null);
+
+      if (disposed) {
+        return;
+      }
+
+      if (supplement.header.chainId) {
+        homeChainIdRef.current = supplement.header.chainId;
+      }
+
+      const nextSnapshot = buildDerivedHomeSnapshot({
+        feed: currentStatus,
+        supplement,
+        recentBlocks: recentHomeBlocksRef.current,
+        chainId: homeChainIdRef.current,
+        pollIntervalMs: currentStatus.pollIntervalMs,
+        activityTransactions: recentHomeTransactionsRef.current,
+      });
+
+      setSnapshot((current) =>
+        current
+          ? {
+              ...nextSnapshot,
+              activity: current.activity,
+            }
+          : current,
       );
     }
 
@@ -458,6 +497,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
     const unsubscribeTransactionCache = subscribeEvmTransactionCache(() => {
       if (isHomePage) {
         void refreshCachedHomeTransactions();
+        void refreshHomeMetricsOnly();
       }
     });
 

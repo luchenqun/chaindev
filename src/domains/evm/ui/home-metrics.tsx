@@ -86,7 +86,7 @@ export function EvmHomeMetrics() {
     : fallbackHeader;
 
   if (!snapshot && !errorMessage) {
-    return <MetricCardsSkeleton />;
+    return <MetricCardsSkeleton headerItems={4} metricRows={[4, 4]} />;
   }
 
   return (

@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
-import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
+import { Skeleton } from '@/components/ui/skeleton';
 import { READABLE_DENOM_ALIASES } from '@/domains/cosmos/client/readable-denom-aliases';
 import { formatReadableDenom } from '@/domains/cosmos/client/tx-helpers';
 import { getCosmosParamsDirect, type CosmosParamsModuleResult } from '@/domains/cosmos/client/queries';
@@ -22,6 +22,42 @@ type FormattedModuleSection = {
   title?: string;
   fields: ParamsFieldCardProps[];
 };
+
+function CosmosParamsPageSkeleton() {
+  return (
+    <main className="section-block">
+      <div className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0">
+          <Skeleton className="h-9 w-32" />
+        </div>
+        <Skeleton className="h-8 w-8 rounded-md" />
+      </div>
+
+      <div className="grid gap-4">
+        {Array.from({ length: 4 }).map((_, moduleIndex) => (
+          <section key={moduleIndex} className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <div className="flex min-w-0 items-start justify-between gap-4">
+                <Skeleton className="h-6 w-36" />
+                <Skeleton className="h-8 w-8 rounded-md" />
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {Array.from({ length: 8 }).map((__, fieldIndex) => (
+                  <div key={fieldIndex} className="rounded-lg bg-slate-100 px-4 py-3">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="mt-2 h-5 w-28" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        ))}
+      </div>
+    </main>
+  );
+}
 
 function formatIntegerText(value: string | undefined) {
   if (!value) {
@@ -805,7 +841,7 @@ export default function CosmosParamsPage() {
   if (loading && !data) {
     return (
       <AppShell mode="cosmos">
-        <ListPageSkeleton titleWidth="w-32" rows={6} columns={1} showToolbar={false} />
+        <CosmosParamsPageSkeleton />
       </AppShell>
     );
   }
