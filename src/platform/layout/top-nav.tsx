@@ -1,6 +1,6 @@
 'use client';
 
-import { IconChevronDown, IconCloudCode, IconLogout, IconRepeat, IconSend, IconUserCircle } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCalculator, IconChevronDown, IconCloudCode, IconCode, IconLogout, IconSend, IconUserCircle } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -138,7 +138,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           {
             id: 'tools',
             label: 'Tools',
-            items: [{ href: '/cosmos/tools/bech32', label: 'Bech32', icon: IconRepeat }],
+            items: [{ href: '/cosmos/tools/bech32', label: 'Bech32', icon: IconArrowsExchange }],
           },
         ]
       : [
@@ -154,9 +154,9 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             id: 'tools',
             label: 'Tools',
             items: [
-              { href: '/evm/tools/decode', label: 'Input Data Decoder', icon: IconRepeat },
-              { href: '/evm/tools/unit-converter', label: 'Unit Converter', icon: IconRepeat },
-              { href: '/evm/tools/bech32', label: 'Bech32', icon: IconRepeat },
+              { href: '/evm/tools/decode', label: 'Input Data Decoder', icon: IconCode },
+              { href: '/evm/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
+              { href: '/evm/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
             ],
           },
         ];
