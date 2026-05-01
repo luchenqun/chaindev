@@ -15,9 +15,11 @@ const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 const API_SPECS = [
   { value: 'cosmos', label: 'Cosmos SDK', file: '/cosmos.yaml', baseUrl: 'rest' },
   { value: 'quarix', label: 'Quarix', file: '/quarix.yaml', baseUrl: 'rest' },
+  { value: 'moca', label: 'Moca', file: '/moca.yaml', baseUrl: 'rest' },
   { value: 'evm', label: 'EVM', file: '/evm.yaml', baseUrl: 'rest' },
   { value: 'cometbft', label: 'CometBFT', file: '/cometbft.yaml', baseUrl: 'rpc' },
 ] as const;
+const COSMOS_REST_INPUT_CACHE_KEY = 'chaindev-cosmos-rest-inputs-v1';
 const bodyTextareaClassName =
   'min-h-28 w-full resize-none overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm leading-6 text-slate-800 shadow-sm outline-none transition focus:border-sky-300 focus:ring-4 focus:ring-sky-100';
 
@@ -57,6 +59,11 @@ type RestEndpoint = {
   bodyParameter: SwaggerParameter | null;
 };
 type FieldErrors = Record<string, string>;
+type RestEndpointInputCacheEntry = {
+  pathValues: Record<string, string>;
+  queryValues: Record<string, string>;
+  bodyJson: string;
+};
 
 function isHttpMethod(value: string): value is HttpMethod {
   return HTTP_METHODS.includes(value as HttpMethod);
@@ -133,6 +140,71 @@ function createBodyTemplate(endpoint: RestEndpoint | null) {
   const template = Object.fromEntries(Object.keys(properties).map((key) => [key, '']));
 
   return JSON.stringify(template, null, 2);
+}
+
+function createRestEndpointCacheKey(apiSpec: ApiSpecValue, endpointId: string) {
+  return `${apiSpec}:${endpointId}`;
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return !!value && typeof value === 'object' && !Array.isArray(value) && Object.values(value).every((item) => typeof item === 'string');
+}
+
+function readCosmosRestInputCache() {
+  if (typeof window === 'undefined') {
+    return {} as Record<string, RestEndpointInputCacheEntry>;
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(COSMOS_REST_INPUT_CACHE_KEY);
+
+    if (!rawValue) {
+      return {} as Record<string, RestEndpointInputCacheEntry>;
+    }
+
+    const parsedValue = JSON.parse(rawValue) as unknown;
+
+    if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+      return {} as Record<string, RestEndpointInputCacheEntry>;
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsedValue).filter((entry): entry is [string, RestEndpointInputCacheEntry] => {
+        const cacheEntry = entry[1];
+
+        return (
+          !!cacheEntry &&
+          typeof cacheEntry === 'object' &&
+          !Array.isArray(cacheEntry) &&
+          isStringRecord((cacheEntry as RestEndpointInputCacheEntry).pathValues) &&
+          isStringRecord((cacheEntry as RestEndpointInputCacheEntry).queryValues) &&
+          typeof (cacheEntry as RestEndpointInputCacheEntry).bodyJson === 'string'
+        );
+      }),
+    );
+  } catch {
+    return {} as Record<string, RestEndpointInputCacheEntry>;
+  }
+}
+
+function writeCosmosRestInputCache(cache: Record<string, RestEndpointInputCacheEntry>) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.localStorage.setItem(COSMOS_REST_INPUT_CACHE_KEY, JSON.stringify(cache));
+}
+
+function getCachedCosmosRestInput(apiSpec: ApiSpecValue, endpointId: string) {
+  return readCosmosRestInputCache()[createRestEndpointCacheKey(apiSpec, endpointId)] ?? null;
+}
+
+function persistCosmosRestInput(apiSpec: ApiSpecValue, endpointId: string, entry: RestEndpointInputCacheEntry) {
+  const currentCache = readCosmosRestInputCache();
+  writeCosmosRestInputCache({
+    ...currentCache,
+    [createRestEndpointCacheKey(apiSpec, endpointId)]: entry,
+  });
 }
 
 function replacePathParameters(path: string, values: Record<string, string>) {
@@ -298,13 +370,25 @@ export default function CosmosRestToolPage() {
   }, [selectedApiSpec.file]);
 
   useEffect(() => {
-    setPathValues({});
-    setQueryValues({});
-    setBodyJson(createBodyTemplate(selectedEndpoint));
+    if (!selectedEndpoint) {
+      setPathValues({});
+      setQueryValues({});
+      setBodyJson('{}');
+      setResult(null);
+      setError(null);
+      setFieldErrors({});
+      return;
+    }
+
+    const cachedInput = getCachedCosmosRestInput(apiSpec, selectedEndpoint.id);
+
+    setPathValues(cachedInput?.pathValues ?? {});
+    setQueryValues(cachedInput?.queryValues ?? {});
+    setBodyJson(cachedInput?.bodyJson ?? createBodyTemplate(selectedEndpoint));
     setResult(null);
     setError(null);
     setFieldErrors({});
-  }, [selectedEndpoint]);
+  }, [apiSpec, selectedEndpoint]);
 
   async function handleRun() {
     if (!selectedEndpoint) {
@@ -332,6 +416,11 @@ export default function CosmosRestToolPage() {
         JSON.parse(bodyJson);
       }
 
+      persistCosmosRestInput(apiSpec, selectedEndpoint.id, {
+        pathValues,
+        queryValues,
+        bodyJson,
+      });
       const response = await requestCosmosRestDirect({
         endpointPath,
         method: selectedEndpoint.method,

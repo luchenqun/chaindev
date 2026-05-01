@@ -119,7 +119,10 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           { href: '/cosmos/tools/rest', label: 'REST API', icon: IconCloudCode },
           { href: '/cosmos/tools/bech32', label: 'Bech32', icon: IconRepeat },
         ]
-      : [{ href: '/evm/tools/bech32', label: 'Bech32', icon: IconRepeat }];
+      : [
+          { href: '/evm/tools/rpc', label: 'RPC API', icon: IconCloudCode },
+          { href: '/evm/tools/bech32', label: 'Bech32', icon: IconRepeat },
+        ];
   const moreActive = moreItems.some((item) => matchesNavItem(pathname, item.href));
 
   return (

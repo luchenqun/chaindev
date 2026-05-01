@@ -1,0 +1,1121 @@
+swagger: "2.0"
+info:
+  title: Moca REST API
+  version: "1.0"
+  description: REST query endpoints generated from selected Moca query.proto files.
+schemes:
+  - http
+  - https
+consumes:
+  - application/json
+produces:
+  - application/json
+paths:
+  /moca/challenge/params:
+    get:
+      tags:
+        - moca.challenge
+      operationId: Params
+      summary: Parameters queries the parameters of the challenge module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/challenge/attested_challenge:
+    get:
+      tags:
+        - moca.challenge
+      operationId: AttestedChallenge
+      summary: Queries the attested challenge by challenge id.
+      parameters:
+        - name: challenge_id
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/challenge/latest_attested_challenges:
+    get:
+      tags:
+        - moca.challenge
+      operationId: LatestAttestedChallenges
+      summary: Queries the latest attested challenges.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/challenge/inturn_attestation_submitter:
+    get:
+      tags:
+        - moca.challenge
+      operationId: InturnAttestationSubmitter
+      summary: Queries the inturn attestation submitter.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+
+  /mocachain/moca/gensptx/params:
+    get:
+      tags:
+        - moca.gensp
+      operationId: Params
+      summary: Parameters queries the parameters of the gensp module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+
+  /moca/payment/params:
+    get:
+      tags:
+        - moca.payment
+      operationId: Params
+      summary: Parameters queries the parameters of the payment module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/params/{timestamp}:
+    get:
+      tags:
+        - moca.payment
+      operationId: ParamsByTimestamp
+      summary: ParamsByTimestamp queries the parameters of the payment module by timestamp.
+      parameters:
+        - name: timestamp
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/out_flows/{account}:
+    get:
+      tags:
+        - moca.payment
+      operationId: OutFlows
+      summary: Queries out flows by account.
+      parameters:
+        - name: account
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/stream_record/{account}:
+    get:
+      tags:
+        - moca.payment
+      operationId: StreamRecord
+      summary: Queries a stream record by account.
+      parameters:
+        - name: account
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/stream_records:
+    get:
+      tags:
+        - moca.payment
+      operationId: StreamRecords
+      summary: Queries all stream records.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/payment_account_count/{owner}:
+    get:
+      tags:
+        - moca.payment
+      operationId: PaymentAccountCount
+      summary: Queries the payment account count by owner.
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/payment_account_counts:
+    get:
+      tags:
+        - moca.payment
+      operationId: PaymentAccountCounts
+      summary: Queries all payment account counts.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/payment_account/{addr}:
+    get:
+      tags:
+        - moca.payment
+      operationId: PaymentAccount
+      summary: Queries a payment account by payment account address.
+      parameters:
+        - name: addr
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/payment_accounts:
+    get:
+      tags:
+        - moca.payment
+      operationId: PaymentAccounts
+      summary: Queries all payment accounts.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/dynamic_balance/{account}:
+    get:
+      tags:
+        - moca.payment
+      operationId: DynamicBalance
+      summary: Queries dynamic balance of a payment account.
+      parameters:
+        - name: account
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/payment_accounts_by_owner/{owner}:
+    get:
+      tags:
+        - moca.payment
+      operationId: PaymentAccountsByOwner
+      summary: Queries all payment accounts by owner.
+      parameters:
+        - name: owner
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/auto_settle_records:
+    get:
+      tags:
+        - moca.payment
+      operationId: AutoSettleRecords
+      summary: Queries all auto settle records.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/payment/delayed_withdrawal/{account}:
+    get:
+      tags:
+        - moca.payment
+      operationId: DelayedWithdrawal
+      summary: Queries delayed withdrawal of an account.
+      parameters:
+        - name: account
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+
+  /moca/permission/params:
+    get:
+      tags:
+        - moca.permission
+      operationId: Params
+      summary: Parameters queries the parameters of the permission module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+
+  /moca/sp/params:
+    get:
+      tags:
+        - moca.sp
+      operationId: Params
+      summary: Parameters queries the parameters of the sp module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage_providers:
+    get:
+      tags:
+        - moca.sp
+      operationId: StorageProviders
+      summary: Queries storage providers.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/sp/sp_storage_price/{sp_addr}:
+    get:
+      tags:
+        - moca.sp
+      operationId: QuerySpStoragePrice
+      summary: Gets the latest storage price of a specific storage provider.
+      parameters:
+        - name: sp_addr
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/sp/global_sp_store_price_by_time/{timestamp}:
+    get:
+      tags:
+        - moca.sp
+      operationId: QueryGlobalSpStorePriceByTime
+      summary: Gets the global store price by time.
+      parameters:
+        - name: timestamp
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage_provider/{id}:
+    get:
+      tags:
+        - moca.sp
+      operationId: StorageProvider
+      summary: Queries a storage provider by id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/sp/storage_provider_by_operator_address:
+    get:
+      tags:
+        - moca.sp
+      operationId: StorageProviderByOperatorAddress
+      summary: Queries a storage provider by operator address.
+      parameters:
+        - name: operator_address
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/sp/storage_provider_maintenance_records_by_operator_address:
+    get:
+      tags:
+        - moca.sp
+      operationId: StorageProviderMaintenanceRecordsByOperatorAddress
+      summary: Queries storage provider maintenance records by operator address.
+      parameters:
+        - name: operator_address
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+
+  /moca/storage/params:
+    get:
+      tags:
+        - moca.storage
+      operationId: Params
+      summary: Parameters queries the parameters of the storage module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/params/{timestamp}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryParamsByTimestamp
+      summary: Queries the parameters of the storage module by timestamp.
+      parameters:
+        - name: timestamp
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_bucket/{bucket_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadBucket
+      summary: Queries a bucket by bucket name.
+      parameters:
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_bucket_by_id/{bucket_id}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadBucketById
+      summary: Queries a bucket by bucket id.
+      parameters:
+        - name: bucket_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_bucket_nft/{token_id}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadBucketNFT
+      summary: Queries bucket NFT metadata.
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_object/{bucket_name}/{object_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadObject
+      summary: Queries an object by bucket name and object name.
+      parameters:
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+        - name: object_name
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_object_by_id/{object_id}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadObjectById
+      summary: Queries an object by object id.
+      parameters:
+        - name: object_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_shadow_object/{bucket_name}/{object_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadShadowObject
+      summary: Queries a shadow object by bucket name and object name.
+      parameters:
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+        - name: object_name
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_object_nft/{token_id}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadObjectNFT
+      summary: Queries object NFT metadata.
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/list_buckets:
+    get:
+      tags:
+        - moca.storage
+      operationId: ListBuckets
+      summary: Queries a list of buckets.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/list_objects/{bucket_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: ListObjects
+      summary: Queries a list of objects under a bucket.
+      parameters:
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/list_objects_by_bucket_id/{bucket_id}:
+    get:
+      tags:
+        - moca.storage
+      operationId: ListObjectsByBucketId
+      summary: Queries a list of objects under a bucket by bucket id.
+      parameters:
+        - name: bucket_id
+          in: path
+          required: true
+          type: string
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_group_nft/{token_id}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadGroupNFT
+      summary: Queries group NFT metadata.
+      parameters:
+        - name: token_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/policy_for_account/{resource}/{principal_address}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryPolicyForAccount
+      summary: Queries a policy that grants permission to an account.
+      parameters:
+        - name: resource
+          in: path
+          required: true
+          type: string
+        - name: principal_address
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/verify_permission/{operator}/{bucket_name}/{action_type}:
+    get:
+      tags:
+        - moca.storage
+      operationId: VerifyPermission
+      summary: Queries verify permission results.
+      parameters:
+        - name: operator
+          in: path
+          required: true
+          type: string
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+        - name: action_type
+          in: path
+          required: true
+          type: string
+        - name: object_name
+          in: query
+          required: false
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_group/{group_owner}/{group_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadGroup
+      summary: Queries a group by owner and group name.
+      parameters:
+        - name: group_owner
+          in: path
+          required: true
+          type: string
+        - name: group_name
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/list_groups/{group_owner}:
+    get:
+      tags:
+        - moca.storage
+      operationId: ListGroups
+      summary: Queries a list of groups for an owner.
+      parameters:
+        - name: group_owner
+          in: path
+          required: true
+          type: string
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_group_member:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadGroupMember
+      summary: Queries a head group member item.
+      parameters:
+        - name: member
+          in: query
+          required: true
+          type: string
+        - name: group_owner
+          in: query
+          required: true
+          type: string
+        - name: group_name
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/policy_for_group/{resource}/{principal_group_id}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryPolicyForGroup
+      summary: Queries a policy that grants permission to a group.
+      parameters:
+        - name: resource
+          in: path
+          required: true
+          type: string
+        - name: principal_group_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/policy_by_id/{policy_id}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryPolicyById
+      summary: Queries a policy by policy id.
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/lock_fee:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryLockFee
+      summary: Queries lock fee for storing an object.
+      parameters:
+        - name: primary_sp_address
+          in: query
+          required: true
+          type: string
+        - name: create_at
+          in: query
+          required: true
+          type: string
+        - name: payload_size
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/head_bucket_extra/{bucket_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: HeadBucketExtra
+      summary: Queries bucket extra info by bucket name.
+      parameters:
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/is_price_changed/{bucket_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryIsPriceChanged
+      summary: Queries whether read and storage prices changed for a bucket.
+      parameters:
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/quota_update_time/{bucket_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryQuotaUpdateTime
+      summary: Queries the quota update time for a bucket.
+      parameters:
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/group_members_exist/{group_id}/{members}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryGroupMembersExist
+      summary: Queries whether specific members exist in a group.
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          type: string
+        - name: members
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/groups_exist/{group_owner}/{group_names}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryGroupsExist
+      summary: Queries whether specific groups exist for a group owner.
+      parameters:
+        - name: group_owner
+          in: path
+          required: true
+          type: string
+        - name: group_names
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/groups_exist_by_id/{group_ids}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryGroupsExistById
+      summary: Queries whether specific groups exist by id.
+      parameters:
+        - name: group_ids
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/storage/payment_account_bucket_flow_rate_limit/{payment_account}/{bucket_name}:
+    get:
+      tags:
+        - moca.storage
+      operationId: QueryPaymentAccountBucketFlowRateLimit
+      summary: Queries the flow rate limit of a bucket for a payment account.
+      parameters:
+        - name: payment_account
+          in: path
+          required: true
+          type: string
+        - name: bucket_name
+          in: path
+          required: true
+          type: string
+        - name: bucket_owner
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+
+  /moca/virtualgroup/params:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: Params
+      summary: Parameters queries the parameters of the virtualgroup module.
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/global_virtual_group:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: GlobalVirtualGroup
+      summary: Queries a global virtual group by id.
+      parameters:
+        - name: global_virtual_group_id
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/global_virtual_group_by_family_id:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: GlobalVirtualGroupByFamilyID
+      summary: Queries global virtual groups by family id.
+      parameters:
+        - name: global_virtual_group_family_id
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/global_virtual_group_family:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: GlobalVirtualGroupFamily
+      summary: Queries a global virtual group family by id.
+      parameters:
+        - name: family_id
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/global_virtual_group_families:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: GlobalVirtualGroupFamilies
+      summary: Queries global virtual group families.
+      parameters:
+        - $ref: "#/parameters/PaginationKey"
+        - $ref: "#/parameters/PaginationOffset"
+        - $ref: "#/parameters/PaginationLimit"
+        - $ref: "#/parameters/PaginationCountTotal"
+        - $ref: "#/parameters/PaginationReverse"
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/available_global_virtual_group_families:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: AvailableGlobalVirtualGroupFamilies
+      summary: Filters global virtual group family ids qualified to create a bucket.
+      parameters:
+        - name: global_virtual_group_family_ids
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/swap_in_info:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: SwapInInfo
+      summary: Gets reserved swap-in info for a global virtual group family or group.
+      parameters:
+        - name: global_virtual_group_family_id
+          in: query
+          required: true
+          type: string
+        - name: global_virtual_group_id
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/sp_gvg_statistics:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: GVGStatistics
+      summary: Gets global virtual group statistics for a storage provider.
+      parameters:
+        - name: sp_id
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/sp_available_global_virtual_group_families:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: QuerySpAvailableGlobalVirtualGroupFamilies
+      summary: Filters available global virtual group family ids under a storage provider.
+      parameters:
+        - name: sp_id
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+  /moca/virtualgroup/sp_optimal_global_virtual_group_family:
+    get:
+      tags:
+        - moca.virtualgroup
+      operationId: QuerySpOptimalGlobalVirtualGroupFamily
+      summary: Queries the optimal global virtual group family under a storage provider.
+      parameters:
+        - name: sp_id
+          in: query
+          required: true
+          type: string
+        - name: pick_vgf_strategy
+          in: query
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+parameters:
+  PaginationKey:
+    name: pagination.key
+    in: query
+    required: false
+    type: string
+    format: byte
+  PaginationOffset:
+    name: pagination.offset
+    in: query
+    required: false
+    type: string
+    format: uint64
+  PaginationLimit:
+    name: pagination.limit
+    in: query
+    required: false
+    type: string
+    format: uint64
+  PaginationCountTotal:
+    name: pagination.count_total
+    in: query
+    required: false
+    type: boolean
+  PaginationReverse:
+    name: pagination.reverse
+    in: query
+    required: false
+    type: boolean
