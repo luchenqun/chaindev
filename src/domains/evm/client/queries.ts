@@ -184,7 +184,7 @@ function derivePollIntervalMs(timestamps: bigint[]) {
   const blockDistance = timestamps.length - 1;
   const averageSeconds = (Number(latestTimestamp - oldestTimestamp) / blockDistance) * 0.8;
 
-  return Math.max(1_000, Math.min(30_000, Math.round(averageSeconds * 1_000)));
+  return Math.max(100, Math.min(30_000, Math.round(averageSeconds * 1_000)));
 }
 
 function derivePollIntervalMsFromRange(latestTimestamp: bigint, oldestTimestamp: bigint, blockSpan: number) {
@@ -194,7 +194,7 @@ function derivePollIntervalMsFromRange(latestTimestamp: bigint, oldestTimestamp:
 
   const averageSeconds = (Number(latestTimestamp - oldestTimestamp) / blockSpan) * 0.8;
 
-  return Math.max(1_000, Math.min(30_000, Math.round(averageSeconds * 1_000)));
+  return Math.max(100, Math.min(30_000, Math.round(averageSeconds * 1_000)));
 }
 
 const HOME_BLOCK_FETCH_BATCH_SIZE = 12;
