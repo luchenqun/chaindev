@@ -810,6 +810,13 @@ export type CosmosHomeSnapshot = {
   refreshedAt: number;
 };
 
+export type CosmosParamsModuleResult = {
+  id: string;
+  label: string;
+  endpoint: string;
+  data: Record<string, unknown>;
+};
+
 export function getActiveCosmosProvider() {
   const profile = readActiveRpcProfileCookie('cosmos');
 
@@ -822,6 +829,155 @@ export function getActiveCosmosProvider() {
   }
 
   return profile;
+}
+
+async function tryFetchJsonObject(url: string) {
+  try {
+    const payload = await fetchJson<unknown>(url);
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return null;
+    }
+
+    return payload as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function hasDisplayableObjectData(value: unknown): boolean {
+  if (value == null) {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  if (typeof value !== 'object') {
+    return true;
+  }
+
+  const entries = Object.values(value as Record<string, unknown>);
+
+  if (!entries.length) {
+    return false;
+  }
+
+  return entries.some((entry) => hasDisplayableObjectData(entry));
+}
+
+async function loadFirstAvailableParamsModule(
+  profile: CosmosProvider,
+  definition: {
+    id: string;
+    label: string;
+    paths: readonly string[];
+  },
+) {
+  for (const path of definition.paths) {
+    const endpoint = `${profile.restUrl}${path}`;
+    const payload = await tryFetchJsonObject(endpoint);
+
+    if (!payload || !hasDisplayableObjectData(payload)) {
+      continue;
+    }
+
+    return {
+      id: definition.id,
+      label: definition.label,
+      endpoint,
+      data: payload,
+    } satisfies CosmosParamsModuleResult;
+  }
+
+  return null;
+}
+
+async function loadGovParams(profile: CosmosProvider) {
+  const groups = [
+    { id: 'deposit', label: 'Deposit', key: 'depositParams' },
+    { id: 'voting', label: 'Voting', key: 'votingParams' },
+    { id: 'tally', label: 'Tally', key: 'tallyParams' },
+  ] as const;
+  const versions = ['v1', 'v1beta1'] as const;
+
+  for (const version of versions) {
+    const entries = await Promise.all(
+      groups.map(async (group) => {
+        const endpoint = `${profile.restUrl}/cosmos/gov/${version}/params/${group.id}`;
+        const payload = await tryFetchJsonObject(endpoint);
+
+        if (!payload) {
+          return null;
+        }
+
+        const value = (payload[group.key] as Record<string, unknown> | undefined) ?? payload;
+
+        if (!hasDisplayableObjectData(value)) {
+          return null;
+        }
+
+        return {
+          label: group.label,
+          endpoint,
+          value,
+        };
+      }),
+    );
+    const availableEntries = entries.filter((entry): entry is NonNullable<typeof entry> => entry != null);
+
+    if (!availableEntries.length) {
+      continue;
+    }
+
+    return {
+      id: 'gov',
+      label: 'Governance',
+      endpoint: availableEntries.map((entry) => entry.endpoint).join('\n'),
+      data: Object.fromEntries(availableEntries.map((entry) => [entry.label.toLowerCase(), entry.value])),
+    } satisfies CosmosParamsModuleResult;
+  }
+
+  return null;
+}
+
+export async function getCosmosParamsDirect() {
+  const profile = getActiveCosmosProvider();
+  const moduleDefinitions = [
+    { id: 'auth', label: 'Auth', paths: ['/cosmos/auth/v1beta1/params'] },
+    { id: 'bank', label: 'Bank', paths: ['/cosmos/bank/v1beta1/params'] },
+    { id: 'consensus', label: 'Consensus', paths: ['/cosmos/consensus/v1/params'] },
+    { id: 'distribution', label: 'Distribution', paths: ['/cosmos/distribution/v1beta1/params'] },
+    { id: 'mint', label: 'Mint', paths: ['/cosmos/mint/v1beta1/params'] },
+    { id: 'evm-vm', label: 'EVM VM', paths: ['/cosmos/evm/vm/v1/params', '/evmos/evm/v1/params'] },
+    { id: 'evm-feemarket', label: 'EVM Fee Market', paths: ['/cosmos/evm/feemarket/v1/params', '/evmos/feemarket/v1/params'] },
+    { id: 'evm-erc20', label: 'EVM ERC20', paths: ['/cosmos/evm/erc20/v1/params', '/evmos/erc20/v1/params'] },
+    { id: 'protocolpool', label: 'Protocol Pool', paths: ['/cosmos/protocolpool/v1/params'] },
+    { id: 'slashing', label: 'Slashing', paths: ['/cosmos/slashing/v1beta1/params'] },
+    { id: 'staking', label: 'Staking', paths: ['/cosmos/staking/v1beta1/params'] },
+    { id: 'quarix-gaswaiver', label: 'Quarix Gas Waiver', paths: ['/quarix/gaswaiver/v1/params'] },
+    { id: 'quarix-veto', label: 'Quarix Veto', paths: ['/quarix/gov/v1/veto_params'] },
+  ] as const;
+
+  const results = await Promise.all(
+    moduleDefinitions.map((definition) => loadFirstAvailableParamsModule(profile, definition)),
+  );
+
+  const modules = results.filter((result): result is CosmosParamsModuleResult => result != null);
+  const govModule = await loadGovParams(profile);
+
+  if (govModule) {
+    modules.splice(4, 0, govModule);
+  }
+
+  return {
+    providerName: profile.name,
+    providerId: profile.id,
+    restUrl: profile.restUrl,
+    modules,
+    fetchedAt: Date.now(),
+  };
 }
 
 type CachedCosmosValidatorMaps = {

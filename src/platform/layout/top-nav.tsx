@@ -71,6 +71,10 @@ function matchesNavItem(pathname: string, href: string) {
     return pathname.startsWith('/cosmos/proposals') || pathname.startsWith('/cosmos/proposal/');
   }
 
+  if (href.startsWith('/cosmos/params')) {
+    return pathname.startsWith('/cosmos/params');
+  }
+
   if (href.startsWith('/cosmos/validators')) {
     return pathname.startsWith('/cosmos/validators') || pathname.startsWith('/cosmos/validator/');
   }
@@ -98,6 +102,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           { href: '/cosmos/accounts', label: 'Accounts' },
           { href: '/cosmos/validators', label: 'Validators' },
           { href: '/cosmos/proposals', label: 'Proposals' },
+          { href: '/cosmos/params', label: 'Params' },
         ]
       : [
           { href: '/evm/blocks', label: 'Blocks' },
