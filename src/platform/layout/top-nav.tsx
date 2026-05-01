@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconCalculator, IconChevronDown, IconCloudCode, IconCode, IconLogout, IconSend, IconUserCircle } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCalculator, IconChevronDown, IconClockSearch, IconCloudCode, IconCode, IconLogout, IconSend, IconUserCircle } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -147,6 +147,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             label: 'Chain',
             items: [
               { href: '/evm/tools/send-tx', label: 'Send Transaction', icon: IconSend },
+              { href: '/evm/tools/historical-balance', label: 'Historical Balance', icon: IconClockSearch },
               { href: '/evm/tools/rpc', label: 'RPC API', icon: IconCloudCode },
             ],
           },
