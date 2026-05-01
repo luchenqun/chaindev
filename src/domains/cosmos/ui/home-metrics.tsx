@@ -1,5 +1,7 @@
 'use client';
 
+import { IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 
@@ -66,7 +68,7 @@ function MetricCard({ label, value, subtext }: Metric) {
 }
 
 export function CosmosHomeMetrics() {
-  const { snapshot, errorMessage, connectionMode } = useCosmosHomeData();
+  const { snapshot, errorMessage, connectionMode, autoRefreshEnabled, setAutoRefreshEnabled } = useCosmosHomeData();
 
   if (!snapshot && !errorMessage) {
     return <CosmosHomeMetricsSkeleton />;
@@ -121,8 +123,20 @@ export function CosmosHomeMetrics() {
       ) : null}
       {errorMessage ? <div className="border-t border-slate-200 bg-rose-50 px-5 py-3 text-sm text-rose-600">{errorMessage}</div> : null}
       {snapshot ? (
-        <div className="border-t border-slate-200 bg-slate-50 px-5 py-2 text-xs text-slate-500">
-          {connectionMode === 'ws' ? 'Live updates via WebSocket. HTTP polling remains enabled as fallback.' : 'Auto refresh via HTTP polling.'}
+        <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-2 text-xs text-slate-500">
+          <span>
+            {connectionMode === 'ws'
+              ? `Live updates via WebSocket. ${autoRefreshEnabled ? 'HTTP snapshot refresh is enabled.' : 'HTTP snapshot refresh is disabled by default.'}`
+              : 'Auto refresh via HTTP polling.'}
+          </span>
+          <ActionIconButton
+            tooltip={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
+            aria-pressed={autoRefreshEnabled}
+            className={autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
+            onClick={() => setAutoRefreshEnabled((current) => !current)}
+          >
+            {autoRefreshEnabled ? <IconPlayerPause className="size-4" stroke={1.8} /> : <IconPlayerPlay className="size-4" stroke={1.8} />}
+          </ActionIconButton>
         </div>
       ) : null}
     </section>

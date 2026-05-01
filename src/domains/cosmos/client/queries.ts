@@ -810,6 +810,8 @@ export type CosmosHomeSnapshot = {
   refreshedAt: number;
 };
 
+export type CosmosHomeSummarySnapshot = Pick<CosmosHomeSnapshot, 'header' | 'metrics' | 'latestHeight' | 'refreshedAt'>;
+
 export type CosmosParamsModuleResult = {
   id: string;
   label: string;
@@ -3344,6 +3346,98 @@ export async function getCosmosHomeSnapshotDirect(blockLimit = 6, txLimit = 6): 
       blocks,
       transactions: latestTransactions.slice(0, txLimit),
     },
+    latestHeight,
+    refreshedAt: Date.now(),
+  };
+}
+
+export async function getCosmosHomeSummarySnapshotDirect(): Promise<CosmosHomeSummarySnapshot> {
+  const profile = getActiveCosmosProvider();
+  const [
+    statusPayload,
+    netInfoPayload,
+    unconfirmedPayload,
+    txSearchPayload,
+    restValidatorsPayload,
+    proposalsPayload,
+    poolPayload,
+    communityPoolPayload,
+    supplyPayload,
+  ] = await Promise.all([
+    getStatusDirect(profile),
+    getNetInfoDirect(profile).catch(() => ({ result: { n_peers: '0' } })),
+    getUnconfirmedTxsDirect(profile).catch(() => ({
+      result: { n_txs: '0', total: '0' },
+    })),
+    getTxSearchDirect(profile, 1).catch(() => ({ result: { total_count: '0', txs: [] } })),
+    getRestValidatorsDirect(profile).catch(() => ({ validators: [], pagination: { total: '0' } })),
+    fetchJson<CosmosGovProposalsResponse>(`${profile.restUrl}/cosmos/gov/v1/proposals?pagination.count_total=true&pagination.limit=1`).catch(() => ({
+      proposals: [],
+      pagination: { total: '0' },
+    })),
+    fetchJson<CosmosPoolResponse>(`${profile.restUrl}/cosmos/staking/v1beta1/pool`).catch(() => ({ pool: { bonded_tokens: '0', not_bonded_tokens: '0' } })),
+    fetchJson<CosmosCommunityPoolResponse>(`${profile.restUrl}/cosmos/distribution/v1beta1/community_pool`).catch(() => ({ pool: [] })),
+    fetchJson<CosmosSupplyResponse>(`${profile.restUrl}/cosmos/bank/v1beta1/supply`).catch(() => ({ supply: [] })),
+  ]);
+  const latestHeight = Number(statusPayload.result?.sync_info?.latest_block_height ?? 0);
+
+  return {
+    header: {
+      connection: profile.wsUrl ? 'RPC + WebSocket' : 'RPC Polling',
+      providerName: profile.name,
+      chainId: statusPayload.result?.node_info?.network ?? 'Unavailable',
+      latestBlockTime: formatLocalTimestamp(statusPayload.result?.sync_info?.latest_block_time),
+    },
+    metrics: [
+      {
+        label: 'Moniker',
+        value: statusPayload.result?.node_info?.moniker ?? profile.name ?? 'Unavailable',
+      },
+      {
+        label: 'Block Height',
+        value: formatInteger(latestHeight),
+      },
+      {
+        label: 'Confirmed Txs',
+        value: formatInteger(txSearchPayload.result?.total_count),
+      },
+      {
+        label: 'Unconfirmed Txs',
+        value: formatInteger(unconfirmedPayload.result?.n_txs ?? unconfirmedPayload.result?.total, '0'),
+      },
+      {
+        label: 'Validator Count',
+        value: formatInteger(restValidatorsPayload.pagination?.total ?? '0'),
+      },
+      {
+        label: 'Peer Count',
+        value: formatInteger(netInfoPayload.result?.n_peers ?? '0'),
+      },
+      {
+        label: 'Average Block Time',
+        value: 'Live',
+      },
+      {
+        label: 'Proposals',
+        value: formatInteger(proposalsPayload.pagination?.total ?? String(proposalsPayload.proposals?.length ?? 0), '0'),
+      },
+      {
+        label: 'Bonded Tokens',
+        value: formatReadableTokenAmount(poolPayload.pool?.bonded_tokens ?? '0'),
+      },
+      {
+        label: 'Not Bonded Tokens',
+        value: formatReadableTokenAmount(poolPayload.pool?.not_bonded_tokens ?? '0'),
+      },
+      {
+        label: 'Community Pool',
+        value: formatReadableDecCoinCollection(communityPoolPayload.pool),
+      },
+      {
+        label: 'Bank Supply',
+        value: formatReadableDenomCollection(supplyPayload.supply),
+      },
+    ],
     latestHeight,
     refreshedAt: Date.now(),
   };

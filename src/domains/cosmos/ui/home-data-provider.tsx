@@ -1,10 +1,11 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, type Dispatch, type ReactNode, type SetStateAction, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   getActiveCosmosProvider,
   getCosmosHomeSnapshotDirect,
+  getCosmosHomeSummarySnapshotDirect,
   getCosmosLatestBlockFeedDirect,
   getCosmosOverviewDirect,
   getCosmosValidatorMapsForHeightDirect,
@@ -24,6 +25,8 @@ type CosmosHomeDataContextValue = {
   errorMessage: string | null;
   nowMs: number;
   connectionMode: 'ws' | 'poll';
+  autoRefreshEnabled: boolean;
+  setAutoRefreshEnabled: Dispatch<SetStateAction<boolean>>;
 };
 
 const CosmosHomeDataContext = createContext<CosmosHomeDataContextValue | null>(null);
@@ -198,6 +201,9 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [connectionMode, setConnectionMode] = useState<'ws' | 'poll'>('poll');
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
+  const snapshotRef = useRef<CosmosHomeSnapshot | null>(null);
+  const autoRefreshEnabledRef = useRef(false);
   const pollTimeoutRef = useRef<number | null>(null);
   const websocketRef = useRef<WebSocket | null>(null);
   const refreshQueuedRef = useRef(false);
@@ -224,6 +230,14 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       window.clearInterval(intervalId);
     };
   }, []);
+
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
+
+  useEffect(() => {
+    autoRefreshEnabledRef.current = autoRefreshEnabled;
+  }, [autoRefreshEnabled]);
 
   useEffect(() => {
     const handleModeChanged = () => {
@@ -310,13 +324,33 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const nextSnapshot = await getCosmosHomeSnapshotDirect();
+        if (snapshotRef.current == null) {
+          const nextSnapshot = await getCosmosHomeSnapshotDirect();
 
-        if (disposed) {
-          return;
+          if (disposed) {
+            return;
+          }
+
+          setSnapshot(nextSnapshot);
+        } else {
+          const nextSnapshot = await getCosmosHomeSummarySnapshotDirect();
+
+          if (disposed) {
+            return;
+          }
+
+          setSnapshot((current) =>
+            current
+              ? {
+                  ...current,
+                  header: nextSnapshot.header,
+                  metrics: nextSnapshot.metrics,
+                  latestHeight: nextSnapshot.latestHeight,
+                  refreshedAt: nextSnapshot.refreshedAt,
+                }
+              : current,
+          );
         }
-
-        setSnapshot(nextSnapshot);
         setErrorMessage(null);
 
         if (!websocketRef.current) {
@@ -652,7 +686,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           },
         };
       });
-      if (isHomeRoute) {
+      if (isHomeRoute && autoRefreshEnabledRef.current) {
         queueRefresh();
       }
       setErrorMessage(null);
@@ -825,8 +859,10 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       errorMessage,
       nowMs,
       connectionMode,
+      autoRefreshEnabled,
+      setAutoRefreshEnabled,
     }),
-    [connectionMode, errorMessage, latestFeed, nowMs, snapshot],
+    [autoRefreshEnabled, connectionMode, errorMessage, latestFeed, nowMs, snapshot],
   );
 
   return <CosmosHomeDataContext.Provider value={value}>{children}</CosmosHomeDataContext.Provider>;
