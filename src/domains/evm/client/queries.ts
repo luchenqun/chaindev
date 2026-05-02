@@ -1513,6 +1513,21 @@ export async function hasEvmTransactionByHashDirect(hash: string) {
   }
 }
 
+export async function getEvmBlockNumberByHashDirect(hash: string) {
+  const { client } = await getEvmClientWithProfile();
+
+  try {
+    const block = await client.getBlock({
+      blockHash: hash as `0x${string}`,
+      includeTransactions: false,
+    });
+
+    return block.number ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getEvmTransactionReceiptSummariesDirect(hashes: string[]) {
   const { client, profile } = await getEvmClientWithProfile();
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);

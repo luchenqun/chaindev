@@ -32,3 +32,41 @@ export function resolveQueryTarget(raw: string, mode: PlatformMode): QueryResolu
 
   return { ok: false, message: 'Unsupported query type' };
 }
+
+export function resolveQueryTargetFromParsedMatch(
+  match: ReturnType<typeof parseQuery>,
+  mode: PlatformMode,
+  options?: {
+    evmBlockNumberByHash?: bigint | number | null;
+  },
+): QueryResolution {
+  if (match.type === 'evm-hash') {
+    if (options?.evmBlockNumberByHash != null) {
+      return { ok: true, target: `/evm/block/${options.evmBlockNumberByHash.toString()}` };
+    }
+
+    return { ok: true, target: `/evm/tx/${match.value}` };
+  }
+
+  if (match.type === 'evm-address') {
+    return { ok: true, target: `/evm/address/${match.value}` };
+  }
+
+  if (match.type === 'cosmos-tx') {
+    return { ok: true, target: `/cosmos/tx/${match.value}` };
+  }
+
+  if (match.type === 'cosmos-address') {
+    return { ok: true, target: `/cosmos/account/${match.value}` };
+  }
+
+  if (match.type === 'numeric' && mode === 'evm') {
+    return { ok: true, target: `/evm/block/${match.value}` };
+  }
+
+  if (match.type === 'numeric' && mode === 'cosmos') {
+    return { ok: true, target: `/cosmos/block/${match.value}` };
+  }
+
+  return { ok: false, message: 'Unsupported query type' };
+}

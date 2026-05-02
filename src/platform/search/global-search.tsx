@@ -7,8 +7,10 @@ import { getMessages } from '@/i18n';
 import type { PlatformMode } from '@/config/chains';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getEvmBlockNumberByHashDirect, hasEvmTransactionByHashDirect } from '@/domains/evm/client/queries';
 import { cn } from '@/lib/utils';
-import { resolveQueryTarget } from '@/platform/search/resolve-query';
+import { parseQuery } from '@/platform/search/parse-query';
+import { resolveQueryTarget, resolveQueryTargetFromParsedMatch } from '@/platform/search/resolve-query';
 
 type GlobalSearchProps = {
   mode: PlatformMode;
@@ -37,7 +39,19 @@ export function GlobalSearch({ mode, placeholder = 'Search by block, tx, or addr
     setMessage('');
 
     try {
-      const payload = resolveQueryTarget(query, mode);
+      const parsed = parseQuery(query);
+      let payload = resolveQueryTarget(query, mode);
+
+      if (mode === 'evm' && parsed.type === 'evm-hash') {
+        const transactionFound = await hasEvmTransactionByHashDirect(parsed.value);
+
+        if (transactionFound) {
+          payload = resolveQueryTargetFromParsedMatch(parsed, mode);
+        } else {
+          const blockNumber = await getEvmBlockNumberByHashDirect(parsed.value);
+          payload = blockNumber != null ? resolveQueryTargetFromParsedMatch(parsed, mode, { evmBlockNumberByHash: blockNumber }) : { ok: false, message: messages.search.notFound };
+        }
+      }
 
       if (!payload.ok) {
         setMessage(payload.message ?? messages.search.unsupported);

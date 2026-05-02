@@ -31,6 +31,7 @@ export const en = {
     empty: 'Enter a query to search.',
     unsupported: 'This query type is not supported yet.',
     failed: 'Search failed.',
+    notFound: 'No matching transaction or block was found for this hash.',
   },
   home: {
     badge: 'Explorer + Workbench',
