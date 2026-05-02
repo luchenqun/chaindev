@@ -115,7 +115,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
         open={clearDialogOpen}
         onOpenChange={setClearDialogOpen}
         title="Clear browser storage"
-        description="Clear all local Chaindev data stored in this browser for the current site."
+        description="Clear all local data stored in this browser for the current site."
         maxWidthClassName="max-w-lg"
         footer={
           <>

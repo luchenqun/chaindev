@@ -4,8 +4,11 @@ import { AppProviders } from '@/app/providers';
 import { defaultLocale } from '@/i18n/config';
 
 export const metadata: Metadata = {
-  title: 'Chaindev',
-  description: 'Unified EVM and Cosmos developer platform',
+  title: {
+    default: 'Chain Dev for EVM & Cosmos',
+    template: '%s | Chain Dev for EVM & Cosmos',
+  },
+  description: 'Unified EVM and Cosmos developer workbench',
   icons: {
     icon: '/icon.svg',
     shortcut: '/icon.svg',

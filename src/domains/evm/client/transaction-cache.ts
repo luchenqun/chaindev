@@ -491,7 +491,7 @@ async function getDatabase() {
 
       request.onblocked = () => {
         blockedTimeoutId = window.setTimeout(() => {
-          fail(new Error('IndexedDB upgrade is blocked. Close other Chaindev tabs and reload.'));
+          fail(new Error('IndexedDB upgrade is blocked. Close other tabs for this site and reload.'));
         }, 1500);
       };
 

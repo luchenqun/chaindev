@@ -237,8 +237,12 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
       <div className="border-t border-slate-100">
         <div className="mx-auto grid max-w-[1400px] gap-5 px-3 py-0.5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
           <div className="flex items-center gap-3">
-            <Link prefetch={false} href="/" className="flex items-center gap-3">
-              <Image alt="Chaindev" className="h-[52px] w-auto" height={52} src="/brand-lockup.svg" width={223} />
+            <Link prefetch={false} href="/" className="flex items-center gap-3 py-1">
+              <Image alt="Chain Dev for EVM & Cosmos" className="h-9 w-9" height={36} src="/brand-mark.svg" width={36} />
+              <span className="flex flex-col leading-none">
+                <span className="text-[24px] font-semibold tracking-[-0.04em] text-slate-950">Chain Dev</span>
+                <span className="mt-1 text-[11px] font-medium tracking-[0.08em] text-slate-500">for EVM &amp; Cosmos</span>
+              </span>
             </Link>
           </div>
 
