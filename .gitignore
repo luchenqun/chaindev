@@ -13,3 +13,4 @@ data/
 .env.local
 .env.*.local
 !.env.example
+.codex/
