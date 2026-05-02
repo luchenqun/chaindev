@@ -230,8 +230,7 @@ export function Bech32ToolPage() {
   const [submitting, setSubmitting] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const inputIsSecret = action === 'encode' && (Boolean(generatedPrivateKey) || isMnemonic(input) || isPrivateKeyLike(input));
-  const inputDisplayValue = generatedPrivateKey ? '*'.repeat(64) : input;
-  const resolvedInputValue = generatedPrivateKey ? (showSecretInput ? generatedPrivateKey : inputDisplayValue) : input;
+  const resolvedInputValue = generatedPrivateKey ?? input;
 
   async function handleCopy(field: string, value: string) {
     await copyText(value);
@@ -289,7 +288,7 @@ export function Bech32ToolPage() {
   function handleInputChange(value: string) {
     if (generatedPrivateKey) {
       setGeneratedPrivateKey(null);
-      setInput(value.replace(/\*/g, ''));
+      setInput(value);
       return;
     }
 
@@ -425,7 +424,7 @@ export function Bech32ToolPage() {
                     <div className="relative mt-1">
                       <Input
                         id="bech32-input"
-                        type={inputIsSecret && !showSecretInput && !generatedPrivateKey ? 'password' : 'text'}
+                        type={inputIsSecret && !showSecretInput ? 'password' : 'text'}
                         value={resolvedInputValue}
                         className={inputIsSecret ? 'pr-20 font-mono text-sm' : 'font-mono text-sm'}
                         placeholder="hex address / private key / public key / mnemonic"
