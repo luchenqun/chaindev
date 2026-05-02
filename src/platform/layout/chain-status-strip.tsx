@@ -5,6 +5,7 @@ import { IconAntennaBars5, IconClockHour4, IconStack2, IconTrash } from '@tabler
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ModalDialog } from '@/components/ui/modal-dialog';
+import { RollingCounter } from '@/components/ui/rolling-counter';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { type PlatformMode } from '@/config/chains';
@@ -105,7 +106,9 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
         <span className="flex flex-col gap-0.5 text-[13px] leading-none">
           <span className="inline-flex items-center gap-1.5">
             <span>{displayItem.label}</span>
-            <strong className={displayItem.toneClassName ?? 'text-slate-800'}>{displayItem.value}</strong>
+            <strong className={displayItem.toneClassName ?? 'text-slate-800'}>
+              <RollingCounter value={displayItem.value} />
+            </strong>
           </span>
           {mode === 'evm' ? (
             <span className="inline-flex items-center gap-1.5">
