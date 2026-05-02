@@ -44,7 +44,7 @@ function normalizeSignatureQuery(value: string): { normalized: string; kind: Loo
   throw new Error('Enter a valid 4-byte function selector or 32-byte event topic.');
 }
 
-export function FourByteToolPage() {
+export function SignatureLookupToolPage() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SignatureRecord[]>([]);
   const [searchedQuery, setSearchedQuery] = useState('');

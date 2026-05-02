@@ -1,5 +1,5 @@
-import { FourByteToolPage } from '@/platform/tools/four-byte-tool-page';
+import { SignatureLookupToolPage } from '@/platform/tools/signature-lookup-tool-page';
 
 export default function FourBytePage() {
-  return <FourByteToolPage />;
+  return <SignatureLookupToolPage />;
 }
