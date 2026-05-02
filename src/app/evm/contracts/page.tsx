@@ -1399,9 +1399,9 @@ export default function EvmContractsRegistryPage() {
                     {group.items.length ? (
                       <ul className="divide-y divide-slate-200">
                         {group.items.map((item) => (
-                          <li key={`${item.category}-${item.signature}`} className="flex items-center justify-between gap-4 px-4 py-3">
-                            <div className="min-w-0">
-                              <p className="truncate font-mono text-sm text-slate-900">
+                          <li key={`${item.category}-${item.signature}`} className="flex items-start justify-between gap-4 px-4 py-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="break-words font-mono text-sm leading-6 text-slate-900">
                                 {item.signature}
                                 <span className="ml-2 text-slate-500">({item.methodId})</span>
                               </p>

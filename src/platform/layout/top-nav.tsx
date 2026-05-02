@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLogout, IconSend, IconUserCircle, IconWallet } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLogout, IconSearch, IconSend, IconUserCircle, IconWallet } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -143,6 +143,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/tools/big-number', label: 'Big Number', icon: IconFunction },
               { href: '/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
               { href: '/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
+              { href: '/tools/4byte', label: 'Signature Lookup', icon: IconSearch },
             ],
           },
           {
@@ -173,6 +174,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/tools/big-number', label: 'Big Number', icon: IconFunction },
               { href: '/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
               { href: '/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
+              { href: '/tools/4byte', label: 'Signature Lookup', icon: IconSearch },
             ],
           },
           {
