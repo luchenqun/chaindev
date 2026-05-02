@@ -49,7 +49,7 @@ export function SignInForm() {
       title="Sign In"
       subtitle={
         <>
-          没有账号？
+          No account?
           <Link href="/signup" className="ml-2 font-medium text-sky-600 hover:text-sky-700">
             Sign Up
           </Link>

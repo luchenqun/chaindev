@@ -76,7 +76,7 @@ export function SignUpForm() {
       title="Sign Up"
       subtitle={
         <>
-          已有账号？
+          Already have an account?
           <Link href="/login" className="ml-2 font-medium text-sky-600 hover:text-sky-700">
             Sign In here
           </Link>
@@ -102,7 +102,7 @@ export function SignUpForm() {
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="A confirmation code will be sent to this address"
+            placeholder="Enter your email address"
             className="h-14 rounded-2xl px-4 text-lg placeholder:text-slate-400"
             required
           />
