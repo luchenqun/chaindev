@@ -473,7 +473,8 @@ export function Bech32ToolPage() {
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 {result.action === 'encode' ? (
                   <>
-                    {renderResultRow('Address', result.bechAddress)}
+                    {renderResultRow('Bech32 address', result.bechAddress)}
+                    {renderResultRow('Hex address', result.address)}
                     {renderResultRow('Public key', result.publicKey)}
                     {renderResultRow('Compressed public key', result.compressedPublicKey)}
                   </>

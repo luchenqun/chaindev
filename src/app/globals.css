@@ -1,7 +1,7 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #f5f7fb;
+  --background: #fcfdfe;
   --foreground: #0f172a;
 }
 
@@ -15,7 +15,8 @@
   }
 
   body {
-    @apply min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.08),_transparent_24%),linear-gradient(180deg,_#f8fafc_0%,_#f1f5f9_100%)] text-slate-900 antialiased;
+    background: var(--background);
+    @apply min-h-screen text-slate-900 antialiased;
   }
 
   a {
