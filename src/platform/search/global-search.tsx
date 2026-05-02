@@ -1,12 +1,13 @@
 'use client';
 
-import { IconChevronDown, IconSearch } from '@tabler/icons-react';
+import { IconChevronDown, IconCornerDownLeft, IconSearch, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useId, useState } from 'react';
 import { getMessages } from '@/i18n';
 import type { PlatformMode } from '@/config/chains';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useToast } from '@/components/ui/toast';
 import { getEvmBlockNumberByHashDirect, hasEvmTransactionByHashDirect } from '@/domains/evm/client/queries';
 import { cn } from '@/lib/utils';
 import { parseQuery } from '@/platform/search/parse-query';
@@ -22,8 +23,8 @@ type GlobalSearchProps = {
 export function GlobalSearch({ mode, placeholder = 'Search by block, tx, or address', variant = 'hero', showLabel = true }: GlobalSearchProps) {
   const messages = getMessages();
   const router = useRouter();
+  const { showToast } = useToast();
   const [query, setQuery] = useState('');
-  const [message, setMessage] = useState('');
   const [pending, setPending] = useState(false);
   const inputId = useId();
 
@@ -31,12 +32,14 @@ export function GlobalSearch({ mode, placeholder = 'Search by block, tx, or addr
     event.preventDefault();
 
     if (!query.trim()) {
-      setMessage(messages.search.empty);
+      showToast({
+        title: messages.search.empty,
+        tone: 'info',
+      });
       return;
     }
 
     setPending(true);
-    setMessage('');
 
     try {
       const parsed = parseQuery(query);
@@ -54,44 +57,65 @@ export function GlobalSearch({ mode, placeholder = 'Search by block, tx, or addr
       }
 
       if (!payload.ok) {
-        setMessage(payload.message ?? messages.search.unsupported);
+        showToast({
+          title: payload.message ?? messages.search.unsupported,
+          tone: 'error',
+        });
         return;
       }
 
       router.push(payload.target);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : messages.search.failed);
+      showToast({
+        title: error instanceof Error ? error.message : messages.search.failed,
+        tone: 'error',
+      });
     } finally {
       setPending(false);
     }
   }
 
   if (variant === 'topbar') {
+    const hasValue = query.trim().length > 0;
+
     return (
-      <form className="flex w-full min-w-0 max-w-[400px] flex-col gap-1" onSubmit={handleSubmit}>
+      <form className="flex w-full min-w-0 max-w-[440px] flex-col gap-1" onSubmit={handleSubmit}>
         {showLabel ? (
           <label className="text-xs font-semibold text-slate-500" htmlFor={inputId}>
             Global Search
           </label>
         ) : null}
-        <div className="flex h-[34px] items-center rounded-md border border-slate-200 bg-slate-50 px-3 shadow-sm transition focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400">
-          <IconSearch className="mr-2 size-3.5 shrink-0 text-slate-400" stroke={2} />
+        <div className="flex h-[38px] items-center rounded-md border border-slate-200 bg-slate-50 px-3 shadow-sm transition focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-400">
+          <IconSearch className="mr-2 size-4 shrink-0 text-slate-400" stroke={2} />
           <Input
             id={inputId}
-            className="h-full border-0 bg-transparent px-0 text-[13px] shadow-none focus-visible:ring-0"
+            className="h-full border-0 bg-transparent px-0 text-[14px] shadow-none focus-visible:ring-0"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={placeholder}
           />
-          <button
-            className="ml-2 inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-[5px] border border-slate-200 bg-slate-200 px-1.5 text-[10px] font-semibold text-white transition hover:bg-slate-300"
-            type="submit"
-            aria-label="Search"
-          >
-            /
-          </button>
+          {hasValue ? (
+            <div className="ml-2 flex items-center gap-1.5">
+              <button
+                type="button"
+                className="inline-flex size-5 items-center justify-center text-slate-400 transition hover:text-slate-600"
+                aria-label="Clear search"
+                onClick={() => {
+                  setQuery('');
+                }}
+              >
+                <IconX className="size-4" stroke={2} />
+              </button>
+              <button
+                className="inline-flex h-6 min-w-[24px] items-center justify-center rounded-[5px] border border-slate-200 bg-slate-200 px-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-300"
+                type="submit"
+                aria-label="Search"
+              >
+                <IconCornerDownLeft className="size-3.5" stroke={2.2} />
+              </button>
+            </div>
+          ) : null}
         </div>
-        {message ? <p className="text-xs text-red-500">{message}</p> : null}
       </form>
     );
   }
@@ -110,7 +134,6 @@ export function GlobalSearch({ mode, placeholder = 'Search by block, tx, or addr
             {pending ? '...' : <IconSearch className="size-4" stroke={2} />}
           </Button>
         </div>
-        {message ? <p className="text-xs text-red-500">{message}</p> : null}
       </form>
     );
   }
@@ -138,7 +161,6 @@ export function GlobalSearch({ mode, placeholder = 'Search by block, tx, or addr
           {pending ? '...' : <IconSearch className="size-5" stroke={2} />}
         </Button>
       </div>
-      {message ? <p className="text-sm text-red-300">{message}</p> : null}
     </form>
   );
 }

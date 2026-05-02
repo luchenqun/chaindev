@@ -133,8 +133,8 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
               }
             }}
           >
-            <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] font-normal leading-none shadow-none focus:ring-0">
-              <div className="flex min-w-0 items-center gap-1.5">
+            <SelectTrigger className="h-auto min-h-0 w-auto justify-start gap-0.5 rounded-none border-0 bg-transparent px-0 py-0 pr-0.5 text-[13px] font-normal leading-none shadow-none focus:ring-0">
+              <div className="flex min-w-0 items-center gap-1">
                 <IconKey className="size-3.5 shrink-0 text-slate-500" stroke={2} />
                 <span className="truncate">
                   {showLoadingKeys ? 'Loading keys...' : (topbarActiveItem?.name ?? (isAuthenticated ? 'No key' : DEFAULT_EVM_PRIVATE_KEY_NAME))}
@@ -194,8 +194,8 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
             setActiveEvmStoredPrivateKey(value);
           }}
         >
-          <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] font-normal leading-none shadow-none focus:ring-0">
-            <div className="flex min-w-0 items-center gap-1.5">
+          <SelectTrigger className="h-auto min-h-0 w-auto justify-start gap-0.5 rounded-none border-0 bg-transparent px-0 py-0 pr-0.5 text-[13px] font-normal leading-none shadow-none focus:ring-0">
+            <div className="flex min-w-0 items-center gap-1">
               <IconKey className="size-3.5 shrink-0 text-slate-500" stroke={2} />
               <span className="truncate">{topbarActiveItem?.name ?? DEFAULT_EVM_PRIVATE_KEY_NAME}</span>
             </div>

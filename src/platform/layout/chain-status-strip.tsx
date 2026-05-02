@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { IconClockHour4, IconStack2, IconTrash } from '@tabler/icons-react';
+import { IconAntennaBars5, IconClockHour4, IconStack2, IconTrash } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ModalDialog } from '@/components/ui/modal-dialog';
@@ -32,7 +32,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
   const [clearState, setClearState] = useState<'idle' | 'clearing' | 'done' | 'failed'>('idle');
   const [clearMessage, setClearMessage] = useState<string | null>(null);
   const { status, pollIntervalMs } = useEvmHomeData();
-  const { snapshot: cosmosSnapshot, latestFeed: cosmosLatestFeed } = useCosmosHomeData();
+  const { snapshot: cosmosSnapshot, latestFeed: cosmosLatestFeed, connectionMode } = useCosmosHomeData();
   const displayItem = useMemo<StatusItem>(() => {
     if (mode === 'evm') {
       return status
@@ -83,12 +83,12 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-5">
-      <span className="inline-flex items-start gap-2">
+    <div className="flex flex-wrap items-center gap-4">
+      <span className="inline-flex items-center gap-2">
         <button
           type="button"
           aria-label="Clear local browser storage"
-          className="flex flex-col gap-0.5 rounded-md pt-[1px] text-slate-400 transition hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          className="flex h-7 flex-col items-center justify-center gap-0.5 rounded-md text-slate-400 transition hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
           onClick={() => {
             setClearState('idle');
             setClearMessage(null);
@@ -96,17 +96,26 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
           }}
         >
           <IconStack2 className="size-3.5" stroke={2} />
-          {mode === 'evm' ? <IconClockHour4 className="size-3" stroke={1.8} /> : null}
+          {mode === 'evm' ? (
+            <IconClockHour4 className="size-3" stroke={1.8} />
+          ) : isCosmosRouteActive(pathname, activeMode) ? (
+            <IconAntennaBars5 className="size-3" stroke={1.8} />
+          ) : null}
         </button>
-        <span className="flex flex-col leading-tight">
+        <span className="flex flex-col gap-0.5 text-[13px] leading-none">
           <span className="inline-flex items-center gap-1.5">
-            <span>{displayItem.label}:</span>
+            <span>{displayItem.label}</span>
             <strong className={displayItem.toneClassName ?? 'text-slate-800'}>{displayItem.value}</strong>
           </span>
           {mode === 'evm' ? (
-            <span className="mt-0.5 inline-flex items-center gap-1.5">
-              <span>Poll:</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span>Poll</span>
               <strong className={displayItem.toneClassName ?? 'text-slate-800'}>{Math.round(pollIntervalMs)} ms</strong>
+            </span>
+          ) : isCosmosRouteActive(pathname, activeMode) ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span>Feed</span>
+              <strong className={displayItem.toneClassName ?? 'text-slate-800'}>{connectionMode === 'ws' ? 'WebSocket' : 'HTTP Polling'}</strong>
             </span>
           ) : null}
         </span>

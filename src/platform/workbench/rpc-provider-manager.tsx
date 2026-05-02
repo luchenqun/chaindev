@@ -679,11 +679,11 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
             handleUse(profile);
           }}
         >
-          <SelectTrigger className="h-full w-auto justify-start gap-1 rounded-none border-0 bg-transparent px-2.5 pr-1 text-[12.5px] leading-none shadow-none focus:ring-0">
+          <SelectTrigger className="h-auto min-h-0 w-auto justify-start gap-0.5 rounded-none border-0 bg-transparent px-0 py-0 pr-0.5 text-[13px] leading-none shadow-none focus:ring-0">
             {topbarActiveProfile ? (
-              <span className="flex min-w-0 items-center gap-2">
+              <span className="flex min-w-0 items-center gap-1.5">
                 <span className="shrink-0">{renderModeIcon(topbarActiveProfile.mode)}</span>
-                <span className="truncate">{`${getModeLabel(topbarActiveProfile.mode)} · ${topbarActiveProfile.name}`}</span>
+                <span className="truncate">{topbarActiveProfile.name}</span>
               </span>
             ) : (
               <span className="truncate">{showLoadingProviders ? 'Loading providers...' : 'No provider'}</span>
