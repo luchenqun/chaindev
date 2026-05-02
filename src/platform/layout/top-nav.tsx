@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { type PlatformMode } from '@/config/chains';
 import { getMessages } from '@/i18n';
 import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
@@ -31,10 +32,6 @@ type NavGroup = {
 const NAV_CLOSE_DELAY_MS = 300;
 
 function inferMode(pathname: string): PlatformMode {
-  if (pathname === '/') {
-    return 'cosmos';
-  }
-
   return pathname.startsWith('/cosmos') ? 'cosmos' : 'evm';
 }
 
@@ -107,6 +104,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const closeTimeoutRef = useRef<number | null>(null);
   const { data: session, status } = useSession();
   const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? session?.user?.email ?? 'Account';
+  const showStatusSkeleton = pathname === '/' && modeOverride == null;
 
   const primaryNavItems: NavItem[] =
     mode === 'cosmos'
@@ -226,15 +224,27 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
     <header className="sticky top-0 z-40 mb-4 border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-[1400px] flex-col gap-1.5 px-3 py-1.5 text-xs text-slate-500 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-1 lg:flex-row lg:items-center lg:gap-3">
-          <ChainStatusStrip mode={mode} />
-          <div className="flex min-w-0 flex-col gap-0.5 text-[11px] leading-none text-slate-500 lg:border-l lg:border-slate-200 lg:pl-3">
-            <div className="flex min-w-0 items-center gap-1">
-              <RpcProviderManager mode={mode} variant="topbar-context" />
-            </div>
-            <div className="flex min-w-0 items-center gap-1">
-              <ActiveEvmKeySelector variant="topbar-context" />
-            </div>
-          </div>
+          {showStatusSkeleton ? (
+            <>
+              <Skeleton className="h-7 w-[118px] rounded-md" />
+              <div className="flex min-w-0 flex-col gap-1 lg:border-l lg:border-slate-200 lg:pl-3">
+                <Skeleton className="h-3.5 w-[160px] rounded-sm" />
+                <Skeleton className="h-3.5 w-[160px] rounded-sm" />
+              </div>
+            </>
+          ) : (
+            <>
+              <ChainStatusStrip mode={mode} />
+              <div className="flex min-w-0 flex-col gap-0.5 text-[11px] leading-none text-slate-500 lg:border-l lg:border-slate-200 lg:pl-3">
+                <div className="flex min-w-0 items-center gap-1">
+                  <RpcProviderManager mode={mode} variant="topbar-context" />
+                </div>
+                <div className="flex min-w-0 items-center gap-1">
+                  <ActiveEvmKeySelector variant="topbar-context" />
+                </div>
+              </div>
+            </>
+          )}
         </div>
         <div className="flex w-full justify-end lg:max-w-[400px] lg:shrink-0">
           <GlobalSearch mode={mode} variant="topbar" showLabel={false} placeholder="Search by Address / Txn Hash / Block" />

@@ -20,7 +20,7 @@ type StatusItem = {
 
 function buildFallbackItem(reason: string): StatusItem {
   return {
-    label: 'Latest Block',
+    label: 'Block',
     value: reason,
     toneClassName: 'text-slate-500',
   };
@@ -38,7 +38,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
     if (mode === 'evm') {
       return status
         ? {
-            label: 'Latest Block',
+            label: 'Block',
             value: status.latestBlock,
             toneClassName: 'text-sky-600',
           }
@@ -48,7 +48,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
     if (isCosmosRouteActive(pathname, activeMode)) {
       if (cosmosLatestFeed) {
         return {
-          label: 'Latest Block',
+          label: 'Block',
           value: cosmosLatestFeed.latestBlock,
           toneClassName: 'text-sky-600',
         };
@@ -56,7 +56,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
 
       return cosmosSnapshot
         ? {
-            label: 'Latest Block',
+            label: 'Block',
             value: String(cosmosSnapshot.latestHeight),
             toneClassName: 'text-sky-600',
           }

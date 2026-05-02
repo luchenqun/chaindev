@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import type { PlatformMode } from '@/config/chains';
+import { CosmosHomePage } from '@/domains/cosmos/ui/home-page';
 import { EvmHomeActivity } from '@/domains/evm/ui/home-activity';
 import { EvmHomeMetrics } from '@/domains/evm/ui/home-metrics';
-import { CosmosHomePage } from '@/domains/cosmos/ui/home-page';
-import { Skeleton } from '@/components/ui/skeleton';
 import { AppShell } from '@/platform/layout/app-shell';
 import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
-import type { PlatformMode } from '@/config/chains';
 
 function EvmHomePage() {
   return (
@@ -72,7 +72,11 @@ export default function HomePage() {
   }, []);
 
   if (activeMode == null) {
-    return <AppShell><HomePageShellSkeleton /></AppShell>;
+    return (
+      <AppShell>
+        <HomePageShellSkeleton />
+      </AppShell>
+    );
   }
 
   return <AppShell mode={activeMode}>{activeMode === 'cosmos' ? <CosmosHomePage /> : <EvmHomePage />}</AppShell>;
