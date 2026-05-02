@@ -32,6 +32,7 @@ const ADD_PROVIDER_ACTION_VALUE = '__chaindev_add_provider__';
 type RpcProviderManagerProps = {
   mode: PlatformMode;
   variant?: 'compact' | 'topbar-context' | 'page';
+  onReadyChange?: (ready: boolean) => void;
 };
 
 type RpcProviderManagerSnapshot = {
@@ -133,7 +134,7 @@ function renderProviderOption(profile: RpcProfile) {
   );
 }
 
-export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderManagerProps) {
+export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }: RpcProviderManagerProps) {
   const router = useRouter();
   const { status } = useSession();
   const { showToast } = useToast();
@@ -240,6 +241,10 @@ export function RpcProviderManager({ mode, variant = 'compact' }: RpcProviderMan
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfilesChanged);
     };
   }, [status]);
+
+  useEffect(() => {
+    onReadyChange?.(!showLoadingProviders);
+  }, [onReadyChange, showLoadingProviders]);
 
   useEffect(() => {
     if (loading) {

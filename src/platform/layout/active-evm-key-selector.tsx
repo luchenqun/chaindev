@@ -22,6 +22,7 @@ const ADD_KEY_ACTION_VALUE = '__chaindev_add_evm_key__';
 
 type ActiveEvmKeySelectorProps = {
   variant?: 'default' | 'topbar-context';
+  onReadyChange?: (ready: boolean) => void;
 };
 
 type ActiveEvmKeySelectorSnapshot = {
@@ -55,7 +56,7 @@ function getTopbarFallbackKey(): EvmStoredPrivateKey {
   };
 }
 
-export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelectorProps) {
+export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: ActiveEvmKeySelectorProps) {
   const router = useRouter();
   const { status } = useSession();
   const { showToast } = useToast();
@@ -66,6 +67,10 @@ export function ActiveEvmKeySelector({ variant = 'default' }: ActiveEvmKeySelect
   const topbarItems = isAuthenticated ? items : items.length ? items : [getTopbarFallbackKey()];
   const topbarActiveItem = isAuthenticated ? activeItem : (activeItem ?? topbarItems[0] ?? null);
   const showLoadingKeys = status === 'loading' && cachedActiveEvmKeySelectorSnapshot == null;
+
+  useEffect(() => {
+    onReadyChange?.(!showLoadingKeys);
+  }, [onReadyChange, showLoadingKeys]);
 
   useEffect(() => {
     if (status === 'loading') {

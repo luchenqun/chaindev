@@ -101,10 +101,12 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const router = useRouter();
   const mode = modeOverride ?? inferMode(pathname);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [providerReady, setProviderReady] = useState(false);
+  const [keyReady, setKeyReady] = useState(false);
   const closeTimeoutRef = useRef<number | null>(null);
   const { data: session, status } = useSession();
   const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? session?.user?.email ?? 'Account';
-  const showStatusSkeleton = pathname === '/' && modeOverride == null;
+  const showStatusSkeleton = pathname === '/' && (modeOverride == null || !providerReady || !keyReady);
 
   const primaryNavItems: NavItem[] =
     mode === 'cosmos'
@@ -223,10 +225,13 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   return (
     <header className="sticky top-0 z-40 mb-4 border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-[1400px] flex-col gap-1.5 px-3 py-1.5 text-xs text-slate-500 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-1 lg:flex-row lg:items-center lg:gap-3">
+        <div className="relative flex min-w-0 flex-1 flex-col gap-1 lg:flex-row lg:items-center lg:gap-3">
           {showStatusSkeleton ? (
             <>
-              <Skeleton className="h-7 w-[118px] rounded-md" />
+              <div className="flex min-w-0 flex-col gap-1">
+                <Skeleton className="h-3.5 w-[118px] rounded-sm" />
+                <Skeleton className="h-3.5 w-[118px] rounded-sm" />
+              </div>
               <div className="flex min-w-0 flex-col gap-1 lg:border-l lg:border-slate-200 lg:pl-3">
                 <Skeleton className="h-3.5 w-[160px] rounded-sm" />
                 <Skeleton className="h-3.5 w-[160px] rounded-sm" />
@@ -237,14 +242,29 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               <ChainStatusStrip mode={mode} />
               <div className="flex min-w-0 flex-col gap-0.5 text-[11px] leading-none text-slate-500 lg:border-l lg:border-slate-200 lg:pl-3">
                 <div className="flex min-w-0 items-center gap-1">
-                  <RpcProviderManager mode={mode} variant="topbar-context" />
+                  <RpcProviderManager mode={mode} variant="topbar-context" onReadyChange={setProviderReady} />
                 </div>
                 <div className="flex min-w-0 items-center gap-1">
-                  <ActiveEvmKeySelector variant="topbar-context" />
+                  <ActiveEvmKeySelector variant="topbar-context" onReadyChange={setKeyReady} />
                 </div>
               </div>
             </>
           )}
+          {showStatusSkeleton ? (
+            <div className="pointer-events-none absolute inset-0 invisible">
+              <div className="flex min-w-0 flex-1 flex-col gap-1 lg:flex-row lg:items-center lg:gap-3">
+                <ChainStatusStrip mode={mode} />
+                <div className="flex min-w-0 flex-col gap-0.5 text-[11px] leading-none text-slate-500 lg:border-l lg:border-slate-200 lg:pl-3">
+                  <div className="flex min-w-0 items-center gap-1">
+                    <RpcProviderManager mode={mode} variant="topbar-context" onReadyChange={setProviderReady} />
+                  </div>
+                  <div className="flex min-w-0 items-center gap-1">
+                    <ActiveEvmKeySelector variant="topbar-context" onReadyChange={setKeyReady} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="flex w-full justify-end lg:max-w-[400px] lg:shrink-0">
           <GlobalSearch mode={mode} variant="topbar" showLabel={false} placeholder="Search by Address / Txn Hash / Block" />
