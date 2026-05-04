@@ -274,7 +274,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
           <GlobalSearch mode={mode} variant="topbar" showLabel={false} placeholder={messages.search.topbarPlaceholder} />
           <button
             type="button"
-            className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition hover:border-sky-300 hover:text-sky-600"
+            className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-sky-300 hover:text-sky-600"
             aria-label={locale === 'en' ? messages.language.switchToChinese : messages.language.switchToEnglish}
             onClick={toggleLocale}
           >
@@ -386,7 +386,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 {openGroup === 'user-menu' ? (
                   <div className="absolute right-0 top-full z-20 pt-2" onMouseEnter={cancelScheduledClose} onMouseLeave={() => scheduleClose('user-menu')}>
                     <div className="absolute inset-x-0 top-0 h-2" aria-hidden="true" />
-                    <div className="min-w-[248px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                    <div className="min-w-[160px] w-max max-w-[320px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
                       <div className="border-t-[3px] border-[#19a7f2]" />
                       <div className="px-3 pb-0 pt-2">
                         {userMenuSections.map((section, sectionIndex) => (

@@ -170,7 +170,7 @@ export async function upsertCosmosAddressTag(address: string, nameTag: string) {
   }
 
   if (!response.ok) {
-    throw new Error(await parseError(response, 'Failed to save name tag.'));
+    throw new Error(await parseError(response, 'Failed to save address tag.'));
   }
 
   const body = (await response.json()) as {
@@ -212,7 +212,7 @@ export async function deleteCosmosAddressTag(address: string) {
   }
 
   if (!response.ok) {
-    throw new Error(await parseError(response, 'Failed to delete name tag.'));
+    throw new Error(await parseError(response, 'Failed to delete address tag.'));
   }
 
   const normalizedAddressLower = normalizeAddress(address);

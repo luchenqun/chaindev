@@ -609,7 +609,7 @@ function CosmosSendTxContent() {
 
   return (
     <>
-      <main className="mx-auto max-w-[1400px] px-3 pb-10">
+      <main className="section-block">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
           <div className="border-b border-slate-200 px-6 py-4">
             <div className="flex min-w-0 items-center justify-between gap-4">

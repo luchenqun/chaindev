@@ -96,7 +96,7 @@ export default function EvmHistoricalBalancePage() {
 
   return (
     <AppShell mode="evm">
-      <main className="mx-auto max-w-[1400px] px-3 pb-10">
+      <main className="section-block">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
           <div className="border-b border-slate-200 px-6 py-5">
             <h1 className="text-2xl font-semibold text-slate-950">{pageMessages.title}</h1>

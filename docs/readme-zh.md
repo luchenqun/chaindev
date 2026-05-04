@@ -20,7 +20,7 @@
 - 工作台能力
   - 自定义 EVM / Cosmos Provider
   - 私钥管理
-  - 名称标签
+  - 地址标签
 - 内置工具
   - `Signature Lookup`
   - `Wallet Generator`
