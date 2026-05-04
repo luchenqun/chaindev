@@ -3,7 +3,7 @@
 import { IconArrowsExchange, IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
 import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
-import { decodeFunctionData, isAddress, parseAbiItem, toFunctionSelector, type Abi, type AbiFunction, type Hex } from 'viem';
+import { decodeFunctionData, isAddress, parseAbiItem, toFunctionSelector, type Abi, type AbiFunction, type AbiParameter, type Hex } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { AutoGrowTextarea } from '@/components/ui/auto-grow-textarea';
 import { Button } from '@/components/ui/button';
@@ -135,8 +135,31 @@ function isAbiFunctionItem(item: Abi[number] | unknown): item is AbiFunction {
   return typeof item === 'object' && item !== null && 'type' in item && item.type === 'function' && 'name' in item;
 }
 
+function hasTupleComponents(parameter: AbiParameter): parameter is AbiParameter & { components: readonly AbiParameter[] } {
+  return 'components' in parameter && Array.isArray(parameter.components);
+}
+
+function getCanonicalAbiParameterType(parameter: AbiParameter): string {
+  if (!parameter.type.endsWith(']')) {
+    if (parameter.type !== 'tuple') {
+      return parameter.type;
+    }
+
+    const components = hasTupleComponents(parameter) ? parameter.components : [];
+    return `(${components.map(getCanonicalAbiParameterType).join(',')})`;
+  }
+
+  const arraySuffix = parameter.type.slice(parameter.type.indexOf('['));
+  const baseParameter = {
+    ...parameter,
+    type: parameter.type.slice(0, parameter.type.indexOf('[')),
+  } satisfies AbiParameter;
+
+  return `${getCanonicalAbiParameterType(baseParameter)}${arraySuffix}`;
+}
+
 function getFunctionSignature(fn: AbiFunction) {
-  return `${fn.name}(${fn.inputs.map((input) => input.type).join(',')})`;
+  return `${fn.name}(${fn.inputs.map(getCanonicalAbiParameterType).join(',')})`;
 }
 
 function isSingleAbiItemLike(value: unknown) {

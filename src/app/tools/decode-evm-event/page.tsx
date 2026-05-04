@@ -2,7 +2,7 @@
 
 import { IconCopy } from '@tabler/icons-react';
 import { type KeyboardEvent, useEffect, useState } from 'react';
-import { decodeEventLog, isAddress, parseAbiItem, toEventSelector, type Abi, type AbiEvent, type Hex } from 'viem';
+import { decodeEventLog, isAddress, parseAbiItem, toEventSelector, type Abi, type AbiEvent, type AbiParameter, type Hex } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
@@ -112,8 +112,31 @@ function isAbiEventItem(item: Abi[number] | unknown): item is AbiEvent {
   return typeof item === 'object' && item !== null && 'type' in item && item.type === 'event' && 'name' in item;
 }
 
+function hasTupleComponents(parameter: AbiParameter): parameter is AbiParameter & { components: readonly AbiParameter[] } {
+  return 'components' in parameter && Array.isArray(parameter.components);
+}
+
+function getCanonicalAbiParameterType(parameter: AbiParameter): string {
+  if (!parameter.type.endsWith(']')) {
+    if (parameter.type !== 'tuple') {
+      return parameter.type;
+    }
+
+    const components = hasTupleComponents(parameter) ? parameter.components : [];
+    return `(${components.map(getCanonicalAbiParameterType).join(',')})`;
+  }
+
+  const arraySuffix = parameter.type.slice(parameter.type.indexOf('['));
+  const baseParameter = {
+    ...parameter,
+    type: parameter.type.slice(0, parameter.type.indexOf('[')),
+  } satisfies AbiParameter;
+
+  return `${getCanonicalAbiParameterType(baseParameter)}${arraySuffix}`;
+}
+
 function getEventSignature(event: AbiEvent) {
-  return `${event.name}(${event.inputs.map((input) => input.type).join(',')})`;
+  return `${event.name}(${event.inputs.map(getCanonicalAbiParameterType).join(',')})`;
 }
 
 function isSingleAbiItemLike(value: unknown) {
