@@ -215,7 +215,7 @@ export const zh = {
     explore: '探索',
     tools: '工具',
     workbench: '工作台',
-    brandDescription: '面向 EVM 与 Cosmos 链的一体化区块浏览器和浏览器端工作台。',
+    brandDescription: '面向 EVM 与 Cosmos 链开发者的一体化开发工作台。',
     builtBy: '由 Luke 构建',
     donations: '捐赠：',
     donationTitle: '捐赠地址',

@@ -8,7 +8,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const cookieStore = await cookies();
   const localeCookie = cookieStore.get(LOCALE_COOKIE_NAME)?.value;
   const locale: Locale = locales.includes(localeCookie as Locale) ? (localeCookie as Locale) : defaultLocale;
-  const brandTitle = locale === 'zh' ? '面向 EVM 与 Cosmos 的 Chain Dev' : 'Chain Dev for EVM & Cosmos';
+  const brandTitle = locale === 'zh' ? 'EVM & Cosmos 链开发工作台' : 'Chain Dev for EVM & Cosmos';
   const description =
     locale === 'zh'
       ? '搜索入口已放到顶部导航，首页聚焦在摘要卡片和数据列表，不再使用大体积首屏横幅。'

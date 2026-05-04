@@ -215,7 +215,7 @@ export const en = {
     explore: 'Explore',
     tools: 'Tools',
     workbench: 'Workbench',
-    brandDescription: 'Unified explorer and browser-based workbench for EVM and Cosmos chains.',
+    brandDescription: 'Unified development workbench for EVM and Cosmos chain builders.',
     builtBy: 'Built by Luke',
     donations: 'Donations:',
     donationTitle: 'Donation Address',

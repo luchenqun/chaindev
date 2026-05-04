@@ -1,19 +1,22 @@
 # Chain Dev for EVM & Cosmos
 
-Browser-first explorer and workbench for EVM and Cosmos chains.
+Unified development workbench for EVM and Cosmos chain builders.
+
+Website: https://chaindev.net/
 
 ## Highlights
 
 - Explore EVM blocks, transactions, accounts, contracts, and pending transactions
 - Explore Cosmos blocks, transactions, accounts, validators, proposals, and params
-- Manage browser-side RPC providers for both EVM and Cosmos
+- Switch between EVM and Cosmos providers directly in the browser
+- Use browser-side developer workbench features for RPC profiles, private keys, address tags, and contract registry
 - Use built-in tools such as:
   - `Signature Lookup`
   - `Wallet Generator`
   - `Bech32`
   - `Keystore`
   - `Hash`
-  - `Big Number`
+  - `Big Number Calculator`
   - `Unit Converter`
   - `EVM RPC API`
   - `Cosmos REST API`
@@ -92,6 +95,7 @@ Open `http://localhost:3000`.
 
 - Chain data is fetched directly from the browser by using the active provider.
 - The app does not rely on a backend proxy for on-chain RPC or REST reads.
+- The workbench is designed to help developers inspect, debug, and operate against EVM and Cosmos chains from one interface.
 - SQLite tables are initialized by the application at runtime.
 - Legacy reference projects live in `ethereum-tool/` and `cosmos-tool/`. Do not add new code there.
 
