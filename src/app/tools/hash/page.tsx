@@ -8,6 +8,8 @@ import { bytesToHex, fromRlp, hexToBytes, hexToString, keccak256, numberToHex, s
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type HashToolId =
@@ -198,6 +200,9 @@ function computeResult(toolId: HashToolId, input: string, useHexBytes: boolean, 
 }
 
 export default function HashToolPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const toolMessages = messages.toolsHash;
   const [activeToolId, setActiveToolId] = useState<HashToolId>('keccak256');
   const [input, setInput] = useState('');
   const [useHexBytes, setUseHexBytes] = useState(false);
@@ -218,18 +223,18 @@ export default function HashToolPage() {
     } catch (error) {
       return {
         value: '',
-        error: error instanceof Error ? error.message : 'Computation failed.',
+        error: error instanceof Error ? error.message : toolMessages.computationFailed,
       };
     }
-  }, [activeToolId, displayFormat, input, useHexBytes]);
+  }, [activeToolId, displayFormat, input, toolMessages.computationFailed, useHexBytes]);
 
   const outputText = useMemo(() => {
     if (output.error) {
-      return output.error;
+      return translateRuntimeText(output.error, locale);
     }
 
     return stringifyOutput(output.value);
-  }, [output.error, output.value]);
+  }, [locale, output.error, output.value]);
 
   async function handleCopy() {
     if (!outputText.trim()) {
@@ -249,9 +254,9 @@ export default function HashToolPage() {
         <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
           <div className="border-b border-slate-200 px-6 py-5">
             <div>
-              <h1 className="text-2xl font-semibold text-slate-950">Hash & Encoding</h1>
+              <h1 className="text-2xl font-semibold text-slate-950">{toolMessages.title}</h1>
               <p className="mt-2 max-w-[1100px] text-sm leading-6 text-slate-600">
-                Common hash, RLP, Base64, hex, ASCII, and bytes conversions, all executed directly in the browser.
+                {toolMessages.description}
               </p>
             </div>
           </div>
@@ -268,7 +273,7 @@ export default function HashToolPage() {
                       className={tool.id === activeToolId ? 'bg-sky-600 hover:bg-sky-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}
                       onClick={() => setActiveToolId(tool.id)}
                     >
-                      {tool.label}
+                      {translateRuntimeText(tool.label, locale)}
                     </Button>
                   ))}
               </div>
@@ -280,12 +285,12 @@ export default function HashToolPage() {
                   className="min-h-[220px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-sky-400"
                   placeholder={
                     activeToolId === 'rlp_encode'
-                      ? 'Enter a string or a JSON array, for example ["0x01", "hello", ["0x02"]]'
+                      ? toolMessages.enterStringOrJsonArray
                       : activeToolId === 'bytes_to_hex'
-                        ? 'Enter a JSON array, for example [104, 101, 108, 108, 111]'
+                        ? toolMessages.enterBytesArray
                         : activeToolId === 'base64_decode'
-                          ? 'Enter a Base64 string'
-                          : 'Enter a value to process'
+                          ? toolMessages.enterBase64
+                          : toolMessages.enterValue
                   }
                   onChange={(event) => setInput(event.target.value)}
                 />
@@ -299,13 +304,13 @@ export default function HashToolPage() {
                     checked={useHexBytes}
                     onChange={(event) => setUseHexBytes(event.target.checked)}
                   />
-                  <span>Treat input as hex bytes</span>
+                  <span>{toolMessages.treatInputAsHexBytes}</span>
                 </label>
               ) : null}
 
               {shouldShowDisplayFormat(activeToolId) ? (
                 <div className="flex flex-wrap items-center gap-4 text-sm text-slate-700">
-                  <span className="font-medium text-slate-700">Output format</span>
+                  <span className="font-medium text-slate-700">{toolMessages.outputFormat}</span>
                   <label className="inline-flex items-center gap-2">
                     <input
                       type="radio"
@@ -314,7 +319,7 @@ export default function HashToolPage() {
                       checked={displayFormat === 'hex'}
                       onChange={() => setDisplayFormat('hex')}
                     />
-                    <span>Hex</span>
+                    <span>{translateRuntimeText(toolMessages.hex, locale)}</span>
                   </label>
                   <label className="inline-flex items-center gap-2">
                     <input
@@ -324,7 +329,7 @@ export default function HashToolPage() {
                       checked={displayFormat === 'string'}
                       onChange={() => setDisplayFormat('string')}
                     />
-                    <span>String</span>
+                    <span>{translateRuntimeText(toolMessages.string, locale)}</span>
                   </label>
                 </div>
               ) : null}
@@ -334,12 +339,14 @@ export default function HashToolPage() {
           <div className="border-t border-slate-200 px-6 py-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-slate-950">Result</h2>
-                <p className="mt-1 text-sm text-slate-500">Current method: {TOOL_DEFINITIONS.find((tool) => tool.id === activeToolId)?.label}</p>
+                <h2 className="text-base font-semibold text-slate-950">{toolMessages.result}</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {toolMessages.currentMethod}: {translateRuntimeText(TOOL_DEFINITIONS.find((tool) => tool.id === activeToolId)?.label ?? '', locale)}
+                </p>
               </div>
               <ActionIconButton
-                tooltip={copied ? 'Copied' : 'Copy result'}
-                aria-label={copied ? 'Result copied' : 'Copy result'}
+                tooltip={copied ? messages.common.copied : messages.common.copyResult}
+                aria-label={copied ? messages.common.resultCopied : messages.common.copyResult}
                 className={outputText.trim() ? 'text-slate-400 hover:text-sky-600' : 'text-slate-300 hover:text-slate-300'}
                 disabled={!outputText.trim()}
                 onClick={() => void handleCopy()}

@@ -9,6 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { READABLE_DENOM_ALIASES } from '@/domains/cosmos/client/readable-denom-aliases';
 import { formatReadableDenom } from '@/domains/cosmos/client/tx-helpers';
 import { getCosmosParamsDirect, type CosmosParamsModuleResult } from '@/domains/cosmos/client/queries';
+import { getFormattingLocale } from '@/i18n/format';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type CosmosParamsPageData = Awaited<ReturnType<typeof getCosmosParamsDirect>>;
@@ -22,6 +25,162 @@ type FormattedModuleSection = {
   title?: string;
   fields: ParamsFieldCardProps[];
 };
+
+function translateParamsLabel(label: string, messages: ReturnType<typeof useMessages>) {
+  const map: Record<string, string> = {
+    'Max Memo Characters': 'Max Memo Characters',
+    'Transaction Signature Limit': 'Transaction Signature Limit',
+    'Transaction Cost Per Byte': 'Transaction Cost Per Byte',
+    'Ed25519 Verification Cost': 'Ed25519 Verification Cost',
+    'Secp256k1 Verification Cost': 'Secp256k1 Verification Cost',
+    'Default Send Enabled': 'Default Send Enabled',
+    'Custom Send Rules': 'Custom Send Rules',
+    'Block Parameters': 'Block Parameters',
+    'Max Bytes': 'Max Bytes',
+    'Max Gas': 'Max Gas',
+    'Evidence Parameters': 'Evidence Parameters',
+    'Max Age (Blocks)': 'Max Age (Blocks)',
+    'Max Age (Duration)': 'Max Age (Duration)',
+    'Validator Parameters': 'Validator Parameters',
+    'Public Key Types': 'Public Key Types',
+    'App Version': 'App Version',
+    'Vote Extensions Height': 'Vote Extensions Height',
+    'Community Tax': 'Community Tax',
+    'Base Proposer Reward': 'Base Proposer Reward',
+    'Bonus Proposer Reward': 'Bonus Proposer Reward',
+    'Withdraw Address': 'Withdraw Address',
+    'Mint Denom': 'Mint Denom',
+    'Inflation Rate Change': 'Inflation Rate Change',
+    'Inflation Max': 'Inflation Max',
+    'Inflation Min': 'Inflation Min',
+    'Goal Bonded': 'Goal Bonded',
+    'Blocks Per Year': 'Blocks Per Year',
+    'Max Supply': 'Max Supply',
+    'Minimum Deposit': 'Minimum Deposit',
+    'Max Deposit Period': 'Max Deposit Period',
+    'Minimum Deposit Ratio': 'Minimum Deposit Ratio',
+    'Voting Period': 'Voting Period',
+    'Expedited Voting Period': 'Expedited Voting Period',
+    'Expedited Minimum Deposit': 'Expedited Minimum Deposit',
+    'Proposal Cancel Ratio': 'Proposal Cancel Ratio',
+    'Proposal Cancel Destination': 'Proposal Cancel Destination',
+    Quorum: 'Quorum',
+    Threshold: 'Threshold',
+    'Veto Threshold': 'Veto Threshold',
+    'Expedited Threshold': 'Expedited Threshold',
+    'Minimum Initial Deposit Ratio': 'Minimum Initial Deposit Ratio',
+    'Burn Vote Quorum': 'Burn Vote Quorum',
+    'Burn Proposal Deposit Prevote': 'Burn Proposal Deposit Prevote',
+    'Burn Vote Veto': 'Burn Vote Veto',
+    'Base Fee Enabled': 'Base Fee Enabled',
+    'Base Fee Change Denominator': 'Base Fee Change Denominator',
+    'Elasticity Multiplier': 'Elasticity Multiplier',
+    'Enable Height': 'Enable Height',
+    'Base Fee': 'Base Fee',
+    'Minimum Gas Price': 'Minimum Gas Price',
+    'Minimum Gas Multiplier': 'Minimum Gas Multiplier',
+    'ERC20 Enabled': 'ERC20 Enabled',
+    'Permissionless Registration': 'Permissionless Registration',
+    'EVM Denom': 'EVM Denom',
+    'History Serve Window': 'History Serve Window',
+    'Extra EIPs': 'Extra EIPs',
+    'EVM Channels': 'EVM Channels',
+    'Create Access Type': 'Create Access Type',
+    'Call Access Type': 'Call Access Type',
+    'Static Precompiles': 'Static Precompiles',
+    'Extended Denom': 'Extended Denom',
+    'Signed Blocks Window': 'Signed Blocks Window',
+    'Minimum Signed Per Window': 'Minimum Signed Per Window',
+    'Downtime Jail Duration': 'Downtime Jail Duration',
+    'Double Sign Slash Fraction': 'Double Sign Slash Fraction',
+    'Downtime Slash Fraction': 'Downtime Slash Fraction',
+    'Unbonding Time': 'Unbonding Time',
+    'Max Validators': 'Max Validators',
+    'Max Entries': 'Max Entries',
+    'Historical Entries': 'Historical Entries',
+    'Bond Denom': 'Bond Denom',
+    'Min Commission Rate': 'Min Commission Rate',
+    'Veto Period': 'Veto Period',
+  };
+
+  const zhMap: Record<string, string> = {
+    'Max Memo Characters': '最大备注字符数',
+    'Transaction Signature Limit': '交易签名上限',
+    'Transaction Cost Per Byte': '每字节交易成本',
+    'Ed25519 Verification Cost': 'Ed25519 验证成本',
+    'Secp256k1 Verification Cost': 'Secp256k1 验证成本',
+    'Default Send Enabled': '默认可转账',
+    'Custom Send Rules': '自定义转账规则',
+    'Block Parameters': '区块参数',
+    'Max Bytes': '最大字节数',
+    'Max Gas': '最大 Gas 数量',
+    'Evidence Parameters': '证据参数',
+    'Max Age (Blocks)': '最大保留期（区块）',
+    'Max Age (Duration)': '最大保留期（时长）',
+    'Validator Parameters': '验证人参数',
+    'Public Key Types': '公钥类型',
+    'App Version': '应用版本',
+    'Vote Extensions Height': '投票扩展启用高度',
+    'Community Tax': '社区税',
+    'Base Proposer Reward': '基础提议者奖励',
+    'Bonus Proposer Reward': '额外提议者奖励',
+    'Withdraw Address': '可提现地址',
+    'Mint Denom': '铸币面额',
+    'Inflation Rate Change': '通胀变化率',
+    'Inflation Max': '最大通胀率',
+    'Inflation Min': '最小通胀率',
+    'Goal Bonded': '目标绑定率',
+    'Blocks Per Year': '每年区块数',
+    'Max Supply': '最大供应量',
+    'Minimum Deposit': '最小押金',
+    'Max Deposit Period': '最大押金期',
+    'Minimum Deposit Ratio': '最小押金比例',
+    'Voting Period': '投票期',
+    'Expedited Voting Period': '加急投票期',
+    'Expedited Minimum Deposit': '加急最小押金',
+    'Proposal Cancel Ratio': '提案取消比例',
+    'Proposal Cancel Destination': '提案取消目标地址',
+    Quorum: '法定人数比例',
+    Threshold: '通过阈值',
+    'Veto Threshold': '否决阈值',
+    'Expedited Threshold': '加急阈值',
+    'Minimum Initial Deposit Ratio': '最小初始押金比例',
+    'Burn Vote Quorum': '燃烧投票法定人数',
+    'Burn Proposal Deposit Prevote': '预投票前燃烧提案押金',
+    'Burn Vote Veto': '燃烧否决投票',
+    'Base Fee Enabled': '基础费用开关',
+    'Base Fee Change Denominator': '基础费用变更分母',
+    'Elasticity Multiplier': '弹性倍数',
+    'Enable Height': '启用高度',
+    'Base Fee': '基础费用',
+    'Minimum Gas Price': '最小 Gas 单价',
+    'Minimum Gas Multiplier': '最小 Gas 倍数',
+    'ERC20 Enabled': 'ERC20 开关',
+    'Permissionless Registration': '无许可注册',
+    'EVM Denom': 'EVM 面额',
+    'History Serve Window': '历史服务窗口',
+    'Extra EIPs': '额外 EIP',
+    'EVM Channels': 'EVM 通道',
+    'Create Access Type': '创建访问类型',
+    'Call Access Type': '调用访问类型',
+    'Static Precompiles': '静态预编译',
+    'Extended Denom': '扩展面额',
+    'Signed Blocks Window': '已签区块窗口',
+    'Minimum Signed Per Window': '窗口最小签名比例',
+    'Downtime Jail Duration': '宕机监禁时长',
+    'Double Sign Slash Fraction': '双签罚没比例',
+    'Downtime Slash Fraction': '宕机罚没比例',
+    'Unbonding Time': '解绑定时间',
+    'Max Validators': '最大验证人数',
+    'Max Entries': '最大条目数',
+    'Historical Entries': '历史条目数',
+    'Bond Denom': '绑定面额',
+    'Min Commission Rate': '最小佣金率',
+    'Veto Period': '否决期',
+  };
+
+  return zhMap[map[label] ?? label] ?? label;
+}
 
 function CosmosParamsPageSkeleton() {
   return (
@@ -59,7 +218,7 @@ function CosmosParamsPageSkeleton() {
   );
 }
 
-function formatIntegerText(value: string | undefined) {
+function formatIntegerText(value: string | undefined, locale?: string) {
   if (!value) {
     return '--';
   }
@@ -68,7 +227,7 @@ function formatIntegerText(value: string | undefined) {
     return value;
   }
 
-  return new Intl.NumberFormat('en-US').format(Number.parseInt(value, 10));
+  return new Intl.NumberFormat(getFormattingLocale(locale)).format(Number.parseInt(value, 10));
 }
 
 function formatBooleanText(value: boolean | undefined) {
@@ -505,11 +664,11 @@ function formatEvmFeeMarketModule(module: CosmosParamsModuleResult): FormattedMo
         },
         {
           label: 'Base Fee Change Denominator',
-          value: typeof params.base_fee_change_denominator === 'number' ? new Intl.NumberFormat('en-US').format(params.base_fee_change_denominator) : '--',
+          value: typeof params.base_fee_change_denominator === 'number' ? String(params.base_fee_change_denominator) : '--',
         },
         {
           label: 'Elasticity Multiplier',
-          value: typeof params.elasticity_multiplier === 'number' ? new Intl.NumberFormat('en-US').format(params.elasticity_multiplier) : '--',
+          value: typeof params.elasticity_multiplier === 'number' ? String(params.elasticity_multiplier) : '--',
         },
         {
           label: 'Enable Height',
@@ -596,7 +755,7 @@ function formatEvmVmModule(module: CosmosParamsModuleResult): FormattedModuleSec
         },
         {
           label: 'Static Precompiles',
-          value: Array.isArray(params.active_static_precompiles) ? new Intl.NumberFormat('en-US').format(params.active_static_precompiles.length) : '--',
+          value: Array.isArray(params.active_static_precompiles) ? String(params.active_static_precompiles.length) : '--',
         },
         {
           label: 'Extended Denom',
@@ -658,15 +817,15 @@ function formatStakingModule(module: CosmosParamsModuleResult): FormattedModuleS
         },
         {
           label: 'Max Validators',
-          value: typeof params.max_validators === 'number' ? new Intl.NumberFormat('en-US').format(params.max_validators) : '--',
+          value: typeof params.max_validators === 'number' ? String(params.max_validators) : '--',
         },
         {
           label: 'Max Entries',
-          value: typeof params.max_entries === 'number' ? new Intl.NumberFormat('en-US').format(params.max_entries) : '--',
+          value: typeof params.max_entries === 'number' ? String(params.max_entries) : '--',
         },
         {
           label: 'Historical Entries',
-          value: typeof params.historical_entries === 'number' ? new Intl.NumberFormat('en-US').format(params.historical_entries) : '--',
+          value: typeof params.historical_entries === 'number' ? String(params.historical_entries) : '--',
         },
         {
           label: 'Bond Denom',
@@ -732,24 +891,27 @@ function formatModule(module: CosmosParamsModuleResult) {
 }
 
 function ParamsFieldCard({ label, value }: ParamsFieldCardProps) {
+  const { locale } = useLocale();
   return (
     <div className="rounded-lg bg-slate-100 px-4 py-3">
-      <p className="text-[13px] font-medium leading-5 text-slate-500">{label}</p>
-      <p className="mt-1.5 text-[15px] font-semibold leading-6 text-slate-700">{value}</p>
+      <p className="text-[13px] font-medium leading-5 text-slate-500">{translateRuntimeText(label, locale)}</p>
+      <p className="mt-1.5 text-[15px] font-semibold leading-6 text-slate-700">{translateRuntimeText(value, locale)}</p>
     </div>
   );
 }
 
 function FormattedModuleView({ sections }: { sections: FormattedModuleSection[] }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
   return (
     <div className="space-y-3">
       {sections.map((section, index) => (
         <div key={section.title ?? `section-${index}`}>
           {index ? <div className="mb-3 border-t border-slate-200" /> : null}
-          {section.title ? <h3 className="text-sm font-semibold text-slate-600">{section.title}</h3> : null}
+          {section.title ? <h3 className="text-sm font-semibold text-slate-600">{locale === 'zh' ? translateParamsLabel(section.title, messages) : section.title}</h3> : null}
           <div className={`${section.title ? 'mt-2' : ''} grid gap-3 md:grid-cols-2 xl:grid-cols-4`}>
             {section.fields.map((field) => (
-              <ParamsFieldCard key={field.label} label={field.label} value={field.value} />
+              <ParamsFieldCard key={field.label} label={locale === 'zh' ? translateParamsLabel(field.label, messages) : field.label} value={field.value} />
             ))}
           </div>
         </div>
@@ -759,18 +921,33 @@ function FormattedModuleView({ sections }: { sections: FormattedModuleSection[] 
 }
 
 function ParamsModuleCard({ module }: { module: CosmosParamsModuleResult }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
   const [showRawJson, setShowRawJson] = useState(false);
   const formattedSections = useMemo(() => formatModule(module), [module]);
+  const localizedSections = useMemo(
+    () =>
+      formattedSections?.map((section) => ({
+        ...section,
+        fields: section.fields.map((field) => ({
+          ...field,
+          value: /^\d{1,3}(,\d{3})*$|^\d+$/.test(field.value)
+            ? formatIntegerText(field.value.replaceAll(',', ''), locale)
+            : translateRuntimeText(field.value, locale),
+        })),
+      })) ?? null,
+    [formattedSections, locale],
+  );
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
       <div className="border-b border-slate-200 px-5 py-4">
         <div className="flex min-w-0 items-start justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="text-base font-semibold text-slate-900">{module.label}</h2>
+            <h2 className="text-base font-semibold text-slate-900">{translateRuntimeText(module.label, locale)}</h2>
           </div>
           <ActionIconButton
-            tooltip={showRawJson ? 'Hide raw JSON' : 'Show raw JSON'}
+            tooltip={showRawJson ? messages.common.hideRawJson : messages.common.showRawJson}
             className={
               showRawJson
                 ? 'shrink-0 rounded-md bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700'
@@ -783,9 +960,9 @@ function ParamsModuleCard({ module }: { module: CosmosParamsModuleResult }) {
         </div>
       </div>
       <div className="p-4">
-        {formattedSections ? <FormattedModuleView sections={formattedSections} /> : null}
-        {showRawJson || !formattedSections ? (
-          <div className={formattedSections ? 'mt-4' : ''}>
+        {localizedSections ? <FormattedModuleView sections={localizedSections} /> : null}
+        {showRawJson || !localizedSections ? (
+          <div className={localizedSections ? 'mt-4' : ''}>
             <JsonViewPanel value={module.data} className="border-0 p-0 shadow-none" controlsClassName="right-0 top-0" />
           </div>
         ) : null}
@@ -795,6 +972,8 @@ function ParamsModuleCard({ module }: { module: CosmosParamsModuleResult }) {
 }
 
 export default function CosmosParamsPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
   const [data, setData] = useState<CosmosParamsPageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -821,7 +1000,7 @@ export default function CosmosParamsPage() {
         }
 
         setData(null);
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos params.');
+        setErrorMessage(error instanceof Error ? error.message : messages.common.failedToLoadBlockTitle);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -836,7 +1015,7 @@ export default function CosmosParamsPage() {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
-  }, [refreshVersion]);
+  }, [messages.common.failedToLoadBlockTitle, refreshVersion]);
 
   if (loading && !data) {
     return (
@@ -851,10 +1030,10 @@ export default function CosmosParamsPage() {
       <main className="section-block">
         <div className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Params</h1>
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">{messages.labels.params}</h1>
           </div>
           <ActionIconButton
-            tooltip="Refresh params"
+            tooltip={messages.common.refresh}
             className="self-start rounded-md text-slate-400 hover:text-slate-700 lg:self-auto"
             onClick={() => setRefreshVersion((current) => current + 1)}
           >
@@ -863,7 +1042,9 @@ export default function CosmosParamsPage() {
         </div>
 
         {errorMessage ? (
-          <section className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">{errorMessage}</section>
+          <section className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+            {translateRuntimeText(errorMessage, locale)}
+          </section>
         ) : null}
 
         {data && data.modules.length ? (
@@ -876,8 +1057,8 @@ export default function CosmosParamsPage() {
 
         {data && !data.modules.length && !errorMessage ? (
           <section className="rounded-2xl border border-slate-200 bg-white px-5 py-10 text-center shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <h2 className="text-base font-semibold text-slate-900">No params endpoints available</h2>
-            <p className="mt-2 text-sm text-slate-500">The active Cosmos REST provider did not return any supported params endpoints.</p>
+            <h2 className="text-base font-semibold text-slate-900">{messages.common.noParamsEndpointsAvailableTitle}</h2>
+            <p className="mt-2 text-sm text-slate-500">{messages.common.noParamsEndpointsAvailableDescription}</p>
           </section>
         ) : null}
       </main>

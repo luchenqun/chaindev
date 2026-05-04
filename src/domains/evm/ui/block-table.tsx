@@ -6,6 +6,8 @@ import { RelativeTime } from '@/components/relative-time';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
 import { AddressLink } from '@/domains/evm/ui/address-link';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { cn } from '@/lib/utils';
 import { usePushedListItems } from '@/platform/home/use-pushed-list-items';
 
@@ -30,6 +32,9 @@ type BlockTableProps = {
 };
 
 export function EvmBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 0, pushAnimationEnabled = false, maxVisibleItems = DEFAULT_TABLE_PAGE_SIZE }: BlockTableProps) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const tableMessages = messages.evmBlocksPage;
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const minerAddresses = useMemo(() => [...new Set(blocks.map((block) => block.miner))], [blocks]);
   const getBlockKey = useCallback((block: BlockTableProps['blocks'][number]) => `${block.height}-${block.hash}`, []);
@@ -83,13 +88,13 @@ export function EvmBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 0, 
         </colgroup>
         <thead className="relative z-10 bg-white">
           <tr>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Block</th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Age</th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Txn</th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Miner</th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Gas Used</th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Gas Limit</th>
-            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Base Fee</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{messages.common.block}</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{tableMessages.age}</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{tableMessages.txn}</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{messages.common.miner}</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{tableMessages.gasUsed}</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{messages.evmTxDetail.gasLimit}</th>
+            <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{tableMessages.baseFee}</th>
           </tr>
         </thead>
         <tbody
@@ -120,10 +125,10 @@ export function EvmBlockTable({ blocks, hrefPrefix, liveInsertAnimationKey = 0, 
                 />
               </td>
               <td className="truncate px-4 py-2.5 text-[14px] leading-6 tabular-nums text-slate-700">
-                {block.gasUsedLabel} <span className="text-slate-500">({block.gasUsedPercent})</span>
+                {translateRuntimeText(block.gasUsedLabel, locale)} <span className="text-slate-500">({translateRuntimeText(block.gasUsedPercent, locale)})</span>
               </td>
-              <td className="truncate px-4 py-2.5 text-[14px] leading-6 tabular-nums text-slate-700">{block.gasLimitLabel}</td>
-              <td className="truncate px-4 py-2.5 text-[14px] leading-6 tabular-nums text-slate-700">{block.baseFeeLabel}</td>
+              <td className="truncate px-4 py-2.5 text-[14px] leading-6 tabular-nums text-slate-700">{translateRuntimeText(block.gasLimitLabel, locale)}</td>
+              <td className="truncate px-4 py-2.5 text-[14px] leading-6 tabular-nums text-slate-700">{translateRuntimeText(block.baseFeeLabel, locale)}</td>
             </tr>
           ))}
         </tbody>

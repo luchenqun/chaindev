@@ -5,6 +5,7 @@ import 'client-only';
 import { formatEther, formatGwei } from 'viem';
 import { createEvmClient } from '@/domains/evm/client/rpc-client';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
+import { formatLocalizedNumber } from '@/i18n/format';
 import { getEvmCurrencyName } from '@/platform/workbench/rpc-profile';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
@@ -193,7 +194,7 @@ function formatInteger(value: bigint | number | null | undefined) {
     return 'Unavailable';
   }
 
-  return new Intl.NumberFormat('en-US').format(Number(value));
+  return formatLocalizedNumber(Number(value));
 }
 
 function formatTransactionFee(value: bigint | null | undefined, currencyName: string) {

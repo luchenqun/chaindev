@@ -11,11 +11,16 @@ import { getCosmosAccountsPageDirect } from '@/domains/cosmos/client/queries';
 import { formatCosmosAddressForDisplay, type CosmosAddressDisplayMode } from '@/domains/cosmos/ui/address-display';
 import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 function CosmosAccountsPageContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const accountMessages = messages.cosmosAccountDetail;
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,7 +57,7 @@ function CosmosAccountsPageContent() {
       } catch (error) {
         if (!cancelled) {
           setData(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos accounts.');
+          setErrorMessage(error instanceof Error ? error.message : accountMessages.failedToLoadFallback);
         }
       } finally {
         if (!cancelled) {
@@ -87,8 +92,8 @@ function CosmosAccountsPageContent() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Accounts are unavailable</h1>
-          <p>{errorMessage}</p>
+          <h1>{messages.labels.accounts}</h1>
+          <p>{errorMessage ? translateRuntimeText(errorMessage, locale) : errorMessage}</p>
         </main>
       </AppShell>
     );
@@ -98,14 +103,16 @@ function CosmosAccountsPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Accounts</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{messages.labels.accounts}</h1>
         </div>
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <p className="text-lg font-semibold text-slate-900">{data.totalLabel}</p>
-                <p className="mt-1 text-sm text-slate-500">Browse accounts returned directly by the active Cosmos REST provider.</p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {data.totalAccounts ? accountMessages.totalAccountsLabel.replace('{count}', data.totalAccounts.toLocaleString(locale)) : accountMessages.noBalancesReturned}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">{accountMessages.balancesDescription}</p>
               </div>
               <div className="flex items-center gap-0 lg:justify-end">
                 <PaginationControls
@@ -118,7 +125,7 @@ function CosmosAccountsPageContent() {
                   onPageChange={handlePageChange}
                 />
                 <ActionIconButton
-                  tooltip={balanceDisplayMode === 'readable' ? 'Switch to accurate balances' : 'Switch to readable balances'}
+                  tooltip={balanceDisplayMode === 'readable' ? accountMessages.switchToAccurateBalances : accountMessages.switchToReadableBalances}
                   tooltipPlacement="bottom"
                   className="h-8 w-8 text-slate-400 hover:text-slate-600"
                   onClick={() => setBalanceDisplayMode((current) => (current === 'readable' ? 'accurate' : 'readable'))}
@@ -126,7 +133,7 @@ function CosmosAccountsPageContent() {
                   {balanceDisplayMode === 'readable' ? <IconAdjustmentsHorizontal className="size-4" stroke={1.8} /> : <IconCode className="size-4" stroke={1.8} />}
                 </ActionIconButton>
                 <ActionIconButton
-                  tooltip={addressDisplayMode === 'bech32' ? 'Switch to hex addresses' : 'Switch to bech32 addresses'}
+                  tooltip={addressDisplayMode === 'bech32' ? messages.cosmosTxDetail.switchToHex : messages.cosmosTxDetail.switchToBech32}
                   tooltipPlacement="bottom"
                   className="h-8 w-8 text-slate-400 hover:text-slate-600"
                   onClick={() => setAddressDisplayMode((current) => (current === 'bech32' ? 'hex' : 'bech32'))}
@@ -134,7 +141,7 @@ function CosmosAccountsPageContent() {
                   <IconArrowsExchange className="size-4" stroke={1.8} />
                 </ActionIconButton>
                 <ActionIconButton
-                  tooltip="Refresh accounts"
+                  tooltip={messages.common.refresh}
                   tooltipPlacement="bottom"
                   className="h-8 w-8 text-slate-400 hover:text-slate-600"
                   onClick={() => setRefreshVersion((current) => current + 1)}
@@ -149,10 +156,10 @@ function CosmosAccountsPageContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Address</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Balances</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Seq</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.address}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.balances}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.sequence}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.evmTxDetail.type}</th>
                 </tr>
               </thead>
               <tbody>
@@ -165,16 +172,18 @@ function CosmosAccountsPageContent() {
                         <td className="px-5 py-3 text-sm" title={displayAddress.full}>
                           <CosmosAddressLink prefetch={false} href={`/cosmos/account/${account.address}`} label={displayAddress.label} copyValue={displayAddress.full} />
                         </td>
-                        <td className="px-5 py-3 text-sm text-slate-700">{balanceDisplayMode === 'readable' ? account.readableBalancesLabel : account.balancesLabel}</td>
-                        <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.sequenceLabel}</td>
-                        <td className="px-5 py-3 text-sm text-slate-700">{account.type}</td>
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          {translateRuntimeText(balanceDisplayMode === 'readable' ? account.readableBalancesLabel : account.balancesLabel, locale)}
+                        </td>
+                        <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{translateRuntimeText(account.sequenceLabel, locale)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-700">{translateRuntimeText(account.type, locale)}</td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
                     <td colSpan={4} className="px-5 py-10 text-center text-sm text-slate-500">
-                      No accounts were returned by the current provider.
+                      {accountMessages.noBalancesReturned}
                     </td>
                   </tr>
                 )}

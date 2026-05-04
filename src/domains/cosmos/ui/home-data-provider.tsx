@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { createContext, type Dispatch, type ReactNode, type SetStateAction, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '@/i18n/format';
 import {
   getActiveCosmosProvider,
   getCosmosHomeSnapshotDirect,
@@ -16,7 +17,9 @@ import {
 import { decodeCosmosHomeTransactionsByHashes } from '@/domains/cosmos/client/home-transactions';
 import { notifyCosmosTransactionsAvailable } from '@/domains/cosmos/ui/live-events';
 import { HOME_ACTIVITY_LIST_LIMIT } from '@/config/pagination';
-import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
+import { useMessages } from '@/i18n/locale-provider';
+import { useActivePlatformMode } from '@/platform/workbench/active-platform-mode-provider';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 import { isCosmosHomeRouteActive, isCosmosLiveBlockRouteActive, isCosmosRouteActive } from '@/platform/workbench/home-route-state';
 
 type CosmosHomeDataContextValue = {
@@ -25,6 +28,7 @@ type CosmosHomeDataContextValue = {
   errorMessage: string | null;
   nowMs: number;
   connectionMode: 'ws' | 'poll';
+  homeLoadStarted: boolean;
   autoRefreshEnabled: boolean;
   setAutoRefreshEnabled: Dispatch<SetStateAction<boolean>>;
 };
@@ -78,7 +82,7 @@ type TendermintWsEnvelope = {
 };
 
 function formatMetricInteger(value: number) {
-  return new Intl.NumberFormat('en-US').format(value);
+  return formatLocalizedNumber(value);
 }
 
 function formatWsGasLabel(value: string | undefined) {
@@ -88,7 +92,7 @@ function formatWsGasLabel(value: string | undefined) {
     return '--';
   }
 
-  return BigInt(normalized).toLocaleString('en-US');
+  return formatLocalizedNumber(BigInt(normalized));
 }
 
 function getWsBlockGasLabel(payload: TendermintWsEnvelope) {
@@ -152,14 +156,14 @@ function formatWsBlockTime(value: string | undefined) {
     return 'Unavailable';
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(timestampMs, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(new Date(timestampMs));
+  });
 }
 
 function formatCompactHash(value: string | undefined, start = 10, end = 8) {
@@ -183,6 +187,21 @@ function parseWsBlockTimestampMs(value: string | undefined) {
   return Number.isFinite(timestampMs) ? timestampMs : null;
 }
 
+function getCosmosProviderSignature() {
+  const profile = readActiveRpcProfileCookie('cosmos');
+
+  if (!profile) {
+    return 'missing-cosmos-provider';
+  }
+
+  return JSON.stringify({
+    id: profile.id,
+    rpcUrl: profile.rpcUrl,
+    restUrl: profile.restUrl,
+    wsUrl: profile.wsUrl,
+  });
+}
+
 async function sha256HexFromBase64(input: string) {
   const raw = window.atob(input);
   const bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0));
@@ -194,13 +213,15 @@ async function sha256HexFromBase64(input: string) {
 }
 
 export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
+  const messages = useMessages();
   const pathname = usePathname();
-  const [activeMode, setActiveMode] = useState(() => readActivePlatformModeCookie());
+  const { activeMode } = useActivePlatformMode();
   const [snapshot, setSnapshot] = useState<CosmosHomeSnapshot | null>(null);
   const [latestFeed, setLatestFeed] = useState<CosmosHomeDataContextValue['latestFeed']>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [connectionMode, setConnectionMode] = useState<'ws' | 'poll'>('poll');
+  const [homeLoadStarted, setHomeLoadStarted] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false);
   const snapshotRef = useRef<CosmosHomeSnapshot | null>(null);
   const autoRefreshEnabledRef = useRef(false);
@@ -211,6 +232,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
   const decodeTimeoutRef = useRef<number | null>(null);
   const liveBlockTxHashesRef = useRef<Map<string, string[]>>(new Map());
   const validatorMapsRef = useRef<CosmosValidatorMaps | null>(null);
+  const activeProviderSignatureRef = useRef<string | null>(null);
   const liveBlockHydrationRef = useRef<{
     requestedHeight: string | null;
     latestAppliedHeight: string | null;
@@ -238,24 +260,6 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     autoRefreshEnabledRef.current = autoRefreshEnabled;
   }, [autoRefreshEnabled]);
-
-  useEffect(() => {
-    const handleModeChanged = () => {
-      setActiveMode(readActivePlatformModeCookie());
-    };
-
-    handleModeChanged();
-
-    window.addEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
-    window.addEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
-    window.addEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
-
-    return () => {
-      window.removeEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
-      window.removeEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
-      window.removeEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
-    };
-  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -323,6 +327,8 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      setHomeLoadStarted(true);
+
       try {
         if (snapshotRef.current == null) {
           const nextSnapshot = await getCosmosHomeSnapshotDirect();
@@ -361,7 +367,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos homepage activity.');
+        setErrorMessage(error instanceof Error ? error.message : messages.common.failedToLoadBlockTitle);
         if (!websocketRef.current) {
           schedulePoll(12_000);
         }
@@ -394,7 +400,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to load the latest Cosmos block.');
+        setErrorMessage(error instanceof Error ? error.message : messages.common.failedToLoadBlockTitle);
       }
     }
 
@@ -781,6 +787,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       setSnapshot(null);
       setLatestFeed(null);
       setErrorMessage(null);
+      setHomeLoadStarted(false);
     }
 
     if (!isCosmosRoute) {
@@ -793,8 +800,10 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
     }
 
     if (isHomeRoute) {
+      setHomeLoadStarted(true);
       void loadSnapshot();
     } else {
+      setHomeLoadStarted(false);
       clearSnapshotTimeout = window.setTimeout(() => {
         if (!disposed) {
           setSnapshot(null);
@@ -824,19 +833,27 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
     }
 
     const handleProfileChanged = () => {
+      const nextSignature = getCosmosProviderSignature();
+
+      if (activeProviderSignatureRef.current === nextSignature) {
+        return;
+      }
+
+      activeProviderSignatureRef.current = nextSignature;
       resetState();
-      if (isCosmosHomeRouteActive(pathname, readActivePlatformModeCookie())) {
+      if (isCosmosHomeRouteActive(pathname, activeMode)) {
         void loadSnapshot();
       }
 
-      if (isCosmosLiveBlockRouteActive(pathname, readActivePlatformModeCookie())) {
+      if (isCosmosLiveBlockRouteActive(pathname, activeMode)) {
         setupWebSocket();
-      } else if (isCosmosRouteActive(pathname, readActivePlatformModeCookie())) {
+      } else if (isCosmosRouteActive(pathname, activeMode)) {
         void loadLatestFeed();
       }
     };
 
     window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
+    activeProviderSignatureRef.current = getCosmosProviderSignature();
 
     return () => {
       disposed = true;
@@ -850,7 +867,7 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       closeSocket();
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
-  }, [activeMode, pathname]);
+  }, [activeMode, messages.common.failedToLoadBlockTitle, pathname]);
 
   const value = useMemo(
     () => ({
@@ -859,10 +876,11 @@ export function CosmosHomeDataProvider({ children }: { children: ReactNode }) {
       errorMessage,
       nowMs,
       connectionMode,
+      homeLoadStarted,
       autoRefreshEnabled,
       setAutoRefreshEnabled,
     }),
-    [autoRefreshEnabled, connectionMode, errorMessage, latestFeed, nowMs, snapshot],
+    [autoRefreshEnabled, connectionMode, errorMessage, homeLoadStarted, latestFeed, nowMs, snapshot],
   );
 
   return <CosmosHomeDataContext.Provider value={value}>{children}</CosmosHomeDataContext.Provider>;

@@ -11,12 +11,19 @@ import { getCosmosBlocksPageDirect } from '@/domains/cosmos/client/queries';
 import { CosmosBlockTable } from '@/domains/cosmos/ui/block-table';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { useLiveInsertAnimationKey } from '@/platform/home/use-live-insert-animation-key';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
+const SUMMARY_LATEST_BLOCK_LABEL = 'Latest Block';
+const SUMMARY_CURRENT_RANGE_LABEL = 'Current Range';
 
 function CosmosBlocksPageContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const pageMessages = messages.cosmosBlocksPage;
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,7 +61,7 @@ function CosmosBlocksPageContent() {
       } catch (error) {
         if (!cancelled) {
           setData(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos blocks.');
+          setErrorMessage(error instanceof Error ? error.message : pageMessages.failedToLoadBlocks);
         }
       } finally {
         if (!cancelled) {
@@ -75,7 +82,7 @@ function CosmosBlocksPageContent() {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
-  }, [currentPage, pathname, router, searchParamsText]);
+  }, [currentPage, pageMessages.failedToLoadBlocks, pathname, router, searchParamsText]);
 
   useEffect(() => {
     if (!latestFeed) {
@@ -88,11 +95,11 @@ function CosmosBlocksPageContent() {
       }
 
       const summary = current.summary.map((item) =>
-        item.label === 'Latest Block'
+        item.label === SUMMARY_LATEST_BLOCK_LABEL
           ? {
               ...item,
               value: latestFeed.latestBlock,
-              note: 'Live head from the active Cosmos WebSocket subscription.',
+              note: pageMessages.summaryLatestBlockNote,
             }
           : item,
       );
@@ -114,10 +121,10 @@ function CosmosBlocksPageContent() {
           totalPages,
           hasNextPage: totalPages > current.page,
           summary: summary.map((item) =>
-            item.label === 'Current Range'
+            item.label === SUMMARY_CURRENT_RANGE_LABEL
               ? {
                   ...item,
-                  note: `Showing page ${current.page} of ${totalPages}.`,
+                  note: pageMessages.summaryCurrentRangeNote.replace('{page}', String(current.page)).replace('{totalPages}', String(totalPages)),
                 }
               : item,
           ),
@@ -135,18 +142,18 @@ function CosmosBlocksPageContent() {
         totalPages,
         hasNextPage: totalPages > current.page,
         summary: summary.map((item) =>
-          item.label === 'Current Range'
+          item.label === SUMMARY_CURRENT_RANGE_LABEL
             ? {
                 ...item,
-                value: `#${topBlock} - #${bottomBlock}`,
-                note: `Showing page ${current.page} of ${totalPages}.`,
+                value: pageMessages.blockRangeValue.replace('{topBlock}', String(topBlock)).replace('{bottomBlock}', String(bottomBlock)),
+                note: pageMessages.summaryCurrentRangeNote.replace('{page}', String(current.page)).replace('{totalPages}', String(totalPages)),
               }
             : item,
         ),
         blocks: mergedBlocks,
       };
     });
-  }, [autoRefreshEnabled, currentPage, latestFeed]);
+  }, [autoRefreshEnabled, currentPage, latestFeed, pageMessages.blockRangeValue, pageMessages.summaryCurrentRangeNote, pageMessages.summaryLatestBlockNote]);
 
   if (loading) {
     return (
@@ -160,8 +167,8 @@ function CosmosBlocksPageContent() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Recent blocks are unavailable</h1>
-          <p>{errorMessage}</p>
+          <h1>{pageMessages.blocksUnavailableTitle}</h1>
+          <p>{errorMessage ? translateRuntimeText(errorMessage, locale) : errorMessage}</p>
         </main>
       </AppShell>
     );
@@ -171,21 +178,21 @@ function CosmosBlocksPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Blocks</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{pageMessages.blocks}</h1>
         </div>
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {data.summary.map((item) => (
             <article key={item.label} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{translateRuntimeText(item.label, locale)}</p>
               <p className="mt-2 text-[34px] font-semibold leading-none text-slate-900">{item.value}</p>
-              <p className="mt-2 text-sm text-slate-500">{item.note}</p>
+              <p className="mt-2 text-sm text-slate-500">{translateRuntimeText(item.note, locale)}</p>
             </article>
           ))}
         </section>
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-sm text-slate-500">Showing {data.blocks.length} blocks from the selected Cosmos provider.</p>
+              <p className="text-sm text-slate-500">{pageMessages.blocksDescription.replace('{count}', String(data.blocks.length))}</p>
             </div>
             <div className="flex items-center gap-0.5 lg:justify-end">
               <PaginationControls
@@ -198,7 +205,7 @@ function CosmosBlocksPageContent() {
                 onPageChange={handlePageChange}
               />
               <ActionIconButton
-                tooltip={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
+                tooltip={autoRefreshEnabled ? pageMessages.disableAutoRefresh : pageMessages.enableAutoRefresh}
                 aria-pressed={autoRefreshEnabled}
                 className={autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
                 onClick={() => setAutoRefreshEnabled((current) => !current)}

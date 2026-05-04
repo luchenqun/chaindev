@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/toast';
 import { lookupEvmHistoricalBalanceDirect, type HistoricalBalanceLookupResult } from '@/domains/evm/client/historical-balance';
 import { getActiveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type AssetType = 'native' | 'erc20';
@@ -24,6 +26,10 @@ function buildDefaultSnapshotDateTime() {
 
 export default function EvmHistoricalBalancePage() {
   const { showToast } = useToast();
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const pageMessages = messages.historicalBalance;
+  const commonMessages = messages.common;
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
   const [assetType, setAssetType] = useState<AssetType>('native');
   const [accountAddress, setAccountAddress] = useState('');
@@ -61,14 +67,14 @@ export default function EvmHistoricalBalancePage() {
 
       setResult(nextResult);
       showToast({
-        title: 'Historical balance loaded',
-        description: `${nextResult.assetLabel} at block #${nextResult.blockNumber}`,
+        title: pageMessages.loaded,
+        description: translateRuntimeText(`${nextResult.assetLabel} at block #${nextResult.blockNumber}`, locale),
       });
     } catch (lookupError) {
-      const message = lookupError instanceof Error ? lookupError.message : 'Failed to lookup historical balance.';
+      const message = lookupError instanceof Error ? translateRuntimeText(lookupError.message, locale) : pageMessages.failed;
       setError(message);
       showToast({
-        title: 'Lookup failed',
+        title: pageMessages.failedTitle,
         description: message,
         tone: 'error',
       });
@@ -93,23 +99,21 @@ export default function EvmHistoricalBalancePage() {
       <main className="mx-auto max-w-[1400px] px-3 pb-10">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
           <div className="border-b border-slate-200 px-6 py-5">
-            <h1 className="text-2xl font-semibold text-slate-950">Historical Balance Checker</h1>
-            <p className="mt-2 max-w-[1100px] text-sm leading-6 text-slate-600">
-              Lookup the historical native coin or ERC-20 token balance for an account at a specific block number or exact timestamp.
-            </p>
+            <h1 className="text-2xl font-semibold text-slate-950">{pageMessages.title}</h1>
+            <p className="mt-2 max-w-[1100px] text-sm leading-6 text-slate-600">{pageMessages.description}</p>
           </div>
 
           <div className="space-y-6 px-6 py-6">
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Choose an option</label>
+                <label className="text-sm font-medium text-slate-700">{pageMessages.chooseOption}</label>
                 <Select value={assetType} onValueChange={(value) => setAssetType(value as AssetType)}>
                   <SelectTrigger className="h-10 text-left text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="native">Native coin balance</SelectItem>
-                    <SelectItem value="erc20">Token (ERC-20) balance</SelectItem>
+                    <SelectItem value="native">{pageMessages.nativeCoinBalance}</SelectItem>
+                    <SelectItem value="erc20">{pageMessages.erc20Balance}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -117,7 +121,7 @@ export default function EvmHistoricalBalancePage() {
               <div className="grid gap-5">
                 <label className="grid gap-2">
                   <span className="text-sm font-medium text-slate-700">
-                    {assetType === 'native' ? 'Account Address / Contract Address' : 'Account Address'} <span className="text-rose-500">*</span>
+                    {assetType === 'native' ? pageMessages.accountOrContractAddress : pageMessages.accountAddress} <span className="text-rose-500">*</span>
                   </span>
                   <div className="relative">
                     <Input value={accountAddress} placeholder="0x..." className="pr-20" onChange={(event) => setAccountAddress(event.target.value)} />
@@ -131,7 +135,7 @@ export default function EvmHistoricalBalancePage() {
                       }}
                       disabled={!activeKey?.address}
                     >
-                      Self
+                      {pageMessages.self}
                     </button>
                   </div>
                 </label>
@@ -139,7 +143,7 @@ export default function EvmHistoricalBalancePage() {
                 {assetType === 'erc20' ? (
                   <label className="grid gap-2">
                     <span className="text-sm font-medium text-slate-700">
-                      Token Address <span className="text-rose-500">*</span>
+                      {pageMessages.tokenAddress} <span className="text-rose-500">*</span>
                     </span>
                     <Input value={tokenAddress} placeholder="0x..." onChange={(event) => setTokenAddress(event.target.value)} />
                   </label>
@@ -147,7 +151,7 @@ export default function EvmHistoricalBalancePage() {
               </div>
 
               <div className="space-y-3">
-                <div className="text-sm font-medium text-slate-700">Filter by:</div>
+                <div className="text-sm font-medium text-slate-700">{pageMessages.filterBy}</div>
                 <div className="flex flex-wrap items-center gap-5">
                   <button
                     type="button"
@@ -157,7 +161,7 @@ export default function EvmHistoricalBalancePage() {
                     <span className={`flex size-5 items-center justify-center rounded-full border ${lookupMode === 'datetime' ? 'border-sky-600' : 'border-slate-300'}`}>
                       <span className={`size-2.5 rounded-full ${lookupMode === 'datetime' ? 'bg-sky-600' : 'bg-transparent'}`} />
                     </span>
-                    Exact Time
+                    {pageMessages.exactTime}
                   </button>
                   <button
                     type="button"
@@ -167,7 +171,7 @@ export default function EvmHistoricalBalancePage() {
                     <span className={`flex size-5 items-center justify-center rounded-full border ${lookupMode === 'block-number' ? 'border-sky-600' : 'border-slate-300'}`}>
                       <span className={`size-2.5 rounded-full ${lookupMode === 'block-number' ? 'bg-sky-600' : 'bg-transparent'}`} />
                     </span>
-                    Block Number
+                    {pageMessages.blockNumber}
                   </button>
                 </div>
               </div>
@@ -175,7 +179,7 @@ export default function EvmHistoricalBalancePage() {
               {lookupMode === 'datetime' ? (
                 <label className="grid gap-2">
                   <span className="text-sm font-medium text-slate-700">
-                    Snapshot Time <span className="text-rose-500">*</span>
+                    {pageMessages.snapshotTime} <span className="text-rose-500">*</span>
                   </span>
                   <input
                     type="datetime-local"
@@ -188,7 +192,7 @@ export default function EvmHistoricalBalancePage() {
               ) : (
                 <label className="grid gap-2">
                   <span className="text-sm font-medium text-slate-700">
-                    Block Number <span className="text-rose-500">*</span>
+                    {pageMessages.blockNumber} <span className="text-rose-500">*</span>
                   </span>
                   <Input value={blockNumber} placeholder="0" onChange={(event) => setBlockNumber(event.target.value)} />
                 </label>
@@ -196,53 +200,53 @@ export default function EvmHistoricalBalancePage() {
 
               <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-5">
                 <Button size="sm" variant="ghost" className="px-3 text-slate-500 hover:text-slate-900" onClick={handleReset} disabled={submitting}>
-                  Reset
+                  {commonMessages.reset}
                 </Button>
                 <Button size="sm" className="px-4" onClick={() => void handleLookup()} disabled={submitting}>
-                  {submitting ? 'Looking up...' : 'Lookup'}
+                  {submitting ? pageMessages.lookingUp : pageMessages.lookup}
                 </Button>
               </div>
             </div>
 
-            {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div> : null}
+            {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{translateRuntimeText(error, locale)}</div> : null}
 
             {result ? (
               <section className="space-y-5 border-t border-slate-200 pt-6">
-                <h2 className="text-lg font-semibold text-slate-950">Balance Snapshot</h2>
+                <h2 className="text-lg font-semibold text-slate-950">{pageMessages.snapshot}</h2>
                 <div className="grid gap-x-8 gap-y-4 text-sm md:grid-cols-2">
                   <div>
-                    <div className="text-slate-500">Provider</div>
-                    <div className="font-medium text-slate-950">{result.providerName}</div>
+                    <div className="text-slate-500">{pageMessages.provider}</div>
+                    <div className="font-medium text-slate-950">{translateRuntimeText(result.providerName, locale)}</div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Asset</div>
-                    <div className="font-medium text-slate-950">{result.assetLabel}</div>
+                    <div className="text-slate-500">{pageMessages.asset}</div>
+                    <div className="font-medium text-slate-950">{translateRuntimeText(result.assetLabel, locale)}</div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Account</div>
+                    <div className="text-slate-500">{pageMessages.account}</div>
                     <div className="break-all font-medium text-slate-950">{result.accountAddress}</div>
                   </div>
                   {result.tokenAddress ? (
                     <div>
-                      <div className="text-slate-500">Token</div>
+                      <div className="text-slate-500">{pageMessages.token}</div>
                       <div className="break-all font-medium text-slate-950">{result.tokenAddress}</div>
                     </div>
                   ) : null}
                   <div>
-                    <div className="text-slate-500">Balance</div>
+                    <div className="text-slate-500">{pageMessages.balance}</div>
                     <div className="font-medium text-slate-950">{result.amount} {result.symbol}</div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Block</div>
-                    <div className="font-medium text-slate-950">{result.blockExplorerLabel}</div>
+                    <div className="text-slate-500">{commonMessages.block}</div>
+                    <div className="font-medium text-slate-950">{translateRuntimeText(result.blockExplorerLabel, locale)}</div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Block Time</div>
+                    <div className="text-slate-500">{pageMessages.blockTime}</div>
                     <div className="font-medium text-slate-950">{result.blockTimestampLabel}</div>
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <div className="text-sm font-medium text-slate-700">Result JSON</div>
+                  <div className="text-sm font-medium text-slate-700">{commonMessages.resultJson}</div>
                   <JsonViewPanel value={result} initialFullyExpanded={false} />
                 </div>
               </section>

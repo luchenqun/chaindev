@@ -1,11 +1,12 @@
 import { formatEther, formatGwei } from 'viem';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '@/i18n/format';
 
 function formatInteger(value: bigint | number | null | undefined) {
   if (value == null) {
     return 'Unavailable';
   }
 
-  return new Intl.NumberFormat('en-US').format(Number(value));
+  return formatLocalizedNumber(Number(value), 'en');
 }
 
 function formatPercent(value: number) {
@@ -25,16 +26,20 @@ function formatTimestampLabel(timestamp: bigint | null | undefined) {
     return 'Unavailable';
   }
 
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    timeZoneName: 'short',
-  }).format(new Date(Number(timestamp) * 1000));
+  return formatLocalizedDateTime(
+    new Date(Number(timestamp) * 1000),
+    {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+      timeZoneName: 'short',
+    },
+    'en',
+  );
 }
 
 function formatBytes(value: bigint | null | undefined) {

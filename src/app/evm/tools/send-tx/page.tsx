@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ui/toast';
 import { forceSendEvmTransactionDirect } from '@/domains/evm/client/contract-executor';
 import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 import { getEvmCurrencyName } from '@/platform/workbench/rpc-profile';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
@@ -52,13 +54,13 @@ function parseRepeatCount(value: string) {
   }
 
   if (!/^\d+$/.test(trimmedValue)) {
-    throw new Error('Repeat count must be a positive integer.');
+    throw new Error('__REPEAT_COUNT_ERROR__');
   }
 
   const parsedValue = Number.parseInt(trimmedValue, 10);
 
   if (!Number.isSafeInteger(parsedValue) || parsedValue <= 0) {
-    throw new Error('Repeat count must be a positive integer.');
+    throw new Error('__REPEAT_COUNT_ERROR__');
   }
 
   return parsedValue;
@@ -80,7 +82,7 @@ function normalizeTransactionData(value: string) {
   }
 
   if (!/^0x[0-9a-fA-F]*$/.test(trimmedValue) || trimmedValue.length % 2 !== 0) {
-    throw new Error('Transaction data must be a valid hex string.');
+    throw new Error('__INVALID_TX_DATA__');
   }
 
   return trimmedValue;
@@ -94,7 +96,7 @@ function createRandomEvmAddress() {
 
 function randomBigIntBetween(min: bigint, max: bigint) {
   if (max < min) {
-    throw new Error('Max value must be greater than or equal to min value.');
+    throw new Error('__MAX_VALUE_RANGE_ERROR__');
   }
 
   if (max === min) {
@@ -125,14 +127,14 @@ function normalizeRandomValueRange(maxValue: string) {
   const normalizedMaxValue = maxValue.trim();
 
   if (!normalizedMaxValue) {
-    throw new Error('Max value is required for random value mode.');
+    throw new Error('__MAX_VALUE_REQUIRED__');
   }
 
   const maxWei = parseEther(normalizedMaxValue);
   const minWei = maxWei / 100n;
 
   if (maxWei < minWei) {
-    throw new Error('Max value must be greater than or equal to min value.');
+    throw new Error('__MAX_VALUE_RANGE_ERROR__');
   }
 
   return {
@@ -176,14 +178,17 @@ function InlineModeSelect({
   disabled?: boolean;
   onValueChange: (value: 'fixed' | 'random') => void;
 }) {
+  const messages = useMessages();
+  const sendTxMessages = messages.sendTx;
+
   return (
     <Select value={value} disabled={disabled} onValueChange={(nextValue) => onValueChange(nextValue as 'fixed' | 'random')}>
       <SelectTrigger className="absolute left-1.5 top-1/2 h-[30px] w-[92px] -translate-y-1/2 border-0 bg-transparent px-2 text-xs font-medium text-slate-700 shadow-none ring-0 focus:ring-0 focus-visible:ring-0">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="fixed">Fixed</SelectItem>
-        <SelectItem value="random">Random</SelectItem>
+        <SelectItem value="fixed">{sendTxMessages.fixed}</SelectItem>
+        <SelectItem value="random">{sendTxMessages.random}</SelectItem>
       </SelectContent>
     </Select>
   );
@@ -250,6 +255,10 @@ function writeEvmSendTxFormCache(cache: EvmSendTxFormCache) {
 }
 
 function EvmSendTxContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const sendTxMessages = messages.sendTx;
+  const commonMessages = messages.common;
   const { showToast } = useToast();
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
   const [fromAddressCopied, setFromAddressCopied] = useState(false);
@@ -404,7 +413,7 @@ function EvmSendTxContent() {
 
   async function submit(password?: string) {
     if (!activeKey) {
-      setFormError('Select a global private key first.');
+      setFormError(sendTxMessages.missingActiveKey);
       return;
     }
 
@@ -505,24 +514,34 @@ function EvmSendTxContent() {
         title:
           totalCount > 1
             ? stopRequestedRef.current
-              ? 'Transactions stopped'
-              : 'Transactions sent'
-            : 'Transaction sent',
+              ? sendTxMessages.stoppedTitle
+              : sendTxMessages.sentManyTitle
+            : sendTxMessages.sentOneTitle,
         description: resultToastDescription(latestResult.hash),
         tone: latestResult.receipt.status === 'success' ? 'success' : 'info',
         durationMs: 8000,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to send transaction.';
+      const message = error instanceof Error ? translateRuntimeText(error.message, locale) : sendTxMessages.failedToSend;
 
-      if (message === 'Password is required.') {
+      if (message === sendTxMessages.passwordRequired) {
         setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
         return;
       }
 
-      setFormError(message);
+      setFormError(
+        message === '__REPEAT_COUNT_ERROR__'
+          ? sendTxMessages.repeatCountError
+          : message === '__INVALID_TX_DATA__'
+            ? sendTxMessages.invalidTransactionData
+            : message === '__MAX_VALUE_REQUIRED__'
+              ? sendTxMessages.maxValueRequired
+              : message === '__MAX_VALUE_RANGE_ERROR__'
+                ? sendTxMessages.maxValueRangeError
+                : message,
+      );
     } finally {
       setSubmitting(false);
       stopRequestedRef.current = false;
@@ -542,7 +561,7 @@ function EvmSendTxContent() {
       setUnlockError(null);
       await submit(password);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+      setUnlockError(error instanceof Error ? translateRuntimeText(error.message, locale) : sendTxMessages.failedToUnlock);
     }
   }
 
@@ -583,8 +602,8 @@ function EvmSendTxContent() {
           <div className="border-b border-slate-200 px-6 py-4">
             <div className="flex min-w-0 items-center justify-between gap-4">
               <div className="flex min-w-0 items-baseline gap-3">
-                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Send Transaction</h1>
-                <p className="min-w-0 truncate text-sm text-slate-500">Send EVM transactions with the selected provider.</p>
+                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">{sendTxMessages.title}</h1>
+                <p className="min-w-0 truncate text-sm text-slate-500">{sendTxMessages.description}</p>
               </div>
               <span className="inline-flex min-w-0 shrink-0 items-center gap-1.5 truncate text-sm font-medium text-slate-700" title={activeKey?.address || undefined}>
                 {activeKey ? (
@@ -595,18 +614,18 @@ function EvmSendTxContent() {
                         ref={copyButtonRef}
                         type="button"
                         className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
-                        aria-label="Copy address"
+                        aria-label={sendTxMessages.copyAddress}
                         onClick={() => void handleCopyFromAddress()}
                       >
                         <IconCopy className="size-4" stroke={1.8} />
                       </button>
                       <FloatingTooltip open={fromAddressCopied} anchorRef={copyButtonRef} className="whitespace-nowrap border border-slate-200 bg-white text-slate-700">
-                        <span className="block whitespace-nowrap">Copied!</span>
+                        <span className="block whitespace-nowrap">{commonMessages.copied}</span>
                       </FloatingTooltip>
                     </span>
                   </>
                 ) : (
-                  'No active address'
+                  sendTxMessages.noActiveAddress
                 )}
               </span>
             </div>
@@ -618,15 +637,15 @@ function EvmSendTxContent() {
                 <div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-type">
-                      Transaction type
+                      {sendTxMessages.transactionType}
                     </label>
                     <Select value={transactionType} disabled={submitting} onValueChange={(value) => setTransactionType(value as 'LEGACY' | 'EIP1559')}>
                       <SelectTrigger id="evm-tx-type" className="mt-1 h-10">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="EIP1559">EIP1559</SelectItem>
-                        <SelectItem value="LEGACY">Legacy</SelectItem>
+                        <SelectItem value="EIP1559">{translateRuntimeText('EIP-1559', locale)}</SelectItem>
+                        <SelectItem value="LEGACY">{sendTxMessages.legacy}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -634,13 +653,13 @@ function EvmSendTxContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-repeat-count">
-                    Repeat broadcasts
+                    {sendTxMessages.repeatBroadcasts}
                   </label>
                   <Input
                     id="evm-tx-repeat-count"
                     value={repeatCount}
                     inputMode="numeric"
-                    placeholder="e.g. 10"
+                    placeholder={sendTxMessages.repeatCountPlaceholder}
                     disabled={submitting}
                     className="mt-1"
                     onChange={(event) => setRepeatCount(event.target.value)}
@@ -651,22 +670,22 @@ function EvmSendTxContent() {
                   <>
                     <div className="sm:col-span-2">
                       <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-gas-price">
-                        Gas price (Gwei)
+                        {sendTxMessages.gasPrice}
                       </label>
-                      <Input id="evm-tx-gas-price" value={gasPrice} inputMode="decimal" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setGasPrice(event.target.value)} />
+                      <Input id="evm-tx-gas-price" value={gasPrice} inputMode="decimal" placeholder={sendTxMessages.autoPlaceholder} disabled={submitting} className="mt-1" onChange={(event) => setGasPrice(event.target.value)} />
                     </div>
                   </>
                 ) : (
                   <>
                     <div>
                       <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-max-fee">
-                        Max fee per gas (Gwei)
+                        {sendTxMessages.maxFeePerGas}
                       </label>
                       <Input
                         id="evm-tx-max-fee"
                         value={maxFeePerGas}
                         inputMode="decimal"
-                        placeholder="Auto"
+                        placeholder={sendTxMessages.autoPlaceholder}
                         disabled={submitting}
                         className="mt-1"
                         onChange={(event) => setMaxFeePerGas(event.target.value)}
@@ -675,13 +694,13 @@ function EvmSendTxContent() {
 
                     <div>
                       <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-max-priority-fee">
-                        Max priority fee (Gwei)
+                        {sendTxMessages.maxPriorityFee}
                       </label>
                       <Input
                         id="evm-tx-max-priority-fee"
                         value={maxPriorityFeePerGas}
                         inputMode="decimal"
-                        placeholder="Auto"
+                        placeholder={sendTxMessages.autoPlaceholder}
                         disabled={submitting}
                         className="mt-1"
                         onChange={(event) => setMaxPriorityFeePerGas(event.target.value)}
@@ -694,14 +713,14 @@ function EvmSendTxContent() {
               <div className="grid gap-4 sm:grid-cols-4">
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-to">
-                    To
+                    {sendTxMessages.to}
                   </label>
                   <div className="relative mt-1">
                     <InlineModeSelect value={toMode} disabled={submitting} onValueChange={(nextValue) => handleToModeChange(nextValue, setToMode, setToAddress)} />
                     <Input
                       id="evm-tx-to"
                       value={toAddress}
-                      placeholder={toMode === 'random' ? 'Generate a random address per send' : '0x...'}
+                      placeholder={toMode === 'random' ? sendTxMessages.randomAddressPlaceholder : sendTxMessages.hexPlaceholder}
                       disabled={submitting}
                       className="min-w-0 pl-[104px]"
                       onChange={(event) => setToAddress(event.target.value)}
@@ -711,16 +730,16 @@ function EvmSendTxContent() {
 
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-data">
-                    Data
+                    {sendTxMessages.data}
                   </label>
-                  <Input id="evm-tx-data" value={data} placeholder="0x" disabled={submitting} className="mt-1" onChange={(event) => setData(event.target.value)} />
+                  <Input id="evm-tx-data" value={data} placeholder={sendTxMessages.zeroHexPlaceholder} disabled={submitting} className="mt-1" onChange={(event) => setData(event.target.value)} />
                 </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-value">
-                    Value ({currencyName})
+                    {sendTxMessages.value} ({currencyName})
                   </label>
                   {valueMode === 'fixed' ? (
                     <div className="relative mt-1">
@@ -729,7 +748,7 @@ function EvmSendTxContent() {
                         id="evm-tx-value"
                         value={value}
                         inputMode="decimal"
-                        placeholder="0"
+                        placeholder={sendTxMessages.zeroPlaceholder}
                         disabled={submitting}
                         className="min-w-0 pl-[104px]"
                         onChange={(event) => setValue(event.target.value)}
@@ -738,27 +757,27 @@ function EvmSendTxContent() {
                   ) : (
                     <div className="relative mt-1">
                       <InlineModeSelect value={valueMode} disabled={submitting} onValueChange={setValueMode} />
-                      <Input value={maxValue} inputMode="decimal" placeholder="Max" disabled={submitting} className="min-w-0 pl-[104px]" onChange={(event) => setMaxValue(event.target.value)} />
+                      <Input value={maxValue} inputMode="decimal" placeholder={sendTxMessages.maxPlaceholder} disabled={submitting} className="min-w-0 pl-[104px]" onChange={(event) => setMaxValue(event.target.value)} />
                     </div>
                   )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-gas-limit">
-                    Gas limit
+                    {sendTxMessages.gasLimit}
                   </label>
-                  <Input id="evm-tx-gas-limit" value={gasLimit} inputMode="numeric" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setGasLimit(event.target.value)} />
+                  <Input id="evm-tx-gas-limit" value={gasLimit} inputMode="numeric" placeholder={sendTxMessages.autoPlaceholder} disabled={submitting} className="mt-1" onChange={(event) => setGasLimit(event.target.value)} />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-receipt-poll-interval">
-                    Receipt poll interval (ms)
+                    {sendTxMessages.receiptPollInterval}
                   </label>
                   <Input
                     id="evm-tx-receipt-poll-interval"
                     value={receiptPollIntervalMs}
                     inputMode="numeric"
-                    placeholder="Optional"
+                    placeholder={sendTxMessages.optionalPlaceholder}
                     disabled={submitting}
                     className="mt-1"
                     onChange={(event) => setReceiptPollIntervalMs(event.target.value)}
@@ -767,12 +786,12 @@ function EvmSendTxContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="evm-tx-nonce">
-                    Nonce
+                    {sendTxMessages.nonce}
                   </label>
-                  <Input id="evm-tx-nonce" value={nonce} inputMode="numeric" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setNonce(event.target.value)} />
+                  <Input id="evm-tx-nonce" value={nonce} inputMode="numeric" placeholder={sendTxMessages.autoPlaceholder} disabled={submitting} className="mt-1" onChange={(event) => setNonce(event.target.value)} />
                 </div>
 
-                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{formError}</p> : null}
+                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{translateRuntimeText(formError, locale)}</p> : null}
               </div>
 
               {broadcastProgress ? (
@@ -780,20 +799,30 @@ function EvmSendTxContent() {
                   <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
                     <span>
                       {broadcastProgress.status === 'cancel-requested'
-                        ? `Cancel requested at ${broadcastProgress.completed}/${broadcastProgress.total}`
+                        ? sendTxMessages.cancelRequestedAt
+                            .replace('{completed}', String(broadcastProgress.completed))
+                            .replace('{total}', String(broadcastProgress.total))
                         : broadcastProgress.status === 'stopped'
-                          ? `Stopped at ${broadcastProgress.completed}/${broadcastProgress.total}`
+                          ? sendTxMessages.stoppedAt
+                              .replace('{completed}', String(broadcastProgress.completed))
+                              .replace('{total}', String(broadcastProgress.total))
                           : broadcastProgress.status === 'completed'
-                            ? `Completed ${broadcastProgress.completed}/${broadcastProgress.total}`
-                            : `Progress ${broadcastProgress.completed}/${broadcastProgress.total}`}
+                            ? sendTxMessages.completedProgress
+                                .replace('{completed}', String(broadcastProgress.completed))
+                                .replace('{total}', String(broadcastProgress.total))
+                            : sendTxMessages.progress
+                                .replace('{completed}', String(broadcastProgress.completed))
+                                .replace('{total}', String(broadcastProgress.total))}
                     </span>
                     <span>
                       {broadcastProgress.status === 'cancel-requested'
-                        ? 'Waiting for current tx'
+                        ? sendTxMessages.waitingCurrentTx
                         : broadcastProgress.status === 'stopped'
-                          ? 'Stopped'
+                          ? sendTxMessages.stopped
                           : broadcastProgress.completed < broadcastProgress.total && submitting
-                            ? `Sending ${Math.min(broadcastProgress.current, broadcastProgress.total)}/${broadcastProgress.total}`
+                            ? sendTxMessages.sending
+                                .replace('{current}', String(Math.min(broadcastProgress.current, broadcastProgress.total)))
+                                .replace('{total}', String(broadcastProgress.total))
                             : `${progressPercent}%`}
                     </span>
                   </div>
@@ -812,7 +841,7 @@ function EvmSendTxContent() {
                 <div className="min-w-0">
                   {typeof latestTxHash === 'string' ? (
                     <span className="inline-flex min-w-0 max-w-full items-center text-sm leading-5 text-slate-700">
-                      <span className="shrink-0 font-medium leading-5">View tx&nbsp;</span>
+                      <span className="shrink-0 font-medium leading-5">{sendTxMessages.viewTx}&nbsp;</span>
                       <Link className="translate-y-[1px] truncate text-sm font-semibold leading-5 text-sky-600 hover:text-sky-700" href={`/evm/tx/${latestTxHash}`}>
                         {formatCompactHash(latestTxHash, 10, 8)}
                       </Link>
@@ -821,20 +850,20 @@ function EvmSendTxContent() {
                 </div>
                 <div className="flex shrink-0 justify-end gap-2">
                   <Button type="button" variant="outline" disabled={submitting} onClick={clearForm}>
-                    Clear
+                    {sendTxMessages.clear}
                   </Button>
                   {submitting && broadcastProgress?.status === 'running' ? (
                     <Button type="button" variant="outline" onClick={handleStopBroadcast}>
-                      Stop
+                      {sendTxMessages.stop}
                     </Button>
                   ) : null}
                   {submitting && broadcastProgress?.status === 'cancel-requested' ? (
                     <Button type="button" variant="outline" disabled>
-                      Cancel requested
+                      {sendTxMessages.cancelRequested}
                     </Button>
                   ) : null}
                   <Button type="button" disabled={submitting} onClick={() => void submit()}>
-                    {submitting ? (broadcastProgress?.status === 'cancel-requested' ? 'Stopping...' : 'Broadcasting...') : 'Broadcast'}
+                    {submitting ? (broadcastProgress?.status === 'cancel-requested' ? sendTxMessages.stopping : sendTxMessages.broadcasting) : sendTxMessages.broadcast}
                   </Button>
                 </div>
               </div>
@@ -864,12 +893,12 @@ function EvmSendTxContent() {
             setUnlockError(null);
           }
         }}
-        title="Unlock Private Key"
-        description={activeKey ? `Enter the password for "${activeKey.name}" to continue sending the transaction.` : 'Enter the password to continue.'}
+        title={sendTxMessages.unlockPrivateKey}
+        description={activeKey ? sendTxMessages.unlockDescription.replace('{name}', activeKey.name) : sendTxMessages.unlockFallbackDescription}
         value={unlockPassword}
         onValueChange={setUnlockPassword}
-        placeholder="Password"
-        confirmLabel="Unlock"
+        placeholder={sendTxMessages.password}
+        confirmLabel={sendTxMessages.unlock}
         confirmDisabled={!unlockPassword.trim()}
         errorMessage={unlockError}
         onConfirm={() => void handleConfirmUnlock()}

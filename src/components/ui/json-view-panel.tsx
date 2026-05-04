@@ -4,6 +4,7 @@ import JsonView from '@uiw/react-json-view';
 import { IconArrowsMaximize, IconArrowsMinimize, IconCopy } from '@tabler/icons-react';
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 'react';
 import { copyText } from '@/components/ui/copy-text';
+import { useMessages } from '@/i18n/locale-provider';
 import { cn } from '@/lib/utils';
 
 export const JSON_VIEW_PANEL_STYLE = {
@@ -60,6 +61,7 @@ export function JsonViewPanel({
   style = JSON_VIEW_PANEL_STYLE,
   initialFullyExpanded = true,
 }: JsonViewPanelProps) {
+  const messages = useMessages();
   const [fullyExpanded, setFullyExpanded] = useState(initialFullyExpanded);
   const [copied, setCopied] = useState(false);
   const copyTimeoutRef = useRef<number | null>(null);
@@ -92,7 +94,7 @@ export function JsonViewPanel({
         <button
           type="button"
           className="inline-flex size-5 items-center justify-center text-slate-400 transition hover:text-sky-600"
-          aria-label={fullyExpanded ? 'Collapse JSON to first level' : 'Expand all JSON'}
+          aria-label={fullyExpanded ? messages.common.collapseJson : messages.common.expandJson}
           onClick={() => setFullyExpanded((current) => !current)}
         >
           {fullyExpanded ? <IconArrowsMinimize className="size-4" stroke={1.8} /> : <IconArrowsMaximize className="size-4" stroke={1.8} />}
@@ -101,7 +103,7 @@ export function JsonViewPanel({
           <button
             type="button"
             className="inline-flex size-5 items-center justify-center text-slate-400 transition hover:text-sky-600"
-            aria-label="Copy JSON"
+            aria-label={messages.common.copyJson}
             onClick={() => void handleCopy()}
           >
             <IconCopy className="size-4" stroke={1.8} />
@@ -111,7 +113,7 @@ export function JsonViewPanel({
               copied ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <span className="block whitespace-nowrap">Copied!</span>
+            <span className="block whitespace-nowrap">{messages.common.copied}</span>
           </span>
         </span>
         {trailingControls}

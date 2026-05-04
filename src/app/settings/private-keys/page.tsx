@@ -27,6 +27,9 @@ import {
   type EvmStoredPrivateKey,
   type EvmStoredPrivateKeySecurityMode,
 } from '@/domains/evm/client/keyring';
+import { formatLocalizedDateTime } from '@/i18n/format';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 import { AccountWorkbenchShell } from '@/platform/layout/account-workbench-shell';
 
@@ -34,18 +37,18 @@ function formatAddressLabel(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
 }
 
-function formatTimestamp(timestamp: number | null) {
+function formatTimestamp(timestamp: number | null, neverLabel: string, locale: string) {
   if (!timestamp) {
-    return 'Never';
+    return neverLabel;
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(timestamp, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(new Date(timestamp));
+  }, locale);
 }
 
 type ProtectedActionState = {
@@ -57,6 +60,9 @@ export default function PrivateKeysPage() {
   const router = useRouter();
   const { status } = useSession();
   const { showToast } = useToast();
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const keyMessages = messages.privateKeys;
   const [items, setItems] = useState<EvmStoredPrivateKey[]>([]);
   const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(null);
   const [source, setSource] = useState<'guest' | 'server'>('guest');
@@ -165,8 +171,8 @@ export default function PrivateKeysPage() {
       }
     } catch (error) {
       showToast({
-        title: 'Failed to load private key.',
-        description: error instanceof Error ? error.message : 'Failed to load private key.',
+        title: keyMessages.failedToLoad,
+        description: error instanceof Error ? translateRuntimeText(error.message, locale) : keyMessages.failedToLoad,
         tone: 'error',
       });
     }
@@ -184,8 +190,8 @@ export default function PrivateKeysPage() {
       resetImportForm();
       setImportDialogOpen(false);
       showToast({
-        title: 'Private key added successfully.',
-        description: 'The latest keys have been reloaded from your account.',
+        title: keyMessages.added,
+        description: keyMessages.reloaded,
         tone: 'success',
       });
     } catch (error) {
@@ -194,7 +200,7 @@ export default function PrivateKeysPage() {
         return;
       }
 
-      setCreateError(error instanceof Error ? error.message : 'Failed to save private key.');
+      setCreateError(error instanceof Error ? translateRuntimeText(error.message, locale) : keyMessages.failedToSave);
     }
   }
 
@@ -202,7 +208,7 @@ export default function PrivateKeysPage() {
     const passwordForSave = editForm.securityMode === 'encrypted' ? editForm.password || editUnlockPasswordFallback || undefined : undefined;
 
     if (editForm.securityMode === 'encrypted' && !passwordForSave) {
-      setEditError('Password is required for encrypted private keys.');
+      setEditError(keyMessages.passwordRequiredForEncrypted);
       return;
     }
 
@@ -218,8 +224,8 @@ export default function PrivateKeysPage() {
       setEditDialogOpen(false);
       resetEditForm();
       showToast({
-        title: 'Private key updated successfully.',
-        description: 'The latest keys have been reloaded from your account.',
+        title: keyMessages.updated,
+        description: keyMessages.reloaded,
         tone: 'success',
       });
     } catch (error) {
@@ -228,7 +234,7 @@ export default function PrivateKeysPage() {
         return;
       }
 
-      setEditError(error instanceof Error ? error.message : 'Failed to update private key.');
+      setEditError(error instanceof Error ? translateRuntimeText(error.message, locale) : keyMessages.failedToUpdate);
     }
   }
 
@@ -241,7 +247,7 @@ export default function PrivateKeysPage() {
       await deleteEvmStoredPrivateKey(deleteTarget.id);
       setDeleteTarget(null);
       showToast({
-        title: 'Private key deleted successfully.',
+        title: keyMessages.deleted,
         tone: 'success',
       });
     } catch (error) {
@@ -270,7 +276,7 @@ export default function PrivateKeysPage() {
       setUnlockError(null);
       setPendingProtectedAction(null);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+      setUnlockError(error instanceof Error ? translateRuntimeText(error.message, locale) : keyMessages.failedToUnlock);
     }
   }
 
@@ -278,7 +284,7 @@ export default function PrivateKeysPage() {
     return (
       <AppShell>
         <AccountWorkbenchShell mode="evm">
-          <div className="rounded-3xl border border-slate-200 bg-white px-5 py-10 text-sm text-slate-500">Loading private keys...</div>
+          <div className="rounded-3xl border border-slate-200 bg-white px-5 py-10 text-sm text-slate-500">{keyMessages.loadingPage}</div>
         </AccountWorkbenchShell>
       </AppShell>
     );
@@ -288,21 +294,21 @@ export default function PrivateKeysPage() {
     <AppShell>
       <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Private Keys</h1>
-          <p className="mt-2 text-sm text-slate-500">Save EVM private keys to your account, choose one as the active key, and use it across deploy and write actions.</p>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{keyMessages.pageTitle}</h1>
+          <p className="mt-2 text-sm text-slate-500">{keyMessages.pageDescription}</p>
         </div>
 
         <section className="grid gap-3 lg:grid-cols-3">
           <article className="rounded-3xl border border-slate-200 bg-white px-5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Total Keys</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{keyMessages.totalKeys}</p>
               <ActionIconButton
                 tooltip={
                   isAuthenticated
                     ? isUsingFallback
-                      ? 'No saved account keys yet. Using the built-in Alice key until you add one.'
-                      : 'Stored in your signed-in account.'
-                    : 'Guest mode uses the built-in Alice key.'
+                      ? keyMessages.totalKeysNoSavedHint
+                      : keyMessages.totalKeysAccountHint
+                    : keyMessages.totalKeysGuestHint
                 }
                 className="text-slate-400 hover:text-slate-600"
                 wrapperClassName="shrink-0"
@@ -314,24 +320,24 @@ export default function PrivateKeysPage() {
           </article>
           <article className="rounded-3xl border border-slate-200 bg-white px-5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Selected Key</p>
-              <ActionIconButton tooltip="Choose one key for global EVM actions." className="text-slate-400 hover:text-slate-600" wrapperClassName="shrink-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{keyMessages.selectedKey}</p>
+              <ActionIconButton tooltip={keyMessages.selectedKeyHint} className="text-slate-400 hover:text-slate-600" wrapperClassName="shrink-0">
                 <IconInfoCircle className="size-3.5" stroke={1.8} />
               </ActionIconButton>
             </div>
-            <p className="mt-2 text-xl font-semibold text-slate-900">{activeItem ? activeItem.name : 'Not Selected'}</p>
-            <p className="mt-1 text-sm text-slate-500">{activeItem ? formatAddressLabel(activeItem.address) : 'No active key'}</p>
+            <p className="mt-2 text-xl font-semibold text-slate-900">{activeItem ? activeItem.name : keyMessages.notSelected}</p>
+            <p className="mt-1 text-sm text-slate-500">{activeItem ? formatAddressLabel(activeItem.address) : keyMessages.noActiveKey}</p>
           </article>
           <article className="rounded-3xl border border-slate-200 bg-white px-5 py-3 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Storage</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{keyMessages.storage}</p>
               <ActionIconButton
                 tooltip={
                   isAuthenticated
                     ? isUsingFallback
-                      ? 'You are signed in, but no account keys are saved yet.'
-                      : 'All private keys are synced to your account.'
-                    : 'Sign in to manage account private keys.'
+                      ? keyMessages.storageNoSavedHint
+                      : keyMessages.storageAccountHint
+                    : keyMessages.storageGuestHint
                 }
                 className="text-slate-400 hover:text-slate-600"
                 wrapperClassName="shrink-0"
@@ -339,7 +345,7 @@ export default function PrivateKeysPage() {
                 <IconInfoCircle className="size-3.5" stroke={1.8} />
               </ActionIconButton>
             </div>
-            <p className="mt-2 text-3xl font-semibold leading-none text-slate-900">{isAuthenticated ? 'Account' : 'Guest'}</p>
+            <p className="mt-2 text-3xl font-semibold leading-none text-slate-900">{isAuthenticated ? keyMessages.accountStorage : keyMessages.guestStorage}</p>
           </article>
         </section>
 
@@ -347,8 +353,8 @@ export default function PrivateKeysPage() {
           <div className="border-b border-slate-200 px-5 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-lg font-semibold text-slate-900">Saved Keys</p>
-                <p className="mt-1 text-sm text-slate-500">Choose the active key for global EVM actions, rename entries, or delete them.</p>
+                <p className="text-lg font-semibold text-slate-900">{keyMessages.savedKeys}</p>
+                <p className="mt-1 text-sm text-slate-500">{keyMessages.savedKeysDescription}</p>
               </div>
               <Button
                 type="button"
@@ -363,7 +369,7 @@ export default function PrivateKeysPage() {
                   setImportDialogOpen(true);
                 }}
               >
-                {isAuthenticated ? 'Add' : 'Sign In to Add'}
+                {isAuthenticated ? keyMessages.add : keyMessages.signInToAdd}
               </Button>
             </div>
           </div>
@@ -371,11 +377,11 @@ export default function PrivateKeysPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Address</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Security</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Last Used</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.name}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.address}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{keyMessages.security}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{keyMessages.lastUsed}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.labels.actions}</th>
                 </tr>
               </thead>
               <tbody>
@@ -402,16 +408,16 @@ export default function PrivateKeysPage() {
                             }
                             variant="secondary"
                           >
-                            {item.securityMode === 'encrypted' ? 'Encrypted' : 'Plain'}
+                            {item.securityMode === 'encrypted' ? keyMessages.encrypted : keyMessages.plain}
                           </Badge>
                         </td>
-                        <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(item.lastUsedAt)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(item.lastUsedAt, messages.common.never, locale)}</td>
                         <td className="px-5 py-3 text-sm">
                           <div className="flex items-center justify-end gap-0">
                             <ActionIconButton
                               className="text-slate-400 hover:text-slate-700"
-                              tooltip="View private key"
-                              aria-label="View private key"
+                              tooltip={keyMessages.viewPrivateKey}
+                              aria-label={keyMessages.viewPrivateKey}
                               onClick={() => {
                                 if (item.securityMode === 'encrypted') {
                                   setPendingProtectedAction({
@@ -436,8 +442,8 @@ export default function PrivateKeysPage() {
                               <>
                                 <ActionIconButton
                                   className="text-slate-400 hover:text-slate-700"
-                                  tooltip="Edit private key"
-                                  aria-label="Edit private key"
+                                  tooltip={keyMessages.editPrivateKey}
+                                  aria-label={keyMessages.editPrivateKey}
                                   onClick={() => {
                                     if (item.securityMode === 'encrypted') {
                                       setPendingProtectedAction({
@@ -460,8 +466,8 @@ export default function PrivateKeysPage() {
                                 </ActionIconButton>
                                 <ActionIconButton
                                   className="text-slate-400 hover:text-rose-600"
-                                  tooltip="Delete private key"
-                                  aria-label="Delete private key"
+                                  tooltip={keyMessages.deletePrivateKey}
+                                  aria-label={keyMessages.deletePrivateKey}
                                   onClick={() => setDeleteTarget(item)}
                                 >
                                   <IconTrash className="size-4" stroke={1.8} />
@@ -476,7 +482,7 @@ export default function PrivateKeysPage() {
                 ) : (
                   <tr>
                     <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={5}>
-                      No private keys saved yet.
+                      {keyMessages.noPrivateKeysSaved}
                     </td>
                   </tr>
                 )}
@@ -494,8 +500,8 @@ export default function PrivateKeysPage() {
               resetImportForm();
             }
           }}
-          title="Import Private Key"
-          description="Save a private key to your account. Add a password if you want to encrypt it before storing remotely."
+          title={keyMessages.importPrivateKey}
+          description={keyMessages.importPrivateKeyDescription}
           footer={
             <>
               <Button
@@ -506,17 +512,17 @@ export default function PrivateKeysPage() {
                   resetImportForm();
                 }}
               >
-                Cancel
+                {messages.common.cancel}
               </Button>
               <Button type="button" disabled={!form.name.trim() || !form.privateKey.trim()} onClick={() => void handleCreate()}>
-                Save Key
+                {keyMessages.saveKey}
               </Button>
             </>
           }
           maxWidthClassName="max-w-2xl"
         >
           <div className="grid gap-3">
-            <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="Key name" />
+            <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder={keyMessages.keyName} />
             <Input
               type="password"
               value={form.privateKey}
@@ -537,10 +543,10 @@ export default function PrivateKeysPage() {
                   password: event.target.value,
                 }))
               }
-              placeholder="Optional password for remote encryption"
+              placeholder={keyMessages.optionalPasswordForRemoteEncryption}
             />
-            <p className="text-xs text-slate-500">Leave the password empty to store the key as plain text in your remote account.</p>
-            {createError ? <p className="text-sm text-rose-600">{createError}</p> : null}
+            <p className="text-xs text-slate-500">{keyMessages.leavePasswordEmptyForPlain}</p>
+            {createError ? <p className="text-sm text-rose-600">{translateRuntimeText(createError, locale)}</p> : null}
           </div>
         </ModalDialog>
 
@@ -553,8 +559,8 @@ export default function PrivateKeysPage() {
               resetEditForm();
             }
           }}
-          title="Edit Private Key"
-          description="Update the key name, private key value, and security mode."
+          title={keyMessages.editPrivateKeyTitle}
+          description={keyMessages.editPrivateKeyDescription}
           footer={
             <>
               <Button
@@ -565,10 +571,10 @@ export default function PrivateKeysPage() {
                   resetEditForm();
                 }}
               >
-                Cancel
+                {messages.common.cancel}
               </Button>
               <Button type="button" disabled={!editForm.name.trim() || !editForm.privateKey.trim()} onClick={() => void handleSaveEdit()}>
-                Save Changes
+                {keyMessages.saveChanges}
               </Button>
             </>
           }
@@ -583,7 +589,7 @@ export default function PrivateKeysPage() {
                   name: event.target.value,
                 }))
               }
-              placeholder="Key name"
+              placeholder={keyMessages.keyName}
             />
             <Input
               type="text"
@@ -606,11 +612,11 @@ export default function PrivateKeysPage() {
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select security mode" />
+                <SelectValue placeholder={keyMessages.selectSecurityMode} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="plain">Plain</SelectItem>
-                <SelectItem value="encrypted">Encrypted</SelectItem>
+                <SelectItem value="plain">{keyMessages.plain}</SelectItem>
+                <SelectItem value="encrypted">{keyMessages.encrypted}</SelectItem>
               </SelectContent>
             </Select>
             <Input
@@ -625,19 +631,19 @@ export default function PrivateKeysPage() {
               placeholder={
                 editForm.securityMode === 'encrypted'
                   ? editUnlockPasswordFallback
-                    ? 'Leave empty to keep the current password'
-                    : 'Password for encrypted storage'
-                  : 'Password not required for plain storage'
+                    ? keyMessages.keepCurrentPassword
+                    : keyMessages.passwordForEncryptedStorage
+                  : keyMessages.passwordNotRequiredForPlainStorage
               }
             />
             {editForm.securityMode === 'encrypted' ? (
               <p className="text-xs text-slate-500">
-                {editUnlockPasswordFallback ? 'Leave the password empty to keep the current encryption password.' : 'Encrypted storage requires a password.'}
+                {editUnlockPasswordFallback ? keyMessages.keepCurrentPasswordHint : keyMessages.encryptedStorageRequiresPassword}
               </p>
             ) : (
-              <p className="text-xs text-slate-500">Plain storage keeps the private key unencrypted in your remote account.</p>
+              <p className="text-xs text-slate-500">{keyMessages.plainStorageHint}</p>
             )}
-            {editError ? <p className="text-sm text-rose-600">{editError}</p> : null}
+            {editError ? <p className="text-sm text-rose-600">{translateRuntimeText(editError, locale)}</p> : null}
           </div>
         </ModalDialog>
 
@@ -651,8 +657,8 @@ export default function PrivateKeysPage() {
               setRevealedPrivateKey('');
             }
           }}
-          title="View Private Key"
-          description={revealedItem ? `Showing the private key for "${revealedItem.name}".` : undefined}
+          title={keyMessages.viewPrivateKeyTitle}
+          description={revealedItem ? keyMessages.showingPrivateKeyFor.replace('{name}', revealedItem.name) : undefined}
           footer={
             <>
               <Button
@@ -664,21 +670,21 @@ export default function PrivateKeysPage() {
                   setRevealedPrivateKey('');
                 }}
               >
-                Close
+                {messages.common.close}
               </Button>
               <Button
                 type="button"
                 onClick={() => {
                   void navigator.clipboard.writeText(revealedPrivateKey);
                   showToast({
-                    title: 'Private key copied.',
+                    title: keyMessages.copied,
                     tone: 'success',
                   });
                 }}
                 disabled={!revealedPrivateKey}
               >
                 <IconCopy className="mr-1 size-4" stroke={1.8} />
-                Copy
+                {keyMessages.copy}
               </Button>
             </>
           }
@@ -686,7 +692,7 @@ export default function PrivateKeysPage() {
         >
           <div className="grid gap-3">
             <Input type="text" value={revealedPrivateKey} readOnly />
-            <p className="text-xs text-rose-600">Anyone with this value can control the account.</p>
+            <p className="text-xs text-rose-600">{keyMessages.dangerousPrivateKeyWarning}</p>
           </div>
         </ModalDialog>
 
@@ -701,16 +707,18 @@ export default function PrivateKeysPage() {
               setPendingProtectedAction(null);
             }
           }}
-          title="Unlock Private Key"
+          title={keyMessages.unlockPrivateKey}
           description={
             pendingProtectedAction
-              ? `Enter the password for "${pendingProtectedAction.item.name}" to ${pendingProtectedAction.type === 'view' ? 'view' : 'edit'} the private key.`
-              : 'Enter the password to continue.'
+              ? keyMessages.unlockPrivateKeyDescription
+                  .replace('{name}', pendingProtectedAction.item.name)
+                  .replace('{action}', pendingProtectedAction.type === 'view' ? keyMessages.viewAction : keyMessages.editAction)
+              : keyMessages.unlockContinueDescription
           }
           value={unlockPassword}
           onValueChange={setUnlockPassword}
-          placeholder="Enter password"
-          confirmLabel="Unlock"
+          placeholder={keyMessages.enterPassword}
+          confirmLabel={keyMessages.unlock}
           confirmDisabled={!unlockPassword.trim()}
           errorMessage={unlockError}
           onConfirm={() => void handleConfirmUnlock()}
@@ -723,9 +731,9 @@ export default function PrivateKeysPage() {
               setDeleteTarget(null);
             }
           }}
-          title="Delete Private Key"
-          description={deleteTarget ? `Delete the private key "${deleteTarget.name}" from your account?` : undefined}
-          confirmLabel="Delete"
+          title={keyMessages.deletePrivateKeyTitle}
+          description={deleteTarget ? keyMessages.deletePrivateKeyDescription.replace('{name}', deleteTarget.name) : undefined}
+          confirmLabel={keyMessages.delete}
           onConfirm={() => {
             void handleDeleteConfirm();
           }}

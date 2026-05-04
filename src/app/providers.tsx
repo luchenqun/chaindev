@@ -7,7 +7,10 @@ import { ToastProvider } from '@/components/ui/toast';
 import { CosmosHomeDataProvider } from '@/domains/cosmos/ui/home-data-provider';
 import { syncEvmKeyringFromServer } from '@/domains/evm/client/keyring';
 import { EvmHomeDataProvider } from '@/domains/evm/ui/home-data-provider';
+import { LocaleProvider } from '@/i18n/locale-provider';
+import type { Locale } from '@/i18n/config';
 import { setClientAuthenticated } from '@/platform/auth/client-session-state';
+import { ActivePlatformModeProvider } from '@/platform/workbench/active-platform-mode-provider';
 import { syncGuestRpcDefaults, writeActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
 
 function ActivePlatformModeSync() {
@@ -51,16 +54,20 @@ function GuestWorkbenchDefaultsSync() {
   return null;
 }
 
-export function AppProviders({ children }: { children: ReactNode }) {
+export function AppProviders({ children, initialLocale }: { children: ReactNode; initialLocale?: Locale }) {
   return (
     <SessionProvider>
-      <ToastProvider>
-        <ActivePlatformModeSync />
-        <GuestWorkbenchDefaultsSync />
-        <EvmHomeDataProvider>
-          <CosmosHomeDataProvider>{children}</CosmosHomeDataProvider>
-        </EvmHomeDataProvider>
-      </ToastProvider>
+      <LocaleProvider initialLocale={initialLocale}>
+        <ToastProvider>
+          <ActivePlatformModeProvider>
+            <ActivePlatformModeSync />
+            <GuestWorkbenchDefaultsSync />
+            <EvmHomeDataProvider>
+              <CosmosHomeDataProvider>{children}</CosmosHomeDataProvider>
+            </EvmHomeDataProvider>
+          </ActivePlatformModeProvider>
+        </ToastProvider>
+      </LocaleProvider>
     </SessionProvider>
   );
 }

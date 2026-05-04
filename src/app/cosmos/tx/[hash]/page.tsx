@@ -16,6 +16,8 @@ import {
   CosmosDetailRow as DetailRow,
   formatTimestampWithSeconds,
 } from '@/domains/cosmos/ui/detail-primitives';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 function StatusBadge({ status, label }: { status: 'success' | 'failed'; label: string }) {
@@ -38,6 +40,9 @@ function TxEventsSection({
     }>;
   }>;
 }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.cosmosTxDetail;
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const timeoutRef = useRef<number | null>(null);
 
@@ -75,8 +80,7 @@ function TxEventsSection({
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{`${index + 1}. ${event.type}`}</span>
                   <span className="text-xs text-slate-500">
-                    {event.attributes.length} attribute
-                    {event.attributes.length === 1 ? '' : 's'}
+                    {txMessages.attributeCount.replace('{count}', String(event.attributes.length))}
                   </span>
                 </div>
 
@@ -85,23 +89,25 @@ function TxEventsSection({
                     <table className="min-w-full w-max border-collapse whitespace-nowrap">
                       <thead>
                         <tr>
-                          <th className="w-[180px] min-w-[180px] border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Key</th>
-                          <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Value</th>
-                          {showIndexedColumn ? <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Indexed</th> : null}
+                          <th className="w-[180px] min-w-[180px] border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">{txMessages.key}</th>
+                          <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">{txMessages.value}</th>
+                          {showIndexedColumn ? <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">{txMessages.indexed}</th> : null}
                         </tr>
                       </thead>
                       <tbody>
                         {event.attributes.map((attribute, attributeIndex) => (
                           <tr key={`${event.type}-${attribute.key}-${attributeIndex}`} className="border-t border-slate-200">
-                            <td className="w-[180px] min-w-[180px] px-3 py-2 text-sm text-slate-700 mono">{attribute.key || 'Unknown'}</td>
+                            <td className="w-[180px] min-w-[180px] px-3 py-2 text-sm text-slate-700 mono">
+                              {translateRuntimeText(attribute.key || txMessages.unknown, locale)}
+                            </td>
                             <td className="px-3 py-2 text-sm text-slate-900">
                               <div className="flex items-start gap-2">
-                                <span className="mono whitespace-pre-wrap break-all">{attribute.value || 'Empty'}</span>
+                                <span className="mono whitespace-pre-wrap break-all">{attribute.value || txMessages.emptyValue}</span>
                                 <span className="relative inline-flex shrink-0">
                                   <button
                                     type="button"
                                     className="inline-flex h-5 w-5 items-center justify-center text-slate-400 transition hover:text-sky-600"
-                                    aria-label="Copy event value"
+                                    aria-label={txMessages.copyEventValue}
                                     onClick={() => void handleCopy(attribute.value || '', `${event.type}-${attribute.key}-${attributeIndex}`)}
                                   >
                                     <IconCopy className="size-3.5" stroke={1.8} />
@@ -111,33 +117,33 @@ function TxEventsSection({
                                       copiedKey === `${event.type}-${attribute.key}-${attributeIndex}` ? 'opacity-100' : 'opacity-0'
                                     }`}
                                   >
-                                    <span className="block whitespace-nowrap">Copied!</span>
+                                    <span className="block whitespace-nowrap">{messages.common.copied}</span>
                                   </span>
                                 </span>
                               </div>
                             </td>
-                            {showIndexedColumn ? <td className="px-3 py-2 text-sm text-slate-700">{attribute.indexed ? 'true' : 'false'}</td> : null}
+                            {showIndexedColumn ? <td className="px-3 py-2 text-sm text-slate-700">{attribute.indexed ? txMessages.booleanTrue : txMessages.booleanFalse}</td> : null}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 ) : (
-                  <div className="empty-state">No attributes returned.</div>
+                  <div className="empty-state">{txMessages.noAttributes}</div>
                 )}
               </article>
             );
           })}
         </div>
       ) : (
-        <div className="empty-state">No transaction events returned.</div>
+        <div className="empty-state">{txMessages.noTransactionEvents}</div>
       )}
     </section>
   );
 }
 
 function TxMessagesSection({
-  messages,
+  messages: items,
 }: {
   messages: Array<{
     type: string;
@@ -148,20 +154,23 @@ function TxMessagesSection({
     }>;
   }>;
 }) {
+  const localeMessages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = localeMessages.cosmosTxDetail;
   return (
     <section className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
       <div className="mb-4">
-        <p className="text-base font-semibold text-slate-900">Messages</p>
-        <p className="mt-1 text-sm text-slate-500">Decoded from the transaction body returned by the active Cosmos REST endpoint.</p>
+        <p className="text-base font-semibold text-slate-900">{txMessages.messages}</p>
+        <p className="mt-1 text-sm text-slate-500">{txMessages.messagesDescription}</p>
       </div>
 
-      {messages.length ? (
+      {items.length ? (
         <div className="grid gap-4">
-          {messages.map((message, index) => (
+          {items.map((message, index) => (
             <article key={`${message.type}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
               <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{message.title}</span>
-                <span className="text-xs text-slate-500 mono">{message.type}</span>
+                <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{translateRuntimeText(message.title, locale)}</span>
+                <span className="text-xs text-slate-500 mono">{translateRuntimeText(message.type, locale)}</span>
               </div>
 
               {message.fields.length ? (
@@ -169,34 +178,37 @@ function TxMessagesSection({
                   <table className="min-w-full w-full border-collapse">
                     <thead>
                       <tr>
-                        <th className="w-[180px] min-w-[180px] border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Field</th>
-                        <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Value</th>
+                        <th className="w-[180px] min-w-[180px] border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">{txMessages.field}</th>
+                        <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">{txMessages.value}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {message.fields.map((field, fieldIndex) => (
                         <tr key={`${field.key}-${fieldIndex}`} className="border-t border-slate-200">
-                          <td className="w-[180px] min-w-[180px] px-3 py-2 text-sm text-slate-700 mono">{field.key}</td>
-                          <td className="px-3 py-2 text-sm text-slate-900 mono whitespace-pre-wrap break-all align-top">{field.value}</td>
+                          <td className="w-[180px] min-w-[180px] px-3 py-2 text-sm text-slate-700 mono">{translateRuntimeText(field.key, locale)}</td>
+                          <td className="px-3 py-2 text-sm text-slate-900 mono whitespace-pre-wrap break-all align-top">{translateRuntimeText(field.value, locale)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <div className="empty-state">No message fields returned.</div>
+                <div className="empty-state">{txMessages.noMessageFields}</div>
               )}
             </article>
           ))}
         </div>
       ) : (
-        <div className="empty-state">No messages returned for this transaction.</div>
+        <div className="empty-state">{txMessages.noMessages}</div>
       )}
     </section>
   );
 }
 
 export default function CosmosTxPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.cosmosTxDetail;
   const params = useParams<{ hash: string }>();
   const hash = params.hash;
   const isValid = useMemo(() => /^[A-Fa-f0-9]{64}$/.test(hash), [hash]);
@@ -239,7 +251,7 @@ export default function CosmosTxPage() {
       } catch (error) {
         if (!cancelled) {
           setTransaction(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos transaction.');
+          setErrorMessage(error instanceof Error ? error.message : txMessages.failedToLoadFallback);
         }
       }
     }
@@ -251,14 +263,14 @@ export default function CosmosTxPage() {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
-  }, [hash, isValid]);
+  }, [hash, isValid, txMessages.failedToLoadFallback]);
 
   if (!isValid) {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Invalid transaction hash</h1>
-          <p>The transaction hash must be a 32-byte hex string.</p>
+          <h1>{txMessages.invalidHashTitle}</h1>
+          <p>{txMessages.invalidHashDescription}</p>
         </main>
       </AppShell>
     );
@@ -276,8 +288,8 @@ export default function CosmosTxPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Failed to load transaction</h1>
-          <p>{errorMessage}</p>
+          <h1>{txMessages.failedToLoadTitle}</h1>
+          <p>{translateRuntimeText(errorMessage, locale)}</p>
         </main>
       </AppShell>
     );
@@ -286,7 +298,7 @@ export default function CosmosTxPage() {
   const hasEvents = transaction.eventsCount > 0;
   const resolvedActiveTab = activeTab === 'events' && !hasEvents ? 'overview' : activeTab;
   const transactionHash = transaction.hash;
-  const displaySender = transaction.sender !== 'Unknown' ? formatCosmosAddressForDisplay(transaction.sender, addressDisplayMode) : null;
+  const displaySender = transaction.sender !== txMessages.unknown ? formatCosmosAddressForDisplay(transaction.sender, addressDisplayMode) : null;
 
   async function handleCopyHash() {
     await copyText(transactionHash);
@@ -329,7 +341,7 @@ export default function CosmosTxPage() {
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'overview' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('overview')}
           >
-            Overview
+            {txMessages.overview}
           </button>
           <button
             type="button"
@@ -344,14 +356,14 @@ export default function CosmosTxPage() {
             disabled={!hasEvents}
             aria-disabled={!hasEvents}
           >
-            {hasEvents ? `Events (${transaction.eventsCount})` : 'Events'}
+            {hasEvents ? `${txMessages.events} (${transaction.eventsCount})` : txMessages.events}
           </button>
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'json' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('json')}
           >
-            JSON
+            {txMessages.json}
           </button>
         </div>
 
@@ -362,7 +374,7 @@ export default function CosmosTxPage() {
                 <DetailGroup plain>
                   <dl>
                     <DetailRow
-                      label="Transaction Hash"
+                      label={txMessages.transactionHash}
                       value={
                         <span className="inline-flex items-start gap-1.5">
                           <span className="mono break-all whitespace-pre-wrap">{transaction.hash}</span>
@@ -370,7 +382,7 @@ export default function CosmosTxPage() {
                             <button
                               type="button"
                               className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
-                              aria-label="Copy transaction hash"
+                              aria-label={txMessages.copyTransactionHash}
                               onClick={() => void handleCopyHash()}
                             >
                               <IconCopy className="size-4" stroke={1.8} />
@@ -380,15 +392,15 @@ export default function CosmosTxPage() {
                                 copiedHash ? 'opacity-100' : 'opacity-0'
                               }`}
                             >
-                              <span className="block whitespace-nowrap">Copied!</span>
+                              <span className="block whitespace-nowrap">{messages.common.copied}</span>
                             </span>
                           </span>
                         </span>
                       }
                     />
-                    <DetailRow label="Status" value={<StatusBadge status={transaction.status} label={transaction.statusLabel} />} />
+                    <DetailRow label={txMessages.status} value={<StatusBadge status={transaction.status} label={translateRuntimeText(transaction.statusLabel, locale)} />} />
                     <DetailRow
-                      label="Block"
+                      label={txMessages.block}
                       value={
                         <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
                           {transaction.height}
@@ -396,17 +408,17 @@ export default function CosmosTxPage() {
                       }
                     />
                     <DetailRow
-                      label="Timestamp"
+                      label={txMessages.timestamp}
                       value={
                         transaction.timestampMs ? (
                           <span className="inline-flex flex-wrap items-center gap-2">
                             <span>
                               <RelativeTime timestampMs={transaction.timestampMs} />
                             </span>
-                            <span className="text-slate-500">({formatTimestampWithSeconds(transaction.timestamp, 'Unavailable')})</span>
+                            <span className="text-slate-500">({formatTimestampWithSeconds(transaction.timestamp, messages.common.unavailable)})</span>
                           </span>
                         ) : (
-                          'Unavailable'
+                          messages.common.unavailable
                         )
                       }
                     />
@@ -415,9 +427,9 @@ export default function CosmosTxPage() {
 
                 <DetailGroup separated>
                   <dl>
-                    <DetailRow label="Type" value={transaction.type} />
+                    <DetailRow label={txMessages.type} value={transaction.type} />
                     <DetailRow
-                      label="Sender"
+                      label={txMessages.sender}
                       value={
                         displaySender ? (
                           <span className="inline-flex max-w-full items-center gap-1.5" title={displaySender.full}>
@@ -425,7 +437,7 @@ export default function CosmosTxPage() {
                               {displaySender.full}
                             </Link>
                             <ActionIconButton
-                              tooltip={addressDisplayMode === 'bech32' ? 'Switch to hex address' : 'Switch to bech32 address'}
+                              tooltip={addressDisplayMode === 'bech32' ? txMessages.switchToHex : txMessages.switchToBech32}
                               className="text-slate-400 hover:text-sky-600"
                               onClick={() => setAddressDisplayMode((current) => (current === 'bech32' ? 'hex' : 'bech32'))}
                             >
@@ -435,7 +447,7 @@ export default function CosmosTxPage() {
                               <button
                                 type="button"
                                 className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
-                                aria-label="Copy sender address"
+                                aria-label={txMessages.copySenderAddress}
                                 onClick={() => void handleCopySenderAddress()}
                               >
                                 <IconCopy className="size-4" stroke={1.8} />
@@ -445,12 +457,12 @@ export default function CosmosTxPage() {
                                   copiedSender ? 'opacity-100' : 'opacity-0'
                                 }`}
                               >
-                                <span className="block whitespace-nowrap">Copied!</span>
+                                <span className="block whitespace-nowrap">{messages.common.copied}</span>
                               </span>
                             </span>
                           </span>
                         ) : (
-                          'Unknown'
+                          translateRuntimeText(txMessages.unknown, locale)
                         )
                       }
                     />
@@ -459,12 +471,15 @@ export default function CosmosTxPage() {
 
                 <DetailGroup separated>
                   <dl>
-                    <DetailRow label="Code" value={String(transaction.code)} />
-                    <DetailRow label="Message Count" value={String(transaction.messageCount)} />
-                    <DetailRow label="Transaction Fee" value={transaction.feeLabel} />
-                    <DetailRow label="Gas Used / Wanted" value={`${transaction.gasUsedLabel} / ${transaction.gasWantedLabel}`} />
-                    <DetailRow label="Memo" value={transaction.memo || '-'} mono={Boolean(transaction.memo)} />
-                    <DetailRow label="Raw Log" value={transaction.rawLog || '-'} mono={Boolean(transaction.rawLog)} />
+                    <DetailRow label={txMessages.code} value={String(transaction.code)} />
+                    <DetailRow label={txMessages.messageCount} value={String(transaction.messageCount)} />
+                    <DetailRow label={txMessages.transactionFee} value={translateRuntimeText(transaction.feeLabel, locale)} />
+                    <DetailRow
+                      label={txMessages.gasUsedWanted}
+                      value={`${translateRuntimeText(transaction.gasUsedLabel, locale)} / ${translateRuntimeText(transaction.gasWantedLabel, locale)}`}
+                    />
+                    <DetailRow label={txMessages.memo} value={transaction.memo || txMessages.emptyValue} mono={Boolean(transaction.memo)} />
+                    <DetailRow label={txMessages.rawLog} value={transaction.rawLog || txMessages.emptyValue} mono={Boolean(transaction.rawLog)} />
                   </dl>
                 </DetailGroup>
               </div>

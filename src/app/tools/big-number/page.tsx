@@ -5,6 +5,8 @@ import { type KeyboardEvent, useMemo, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type OperationId = 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'mod' | 'and' | 'or' | 'xor';
@@ -29,11 +31,11 @@ const OPERATION_DEFINITIONS: OperationDefinition[] = [
 
 type ResultBase = 'decimal' | 'hex';
 
-function parseBigInteger(value: string, fieldLabel: string) {
+function parseBigInteger(value: string, fieldLabel: string, fieldRequiredMessage: string) {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
-    throw new Error(`${fieldLabel} is required.`);
+    throw new Error(fieldRequiredMessage.replace('{field}', fieldLabel));
   }
 
   return BigInt(trimmedValue);
@@ -43,9 +45,21 @@ function normalizeModulo(value: bigint, modulo: bigint) {
   return ((value % modulo) + modulo) % modulo;
 }
 
-function computeResult(operationId: OperationId, rawA: string, rawB: string) {
-  const a = parseBigInteger(rawA, 'Number (A)');
-  const b = parseBigInteger(rawB, 'Number (B)');
+function computeResult(
+  operationId: OperationId,
+  rawA: string,
+  rawB: string,
+  messages: {
+    numberA: string;
+    numberB: string;
+    fieldRequired: string;
+    divisionByZero: string;
+    exponentMustBePositive: string;
+    moduloByZero: string;
+  },
+) {
+  const a = parseBigInteger(rawA, messages.numberA, messages.fieldRequired);
+  const b = parseBigInteger(rawB, messages.numberB, messages.fieldRequired);
 
   switch (operationId) {
     case 'add':
@@ -56,17 +70,17 @@ function computeResult(operationId: OperationId, rawA: string, rawB: string) {
       return (a * b).toString();
     case 'divide':
       if (b === 0n) {
-        throw new Error('Division by zero is not allowed.');
+        throw new Error(messages.divisionByZero);
       }
       return (a / b).toString();
     case 'power':
       if (b < 0n) {
-        throw new Error('Exponent must be zero or a positive integer.');
+        throw new Error(messages.exponentMustBePositive);
       }
       return (a ** b).toString();
     case 'mod':
       if (b === 0n) {
-        throw new Error('Modulo by zero is not allowed.');
+        throw new Error(messages.moduloByZero);
       }
       return normalizeModulo(a, b).toString();
     case 'and':
@@ -335,6 +349,9 @@ function evaluateExpression(expression: string) {
 }
 
 export default function BigNumberPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const toolMessages = messages.toolsBigNumber;
   const [mode, setMode] = useState<CalculatorMode>('operands');
   const [numberA, setNumberA] = useState('');
   const [numberB, setNumberB] = useState('');
@@ -361,7 +378,7 @@ export default function BigNumberPage() {
       } catch (error) {
         return {
           value: '',
-          error: error instanceof Error ? error.message : 'Computation failed.',
+          error: error instanceof Error ? error.message : toolMessages.computationFailed,
         };
       }
     }
@@ -375,20 +392,20 @@ export default function BigNumberPage() {
 
     try {
       return {
-        value: computeResult(activeOperation, numberA, numberB),
+        value: computeResult(activeOperation, numberA, numberB, toolMessages),
         error: null,
       };
     } catch (error) {
       return {
         value: '',
-        error: error instanceof Error ? error.message : 'Computation failed.',
+        error: error instanceof Error ? error.message : toolMessages.computationFailed,
       };
     }
-  }, [activeOperation, expression, expressionSubmitted, mode, numberA, numberB]);
+  }, [activeOperation, expression, expressionSubmitted, mode, numberA, numberB, toolMessages]);
 
   const displayedResult = useMemo(() => {
     if (output.error || !output.value.trim()) {
-      return output.error || output.value;
+      return output.error ? translateRuntimeText(output.error, locale) : output.value;
     }
 
     try {
@@ -396,7 +413,7 @@ export default function BigNumberPage() {
     } catch {
       return output.value;
     }
-  }, [output.error, output.value, resultBase]);
+  }, [locale, output.error, output.value, resultBase]);
 
   async function handleCopy() {
     const valueToCopy = displayedResult;
@@ -448,8 +465,8 @@ export default function BigNumberPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-baseline gap-3">
-                  <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Big Number Calculator</h1>
-                  <p className="min-w-0 truncate text-sm text-slate-500">Large integer math in the browser.</p>
+                  <h1 className="shrink-0 text-2xl font-semibold text-slate-950">{toolMessages.title}</h1>
+                  <p className="min-w-0 truncate text-sm text-slate-500">{toolMessages.description}</p>
                 </div>
               </div>
 
@@ -463,7 +480,7 @@ export default function BigNumberPage() {
                   }
                   onClick={() => handleModeChange('operands')}
                 >
-                  Operands
+                  {toolMessages.operands}
                 </button>
                 <button
                   type="button"
@@ -474,7 +491,7 @@ export default function BigNumberPage() {
                   }
                   onClick={() => handleModeChange('expression')}
                 >
-                  Expression
+                  {toolMessages.expression}
                 </button>
               </div>
             </div>
@@ -486,32 +503,32 @@ export default function BigNumberPage() {
                 <div className="grid gap-6 lg:grid-cols-2">
                   <div>
                     <label className="block text-[18px] font-semibold text-slate-950" htmlFor="big-number-a">
-                      Number (A)
+                      {toolMessages.numberA}
                     </label>
                     <textarea
                       id="big-number-a"
                       value={numberA}
                       className="mt-3 min-h-[170px] w-full rounded-xl border border-slate-200 bg-white px-5 py-4 text-[20px] leading-8 text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-sky-400"
-                      placeholder="Enter an integer"
+                      placeholder={toolMessages.enterInteger}
                       onChange={(event) => setNumberA(event.target.value)}
                     />
                   </div>
                   <div>
                     <label className="block text-[18px] font-semibold text-slate-950" htmlFor="big-number-b">
-                      Number (B)
+                      {toolMessages.numberB}
                     </label>
                     <textarea
                       id="big-number-b"
                       value={numberB}
                       className="mt-3 min-h-[170px] w-full rounded-xl border border-slate-200 bg-white px-5 py-4 text-[20px] leading-8 text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-sky-400"
-                      placeholder="Enter an integer"
+                      placeholder={toolMessages.enterInteger}
                       onChange={(event) => setNumberB(event.target.value)}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <h2 className="text-[18px] font-semibold text-slate-950">Calculate</h2>
+                  <h2 className="text-[18px] font-semibold text-slate-950">{toolMessages.calculate}</h2>
                   <div className="mt-4 flex flex-wrap gap-3">
                     {OPERATION_DEFINITIONS.map((operation) => (
                       <Button
@@ -525,7 +542,7 @@ export default function BigNumberPage() {
                         }
                         onClick={() => setActiveOperation(operation.id)}
                       >
-                        <span className="text-[18px] font-semibold leading-none">{operation.label}</span>
+                        <span className="text-[18px] font-semibold leading-none">{translateRuntimeText(operation.label, locale)}</span>
                       </Button>
                     ))}
                   </div>
@@ -534,14 +551,14 @@ export default function BigNumberPage() {
             ) : (
               <div>
                 <label className="block text-[18px] font-semibold text-slate-950" htmlFor="big-number-expression">
-                  Expression
+                  {toolMessages.expression}
                 </label>
                 <div className="mt-3 rounded-[20px] border-2 border-slate-200 bg-white p-3 focus-within:border-sky-400 focus-within:shadow-[0_0_0_4px_rgba(56,189,248,0.18)]">
                   <textarea
                     id="big-number-expression"
                     value={expression}
                     className="min-h-[80px] w-full resize-none border-0 bg-transparent px-3 py-2 text-[22px] leading-9 text-slate-900 outline-none placeholder:text-slate-400"
-                    placeholder="Enter an expression, for example 2^0xff+4*1000000000000000000+3^19%97"
+                    placeholder={toolMessages.enterExpression}
                     onChange={(event) => {
                       setExpression(event.target.value);
                       setExpressionSubmitted(false);
@@ -551,10 +568,10 @@ export default function BigNumberPage() {
                 </div>
                 <div className="mt-4 flex justify-end gap-3">
                   <Button type="button" variant="outline" className="h-11 rounded-xl px-5 text-base" onClick={handleClearExpression}>
-                    Clear
+                    {toolMessages.clear}
                   </Button>
                   <Button type="button" className="h-11 rounded-xl px-5 text-base" onClick={handleCalculateExpression}>
-                    Calculate
+                    {toolMessages.calculate}
                   </Button>
                 </div>
               </div>
@@ -563,11 +580,11 @@ export default function BigNumberPage() {
 
           <div className="border-t border-slate-200 px-6 py-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-[18px] font-semibold text-slate-950">Result</h2>
+              <h2 className="text-[18px] font-semibold text-slate-950">{toolMessages.result}</h2>
               <div className="flex items-center gap-2">
                 <ActionIconButton
-                  tooltip={resultBase === 'decimal' ? 'Switch result to hex' : 'Switch result to decimal'}
-                  aria-label={resultBase === 'decimal' ? 'Switch result to hex' : 'Switch result to decimal'}
+                  tooltip={resultBase === 'decimal' ? toolMessages.switchResultToHex : toolMessages.switchResultToDecimal}
+                  aria-label={resultBase === 'decimal' ? toolMessages.switchResultToHex : toolMessages.switchResultToDecimal}
                   className={output.error || !output.value ? 'text-slate-300 hover:text-slate-300' : 'text-slate-400 hover:text-sky-600'}
                   disabled={!!output.error || !output.value}
                   onClick={handleToggleResultBase}
@@ -575,8 +592,8 @@ export default function BigNumberPage() {
                   <IconArrowsExchange className="size-4" stroke={1.8} />
                 </ActionIconButton>
                 <ActionIconButton
-                  tooltip={copied ? 'Copied' : 'Copy result'}
-                  aria-label={copied ? 'Result copied' : 'Copy result'}
+                  tooltip={copied ? messages.common.copied : messages.common.copyResult}
+                  aria-label={copied ? messages.common.resultCopied : messages.common.copyResult}
                   className={displayedResult.trim() ? 'text-slate-400 hover:text-sky-600' : 'text-slate-300 hover:text-slate-300'}
                   disabled={!displayedResult.trim()}
                   onClick={() => void handleCopy()}

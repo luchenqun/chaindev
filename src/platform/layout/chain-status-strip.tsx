@@ -8,6 +8,8 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { RollingCounter } from '@/components/ui/rolling-counter';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { type PlatformMode } from '@/config/chains';
 import { isCosmosRouteActive, type ActivePlatformMode } from '@/platform/workbench/home-route-state';
 import { clearAllChaindevBrowserStorage } from '@/platform/workbench/site-storage-reset';
@@ -18,15 +20,18 @@ type StatusItem = {
   toneClassName?: string;
 };
 
-function buildFallbackItem(reason: string): StatusItem {
+function buildFallbackItem(label: string, reason: string): StatusItem {
   return {
-    label: 'Block',
+    label,
     value: reason,
     toneClassName: 'text-slate-500',
   };
 }
 
 export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const commonMessages = messages.common;
   const pathname = usePathname();
   const activeMode = mode as ActivePlatformMode;
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
@@ -38,17 +43,17 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
     if (mode === 'evm') {
       return status
         ? {
-            label: 'Block',
+            label: commonMessages.block,
             value: status.latestBlock,
             toneClassName: 'text-sky-600',
           }
-        : buildFallbackItem('Unavailable');
+        : buildFallbackItem(commonMessages.block, commonMessages.unavailable);
     }
 
     if (isCosmosRouteActive(pathname, activeMode)) {
       if (cosmosLatestFeed) {
         return {
-          label: 'Block',
+          label: commonMessages.block,
           value: cosmosLatestFeed.latestBlock,
           toneClassName: 'text-sky-600',
         };
@@ -56,15 +61,15 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
 
       return cosmosSnapshot
         ? {
-            label: 'Block',
+            label: commonMessages.block,
             value: String(cosmosSnapshot.latestHeight),
             toneClassName: 'text-sky-600',
           }
-        : buildFallbackItem('Unavailable');
+        : buildFallbackItem(commonMessages.block, commonMessages.unavailable);
     }
 
-    return buildFallbackItem('Unavailable');
-  }, [activeMode, cosmosLatestFeed, cosmosSnapshot, mode, pathname, status]);
+    return buildFallbackItem(commonMessages.block, commonMessages.unavailable);
+  }, [activeMode, commonMessages.block, commonMessages.unavailable, cosmosLatestFeed, cosmosSnapshot, mode, pathname, status]);
 
   async function handleClearBrowserStorage() {
     setClearState('clearing');
@@ -73,13 +78,13 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
     try {
       await clearAllChaindevBrowserStorage();
       setClearState('done');
-      setClearMessage('Local storage has been cleared. The page will reload.');
+      setClearMessage(commonMessages.localStorageCleared);
       window.setTimeout(() => {
         window.location.reload();
       }, 500);
     } catch (error) {
       setClearState('failed');
-      setClearMessage(error instanceof Error ? error.message : 'Failed to clear local storage.');
+      setClearMessage(error instanceof Error ? error.message : commonMessages.localStorageClearFailed);
     }
   }
 
@@ -88,7 +93,7 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
       <span className="inline-flex items-center gap-2">
         <button
           type="button"
-          aria-label="Clear local browser storage"
+          aria-label={messages.topNav.clearBrowserStorageLabel}
           className="flex h-7 flex-col items-center justify-center gap-0.5 rounded-md text-slate-400 transition hover:text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
           onClick={() => {
             setClearState('idle');
@@ -112,13 +117,13 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
           </span>
           {mode === 'evm' ? (
             <span className="inline-flex items-center gap-1.5">
-              <span>Poll</span>
+              <span>{commonMessages.poll}</span>
               <strong className={displayItem.toneClassName ?? 'text-slate-800'}>{Math.round(pollIntervalMs)} ms</strong>
             </span>
           ) : isCosmosRouteActive(pathname, activeMode) ? (
             <span className="inline-flex items-center gap-1.5">
-              <span>Feed</span>
-              <strong className={displayItem.toneClassName ?? 'text-slate-800'}>{connectionMode === 'ws' ? 'WebSocket' : 'HTTP Polling'}</strong>
+              <span>{commonMessages.feed}</span>
+              <strong className={displayItem.toneClassName ?? 'text-slate-800'}>{connectionMode === 'ws' ? commonMessages.websocket : commonMessages.httpPolling}</strong>
             </span>
           ) : null}
         </span>
@@ -126,26 +131,26 @@ export function ChainStatusStrip({ mode }: { mode: PlatformMode }) {
       <ModalDialog
         open={clearDialogOpen}
         onOpenChange={setClearDialogOpen}
-        title="Clear browser storage"
-        description="Clear all local data stored in this browser for the current site."
+        title={commonMessages.clearBrowserStorage}
+        description={commonMessages.clearBrowserStorageDescription}
         maxWidthClassName="max-w-lg"
         footer={
           <>
             <Button variant="outline" onClick={() => setClearDialogOpen(false)} disabled={clearState === 'clearing'}>
-              Cancel
+              {commonMessages.cancel}
             </Button>
             <Button className="gap-2 bg-rose-600 hover:bg-rose-700" onClick={() => void handleClearBrowserStorage()} disabled={clearState === 'clearing'}>
               <IconTrash className="size-4" stroke={1.8} />
-              {clearState === 'clearing' ? 'Clearing...' : 'Clear all'}
+              {clearState === 'clearing' ? commonMessages.clearing : commonMessages.clearAll}
             </Button>
           </>
         }
       >
         <div className="space-y-4 text-sm leading-6 text-slate-600">
-          <p>This clears localStorage, sessionStorage, IndexedDB databases, Cache Storage, and browser-accessible cookies for this site.</p>
-          <p>Provider defaults will be recreated after reload, and chain data will be fetched again from the active provider.</p>
+          <p>{commonMessages.clearBrowserStorageDetail1}</p>
+          <p>{commonMessages.clearBrowserStorageDetail2}</p>
           {clearMessage ? (
-            <p className={clearState === 'failed' ? 'font-medium text-rose-600' : 'font-medium text-slate-800'}>{clearMessage}</p>
+            <p className={clearState === 'failed' ? 'font-medium text-rose-600' : 'font-medium text-slate-800'}>{translateRuntimeText(clearMessage, locale)}</p>
           ) : null}
         </div>
       </ModalDialog>

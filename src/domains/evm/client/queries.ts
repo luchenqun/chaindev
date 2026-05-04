@@ -3,6 +3,7 @@
 import 'client-only';
 
 import { formatEther, formatGwei, isAddress } from 'viem';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '@/i18n/format';
 import { getEvmCurrencyName } from '@/platform/workbench/rpc-profile';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 import { createEvmClient } from '@/domains/evm/client/rpc-client';
@@ -48,14 +49,14 @@ function formatLocalDateTime(timestampSeconds: bigint | null | undefined) {
     return 'Unavailable';
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(Number(timestampSeconds) * 1000, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(new Date(Number(timestampSeconds) * 1000));
+  });
 }
 
 function shortenHash(value: string | null | undefined, start = 10, end = 8) {
@@ -105,7 +106,7 @@ function formatGasUsed(value: bigint | null | undefined) {
     return 'Unavailable';
   }
 
-  return `${value.toLocaleString('en-US')} Gas`;
+  return `${formatLocalizedNumber(value)} Gas`;
 }
 
 function formatInteger(value: bigint | number | null | undefined) {
@@ -113,7 +114,7 @@ function formatInteger(value: bigint | number | null | undefined) {
     return 'Unavailable';
   }
 
-  return new Intl.NumberFormat('en-US').format(Number(value));
+  return formatLocalizedNumber(Number(value));
 }
 
 function formatPercent(value: number) {

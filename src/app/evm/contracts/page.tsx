@@ -16,6 +16,7 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import { formatLocalizedDateTime } from '@/i18n/format';
 import { getContractConstructor, getContractFunctions, parseContractAbiJson } from '@/domains/evm/client/abi-utils';
 import {
   createEvmContractArtifact,
@@ -44,6 +45,8 @@ import {
   type EvmStoredPrivateKey,
 } from '@/domains/evm/client/keyring';
 import { AddressLink } from '@/domains/evm/ui/address-link';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 import { AccountWorkbenchShell } from '@/platform/layout/account-workbench-shell';
 
@@ -155,8 +158,10 @@ function getInitialArgumentValue(parameter: AbiParameter) {
 }
 
 function ContractInputsForm({ inputs, values, onChange }: { inputs: readonly AbiParameter[]; values: string[]; onChange: (index: number, value: string) => void }) {
+  const messages = useMessages();
+
   if (!inputs.length) {
-    return <p className="text-sm text-slate-500">This contract deployment does not require constructor arguments.</p>;
+    return <p className="text-sm text-slate-500">{messages.contractPanel.noConstructorArguments}</p>;
   }
 
   return (
@@ -178,7 +183,11 @@ function ContractInputsForm({ inputs, values, onChange }: { inputs: readonly Abi
                 textareaClassName={textareaClassName}
               />
             ) : (
-              <Input value={values[index] ?? ''} onChange={(event) => onChange(index, event.target.value)} placeholder={input.type === 'bool' ? 'true or false' : input.type} />
+              <Input
+                value={values[index] ?? ''}
+                onChange={(event) => onChange(index, event.target.value)}
+                placeholder={input.type === 'bool' ? messages.contractPanel.boolPlaceholder : input.type}
+              />
             )}
           </div>
         );
@@ -188,37 +197,37 @@ function ContractInputsForm({ inputs, values, onChange }: { inputs: readonly Abi
 }
 
 function formatTimestamp(timestamp: number) {
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(timestamp, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(new Date(timestamp));
+  });
 }
 
-function normalizeDeployErrorMessage(message: string) {
+function normalizeDeployErrorMessage(message: string, contractRegistryMessages: ReturnType<typeof useMessages>['contractRegistry']) {
   if (/only developer can create contract/i.test(message)) {
-    return 'Deployment rejected by the current chain. Only developer-authorized accounts can create contracts.';
+    return contractRegistryMessages.deployRejectedDeveloperOnly;
   }
 
   const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
 
   if (rpcDescMatch?.[1]) {
-    return `Deployment failed: ${rpcDescMatch[1].trim()}.`;
+    return `${contractRegistryMessages.deployFailedPrefix} ${rpcDescMatch[1].trim()}.`;
   }
 
   if (/Missing or invalid parameters\./i.test(message)) {
-    return 'Deployment failed. The current RPC node rejected the request parameters.';
+    return `${contractRegistryMessages.deployFailedPrefix} ${contractRegistryMessages.rpcRejectedRequestParameters}`;
   }
 
   return message;
 }
 
-function normalizeWorkbenchErrorMessage(message: string, fallback: string) {
+function normalizeWorkbenchErrorMessage(message: string, fallback: string, contractRegistryMessages: ReturnType<typeof useMessages>['contractRegistry']) {
   if (/only developer can create contract/i.test(message)) {
-    return 'Deployment rejected by the current chain. Only developer-authorized accounts can create contracts.';
+    return contractRegistryMessages.deployRejectedDeveloperOnly;
   }
 
   const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
@@ -228,7 +237,7 @@ function normalizeWorkbenchErrorMessage(message: string, fallback: string) {
   }
 
   if (/Missing or invalid parameters\./i.test(message)) {
-    return `${fallback} The current RPC node rejected the request parameters.`;
+    return `${fallback} ${contractRegistryMessages.rpcRejectedRequestParameters}`;
   }
 
   return message;
@@ -247,6 +256,7 @@ function getDefaultBindingAddressForArtifact(artifact?: Pick<EvmContractArtifact
 }
 
 function InteractContractLink({ href }: { href: string }) {
+  const messages = useMessages();
   const triggerRef = useRef<HTMLAnchorElement | null>(null);
   const [tooltipOpen, setTooltipOpen] = useState(false);
 
@@ -255,7 +265,7 @@ function InteractContractLink({ href }: { href: string }) {
       <Link
         ref={triggerRef}
         href={href}
-        aria-label="Interact with contract"
+        aria-label={messages.contractRegistry.interactWithContract}
         className="inline-flex items-center justify-center p-[3px] text-slate-400 transition hover:text-slate-700"
         onBlur={() => setTooltipOpen(false)}
         onFocus={() => setTooltipOpen(true)}
@@ -265,7 +275,7 @@ function InteractContractLink({ href }: { href: string }) {
         <IconLinkPlus className="size-4" stroke={1.8} />
       </Link>
       <FloatingTooltip open={tooltipOpen} anchorRef={triggerRef} className="whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] text-white shadow-[0_8px_20px_rgba(15,23,42,0.18)]">
-        Interact with contract
+        {messages.contractRegistry.interactWithContract}
       </FloatingTooltip>
     </span>
   );
@@ -330,6 +340,11 @@ export default function EvmContractsRegistryPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const { showToast } = useToast();
+  const { locale } = useLocale();
+  const messages = useMessages();
+  const labelMessages = messages.labels;
+  const contractRegistryMessages = messages.contractRegistry;
+  const contractPanelMessages = messages.contractPanel;
   const [environment, setEnvironment] = useState<EnvironmentState>(null);
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
   const [bindings, setBindings] = useState<EvmContractBinding[]>([]);
@@ -397,7 +412,7 @@ export default function EvmContractsRegistryPage() {
           await syncEvmContractRegistryFromServer();
         } catch (error) {
           if (!cancelled) {
-            setArtifactError(error instanceof Error ? error.message : 'Failed to load contract registry.');
+            setArtifactError(error instanceof Error ? error.message : contractRegistryMessages.failedToLoadRegistry);
           }
         }
       }
@@ -504,7 +519,7 @@ export default function EvmContractsRegistryPage() {
           category: 'event',
           signature: getEventSignature(abiEvent),
           methodId: toEventSelector(getEventSignature(abiEvent)),
-          badgeLabel: abiEvent.anonymous ? 'anonymous' : 'event',
+          badgeLabel: abiEvent.anonymous ? 'Anonymous' : 'Event',
         }),
       );
 
@@ -701,19 +716,19 @@ export default function EvmContractsRegistryPage() {
       if (artifactForm.id) {
         await updateEvmContractArtifact(artifactForm.id, artifactForm);
         showToast({
-          title: 'Artifact updated',
-          description: `"${artifactForm.name.trim()}" was saved successfully.`,
+          title: contractRegistryMessages.artifactUpdated,
+          description: contractRegistryMessages.artifactUpdatedDescription.replace('{name}', artifactForm.name.trim()),
         });
       } else {
         const contractAddress = artifactForm.contractAddress.trim();
 
         if (contractAddress) {
           if (!environment) {
-            throw new Error('No active EVM provider selected.');
+            throw new Error(contractRegistryMessages.noActiveEvmProviderSelected);
           }
 
           if (!isAddress(contractAddress)) {
-            throw new Error('Contract address must be a valid EVM address.');
+            throw new Error(contractRegistryMessages.invalidContractAddress);
           }
         }
 
@@ -731,8 +746,10 @@ export default function EvmContractsRegistryPage() {
         }
 
         showToast({
-          title: 'Artifact created',
-          description: contractAddress ? `"${artifactForm.name.trim()}" was added and bound successfully.` : `"${artifactForm.name.trim()}" was added successfully.`,
+          title: contractRegistryMessages.artifactCreated,
+          description: contractAddress
+            ? contractRegistryMessages.artifactCreatedAndBoundDescription.replace('{name}', artifactForm.name.trim())
+            : contractRegistryMessages.artifactCreatedDescription.replace('{name}', artifactForm.name.trim()),
         });
       }
 
@@ -744,7 +761,13 @@ export default function EvmContractsRegistryPage() {
         return;
       }
 
-      setArtifactError(normalizeWorkbenchErrorMessage(error instanceof Error ? error.message : 'Failed to save contract artifact.', 'Failed to save contract artifact.'));
+      setArtifactError(
+        normalizeWorkbenchErrorMessage(
+          error instanceof Error ? error.message : contractRegistryMessages.failedToSaveContractArtifact,
+          contractRegistryMessages.failedToSaveContractArtifact,
+          contractRegistryMessages,
+        ),
+      );
     }
   }
 
@@ -760,7 +783,13 @@ export default function EvmContractsRegistryPage() {
       }));
       setArtifactError(null);
     } catch (error) {
-      setArtifactError(normalizeWorkbenchErrorMessage(error instanceof Error ? error.message : 'Failed to parse contract artifact.', 'Failed to parse contract artifact.'));
+      setArtifactError(
+        normalizeWorkbenchErrorMessage(
+          error instanceof Error ? error.message : contractRegistryMessages.failedToParseContractArtifact,
+          contractRegistryMessages.failedToParseContractArtifact,
+          contractRegistryMessages,
+        ),
+      );
     }
   }
 
@@ -785,7 +814,7 @@ export default function EvmContractsRegistryPage() {
 
   async function handleSaveBinding() {
     if (!environment) {
-      setBindingError('No active EVM provider selected.');
+      setBindingError(contractRegistryMessages.noActiveEvmProviderSelected);
       return;
     }
 
@@ -798,8 +827,8 @@ export default function EvmContractsRegistryPage() {
           providerName: environment.providerName,
         });
         showToast({
-          title: 'Binding updated',
-          description: `"${bindingForm.label.trim() || bindingForm.address}" was updated successfully.`,
+          title: contractRegistryMessages.bindingUpdated,
+          description: bindingForm.label.trim() || bindingForm.address,
         });
       } else {
         await createEvmContractBinding({
@@ -809,8 +838,8 @@ export default function EvmContractsRegistryPage() {
           providerName: environment.providerName,
         });
         showToast({
-          title: 'Binding created',
-          description: `"${bindingForm.label.trim() || bindingForm.address}" was added successfully.`,
+          title: contractRegistryMessages.bindingCreated,
+          description: bindingForm.label.trim() || bindingForm.address,
         });
       }
 
@@ -822,7 +851,13 @@ export default function EvmContractsRegistryPage() {
         return;
       }
 
-      setBindingError(normalizeWorkbenchErrorMessage(error instanceof Error ? error.message : 'Failed to save contract binding.', 'Failed to save contract binding.'));
+      setBindingError(
+        normalizeWorkbenchErrorMessage(
+          error instanceof Error ? error.message : contractRegistryMessages.failedToSaveContractBinding,
+          contractRegistryMessages.failedToSaveContractBinding,
+          contractRegistryMessages,
+        ),
+      );
     }
   }
 
@@ -841,17 +876,17 @@ export default function EvmContractsRegistryPage() {
     },
   ) {
     if (!deployArtifact) {
-      setDeployError('Select a contract artifact first.');
+      setDeployError(contractRegistryMessages.deployContractArtifact);
       return;
     }
 
     if (!deployArtifact.bytecode) {
-      setDeployError('This artifact does not include deployable bytecode.');
+      setDeployError(contractRegistryMessages.artifactNoDeployableBytecode);
       return;
     }
 
     if (!activeKey) {
-      setDeployError('Select a global private key first.');
+      setDeployError(contractRegistryMessages.selectGlobalKeyFirstWithSettings);
       return;
     }
 
@@ -895,7 +930,7 @@ export default function EvmContractsRegistryPage() {
           key: simulationKey,
           attempts: deploySimulationFailureRef.current.key === simulationKey ? deploySimulationFailureRef.current.attempts + 1 : 1,
         };
-        setDeployError(normalizeDeployErrorMessage(defaults.simulationError));
+        setDeployError(normalizeDeployErrorMessage(defaults.simulationError, contractRegistryMessages));
       } else {
         deploySimulationFailureRef.current = {
           key: simulationKey,
@@ -904,13 +939,13 @@ export default function EvmContractsRegistryPage() {
         setDeployError(null);
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to simulate deployment.';
+      const message = error instanceof Error ? error.message : contractRegistryMessages.deployContract;
 
       if (requestId !== deployDefaultsRequestIdRef.current) {
         return;
       }
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingDeployAction('fill');
         setDeployUnlockPassword('');
         setDeployUnlockError(null);
@@ -922,7 +957,7 @@ export default function EvmContractsRegistryPage() {
         key: simulationKey,
         attempts: deploySimulationFailureRef.current.key === simulationKey ? deploySimulationFailureRef.current.attempts + 1 : 1,
       };
-      setDeployError(normalizeDeployErrorMessage(message));
+      setDeployError(normalizeDeployErrorMessage(message, contractRegistryMessages));
     } finally {
       if (requestId === deployDefaultsRequestIdRef.current) {
         setDeployActionLoading(null);
@@ -932,17 +967,17 @@ export default function EvmContractsRegistryPage() {
 
   async function executeDeployAction() {
     if (!deployArtifact) {
-      setDeployError('Select a contract artifact first.');
+      setDeployError(contractRegistryMessages.deployContractArtifact);
       return;
     }
 
     if (!deployArtifact.bytecode) {
-      setDeployError('This artifact does not include deployable bytecode.');
+      setDeployError(contractRegistryMessages.artifactNoDeployableBytecode);
       return;
     }
 
     if (!activeKey) {
-      setDeployError('Select a global private key first.');
+      setDeployError(contractRegistryMessages.selectGlobalKeyFirstWithSettings);
       return;
     }
 
@@ -1012,26 +1047,27 @@ export default function EvmContractsRegistryPage() {
           bindingId = binding.id;
         } catch (error) {
           deployBindingError = normalizeWorkbenchErrorMessage(
-            error instanceof Error ? error.message : 'Failed to create a binding for the deployed contract.',
-            'Failed to create a binding for the deployed contract.',
+            error instanceof Error ? error.message : contractRegistryMessages.failedToCreateBindingForDeployedContract,
+            contractRegistryMessages.failedToCreateBindingForDeployedContract,
+            contractRegistryMessages,
           );
         }
       }
 
       showToast({
-        title: 'Contract deployed',
+        title: contractRegistryMessages.contractDeployed,
         description: deployBindingError
-          ? `Deployed to ${result.contractAddress}. Binding was not created.`
+          ? contractRegistryMessages.deployedBindingNotCreatedDescription.replace('{address}', result.contractAddress)
           : bindingId
-            ? `Deployed to ${result.contractAddress} and binding was created.`
-            : `Deployed to ${result.contractAddress}.`,
+            ? contractRegistryMessages.deployedBindingCreatedDescription.replace('{address}', result.contractAddress)
+            : contractRegistryMessages.deployedDescription.replace('{address}', result.contractAddress),
       });
       deploySucceeded = true;
       resetDeployState();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to deploy contract.';
+      const message = error instanceof Error ? error.message : contractRegistryMessages.deployContract;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingDeployAction('deploy');
         setDeployUnlockPassword('');
         setDeployUnlockError(null);
@@ -1039,7 +1075,7 @@ export default function EvmContractsRegistryPage() {
         return;
       }
 
-      setDeployError(normalizeDeployErrorMessage(message));
+      setDeployError(normalizeDeployErrorMessage(message, contractRegistryMessages));
     } finally {
       if (!deploySucceeded) {
         setDeployActionLoading(null);
@@ -1066,7 +1102,11 @@ export default function EvmContractsRegistryPage() {
       }
     } catch (error) {
       setDeployUnlockError(
-        normalizeWorkbenchErrorMessage(error instanceof Error ? error.message : 'Failed to unlock the selected private key.', 'Failed to unlock the selected private key.'),
+        normalizeWorkbenchErrorMessage(
+          error instanceof Error ? error.message : messages.evmTxDetail.failedToUnlockPrivateKey,
+          messages.evmTxDetail.failedToUnlockPrivateKey,
+          contractRegistryMessages,
+        ),
       );
     }
   }
@@ -1099,9 +1139,21 @@ export default function EvmContractsRegistryPage() {
       }
 
       if (deleteTarget.type === 'artifact') {
-        setArtifactError(normalizeWorkbenchErrorMessage(error instanceof Error ? error.message : 'Failed to delete contract artifact.', 'Failed to delete contract artifact.'));
+        setArtifactError(
+          normalizeWorkbenchErrorMessage(
+            error instanceof Error ? error.message : contractRegistryMessages.failedToDeleteContractArtifact,
+            contractRegistryMessages.failedToDeleteContractArtifact,
+            contractRegistryMessages,
+          ),
+        );
       } else {
-        setBindingError(normalizeWorkbenchErrorMessage(error instanceof Error ? error.message : 'Failed to delete contract binding.', 'Failed to delete contract binding.'));
+        setBindingError(
+          normalizeWorkbenchErrorMessage(
+            error instanceof Error ? error.message : contractRegistryMessages.failedToDeleteContractBinding,
+            contractRegistryMessages.failedToDeleteContractBinding,
+            contractRegistryMessages,
+          ),
+        );
       }
     }
   }
@@ -1110,25 +1162,25 @@ export default function EvmContractsRegistryPage() {
     <AppShell>
       <AccountWorkbenchShell mode="evm">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Contract Registry</h1>
-          <p className="mt-2 text-sm text-slate-500">Store contract artifacts and bind deployed contracts to the active EVM environment.</p>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{messages.navigation.contracts}</h1>
+          <p className="mt-2 text-sm text-slate-500">{contractRegistryMessages.description}</p>
         </div>
 
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="border-b border-slate-200 px-5 py-4">
-            <p className="text-lg font-semibold text-slate-900">Bound Contracts</p>
-            <p className="mt-1 text-sm text-slate-500">Deployed contracts bound to the active provider and chain scope.</p>
+            <p className="text-lg font-semibold text-slate-900">{contractRegistryMessages.boundContracts}</p>
+            <p className="mt-1 text-sm text-slate-500">{contractRegistryMessages.description}</p>
           </div>
           <div className="overflow-x-auto">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Label</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Address</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Artifact</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Provider</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Updated</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{contractRegistryMessages.bindingLabel}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.address}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.evmTxDetail.artifact}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.providerName}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.updated}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{labelMessages.actions}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1144,8 +1196,8 @@ export default function EvmContractsRegistryPage() {
                           className="font-medium text-sky-600 hover:text-sky-700 mono"
                         />
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{artifactsById[binding.artifactId]?.name ?? 'Missing Artifact'}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{binding.providerName}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">{artifactsById[binding.artifactId]?.name ?? messages.common.unavailable}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">{translateRuntimeText(binding.providerName, locale)}</td>
                       <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(binding.updatedAt)}</td>
                       <td className="px-5 py-3 text-sm">
                         <div className="flex items-center justify-end gap-0">
@@ -1154,22 +1206,22 @@ export default function EvmContractsRegistryPage() {
                             <>
                               <ActionIconButton
                                 className="text-slate-400 hover:text-slate-700"
-                                tooltip="Edit binding"
-                                aria-label="Edit binding"
+                                tooltip={contractRegistryMessages.editBindingTitle}
+                                aria-label={contractRegistryMessages.editBindingTitle}
                                 onClick={() => startBindingEdit(binding)}
                               >
                                 <IconEdit className="size-4" stroke={1.8} />
                               </ActionIconButton>
                               <ActionIconButton
                                 className="text-slate-400 hover:text-rose-600"
-                                tooltip="Delete binding"
-                                aria-label="Delete binding"
+                                tooltip={messages.common.delete}
+                                aria-label={messages.common.delete}
                                 onClick={() =>
                                   setDeleteTarget({
                                     type: 'binding',
                                     id: binding.id,
-                                    title: 'Delete Bound Contract',
-                                    description: `Delete the contract binding "${binding.label}"?`,
+                                    title: messages.common.delete,
+                                    description: contractRegistryMessages.deleteBindingDescription.replace('{name}', binding.label),
                                   })
                                 }
                               >
@@ -1182,9 +1234,9 @@ export default function EvmContractsRegistryPage() {
                     </tr>
                   ))
                 ) : (
-                  <tr>
-                    <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
-                      No contract bindings found for the active provider scope.
+                    <tr>
+                      <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
+                        {contractRegistryMessages.noBindings}
                     </td>
                   </tr>
                 )}
@@ -1195,35 +1247,35 @@ export default function EvmContractsRegistryPage() {
 
         {[
           {
-            title: 'System Artifacts',
-            description: 'Shared ABI and bytecode definitions published by administrators for all users.',
+            title: contractRegistryMessages.systemArtifacts,
+            description: contractRegistryMessages.systemArtifactsDescription,
             items: systemArtifacts,
             showAdd: isAdmin,
             showDefaultContract: true,
             addScope: 'system' as const,
-            emptyText: 'No system artifacts yet.',
+            emptyText: contractRegistryMessages.noSystemArtifacts,
           },
           {
-            title: 'My Artifacts',
-            description: 'Your reusable ABI and bytecode definitions for the current account.',
+            title: contractRegistryMessages.myArtifacts,
+            description: contractRegistryMessages.myArtifactsDescription,
             items: myArtifacts,
             showAdd: true,
             showDefaultContract: false,
             addScope: 'user' as const,
-            emptyText: 'No personal artifacts yet.',
+            emptyText: contractRegistryMessages.noPersonalArtifacts,
           },
         ].map((group) => (
           <section key={group.title} className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
               <div>
-                <p className="text-lg font-semibold text-slate-900">{group.title}</p>
-                <p className="mt-1 text-sm text-slate-500">{group.description}</p>
+                <p className="text-lg font-semibold text-slate-900">{translateRuntimeText(group.title, locale)}</p>
+                <p className="mt-1 text-sm text-slate-500">{translateRuntimeText(group.description, locale)}</p>
               </div>
               {group.showAdd ? (
                 <div className="flex justify-end gap-2">
                   {group.showAdd ? (
                     <Button type="button" size="sm" onClick={() => startArtifactCreate(group.addScope)}>
-                      Add
+                      {messages.common.add}
                     </Button>
                   ) : null}
                 </div>
@@ -1233,15 +1285,15 @@ export default function EvmContractsRegistryPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.name}</th>
                     {group.showDefaultContract ? (
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Default Contract</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.evmTxDetail.contract}</th>
                     ) : null}
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Functions</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Events</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Bytecode</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Updated</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{contractPanelMessages.functions}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosTxDetail.events}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{contractPanelMessages.artifactBytecode}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.updated}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{labelMessages.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1265,14 +1317,16 @@ export default function EvmContractsRegistryPage() {
                         ) : null}
                         <td className="px-5 py-3 text-sm text-slate-700">{artifact.functionCount}</td>
                         <td className="px-5 py-3 text-sm text-slate-700">{artifact.eventCount}</td>
-                        <td className={`px-5 py-3 text-sm ${artifact.bytecode ? 'text-emerald-600' : 'text-slate-700'}`}>{artifact.bytecode ? 'Available' : 'Missing'}</td>
+                        <td className={`px-5 py-3 text-sm ${artifact.bytecode ? 'text-emerald-600' : 'text-slate-700'}`}>
+                          {artifact.bytecode ? contractPanelMessages.available : contractPanelMessages.missing}
+                        </td>
                         <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(artifact.updatedAt)}</td>
                         <td className="px-5 py-3 text-sm">
                           <div className="flex items-center justify-end gap-0">
                             <ActionIconButton
                               className="text-slate-400 hover:text-slate-700"
-                              tooltip="View artifact methods"
-                              aria-label="View artifact methods"
+                              tooltip={contractRegistryMessages.viewArtifactMethods}
+                              aria-label={contractRegistryMessages.viewArtifactMethods}
                               onClick={() => setArtifactDetailsTarget(artifact)}
                             >
                               <IconListDetails className="size-4" stroke={1.8} />
@@ -1280,16 +1334,16 @@ export default function EvmContractsRegistryPage() {
                             <ActionIconButton
                               disabled={!artifact.bytecode}
                               className={artifact.bytecode ? 'text-slate-400 hover:text-sky-600' : 'text-slate-300'}
-                              tooltip="Deploy contract artifact"
-                              aria-label="Deploy contract artifact"
+                              tooltip={contractRegistryMessages.deployContractArtifact}
+                              aria-label={contractRegistryMessages.deployContractArtifact}
                               onClick={() => startDeployArtifact(artifact)}
                             >
                               <IconRocket className="size-4" stroke={1.8} />
                             </ActionIconButton>
                             <ActionIconButton
                               className="text-slate-400 hover:text-sky-600"
-                              tooltip="Bind contract address"
-                              aria-label="Bind contract address"
+                              tooltip={contractRegistryMessages.bindContractAddress}
+                              aria-label={contractRegistryMessages.bindContractAddress}
                               onClick={() => startBindingCreate(artifact)}
                             >
                               <IconPlugConnected className="size-4" stroke={1.8} />
@@ -1298,22 +1352,22 @@ export default function EvmContractsRegistryPage() {
                               <>
                                 <ActionIconButton
                                   className="text-slate-400 hover:text-slate-700"
-                                  tooltip="Edit artifact"
-                                  aria-label="Edit artifact"
+                                  tooltip={contractRegistryMessages.editArtifact}
+                                  aria-label={contractRegistryMessages.editArtifact}
                                   onClick={() => startArtifactEdit(artifact)}
                                 >
                                   <IconEdit className="size-4" stroke={1.8} />
                                 </ActionIconButton>
                                 <ActionIconButton
                                   className="text-slate-400 hover:text-rose-600"
-                                  tooltip="Delete artifact"
-                                  aria-label="Delete artifact"
+                                  tooltip={contractRegistryMessages.deleteArtifact}
+                                  aria-label={contractRegistryMessages.deleteArtifact}
                                   onClick={() =>
                                     setDeleteTarget({
                                       type: 'artifact',
                                       id: artifact.id,
-                                      title: 'Delete Contract Artifact',
-                                      description: `Delete the artifact "${artifact.name}"?`,
+                                      title: messages.common.delete,
+                                      description: contractRegistryMessages.deleteArtifactDescription.replace('{name}', artifact.name),
                                     })
                                   }
                                 >
@@ -1345,9 +1399,9 @@ export default function EvmContractsRegistryPage() {
               setDeleteTarget(null);
             }
           }}
-          title={deleteTarget?.title ?? 'Delete'}
+          title={deleteTarget?.title ?? messages.common.delete}
           description={deleteTarget?.description}
-          confirmLabel="Delete"
+          confirmLabel={messages.common.confirm}
           onConfirm={() => {
             void handleConfirmDelete();
           }}
@@ -1360,11 +1414,11 @@ export default function EvmContractsRegistryPage() {
               setArtifactDetailsTarget(null);
             }
           }}
-          title={artifactDetailsTarget ? `${artifactDetailsTarget.name} Methods` : 'Artifact Methods'}
-          description="List of contract methods parsed from the saved ABI."
+          title={artifactDetailsTarget ? `${artifactDetailsTarget.name} ${contractRegistryMessages.artifactMethods}` : contractRegistryMessages.artifactMethods}
+          description={contractRegistryMessages.artifactDescription}
           footer={
             <Button type="button" variant="ghost" onClick={() => setArtifactDetailsTarget(null)}>
-              Close
+              {messages.common.close}
             </Button>
           }
           maxWidthClassName="max-w-3xl"
@@ -1375,21 +1429,21 @@ export default function EvmContractsRegistryPage() {
                 {[
                   {
                     key: 'read',
-                    title: 'Read',
+                    title: contractPanelMessages.read,
                     items: artifactDetailsGroups.read,
-                    emptyText: 'No read methods.',
+                    emptyText: contractPanelMessages.noReadMethods,
                   },
                   {
                     key: 'write',
-                    title: 'Write',
+                    title: contractPanelMessages.write,
                     items: artifactDetailsGroups.write,
-                    emptyText: 'No write methods.',
+                    emptyText: contractPanelMessages.noWriteMethods,
                   },
                   {
                     key: 'event',
-                    title: 'Event',
+                    title: contractPanelMessages.event,
                     items: artifactDetailsGroups.event,
-                    emptyText: 'No events.',
+                    emptyText: contractPanelMessages.noEvents,
                   },
                 ].map((group) => (
                   <div key={group.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
@@ -1407,7 +1461,7 @@ export default function EvmContractsRegistryPage() {
                               </p>
                             </div>
                             <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.08em] text-slate-600">
-                              {item.badgeLabel}
+                              {translateRuntimeText(item.badgeLabel, locale)}
                             </span>
                           </li>
                         ))}
@@ -1420,7 +1474,7 @@ export default function EvmContractsRegistryPage() {
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
-                No contract methods were found in this ABI.
+                {contractPanelMessages.noContractMethodsFound}
               </div>
             )}
           </div>
@@ -1435,8 +1489,8 @@ export default function EvmContractsRegistryPage() {
               resetArtifactForm();
             }
           }}
-          title={artifactForm.id ? 'Edit Artifact' : 'Create Artifact'}
-          description="Save ABI and optional bytecode for reuse across environments."
+          title={artifactForm.id ? contractRegistryMessages.editArtifactTitle : contractRegistryMessages.createArtifact}
+          description={contractRegistryMessages.artifactDescription}
           footer={
             <>
               <Button
@@ -1447,10 +1501,10 @@ export default function EvmContractsRegistryPage() {
                   resetArtifactForm();
                 }}
               >
-                Cancel
+                {messages.common.cancel}
               </Button>
               <Button type="button" onClick={() => void handleSaveArtifact()}>
-                {artifactForm.id ? 'Update Artifact' : 'Save Artifact'}
+                {artifactForm.id ? contractPanelMessages.updateArtifact : contractPanelMessages.saveArtifact}
               </Button>
             </>
           }
@@ -1460,14 +1514,14 @@ export default function EvmContractsRegistryPage() {
             <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Import Artifact JSON</p>
-                  <p className="mt-1 text-sm text-slate-500">Paste artifact JSON and autofill the form.</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{contractPanelMessages.importArtifactJson}</p>
+                  <p className="mt-1 text-sm text-slate-500">{contractPanelMessages.pasteArtifactJsonDescription}</p>
                 </div>
                 {artifactImportText ? (
                   <ActionIconButton
                     className="text-slate-400 hover:text-slate-700"
-                    tooltip="Clear import input"
-                    aria-label="Clear import input"
+                    tooltip={messages.evmTxDetail.clearInput}
+                    aria-label={messages.evmTxDetail.clearInput}
                     onClick={() => handleImportInputChange('')}
                   >
                     <IconX className="size-4" stroke={1.8} />
@@ -1478,7 +1532,7 @@ export default function EvmContractsRegistryPage() {
                 className={`mt-2 ${importTextareaClassName}`}
                 value={artifactImportText}
                 onChange={(event) => handleImportInputChange(event.target.value)}
-                placeholder='{"contractName":"Simple","abi":[...],"bytecode":"0x..."}'
+                placeholder={contractPanelMessages.artifactImportPlaceholder}
               />
             </div>
             {isAdmin ? (
@@ -1492,11 +1546,11 @@ export default function EvmContractsRegistryPage() {
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select artifact scope" />
+                  <SelectValue placeholder={contractPanelMessages.selectArtifactScope} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="user">My Artifact</SelectItem>
-                  <SelectItem value="system">System Artifact</SelectItem>
+                  <SelectItem value="user">{contractPanelMessages.myArtifact}</SelectItem>
+                  <SelectItem value="system">{contractPanelMessages.systemArtifact}</SelectItem>
                 </SelectContent>
               </Select>
             ) : null}
@@ -1508,7 +1562,7 @@ export default function EvmContractsRegistryPage() {
                   name: event.target.value,
                 }))
               }
-              placeholder="Contract Name"
+              placeholder={contractPanelMessages.contractName}
             />
             <textarea
               className={textareaClassName}
@@ -1519,7 +1573,7 @@ export default function EvmContractsRegistryPage() {
                   abiJson: event.target.value,
                 }))
               }
-              placeholder='[{"type":"function","name":"balanceOf","inputs":[{"name":"owner","type":"address"}],"outputs":[{"type":"uint256"}],"stateMutability":"view"}]'
+              placeholder={contractPanelMessages.abiPlaceholder}
             />
             <textarea
               className={textareaClassName}
@@ -1530,7 +1584,7 @@ export default function EvmContractsRegistryPage() {
                   bytecode: event.target.value,
                 }))
               }
-              placeholder="Optional bytecode (0x...)"
+              placeholder={contractPanelMessages.optionalBytecode}
             />
             {!artifactForm.id ? (
               <Input
@@ -1541,10 +1595,10 @@ export default function EvmContractsRegistryPage() {
                     contractAddress: event.target.value,
                   }))
                 }
-                placeholder="Optional contract address (auto-bind after create)"
+                placeholder={contractRegistryMessages.optionalContractAddressAfterCreate}
               />
             ) : null}
-            {artifactError ? <p className="text-sm text-rose-600">{artifactError}</p> : null}
+            {artifactError ? <p className="text-sm text-rose-600">{translateRuntimeText(artifactError, locale)}</p> : null}
           </div>
         </ModalDialog>
 
@@ -1557,8 +1611,8 @@ export default function EvmContractsRegistryPage() {
               resetBindingForm();
             }
           }}
-          title={bindingForm.id ? 'Edit Binding' : 'Bind Contract Address'}
-          description="Bind a deployed contract address to the active provider and chain."
+          title={bindingForm.id ? contractRegistryMessages.editBindingTitle : contractRegistryMessages.bindContractAddressTitle}
+          description={contractRegistryMessages.bindContractAddressDescription}
           footer={
             <>
               <Button
@@ -1569,10 +1623,10 @@ export default function EvmContractsRegistryPage() {
                   resetBindingForm();
                 }}
               >
-                Cancel
+                {messages.common.cancel}
               </Button>
               <Button type="button" onClick={() => void handleSaveBinding()} disabled={!artifacts.length}>
-                {bindingForm.id ? 'Update Binding' : 'Save Binding'}
+                {bindingForm.id ? contractRegistryMessages.updateBinding : contractRegistryMessages.saveBinding}
               </Button>
             </>
           }
@@ -1598,12 +1652,12 @@ export default function EvmContractsRegistryPage() {
               }
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a contract artifact" />
+                <SelectValue placeholder={contractRegistryMessages.selectContractArtifact} />
               </SelectTrigger>
               <SelectContent>
                 {artifacts.map((artifact) => (
                   <SelectItem key={artifact.id} value={artifact.id}>
-                    {artifact.scope === 'system' ? `[System] ${artifact.name}` : artifact.name}
+                    {artifact.scope === 'system' ? `${contractPanelMessages.systemArtifact} · ${artifact.name}` : artifact.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -1616,7 +1670,7 @@ export default function EvmContractsRegistryPage() {
                   address: event.target.value,
                 }))
               }
-              placeholder="Deployed Contract Address"
+              placeholder={contractRegistryMessages.deployedContractAddress}
             />
             <Input
               value={bindingForm.label}
@@ -1626,9 +1680,9 @@ export default function EvmContractsRegistryPage() {
                   label: event.target.value,
                 }))
               }
-              placeholder="Binding Label"
+              placeholder={contractRegistryMessages.bindingLabel}
             />
-            {bindingError ? <p className="text-sm text-rose-600">{bindingError}</p> : null}
+            {bindingError ? <p className="text-sm text-rose-600">{translateRuntimeText(bindingError, locale)}</p> : null}
           </div>
         </ModalDialog>
 
@@ -1639,8 +1693,8 @@ export default function EvmContractsRegistryPage() {
               resetDeployState();
             }
           }}
-          title="Deploy Contract"
-          description="Deploy this saved artifact with the current global private key."
+          title={contractRegistryMessages.deployContract}
+          description={contractRegistryMessages.deployContractDescription}
           footer={
             <>
               <Button
@@ -1650,7 +1704,7 @@ export default function EvmContractsRegistryPage() {
                   resetDeployState();
                 }}
               >
-                Cancel
+                {messages.common.cancel}
               </Button>
               <Button
                 type="button"
@@ -1661,10 +1715,10 @@ export default function EvmContractsRegistryPage() {
                 {deployActionLoading === 'deploy' ? (
                   <>
                     <IconLoader2 className="mr-2 size-4 animate-spin" />
-                    Deploying...
+                    {contractRegistryMessages.deploying}
                   </>
                 ) : (
-                  'Deploy Contract'
+                  contractRegistryMessages.deployContract
                 )}
               </Button>
             </>
@@ -1674,49 +1728,53 @@ export default function EvmContractsRegistryPage() {
           <div className="grid max-h-[68vh] gap-4 overflow-y-auto pr-1">
             <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2 lg:grid-cols-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Artifact</p>
-                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{deployArtifact?.name ?? 'Unavailable'}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{messages.evmTxDetail.artifact}</p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{deployArtifact?.name ?? contractRegistryMessages.unavailable}</p>
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Constructor</p>
-                <p className="mt-1 text-sm text-slate-700">{deployConstructor?.inputs.length ? `${deployConstructor.inputs.length} argument(s)` : 'No arguments'}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{contractRegistryMessages.constructor}</p>
+                <p className="mt-1 text-sm text-slate-700">
+                  {deployConstructor?.inputs.length
+                    ? contractRegistryMessages.argumentCount.replace('{count}', String(deployConstructor.inputs.length))
+                    : contractRegistryMessages.noArguments}
+                </p>
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Selected Key</p>
-                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{activeKey?.name ?? 'No Key Selected'}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{contractRegistryMessages.selectedKey}</p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-900">{activeKey?.name ?? messages.evmTxDetail.noKeySelected}</p>
               </div>
               {activeKey && activeKey.securityMode === 'encrypted' && !isEvmStoredPrivateKeyUnlocked(activeKey.id) ? (
-                <p className="text-xs text-amber-600 sm:col-span-2 lg:col-span-3">This key is encrypted and will require unlock before deployment.</p>
+                <p className="text-xs text-amber-600 sm:col-span-2 lg:col-span-3">{contractRegistryMessages.encryptedKeyRequiresUnlock}</p>
               ) : null}
             </div>
 
             {!activeKey ? (
               <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                Select a global private key first from{' '}
+                {contractRegistryMessages.selectGlobalKeyFirstWithSettings}{' '}
                 <Link href="/settings/private-keys" className="font-semibold underline underline-offset-2">
-                  Settings / Private Keys
+                  {messages.navigation.settings} / {messages.navigation.privateKeys}
                 </Link>
                 .
               </div>
             ) : null}
 
             {!deployArtifact?.bytecode ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">This artifact does not include deployable bytecode.</div>
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{contractRegistryMessages.artifactNoDeployableBytecode}</div>
             ) : null}
 
             <div className="grid gap-3">
-              <p className="text-sm font-medium text-slate-700">Constructor Arguments</p>
+              <p className="text-sm font-medium text-slate-700">{contractRegistryMessages.constructorArguments}</p>
               <div className="max-h-64 overflow-y-auto pr-1">
                 <ContractInputsForm inputs={deployConstructor?.inputs ?? []} values={deployArgumentValues} onChange={updateDeployArgumentValue} />
               </div>
               {deployConstructor?.inputs.length && !isDeploySimulationReady ? (
-                <p className="text-xs text-slate-500">Fill all constructor arguments first. Gas and nonce will be simulated automatically after that.</p>
+                <p className="text-xs text-slate-500">{contractRegistryMessages.fillConstructorArgumentsFirst}</p>
               ) : null}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <label className="text-sm font-medium text-slate-700">{messages.evmTxDetail.txnType}</label>
                 <Select
                   value={deployDialogValues.transactionType}
                   onValueChange={(value) =>
@@ -1727,16 +1785,18 @@ export default function EvmContractsRegistryPage() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select transaction type" />
+                    <SelectValue placeholder={contractRegistryMessages.selectTransactionType} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="EIP1559">EIP1559</SelectItem>
-                    <SelectItem value="LEGACY">LEGACY</SelectItem>
+                    <SelectItem value="EIP1559">{translateRuntimeText('EIP-1559', locale)}</SelectItem>
+                    <SelectItem value="LEGACY">{messages.sendTx.legacy}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Native Value ({environment?.nativeCurrency ?? 'Native'})</label>
+                <label className="text-sm font-medium text-slate-700">
+                  {contractRegistryMessages.nativeValue.replace('{currency}', environment?.nativeCurrency ?? 'Native')}
+                </label>
                 <Input
                   value={deployDialogValues.value}
                   onChange={(event) => {
@@ -1752,7 +1812,7 @@ export default function EvmContractsRegistryPage() {
               </div>
               {deployDialogValues.transactionType === 'LEGACY' ? (
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <label className="text-sm font-medium text-slate-700">{messages.evmTxDetail.gasPriceGwei}</label>
                   <Input
                     value={deployDialogValues.gasPrice}
                     onChange={(event) =>
@@ -1761,13 +1821,13 @@ export default function EvmContractsRegistryPage() {
                         gasPrice: event.target.value,
                       }))
                     }
-                    placeholder="auto"
+                    placeholder={messages.sendTx.autoPlaceholder}
                   />
                 </div>
               ) : (
                 <>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">{messages.evmTxDetail.maxFeePerGasGwei}</label>
                     <Input
                       value={deployDialogValues.maxFeePerGas}
                       onChange={(event) =>
@@ -1776,11 +1836,11 @@ export default function EvmContractsRegistryPage() {
                           maxFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="auto"
+                      placeholder={messages.sendTx.autoPlaceholder}
                     />
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">{messages.evmTxDetail.maxPriorityFeePerGasGwei}</label>
                     <Input
                       value={deployDialogValues.maxPriorityFeePerGas}
                       onChange={(event) =>
@@ -1789,13 +1849,13 @@ export default function EvmContractsRegistryPage() {
                           maxPriorityFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="auto"
+                      placeholder={messages.sendTx.autoPlaceholder}
                     />
                   </div>
                 </>
               )}
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <label className="text-sm font-medium text-slate-700">{messages.evmTxDetail.gasLimit}</label>
                 <Input
                   value={deployDialogValues.gasLimit}
                   onChange={(event) =>
@@ -1808,7 +1868,7 @@ export default function EvmContractsRegistryPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <label className="text-sm font-medium text-slate-700">{messages.evmTxDetail.nonce}</label>
                 <Input
                   value={deployDialogValues.nonce}
                   onChange={(event) =>
@@ -1817,29 +1877,33 @@ export default function EvmContractsRegistryPage() {
                       nonce: event.target.value,
                     }))
                   }
-                  placeholder="auto"
+                  placeholder={messages.sendTx.autoPlaceholder}
                 />
               </div>
               <div className="grid gap-2 sm:col-span-2">
-                <label className="text-sm font-medium text-slate-700">Binding Label</label>
-                <Input value={deployBindingLabel} onChange={(event) => setDeployBindingLabel(event.target.value)} placeholder={deployArtifact?.name ?? 'Binding label'} />
-                <p className="text-xs text-slate-500">Leave empty if you do not want to create a binding after deployment.</p>
+                <label className="text-sm font-medium text-slate-700">{contractRegistryMessages.bindingLabel}</label>
+                <Input
+                  value={deployBindingLabel}
+                  onChange={(event) => setDeployBindingLabel(event.target.value)}
+                  placeholder={deployArtifact?.name ?? contractRegistryMessages.bindingLabelPlaceholder}
+                />
+                <p className="text-xs text-slate-500">{contractRegistryMessages.leaveEmptyForNoBinding}</p>
               </div>
             </div>
 
             {deployResult ? (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">Deployment Result</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700">{contractRegistryMessages.deploymentResult}</p>
                 <dl className="mt-3 grid gap-3">
                   <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">Contract Address</dt>
+                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">{contractRegistryMessages.contractAddress}</dt>
                     <dd className="mt-1 text-sm text-slate-900 mono">{deployResult.contractAddress}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">Transaction Hash</dt>
+                    <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">{messages.evmTxDetail.transactionHash}</dt>
                     <dd className="mt-1 text-sm text-slate-900 mono">{deployResult.hash}</dd>
                   </div>
-                  {deployResult.bindingError ? <div className="text-sm text-amber-700">{deployResult.bindingError}</div> : null}
+                  {deployResult.bindingError ? <div className="text-sm text-amber-700">{translateRuntimeText(deployResult.bindingError, locale)}</div> : null}
                   {deployResult.bindingId ? (
                     <div>
                       <Link
@@ -1847,7 +1911,7 @@ export default function EvmContractsRegistryPage() {
                         className="inline-flex items-center gap-1 text-sm font-semibold text-sky-700 hover:text-sky-800"
                       >
                         <IconLinkPlus className="size-4" stroke={1.8} />
-                        Open Interact
+                        {contractRegistryMessages.openInteract}
                       </Link>
                     </div>
                   ) : null}
@@ -1857,7 +1921,7 @@ export default function EvmContractsRegistryPage() {
 
             {deployError ? (
               <div className="max-h-32 overflow-auto rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                <p className="break-all whitespace-pre-wrap">{deployError}</p>
+                <p className="break-all whitespace-pre-wrap">{translateRuntimeText(deployError, locale)}</p>
               </div>
             ) : null}
           </div>
@@ -1873,12 +1937,12 @@ export default function EvmContractsRegistryPage() {
               setPendingDeployAction(null);
             }
           }}
-          title="Unlock Private Key"
-          description={activeKey ? `Enter the password for "${activeKey.name}" to continue the deployment flow.` : 'Enter the password to continue.'}
+          title={messages.privateKeys.unlockPrivateKey}
+          description={activeKey ? messages.evmTxDetail.unlockDescription.replace('{name}', activeKey.name) : messages.evmTxDetail.unlockFallbackDescription}
           value={deployUnlockPassword}
           onValueChange={setDeployUnlockPassword}
-          placeholder="Password"
-          confirmLabel="Unlock"
+          placeholder={messages.sendTx.password}
+          confirmLabel={messages.sendTx.unlock}
           confirmDisabled={!deployUnlockPassword.trim()}
           errorMessage={deployUnlockError}
           onConfirm={() => {

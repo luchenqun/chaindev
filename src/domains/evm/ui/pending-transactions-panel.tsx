@@ -11,6 +11,8 @@ import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transacti
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { TransactionMethodBadge } from '@/domains/evm/ui/transaction-list-cells';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 
 function PendingTransactionsPanelSkeleton({ className = '' }: { className?: string }) {
   return (
@@ -62,6 +64,10 @@ function PendingTransactionsPanelSkeleton({ className = '' }: { className?: stri
 }
 
 export function PendingTransactionsPanel({ className = '' }: { className?: string }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const pendingMessages = messages.pendingTransactions;
+  const commonMessages = messages.common;
   const { pollIntervalMs } = useEvmHomeData();
   const [data, setData] = useState<Awaited<ReturnType<typeof getEvmPendingTransactionsDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -117,7 +123,7 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
         }
 
         setData(null);
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to load pending transactions.');
+        setErrorMessage(error instanceof Error ? error.message : pendingMessages.failedToLoad);
         timeoutId = window.setTimeout(() => {
           void load();
         }, 12_000);
@@ -190,8 +196,8 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
   if (!data) {
     return (
       <section className={`rounded-3xl border border-slate-200 bg-white px-5 py-10 shadow-[0_6px_18px_rgba(15,23,42,0.06)] ${className}`.trim()}>
-        <h2 className="text-lg font-semibold text-slate-900">Pending Transactions</h2>
-        <p className="mt-2 text-sm text-slate-500">{errorMessage}</p>
+        <h2 className="text-lg font-semibold text-slate-900">{pendingMessages.title}</h2>
+        <p className="mt-2 text-sm text-slate-500">{errorMessage ? translateRuntimeText(errorMessage, locale) : errorMessage}</p>
       </section>
     );
   }
@@ -200,11 +206,13 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
     <section className={`overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)] ${className}`.trim()}>
       <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
-          <p className="text-lg font-semibold text-slate-900">{data.title}</p>
-          <p className="mt-1 text-sm text-slate-500">{data.subtitle}</p>
+          <p className="text-lg font-semibold text-slate-900">{translateRuntimeText(data.title, locale)}</p>
+          <p className="mt-1 text-sm text-slate-500">{translateRuntimeText(data.subtitle, locale)}</p>
         </div>
         <div className="text-sm text-slate-500">
-          Showing {data.displayedTransactions.toLocaleString('en-US')} of {data.totalTransactions.toLocaleString('en-US')}
+          {pendingMessages.showingCount
+            .replace('{displayed}', data.displayedTransactions.toLocaleString(locale))
+            .replace('{total}', data.totalTransactions.toLocaleString(locale))}
         </div>
       </div>
 
@@ -222,14 +230,14 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
           </colgroup>
           <thead>
             <tr>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">To</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Nonce</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Gas Price</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Max Tx Cost</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pendingMessages.hash}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pendingMessages.method}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{commonMessages.from}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{commonMessages.to}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pendingMessages.amount}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pendingMessages.nonce}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pendingMessages.gasPrice}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pendingMessages.maxTxCost}</th>
             </tr>
           </thead>
           <tbody>
@@ -267,19 +275,19 @@ export function PendingTransactionsPanel({ className = '' }: { className?: strin
                         className="font-medium text-sky-600 hover:text-sky-700"
                       />
                     ) : (
-                      <span>{transaction.toLabel}</span>
+                      <span>{translateRuntimeText(transaction.toLabel, locale)}</span>
                     )}
                   </td>
-                  <td className="truncate px-5 py-3 text-sm font-medium text-slate-900">{transaction.amountLabel}</td>
-                  <td className="truncate px-5 py-3 text-sm tabular-nums text-slate-700">{transaction.nonceLabel}</td>
-                  <td className="truncate px-5 py-3 text-sm text-slate-700">{transaction.gasPriceLabel}</td>
-                  <td className="truncate px-5 py-3 text-sm font-medium text-slate-900">{transaction.maxTxCostLabel}</td>
+                  <td className="truncate px-5 py-3 text-sm font-medium text-slate-900">{translateRuntimeText(transaction.amountLabel, locale)}</td>
+                  <td className="truncate px-5 py-3 text-sm tabular-nums text-slate-700">{translateRuntimeText(transaction.nonceLabel, locale)}</td>
+                  <td className="truncate px-5 py-3 text-sm text-slate-700">{translateRuntimeText(transaction.gasPriceLabel, locale)}</td>
+                  <td className="truncate px-5 py-3 text-sm font-medium text-slate-900">{translateRuntimeText(transaction.maxTxCostLabel, locale)}</td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-500">
-                  No pending transactions were returned by the current provider.
+                  {pendingMessages.empty}
                 </td>
               </tr>
             )}

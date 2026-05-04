@@ -8,6 +8,7 @@ import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import { useMessages } from '@/i18n/locale-provider';
 import {
   getActiveEvmStoredPrivateKey,
   listEvmStoredPrivateKeys,
@@ -60,6 +61,8 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
   const router = useRouter();
   const { status } = useSession();
   const { showToast } = useToast();
+  const messages = useMessages();
+  const keyMessages = messages.privateKeys;
   const isAuthenticated = status === 'authenticated';
   const [items, setItems] = useState<EvmStoredPrivateKey[]>(() => cachedActiveEvmKeySelectorSnapshot?.items ?? []);
   const [activeItem, setActiveItem] = useState<EvmStoredPrivateKey | null>(() => cachedActiveEvmKeySelectorSnapshot?.activeItem ?? null);
@@ -115,8 +118,8 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
   function handleOpenKeySettings() {
     if (!isAuthenticated) {
       showToast({
-        title: 'Login required',
-        description: 'Sign in before adding a private key.',
+        title: keyMessages.loginRequired,
+        description: keyMessages.signInBeforeAdding,
         tone: 'info',
       });
       return;
@@ -142,7 +145,7 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
               <div className="flex min-w-0 items-center gap-1">
                 <IconKey className="size-3.5 shrink-0 text-slate-500" stroke={2} />
                 <span className="truncate">
-                  {showLoadingKeys ? 'Loading keys...' : (topbarActiveItem?.name ?? (isAuthenticated ? 'No key' : DEFAULT_EVM_PRIVATE_KEY_NAME))}
+                  {showLoadingKeys ? keyMessages.loading : (topbarActiveItem?.name ?? (isAuthenticated ? keyMessages.noKey : DEFAULT_EVM_PRIVATE_KEY_NAME))}
                 </span>
               </div>
             </SelectTrigger>
@@ -156,7 +159,7 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
               <SelectItem value={ADD_KEY_ACTION_VALUE} className="rounded-none py-2.5">
                 <span className="flex items-center gap-2">
                   <IconPlus className="size-4" stroke={2} />
-                  <span>Add key</span>
+                  <span>{keyMessages.addKey}</span>
                 </span>
               </SelectItem>
             </SelectContent>
@@ -169,7 +172,7 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
       return (
         <Button variant="ghost" disabled className="h-8 gap-1.5 px-2 text-[13px] font-normal text-slate-500">
           <IconKey className="size-4" stroke={2} />
-          Loading Keys...
+          {keyMessages.loading}
         </Button>
       );
     }
@@ -178,7 +181,7 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
       <Link href="/settings/private-keys">
         <Button variant="ghost" className="h-8 gap-1.5 px-2 text-[13px] font-normal text-slate-700">
           <IconKey className="size-4" stroke={2} />
-          No Key
+          {keyMessages.noKey}
         </Button>
       </Link>
     );
@@ -215,7 +218,7 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
             <SelectItem value={ADD_KEY_ACTION_VALUE} className="rounded-none py-2.5">
               <span className="flex items-center gap-2">
                 <IconPlus className="size-4" stroke={2} />
-                <span>Add key</span>
+                <span>{keyMessages.addKey}</span>
               </span>
             </SelectItem>
           </SelectContent>
@@ -236,7 +239,7 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
         <SelectTrigger className="h-8 w-auto justify-start gap-1 rounded-lg border-transparent bg-transparent px-2 pr-1.5 text-[13px] font-normal shadow-none hover:bg-slate-100 focus:ring-0">
           <div className="flex min-w-0 items-center gap-1.5">
             <IconKey className="size-4 shrink-0 text-slate-500" stroke={2} />
-            <span className="truncate">{activeItem?.name ?? 'Select Key'}</span>
+            <span className="truncate">{activeItem?.name ?? keyMessages.selectKey}</span>
           </div>
         </SelectTrigger>
         <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
@@ -250,7 +253,7 @@ export function ActiveEvmKeySelector({ variant = 'default', onReadyChange }: Act
       <Link
         href={manageHref}
         className="inline-flex h-6 items-center justify-center px-0.5 text-slate-500 transition hover:text-slate-900"
-        aria-label={isAuthenticated ? 'Manage private keys' : 'Sign in to manage private keys'}
+        aria-label={isAuthenticated ? keyMessages.manage : keyMessages.signInToManage}
       >
         <IconPlus className="size-3.5" stroke={2} />
       </Link>

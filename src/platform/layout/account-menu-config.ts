@@ -1,4 +1,5 @@
 import type { PlatformMode } from '@/config/chains';
+import type { Messages } from '@/i18n';
 
 export type AccountMenuItem = {
   href: string;
@@ -12,28 +13,28 @@ export type AccountMenuSection = {
   items: AccountMenuItem[];
 };
 
-export const accountMenuSections: AccountMenuSection[] = [
-  {
-    id: 'account',
-    label: 'Account',
-    items: [
-      { href: '/settings/providers', label: 'Providers', modes: ['evm', 'cosmos'] },
-      {
-        href: '/settings/private-keys',
-        label: 'Private Keys',
-        modes: ['evm', 'cosmos'],
-      },
-      { href: '/evm/settings/name-tags', label: 'Name Tags', modes: ['evm'] },
-    ],
-  },
-  {
-    id: 'workspace',
-    label: 'Workspace',
-    items: [{ href: '/evm/contracts', label: 'Contracts', modes: ['evm'] }],
-  },
-];
+export function getAccountMenuSections(mode: PlatformMode, messages: Messages) {
+  const accountMenuSections: AccountMenuSection[] = [
+    {
+      id: 'account',
+      label: messages.topNav.account,
+      items: [
+        { href: '/settings/providers', label: messages.navigation.providers, modes: ['evm', 'cosmos'] },
+        {
+          href: '/settings/private-keys',
+          label: messages.navigation.privateKeys,
+          modes: ['evm', 'cosmos'],
+        },
+        { href: '/evm/settings/name-tags', label: messages.navigation.nameTags, modes: ['evm'] },
+      ],
+    },
+    {
+      id: 'workspace',
+      label: messages.topNav.workspace,
+      items: [{ href: '/evm/contracts', label: messages.navigation.contracts, modes: ['evm'] }],
+    },
+  ];
 
-export function getAccountMenuSections(mode: PlatformMode) {
   return accountMenuSections
     .map((section) => ({
       ...section,

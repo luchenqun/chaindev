@@ -4,13 +4,13 @@ import { seedDefaultWorkbenchForUser } from '@/server/repositories/workbench-boo
 import { fail, ok } from '@/server/utils/api-response';
 
 const registerSchema = z.object({
-  username: z.string().trim().min(2, '用户名至少 2 位。').max(40, '用户名不能超过 40 位。'),
+  username: z.string().trim().min(2, 'Username must be at least 2 characters.').max(40, 'Username must be 40 characters or fewer.'),
   email: z
     .string()
     .trim()
-    .email('请输入有效邮箱地址。')
+    .email('Enter a valid email address.')
     .transform((value) => value.toLowerCase()),
-  password: z.string().min(8, '密码至少 8 位。').max(128, '密码不能超过 128 位。'),
+  password: z.string().min(8, 'Password must be at least 8 characters.').max(128, 'Password must be 128 characters or fewer.'),
 });
 
 export async function POST(request: Request) {
@@ -24,11 +24,11 @@ export async function POST(request: Request) {
     });
 
     if (existing?.email?.toLowerCase() === body.email || existing?.username?.toLowerCase() === body.email) {
-      return fail({ category: 'validation', message: '该邮箱已注册。' }, 409);
+      return fail({ category: 'validation', message: 'That email is already registered.' }, 409);
     }
 
     if (existing?.username?.toLowerCase() === normalizedUsernameLower || existing?.email?.toLowerCase() === normalizedUsernameLower) {
-      return fail({ category: 'validation', message: '该用户名已存在。' }, 409);
+      return fail({ category: 'validation', message: 'That username already exists.' }, 409);
     }
 
     const user = await createCredentialUser({
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     });
 
     if (!user) {
-      return fail({ category: 'server', message: '注册失败，请稍后重试。' }, 500);
+      return fail({ category: 'server', message: 'Registration failed. Please try again later.' }, 500);
     }
 
     await seedDefaultWorkbenchForUser(user.id);
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       return fail(
         {
           category: 'validation',
-          message: error.issues[0]?.message ?? '参数不合法。',
+          message: error.issues[0]?.message ?? 'Invalid request parameters.',
         },
         400,
       );
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     return fail(
       {
         category: 'server',
-        message: error instanceof Error ? error.message : '注册失败。',
+        message: error instanceof Error ? error.message : 'Registration failed.',
       },
       500,
     );

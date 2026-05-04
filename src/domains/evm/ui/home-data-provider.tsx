@@ -5,6 +5,7 @@ import { createContext, type ReactNode, useContext, useEffect, useMemo, useRef, 
 import {
   getEvmHomeBootstrapDirect,
   getEvmHomeCachedTransactionsDirect,
+  getActiveEvmCurrencyNameClient,
   getEvmLatestFeedDirect,
   getEvmHomeMetricsSupplementDirect,
   getEvmHomeSnapshotDirect,
@@ -12,7 +13,10 @@ import {
 } from '@/domains/evm/client/queries';
 import { HOME_ACTIVITY_LIST_LIMIT } from '@/config/pagination';
 import { subscribeEvmTransactionCache } from '@/domains/evm/client/transaction-cache';
-import { readActivePlatformModeCookie } from '@/platform/workbench/rpc-profile-client';
+import { formatLocalizedNumber } from '@/i18n/format';
+import { useMessages } from '@/i18n/locale-provider';
+import { useActivePlatformMode } from '@/platform/workbench/active-platform-mode-provider';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 import { isEvmRouteActive } from '@/platform/workbench/home-route-state';
 
 type EvmHomeSnapshot = Awaited<ReturnType<typeof getEvmHomeSnapshotDirect>>;
@@ -30,6 +34,7 @@ type EvmHomeDataContextValue = {
   errorMessage: string | null;
   pollIntervalMs: number;
   nowMs: number;
+  homeLoadStarted: boolean;
 };
 
 const EvmHomeDataContext = createContext<EvmHomeDataContextValue | null>(null);
@@ -38,7 +43,7 @@ const HOME_BLOCK_LIST_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
 const HOME_TRANSACTION_LIST_LIMIT = HOME_ACTIVITY_LIST_LIMIT;
 
 function formatMetricInteger(value: number) {
-  return new Intl.NumberFormat('en-US').format(value);
+  return formatLocalizedNumber(value);
 }
 
 function formatMetricInterval(seconds: number | null | undefined) {
@@ -87,7 +92,10 @@ function buildDerivedHomeSnapshot(input: {
   chainId: string | null;
   pollIntervalMs: number;
   activityTransactions?: EvmHomeBootstrap['transactions'];
+  messages: ReturnType<typeof useMessages>['homeMetrics'];
+  unavailable: string;
 }): EvmHomeSnapshot {
+  const metricsMessages = input.messages;
   const activityBlocks = input.recentBlocks.slice(0, HOME_BLOCK_LIST_LIMIT).map((item) => item.block);
   const activityTransactions =
     input.activityTransactions ??
@@ -112,51 +120,55 @@ function buildDerivedHomeSnapshot(input: {
       connection: input.supplement.header.connection,
       providerName: input.supplement.header.providerName,
       nativeCurrency: input.supplement.header.nativeCurrency,
-      chainId: input.chainId ?? 'Unavailable',
+      chainId: input.chainId ?? input.unavailable,
     },
     metrics: [
       {
-        label: 'Latest Block',
+        label: metricsMessages.latestBlock,
         value: input.feed.latestBlock,
-        subtext: 'Current head',
+        subtext: metricsMessages.currentHead,
       },
       {
-        label: 'Latest Block Time',
+        label: metricsMessages.latestBlockTime,
         value: input.feed.latestBlockTime,
-        subtext: 'Local formatted time',
+        subtext: metricsMessages.localFormattedTime,
       },
       {
-        label: 'Average Block Time',
+        label: metricsMessages.averageBlockTime,
         value: formatMetricInterval(averageBlockTimeSeconds),
         subtext:
           recentBlocksForMetrics.length >= 2
-            ? `Sampled from recent ${Math.min(recentBlocksForMetrics.length, RECENT_HOME_BLOCK_WINDOW)} blocks`
-            : 'Waiting for at least 2 recent blocks',
+            ? metricsMessages.sampledRecentBlocks.replace('{count}', String(Math.min(recentBlocksForMetrics.length, RECENT_HOME_BLOCK_WINDOW)))
+            : metricsMessages.waitingForRecentBlocks,
       },
       {
-        label: 'Gas Price',
+        label: metricsMessages.gasPrice,
         value: input.supplement.gasPriceLabel,
-        subtext: 'Quoted in gwei',
+        subtext: metricsMessages.quotedInGwei,
       },
       {
-        label: 'Pending Tx Count',
+        label: metricsMessages.pendingTxCount,
         value: input.supplement.pendingTransactionCountLabel,
-        subtext: input.supplement.pendingTransactionCountLabel === 'Unavailable' ? 'Provider does not expose pending pool' : 'Pending pool snapshot',
+        subtext:
+          input.supplement.pendingTransactionCountLabel === input.unavailable ? metricsMessages.pendingPoolUnavailable : metricsMessages.pendingPoolSnapshot,
       },
       {
-        label: 'Recent Tx Count',
+        label: metricsMessages.recentTxCount,
         value: recentTxCount != null ? formatMetricInteger(recentTxCount) : '--',
-        subtext: recentBlocksForMetrics.length >= 2 ? `Last ${recentBlocksForMetrics.length} blocks` : 'Waiting for at least 2 recent blocks',
+        subtext:
+          recentBlocksForMetrics.length >= 2
+            ? metricsMessages.lastBlocks.replace('{count}', String(recentBlocksForMetrics.length))
+            : metricsMessages.waitingForRecentBlocks,
       },
       {
-        label: 'Cached Transactions',
+        label: metricsMessages.cachedTransactions,
         value: formatMetricInteger(input.supplement.cacheSummary.totalTransactions),
-        subtext: 'Local IndexedDB',
+        subtext: metricsMessages.localIndexedDb,
       },
       {
-        label: 'Observed Accounts',
+        label: metricsMessages.observedAccounts,
         value: formatMetricInteger(input.supplement.cacheSummary.totalObservedAccounts),
-        subtext: 'Derived from cached transactions',
+        subtext: metricsMessages.derivedFromCachedTransactions,
       },
     ],
     activity: {
@@ -169,15 +181,30 @@ function buildDerivedHomeSnapshot(input: {
   };
 }
 
+function getEvmProviderSignature() {
+  const profile = readActiveRpcProfileCookie('evm');
+
+  return JSON.stringify({
+    id: profile?.id ?? null,
+    rpcUrl: profile?.rpcUrl ?? null,
+    wsUrl: profile?.wsUrl ?? null,
+    nativeCurrencySymbol: getActiveEvmCurrencyNameClient(),
+  });
+}
+
 export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
+  const messages = useMessages();
+  const metricsMessages = messages.homeMetrics;
+  const unavailable = messages.common.unavailable;
   const pathname = usePathname();
-  const [activeMode, setActiveMode] = useState(() => readActivePlatformModeCookie());
+  const { activeMode } = useActivePlatformMode();
   const [snapshot, setSnapshot] = useState<EvmHomeSnapshot | null>(null);
   const [status, setStatus] = useState<EvmLiveStatus | null>(null);
   const [latestFeed, setLatestFeed] = useState<EvmLatestFeed | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pollIntervalMs, setPollIntervalMs] = useState(12_000);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [homeLoadStarted, setHomeLoadStarted] = useState(false);
   const timeoutRef = useRef<number | null>(null);
   const pollIntervalRef = useRef(12_000);
   const hasResolvedPollIntervalRef = useRef(false);
@@ -186,6 +213,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   const recentHomeTransactionsRef = useRef<RecentHomeTransaction[]>([]);
   const homeChainIdRef = useRef<string | null>(null);
   const statusRef = useRef<EvmLiveStatus | null>(null);
+  const activeProviderSignatureRef = useRef<string | null>(null);
 
   function resolvePollInterval(nextPollIntervalMs: number) {
     if (!hasResolvedPollIntervalRef.current) {
@@ -209,24 +237,6 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
-
-  useEffect(() => {
-    const handleModeChanged = () => {
-      setActiveMode(readActivePlatformModeCookie());
-    };
-
-    handleModeChanged();
-
-    window.addEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
-    window.addEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
-    window.addEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
-
-    return () => {
-      window.removeEventListener('chaindev:active-rpc-profile-changed', handleModeChanged);
-      window.removeEventListener('chaindev:rpc-profiles-changed', handleModeChanged);
-      window.removeEventListener('chaindev:active-platform-mode-changed', handleModeChanged);
-    };
-  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -334,6 +344,8 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         chainId: homeChainIdRef.current,
         pollIntervalMs: feed.pollIntervalMs,
         activityTransactions: recentHomeTransactionsRef.current,
+        messages: metricsMessages,
+        unavailable,
       });
 
       setSnapshot((current) =>
@@ -374,6 +386,8 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         chainId: homeChainIdRef.current,
         pollIntervalMs: currentStatus.pollIntervalMs,
         activityTransactions: recentHomeTransactionsRef.current,
+        messages: metricsMessages,
+        unavailable,
       });
 
       setSnapshot((current) =>
@@ -411,21 +425,28 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
           chainId: homeChainIdRef.current,
           pollIntervalMs: bootstrap.status.pollIntervalMs,
           activityTransactions: bootstrap.transactions,
+          messages: metricsMessages,
+          unavailable,
         }),
       );
       setErrorMessage(null);
     }
 
     async function load() {
+      if (isHomePage) {
+        setHomeLoadStarted(true);
+      }
+
       try {
-        if (!isEvmRoute) {
-          setStatus(null);
-          setSnapshot(null);
-          setLatestFeed(null);
-          setErrorMessage(null);
-          setPollIntervalMs(12_000);
-          recentHomeBlocksRef.current = [];
-          recentHomeTransactionsRef.current = [];
+      if (!isEvmRoute) {
+        setStatus(null);
+        setSnapshot(null);
+        setLatestFeed(null);
+        setErrorMessage(null);
+        setHomeLoadStarted(false);
+        setPollIntervalMs(12_000);
+        recentHomeBlocksRef.current = [];
+        recentHomeTransactionsRef.current = [];
           homeChainIdRef.current = null;
           clearPoll();
           return;
@@ -471,13 +492,20 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
         if (!isHomePage || recentHomeBlocksRef.current.length === 0) {
           setSnapshot(null);
         }
-        setErrorMessage(error instanceof Error ? error.message : 'Failed to load homepage activity.');
+        setErrorMessage(error instanceof Error ? error.message : messages.common.failedToLoadBlockTitle);
         setPollIntervalMs(12_000);
         scheduleNextPoll(12_000);
       }
     }
 
     const handleProfileChanged = () => {
+      const nextSignature = getEvmProviderSignature();
+
+      if (activeProviderSignatureRef.current === nextSignature) {
+        return;
+      }
+
+      activeProviderSignatureRef.current = nextSignature;
       clearPoll();
       hasValidatedCacheRef.current = false;
       pollIntervalRef.current = 12_000;
@@ -489,10 +517,12 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       setSnapshot(null);
       setStatus(null);
       setLatestFeed(null);
+      setHomeLoadStarted(isHomePage);
       void load();
     };
 
     void load();
+    activeProviderSignatureRef.current = getEvmProviderSignature();
     window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     const unsubscribeTransactionCache = subscribeEvmTransactionCache(() => {
       if (isHomePage) {
@@ -507,7 +537,7 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
       unsubscribeTransactionCache();
     };
-  }, [activeMode, pathname]);
+  }, [activeMode, messages.common.failedToLoadBlockTitle, metricsMessages, pathname, unavailable]);
 
   const value = useMemo(
     () => ({
@@ -517,8 +547,9 @@ export function EvmHomeDataProvider({ children }: { children: ReactNode }) {
       errorMessage,
       pollIntervalMs,
       nowMs,
+      homeLoadStarted,
     }),
-    [errorMessage, latestFeed, nowMs, pollIntervalMs, snapshot, status],
+    [errorMessage, homeLoadStarted, latestFeed, nowMs, pollIntervalMs, snapshot, status],
   );
 
   return <EvmHomeDataContext.Provider value={value}>{children}</EvmHomeDataContext.Provider>;

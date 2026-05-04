@@ -9,6 +9,8 @@ import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { formatRelativeAge } from '@/lib/relative-time';
 import { cn } from '@/lib/utils';
 import { usePushedListItems } from '@/platform/home/use-pushed-list-items';
@@ -19,17 +21,22 @@ type HomeActivityViewportStyle = React.CSSProperties & {
 };
 
 const HOME_ACTIVITY_VISIBLE_ITEMS = 6;
+const LATEST_BLOCKS_TITLE = 'Latest Blocks';
+const LATEST_TRANSACTIONS_TITLE = 'Latest Transactions';
 
 function EmptyState({ title, message }: { title: string; message: string }) {
+  const { locale } = useLocale();
   return (
     <div className="py-6 text-sm text-slate-500">
-      <p className="font-medium text-slate-700">{title}</p>
-      <p className="mt-1">{message}</p>
+      <p className="font-medium text-slate-700">{translateRuntimeText(title, locale)}</p>
+      <p className="mt-1">{translateRuntimeText(message, locale)}</p>
     </div>
   );
 }
 
 export function EvmHomeActivity() {
+  const messages = useMessages();
+  const { locale } = useLocale();
   const { snapshot, errorMessage, nowMs } = useEvmHomeData();
   const activity = snapshot?.activity ?? null;
   const blockItems = activity?.blocks ?? [];
@@ -83,9 +90,9 @@ export function EvmHomeActivity() {
       <Card>
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-900">Latest Blocks</h2>
+            <h2 className="text-lg font-semibold text-slate-900">{translateRuntimeText(LATEST_BLOCKS_TITLE, locale)}</h2>
             <Link prefetch={false} className="text-sm font-medium text-sky-600" href="/evm/blocks">
-              VIEW ALL BLOCKS
+              {messages.common.viewAllBlocks}
             </Link>
           </div>
           <div
@@ -105,11 +112,11 @@ export function EvmHomeActivity() {
                           <Link prefetch={false} className="block text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/block/${block.number}`}>
                             {block.numberLabel}
                           </Link>
-                          <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(block.timestampMs, nowMs)}</p>
+                          <p className="mt-1 text-sm text-slate-500">{formatRelativeAge(block.timestampMs, nowMs, locale)}</p>
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm text-slate-600">
-                            Miner{' '}
+                            {messages.common.miner}{' '}
                             <AddressLink
                               address={block.miner}
                               href={`/evm/address/${block.miner}`}
@@ -124,14 +131,16 @@ export function EvmHomeActivity() {
                             </Link>
                           </p>
                         </div>
-                        <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{block.gasUsedLabel}</div>
+                        <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">
+                          {translateRuntimeText(block.gasUsedLabel, locale)}
+                        </div>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyState title="Latest Blocks" message={errorMessage ?? 'Add an EVM provider first to load latest block data.'} />
+              <EmptyState title={LATEST_BLOCKS_TITLE} message={errorMessage ? translateRuntimeText(errorMessage, locale) : messages.common.addEvmProviderForBlocks} />
             )}
           </div>
         </CardContent>
@@ -140,9 +149,9 @@ export function EvmHomeActivity() {
       <Card>
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-slate-900">Latest Transactions</h2>
+            <h2 className="text-lg font-semibold text-slate-900">{translateRuntimeText(LATEST_TRANSACTIONS_TITLE, locale)}</h2>
             <Link prefetch={false} className="text-sm font-medium text-sky-600" href="/evm/txs">
-              VIEW ALL TRANSACTIONS
+              {messages.common.viewAllTransactions}
             </Link>
           </div>
           <div
@@ -171,12 +180,12 @@ export function EvmHomeActivity() {
                             </Link>
                           </div>
                           <p className="mt-1 truncate text-sm text-slate-500">
-                            Block {transaction.blockNumber} · {formatRelativeAge(transaction.timestampMs, nowMs)}
+                            {messages.common.block} {transaction.blockNumber} · {formatRelativeAge(transaction.timestampMs, nowMs, locale)}
                           </p>
                         </div>
                         <div className="min-w-0">
                           <p className="truncate text-sm text-slate-600">
-                            From{' '}
+                            {messages.common.from}{' '}
                             <AddressLink
                               address={transaction.from}
                               href={`/evm/address/${transaction.from}`}
@@ -189,7 +198,7 @@ export function EvmHomeActivity() {
                             />
                           </p>
                           <p className="truncate text-sm text-slate-600">
-                            To{' '}
+                            {messages.common.to}{' '}
                             {transaction.to ? (
                               <AddressLink
                                 address={transaction.to}
@@ -202,7 +211,7 @@ export function EvmHomeActivity() {
                                 showCopyButton={false}
                               />
                             ) : (
-                              <span className="text-slate-500">{transaction.toLabel}</span>
+                              <span className="text-slate-500">{translateRuntimeText(transaction.toLabel, locale)}</span>
                             )}
                           </p>
                         </div>
@@ -213,7 +222,7 @@ export function EvmHomeActivity() {
                 ))}
               </div>
             ) : (
-              <EmptyState title="Latest Transactions" message={errorMessage ?? 'Add an EVM provider first to load recent transactions.'} />
+              <EmptyState title={LATEST_TRANSACTIONS_TITLE} message={errorMessage ? translateRuntimeText(errorMessage, locale) : messages.common.addEvmProviderForTransactions} />
             )}
           </div>
         </CardContent>

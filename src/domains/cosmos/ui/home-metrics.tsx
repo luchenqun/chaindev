@@ -4,6 +4,8 @@ import { IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 
 type HeaderItem = {
   label: string;
@@ -16,12 +18,24 @@ type Metric = {
   subtext?: string;
 };
 
-const fallbackHeader: HeaderItem[] = [
-  { label: 'Connection', value: 'Unavailable' },
-  { label: 'Provider Name', value: 'Unavailable' },
-  { label: 'Chain ID', value: 'Unavailable' },
-  { label: 'Latest Block Time', value: 'Unavailable' },
-];
+function translateMetricLabel(label: string, metricMessages: ReturnType<typeof useMessages>['homeMetrics']) {
+  const labelMap: Record<string, string> = {
+    Moniker: metricMessages.moniker,
+    'Block Height': metricMessages.blockHeight,
+    'Confirmed Txs': metricMessages.confirmedTxs,
+    'Unconfirmed Txs': metricMessages.unconfirmedTxs,
+    'Validator Count': metricMessages.validatorCount,
+    'Peer Count': metricMessages.peerCount,
+    'Average Block Time': metricMessages.averageBlockTime,
+    Proposals: metricMessages.proposals,
+    'Bonded Tokens': metricMessages.bondedTokens,
+    'Not Bonded Tokens': metricMessages.notBondedTokens,
+    'Community Pool': metricMessages.communityPool,
+    'Bank Supply': metricMessages.bankSupply,
+  };
+
+  return labelMap[label] ?? label;
+}
 
 function CosmosHomeMetricsSkeleton() {
   return (
@@ -58,17 +72,43 @@ function CosmosHomeMetricsSkeleton() {
 }
 
 function MetricCard({ label, value, subtext }: Metric) {
+  const { locale } = useLocale();
+
   return (
     <div className="px-5 py-4">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-semibold leading-tight text-slate-900">{value}</p>
-      {subtext ? <p className="mt-2 text-xs leading-5 text-slate-500">{subtext}</p> : null}
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{translateRuntimeText(label, locale)}</p>
+      <p className="mt-2 text-2xl font-semibold leading-tight text-slate-900">{translateRuntimeText(value, locale)}</p>
+      {subtext ? <p className="mt-2 text-xs leading-5 text-slate-500">{translateRuntimeText(subtext, locale)}</p> : null}
     </div>
   );
 }
 
 export function CosmosHomeMetrics() {
-  const { snapshot, errorMessage, connectionMode, autoRefreshEnabled, setAutoRefreshEnabled } = useCosmosHomeData();
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const metricMessages = messages.homeMetrics;
+  const { snapshot, latestFeed, errorMessage, connectionMode, autoRefreshEnabled, setAutoRefreshEnabled } = useCosmosHomeData();
+
+  const fallbackHeader: HeaderItem[] = [
+    { label: metricMessages.connection, value: connectionMode === 'ws' ? messages.common.websocket : messages.common.httpPolling },
+    { label: metricMessages.providerName, value: messages.common.unavailable },
+    { label: metricMessages.chainId, value: messages.common.unavailable },
+    { label: metricMessages.latestBlockTime, value: latestFeed?.latestBlockTime ?? messages.common.unavailable },
+  ];
+  const fallbackMetrics: Metric[] = [
+    { label: metricMessages.moniker, value: messages.common.unavailable },
+    { label: metricMessages.blockHeight, value: latestFeed?.latestBlock ?? messages.common.unavailable },
+    { label: metricMessages.confirmedTxs, value: messages.common.unavailable },
+    { label: metricMessages.unconfirmedTxs, value: messages.common.unavailable },
+    { label: metricMessages.validatorCount, value: messages.common.unavailable },
+    { label: metricMessages.peerCount, value: messages.common.unavailable },
+    { label: metricMessages.averageBlockTime, value: messages.common.unavailable },
+    { label: metricMessages.proposals, value: messages.common.unavailable },
+    { label: metricMessages.bondedTokens, value: messages.common.unavailable },
+    { label: metricMessages.notBondedTokens, value: messages.common.unavailable },
+    { label: metricMessages.communityPool, value: messages.common.unavailable },
+    { label: metricMessages.bankSupply, value: messages.common.unavailable },
+  ];
 
   if (!snapshot && !errorMessage) {
     return <CosmosHomeMetricsSkeleton />;
@@ -76,13 +116,17 @@ export function CosmosHomeMetrics() {
 
   const headerItems = snapshot
     ? [
-        { label: 'Connection', value: snapshot.header.connection },
-        { label: 'Provider Name', value: snapshot.header.providerName },
-        { label: 'Chain ID', value: snapshot.header.chainId },
-        { label: 'Latest Block Time', value: snapshot.header.latestBlockTime },
+        { label: metricMessages.connection, value: snapshot.header.connection },
+        { label: metricMessages.providerName, value: snapshot.header.providerName },
+        { label: metricMessages.chainId, value: snapshot.header.chainId },
+        { label: metricMessages.latestBlockTime, value: snapshot.header.latestBlockTime },
       ]
     : fallbackHeader;
-  const metrics = snapshot?.metrics ?? [];
+  const metrics =
+    snapshot?.metrics.map((metric) => ({
+      ...metric,
+      label: translateMetricLabel(metric.label, metricMessages),
+    })) ?? fallbackMetrics;
   const firstRow = metrics.slice(0, 4);
   const secondRow = metrics.slice(4, 8);
   const thirdRow = metrics.slice(8);
@@ -92,8 +136,8 @@ export function CosmosHomeMetrics() {
       <div className="grid divide-y divide-slate-200 md:grid-cols-4 md:divide-x md:divide-y-0">
         {headerItems.map((item) => (
           <div key={item.label} className="bg-slate-50 px-5 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{item.value}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{translateRuntimeText(item.label, locale)}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{translateRuntimeText(item.value, locale)}</p>
           </div>
         ))}
       </div>
@@ -121,16 +165,18 @@ export function CosmosHomeMetrics() {
           ))}
         </div>
       ) : null}
-      {errorMessage ? <div className="border-t border-slate-200 bg-rose-50 px-5 py-3 text-sm text-rose-600">{errorMessage}</div> : null}
+      {errorMessage ? <div className="border-t border-slate-200 bg-rose-50 px-5 py-3 text-sm text-rose-600">{translateRuntimeText(errorMessage, locale)}</div> : null}
       {snapshot ? (
         <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-2 text-xs text-slate-500">
           <span>
             {connectionMode === 'ws'
-              ? `Live updates via WebSocket. ${autoRefreshEnabled ? 'HTTP snapshot refresh is enabled.' : 'HTTP snapshot refresh is disabled by default.'}`
-              : 'Auto refresh via HTTP polling.'}
+              ? `${metricMessages.liveUpdatesViaWebsocket} ${
+                  autoRefreshEnabled ? metricMessages.httpSnapshotRefreshEnabled : metricMessages.httpSnapshotRefreshDisabled
+                }`
+              : metricMessages.autoRefreshViaHttpPolling}
           </span>
           <ActionIconButton
-            tooltip={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
+            tooltip={autoRefreshEnabled ? metricMessages.disableAutoRefresh : metricMessages.enableAutoRefresh}
             aria-pressed={autoRefreshEnabled}
             className={autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
             onClick={() => setAutoRefreshEnabled((current) => !current)}

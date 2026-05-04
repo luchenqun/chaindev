@@ -8,6 +8,8 @@ import { copyText } from '@/components/ui/copy-text';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { type Hex } from 'viem';
@@ -84,7 +86,7 @@ function normalizePrivateKey(value: string) {
   }
 
   if (!/^[0-9a-f]{64}$/i.test(normalized)) {
-    throw new Error('Private key must be 32-byte hex.');
+    throw new Error('__KEYSTORE_PRIVATE_KEY_HEX__');
   }
 
   return `0x${normalized}` as Hex;
@@ -96,11 +98,11 @@ function parseKeystoreInput(value: string): KeystoreJson {
   try {
     parsed = JSON.parse(value);
   } catch {
-    throw new Error('Encrypted keystore must be valid JSON.');
+    throw new Error('__KEYSTORE_INVALID_JSON__');
   }
 
   if (!parsed || typeof parsed !== 'object') {
-    throw new Error('Encrypted keystore must be a JSON object.');
+    throw new Error('__KEYSTORE_JSON_OBJECT__');
   }
 
   const candidate = parsed as {
@@ -113,7 +115,7 @@ function parseKeystoreInput(value: string): KeystoreJson {
   const rawCrypto = candidate.crypto ?? candidate.Crypto;
 
   if (!rawCrypto || typeof rawCrypto !== 'object') {
-    throw new Error('Encrypted keystore must contain `crypto` or `Crypto`.');
+    throw new Error('__KEYSTORE_CRYPTO_FIELD__');
   }
 
   const cryptoValue = rawCrypto as {
@@ -128,11 +130,11 @@ function parseKeystoreInput(value: string): KeystoreJson {
   const cipherparams = cryptoValue.cipherparams as { iv?: unknown } | undefined;
 
   if (typeof cryptoValue.cipher !== 'string' || !cipherparams || typeof cipherparams.iv !== 'string' || typeof cryptoValue.ciphertext !== 'string' || typeof cryptoValue.kdf !== 'string' || !cryptoValue.kdfparams || typeof cryptoValue.kdfparams !== 'object' || typeof cryptoValue.mac !== 'string' || typeof candidate.id !== 'string' || candidate.version !== 3) {
-    throw new Error('Encrypted keystore JSON is missing required fields.');
+    throw new Error('__KEYSTORE_REQUIRED_FIELDS__');
   }
 
   if (cryptoValue.cipher !== 'aes-128-ctr') {
-    throw new Error('Only `aes-128-ctr` keystore payloads are supported.');
+    throw new Error('__KEYSTORE_UNSUPPORTED_CIPHER__');
   }
 
   if (cryptoValue.kdf === 'scrypt') {
@@ -145,7 +147,7 @@ function parseKeystoreInput(value: string): KeystoreJson {
       typeof kdfparams.r !== 'number' ||
       typeof kdfparams.salt !== 'string'
     ) {
-      throw new Error('Scrypt keystore JSON is missing required `kdfparams` fields.');
+      throw new Error('__KEYSTORE_SCRYPT_PARAMS__');
     }
 
     return {
@@ -174,7 +176,7 @@ function parseKeystoreInput(value: string): KeystoreJson {
     const kdfparams = cryptoValue.kdfparams as Partial<Pbkdf2KdfParams>;
 
     if (typeof kdfparams.c !== 'number' || typeof kdfparams.dklen !== 'number' || kdfparams.prf !== 'hmac-sha256' || typeof kdfparams.salt !== 'string') {
-      throw new Error('PBKDF2 keystore JSON is missing required `kdfparams` fields.');
+      throw new Error('__KEYSTORE_PBKDF2_PARAMS__');
     }
 
     return {
@@ -198,7 +200,7 @@ function parseKeystoreInput(value: string): KeystoreJson {
     };
   }
 
-  throw new Error('Only `scrypt` and `pbkdf2` keystore payloads are supported.');
+  throw new Error('__KEYSTORE_UNSUPPORTED_KDF__');
 }
 
 function createEncryptResult(privateKeyInput: string, password: string): EncryptResult {
@@ -242,6 +244,10 @@ function createDecryptResult(keystoreInput: string, password: string): DecryptRe
 }
 
 export function KeystoreToolPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const keystoreMessages = messages.keystore;
+  const commonMessages = messages.common;
   const [mode, setMode] = useState<ToolMode>('encrypt');
   const [password, setPassword] = useState('');
   const [privateKey, setPrivateKey] = useState('');
@@ -282,7 +288,29 @@ export function KeystoreToolPage() {
       const nextResult = mode === 'encrypt' ? createEncryptResult(privateKey, password) : createDecryptResult(keystoreJson, password);
       setResult(nextResult);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Failed to process keystore.');
+      const message = submitError instanceof Error ? submitError.message : keystoreMessages.failedToProcess;
+
+      setError(
+        message === '__KEYSTORE_PRIVATE_KEY_HEX__'
+          ? keystoreMessages.privateKeyMustBeHex
+          : message === '__KEYSTORE_INVALID_JSON__'
+            ? keystoreMessages.invalidJson
+            : message === '__KEYSTORE_JSON_OBJECT__'
+              ? keystoreMessages.jsonObjectRequired
+              : message === '__KEYSTORE_CRYPTO_FIELD__'
+                ? keystoreMessages.cryptoFieldRequired
+                : message === '__KEYSTORE_REQUIRED_FIELDS__'
+                  ? keystoreMessages.requiredFieldsMissing
+                  : message === '__KEYSTORE_UNSUPPORTED_CIPHER__'
+                    ? keystoreMessages.unsupportedCipher
+                    : message === '__KEYSTORE_SCRYPT_PARAMS__'
+                      ? keystoreMessages.scryptParamsMissing
+                      : message === '__KEYSTORE_PBKDF2_PARAMS__'
+                        ? keystoreMessages.pbkdf2ParamsMissing
+                        : message === '__KEYSTORE_UNSUPPORTED_KDF__'
+                          ? keystoreMessages.unsupportedKdf
+                          : message,
+      );
     } finally {
       setSubmitting(false);
     }
@@ -296,8 +324,8 @@ export function KeystoreToolPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-baseline gap-3">
-                  <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Keystore</h1>
-                  <p className="min-w-0 truncate text-sm text-slate-500">Encrypt or decrypt EVM keystore JSON.</p>
+                  <h1 className="shrink-0 text-2xl font-semibold text-slate-950">{keystoreMessages.title}</h1>
+                  <p className="min-w-0 truncate text-sm text-slate-500">{keystoreMessages.description}</p>
                 </div>
               </div>
 
@@ -311,7 +339,7 @@ export function KeystoreToolPage() {
                   }
                   onClick={() => handleModeChange('encrypt')}
                 >
-                  Encrypt
+                  {keystoreMessages.encrypt}
                 </button>
                 <button
                   type="button"
@@ -322,7 +350,7 @@ export function KeystoreToolPage() {
                   }
                   onClick={() => handleModeChange('decrypt')}
                 >
-                  Decrypt
+                  {keystoreMessages.decrypt}
                 </button>
               </div>
             </div>
@@ -336,7 +364,7 @@ export function KeystoreToolPage() {
                     <div className="grid gap-4 lg:grid-cols-[25%_minmax(0,1fr)]">
                       <div>
                         <label className="block text-sm font-medium text-slate-700" htmlFor="keystore-password">
-                          Password
+                          {keystoreMessages.password}
                         </label>
                         <div className="relative mt-1">
                             <Input
@@ -344,13 +372,13 @@ export function KeystoreToolPage() {
                               type={showPassword ? 'text' : 'password'}
                               value={password}
                               className="pr-11 font-mono text-sm"
-                              placeholder="Enter password"
+                              placeholder={keystoreMessages.enterPassword}
                               onChange={(event) => setPassword(event.target.value)}
                             />
                           <button
                             type="button"
                             className="absolute right-2 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"
-                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            aria-label={showPassword ? keystoreMessages.hidePassword : keystoreMessages.showPassword}
                             onClick={() => setShowPassword((current) => !current)}
                           >
                             {showPassword ? <IconEyeOff className="size-4.5" stroke={1.8} /> : <IconEye className="size-4.5" stroke={1.8} />}
@@ -360,7 +388,7 @@ export function KeystoreToolPage() {
 
                       <div>
                         <label className="block text-sm font-medium text-slate-700" htmlFor="keystore-private-key">
-                          Private Key
+                          {keystoreMessages.privateKey}
                         </label>
                         <div className="relative mt-1">
                           <Input
@@ -368,13 +396,13 @@ export function KeystoreToolPage() {
                             type={showPrivateKey ? 'text' : 'password'}
                             value={privateKey}
                             className="pr-11 font-mono text-sm"
-                            placeholder="Optional. Leave empty to generate a random private key"
+                            placeholder={keystoreMessages.privateKeyPlaceholder}
                             onChange={handlePrivateKeyChange}
                           />
                           <button
                             type="button"
                             className="absolute right-2 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"
-                            aria-label={showPrivateKey ? 'Hide private key' : 'Show private key'}
+                            aria-label={showPrivateKey ? keystoreMessages.hidePrivateKey : keystoreMessages.showPrivateKey}
                             onClick={() => setShowPrivateKey((current) => !current)}
                           >
                             {showPrivateKey ? <IconEyeOff className="size-4.5" stroke={1.8} /> : <IconEye className="size-4.5" stroke={1.8} />}
@@ -385,10 +413,10 @@ export function KeystoreToolPage() {
 
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <p className="text-sm leading-6 text-slate-600">
-                        Encrypt mode uses `aes-128-ctr` with `scrypt` (`dklen=32`, `n=131072`, `p=1`, `r=8`). If the private key is empty, a random key is generated first.
+                        {keystoreMessages.encryptDescription}
                       </p>
                       <Button type="button" className="w-[120px] self-end lg:self-auto" disabled={submitting} onClick={() => void handleSubmit()}>
-                        {submitting ? 'Running...' : 'Submit'}
+                        {submitting ? commonMessages.running : commonMessages.submit}
                       </Button>
                     </div>
                   </div>
@@ -398,19 +426,19 @@ export function KeystoreToolPage() {
               {mode === 'decrypt' ? (
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-slate-700" htmlFor="keystore-json">
-                    Encrypted JSON
+                    {keystoreMessages.encryptedJson}
                   </label>
                   <textarea
                     id="keystore-json"
                     value={keystoreJson}
                     className="mt-1 min-h-[240px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 font-mono text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 focus:ring-sky-400"
-                    placeholder='Paste a keystore JSON object with `crypto` or `Crypto`.'
+                    placeholder={keystoreMessages.keystoreJsonPlaceholder}
                     onChange={(event) => setKeystoreJson(event.target.value)}
                   />
                   <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_120px] lg:items-end">
                     <div>
                       <label className="block text-sm font-medium text-slate-700" htmlFor="keystore-password">
-                        Password
+                        {keystoreMessages.password}
                       </label>
                       <div className="relative mt-1">
                         <Input
@@ -418,13 +446,13 @@ export function KeystoreToolPage() {
                           type={showPassword ? 'text' : 'password'}
                           value={password}
                           className="pr-11 font-mono text-sm"
-                          placeholder="Enter password"
+                          placeholder={keystoreMessages.enterPassword}
                           onChange={(event) => setPassword(event.target.value)}
                         />
                         <button
                           type="button"
                           className="absolute right-2 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"
-                          aria-label={showPassword ? 'Hide password' : 'Show password'}
+                          aria-label={showPassword ? keystoreMessages.hidePassword : keystoreMessages.showPassword}
                           onClick={() => setShowPassword((current) => !current)}
                         >
                           {showPassword ? <IconEyeOff className="size-4.5" stroke={1.8} /> : <IconEye className="size-4.5" stroke={1.8} />}
@@ -433,31 +461,31 @@ export function KeystoreToolPage() {
                     </div>
 
                     <Button type="button" className="w-[120px]" disabled={submitting} onClick={() => void handleSubmit()}>
-                      {submitting ? 'Running...' : 'Submit'}
+                      {submitting ? commonMessages.running : commonMessages.submit}
                     </Button>
                   </div>
                 </div>
               ) : null}
             </div>
 
-            {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
+            {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{translateRuntimeText(error, locale)}</div> : null}
 
             {result ? (
               <div className="border-t border-slate-200 pt-5">
                 <div className="mb-3">
-                  <h2 className="text-base font-semibold text-slate-950">Result</h2>
-                  <p className="mt-1 text-sm text-slate-500">{mode === 'encrypt' ? 'Generated keystore JSON payload.' : 'Recovered private key and address.'}</p>
+                  <h2 className="text-base font-semibold text-slate-950">{keystoreMessages.result}</h2>
+                  <p className="mt-1 text-sm text-slate-500">{mode === 'encrypt' ? keystoreMessages.generatedPayload : keystoreMessages.recoveredPayload}</p>
                 </div>
                 {mode === 'encrypt' ? (
                   <JsonViewPanel value={result} />
                 ) : (
                   <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                     <div className="grid gap-3 border-b border-slate-200 px-4 py-3 lg:grid-cols-[140px_minmax(0,1fr)_32px] lg:items-center">
-                      <div className="text-sm font-semibold text-slate-600">Address</div>
+                      <div className="text-sm font-semibold text-slate-600">{keystoreMessages.address}</div>
                       <div className="min-w-0 break-all font-mono text-sm text-slate-950">{(result as DecryptResult).address}</div>
                       <ActionIconButton
-                        tooltip={copiedField === 'address' ? 'Copied' : 'Copy address'}
-                        aria-label={copiedField === 'address' ? 'Address copied' : 'Copy address'}
+                        tooltip={copiedField === 'address' ? commonMessages.copied : keystoreMessages.copyAddress}
+                        aria-label={copiedField === 'address' ? keystoreMessages.addressCopied : keystoreMessages.copyAddress}
                         className="justify-self-end text-slate-400 hover:text-sky-600"
                         onClick={() => void handleCopy('address', (result as DecryptResult).address)}
                       >
@@ -466,22 +494,22 @@ export function KeystoreToolPage() {
                     </div>
 
                     <div className="grid gap-3 px-4 py-3 lg:grid-cols-[140px_minmax(0,1fr)_64px] lg:items-center">
-                      <div className="text-sm font-semibold text-slate-600">Private Key</div>
+                      <div className="text-sm font-semibold text-slate-600">{keystoreMessages.privateKey}</div>
                       <div className="min-w-0 break-all font-mono text-sm text-slate-950">
                         {showDecryptedPrivateKey ? (result as DecryptResult).privateKey : '•'.repeat((result as DecryptResult).privateKey.length)}
                       </div>
                       <div className="flex items-center justify-end gap-1">
                         <ActionIconButton
-                          tooltip={showDecryptedPrivateKey ? 'Hide private key' : 'Show private key'}
-                          aria-label={showDecryptedPrivateKey ? 'Hide private key' : 'Show private key'}
+                          tooltip={showDecryptedPrivateKey ? keystoreMessages.hidePrivateKey : keystoreMessages.showPrivateKey}
+                          aria-label={showDecryptedPrivateKey ? keystoreMessages.hidePrivateKey : keystoreMessages.showPrivateKey}
                           className="text-slate-400 hover:text-sky-600"
                           onClick={() => setShowDecryptedPrivateKey((current) => !current)}
                         >
                           {showDecryptedPrivateKey ? <IconEyeOff className="size-4" stroke={1.8} /> : <IconEye className="size-4" stroke={1.8} />}
                         </ActionIconButton>
                         <ActionIconButton
-                          tooltip={copiedField === 'privateKey' ? 'Copied' : 'Copy private key'}
-                          aria-label={copiedField === 'privateKey' ? 'Private key copied' : 'Copy private key'}
+                          tooltip={copiedField === 'privateKey' ? commonMessages.copied : keystoreMessages.copyPrivateKey}
+                          aria-label={copiedField === 'privateKey' ? keystoreMessages.privateKeyCopied : keystoreMessages.copyPrivateKey}
                           className="text-slate-400 hover:text-sky-600"
                           onClick={() => void handleCopy('privateKey', (result as DecryptResult).privateKey)}
                         >

@@ -10,6 +10,8 @@ import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getEvmBlocksPageDirect } from '@/domains/evm/client/queries';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { EvmBlockTable } from '@/domains/evm/ui/block-table';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 import { useLiveInsertAnimationKey } from '@/platform/home/use-live-insert-animation-key';
 
@@ -39,6 +41,8 @@ function buildPageHref(pathname: string, searchParams: URLSearchParams, page: nu
 }
 
 function EvmBlocksPageContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -76,7 +80,7 @@ function EvmBlocksPageContent() {
       } catch (error) {
         if (!cancelled) {
           setData(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load blocks.');
+          setErrorMessage(error instanceof Error ? error.message : messages.common.failedToLoadBlockTitle);
         }
       } finally {
         if (!cancelled) {
@@ -97,7 +101,7 @@ function EvmBlocksPageContent() {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
-  }, [currentPage, pathname, router, searchParamsText]);
+  }, [currentPage, messages.common.failedToLoadBlockTitle, pathname, router, searchParamsText]);
 
   useEffect(() => {
     if (!autoRefreshEnabled || currentPage !== 1 || !latestFeed) {
@@ -143,8 +147,8 @@ function EvmBlocksPageContent() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Recent blocks are unavailable</h1>
-          <p>{errorMessage}</p>
+          <h1>{messages.common.failedToLoadBlockTitle}</h1>
+          <p>{errorMessage ? translateRuntimeText(errorMessage, locale) : errorMessage}</p>
         </main>
       </AppShell>
     );
@@ -154,23 +158,26 @@ function EvmBlocksPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Blocks</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{messages.labels.blocks}</h1>
         </div>
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {data.summary.map((item) => (
             <article key={item.label} className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{item.label}</p>
-              <p className="mt-2 text-[34px] font-semibold leading-none text-slate-900">{item.value}</p>
-              <p className="mt-2 text-sm text-slate-500">{item.note}</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{translateRuntimeText(item.label, locale)}</p>
+              <p className="mt-2 text-[34px] font-semibold leading-none text-slate-900">{translateRuntimeText(item.value, locale)}</p>
+              <p className="mt-2 text-sm text-slate-500">{translateRuntimeText(item.note, locale)}</p>
             </article>
           ))}
         </section>
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-lg font-semibold text-slate-900">{data.totalLabel}</p>
+              <p className="text-lg font-semibold text-slate-900">{translateRuntimeText(data.totalLabel, locale)}</p>
               <p className="mt-1 text-sm text-slate-500">
-                Page {data.page} of {data.totalPages}. Showing {data.blocks.length} blocks from the selected provider.
+                {messages.evmBlocksPage.pageSummary
+                  .replace('{page}', String(data.page))
+                  .replace('{totalPages}', String(data.totalPages))
+                  .replace('{count}', String(data.blocks.length))}
               </p>
             </div>
             <div className="flex items-center gap-0.5 lg:justify-end">
@@ -184,7 +191,7 @@ function EvmBlocksPageContent() {
                 onPageChange={handlePageChange}
               />
               <ActionIconButton
-                tooltip={autoRefreshEnabled ? 'Disable auto refresh' : 'Enable auto refresh'}
+                tooltip={autoRefreshEnabled ? messages.homeMetrics.disableAutoRefresh : messages.homeMetrics.enableAutoRefresh}
                 aria-pressed={autoRefreshEnabled}
                 className={autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
                 onClick={() => setAutoRefreshEnabled((current) => !current)}

@@ -14,6 +14,9 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import { formatLocalizedDateTime } from '@/i18n/format';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { getReadContractFunctions, getWriteContractFunctions, type EvmContractFunctionDescriptor } from '@/domains/evm/client/abi-utils';
 import {
   forceWriteEvmContractMethodDirect,
@@ -129,6 +132,10 @@ function FunctionArgumentsForm({
   onChange: (index: number, value: string) => void;
   selfAddress?: string | null;
 }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.evmTxDetail;
+  const contractPanelMessages = messages.contractPanel;
   const [scaleSelectResetVersion, setScaleSelectResetVersion] = useState<Record<string, number>>({});
 
   if (!fn.inputs.length) {
@@ -186,7 +193,7 @@ function FunctionArgumentsForm({
                 <Input
                   value={values[index] ?? ''}
                   onChange={(event) => onChange(index, event.target.value)}
-                  placeholder={input.type === 'bool' ? 'true or false' : input.type}
+                  placeholder={input.type === 'bool' ? contractPanelMessages.boolPlaceholder : input.type}
                   className={isAddressInput ? 'pr-28' : isIntegerInput ? 'pr-40' : hasValue ? 'pr-10' : undefined}
                 />
                 {hasValue ? (
@@ -200,7 +207,7 @@ function FunctionArgumentsForm({
                           : 'absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700'
                     }
                     onClick={() => onChange(index, '')}
-                    aria-label="Clear input"
+                    aria-label={txMessages.clearInput}
                   >
                     <IconX className="size-4" stroke={1.8} />
                   </button>
@@ -216,7 +223,7 @@ function FunctionArgumentsForm({
                     }}
                     disabled={!selfAddress}
                   >
-                    Self
+                    {contractPanelMessages.self}
                   </button>
                 ) : null}
                 {isIntegerInput ? (
@@ -229,7 +236,7 @@ function FunctionArgumentsForm({
                       }}
                     >
                       <SelectTrigger className="absolute right-1.5 top-1/2 h-[30px] w-[66px] -translate-y-1/2 rounded-xl border-slate-200 bg-slate-50 px-2.5 text-sm font-medium text-slate-700 shadow-none">
-                        <SelectValue placeholder="Scale" />
+                        <SelectValue placeholder={contractPanelMessages.scale} />
                       </SelectTrigger>
                       <SelectContent align="end">
                         {INTEGER_SCALE_OPTIONS.map((option) => (
@@ -320,13 +327,16 @@ function parseDisplayValue(value: string) {
 
 function ValuePreview({ value }: { value: string }) {
   const { showToast } = useToast();
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.evmTxDetail;
   const parsedValue = parseDisplayValue(value);
 
   async function handleCopy() {
     await copyText(value);
     showToast({
-      title: 'Result copied',
-      description: 'Call result was copied successfully.',
+      title: txMessages.resultCopied,
+      description: txMessages.callResultCopied,
     });
   }
 
@@ -334,7 +344,7 @@ function ValuePreview({ value }: { value: string }) {
     return (
       <div className="relative rounded-2xl border border-slate-200 bg-white px-4 py-3 pr-10 text-sm font-medium text-slate-900">
         <div className="absolute right-[6px] top-[6px]">
-          <ActionIconButton className="text-slate-400 hover:text-slate-700" tooltip="Copy result" aria-label="Copy result" onClick={() => void handleCopy()}>
+          <ActionIconButton className="text-slate-400 hover:text-slate-700" tooltip={txMessages.copyResult} aria-label={txMessages.copyResult} onClick={() => void handleCopy()}>
             <IconCopy className="size-4" stroke={1.8} />
           </ActionIconButton>
         </div>
@@ -355,7 +365,7 @@ function formatMiddleEllipsis(value: string, leading = 10, trailing = 8) {
 }
 
 function formatChainTimestamp(timestamp: number) {
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(timestamp * 1000, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -363,7 +373,7 @@ function formatChainTimestamp(timestamp: number) {
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(new Date(timestamp * 1000));
+  });
 }
 
 function normalizeContractActionErrorMessage(message: string, fallback: string) {
@@ -452,35 +462,39 @@ function WriteExecutionPreview({
   result: Awaited<ReturnType<typeof writeEvmContractMethodDirect>> | null;
   error?: string | null;
 }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.evmTxDetail;
+
   if (!preview && !result && !error) {
-    return <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-400">Write the transaction to view the result.</div>;
+    return <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-400">{txMessages.writePreviewEmpty}</div>;
   }
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       {preview ? (
         <div className="px-4 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Simulated Transaction</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{txMessages.simulatedTransaction}</p>
           <dl className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
             <div className="min-w-0">
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">From</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.from}</dt>
               <dd className="mt-1 break-all text-sm text-slate-900 mono">{preview.accountAddress}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.method}</dt>
               <dd className="mt-1 text-sm text-slate-900">{preview.functionSignature}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Estimated Gas</dt>
-              <dd className="mt-1 text-sm text-slate-900">{preview.estimatedGas || 'Unavailable'}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.estimatedGas}</dt>
+              <dd className="mt-1 text-sm text-slate-900">{translateRuntimeText(preview.estimatedGas || messages.common.unavailable, locale)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Price</dt>
-              <dd className="mt-1 text-sm text-slate-900">{preview.gasPriceLabel}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{messages.pendingTransactions.gasPrice}</dt>
+              <dd className="mt-1 text-sm text-slate-900">{translateRuntimeText(preview.gasPriceLabel, locale)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Value</dt>
-              <dd className="mt-1 text-sm text-slate-900">{preview.valueLabel}</dd>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.value}</dt>
+              <dd className="mt-1 text-sm text-slate-900">{translateRuntimeText(preview.valueLabel, locale)}</dd>
             </div>
           </dl>
         </div>
@@ -488,10 +502,10 @@ function WriteExecutionPreview({
       {preview && (result || error) ? <div className="border-t border-slate-200" /> : null}
       {result ? (
         <div className="px-4 py-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Submitted Transaction</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{txMessages.submittedTransaction}</p>
           <dl className="mt-3 grid gap-x-6 gap-y-3 md:grid-cols-2">
             <div className="min-w-0">
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Transaction Hash</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.transactionHash}</dt>
               <dd className="mt-1 text-sm font-medium text-slate-900">
                 <Link href={`/evm/tx/${result.hash}`} className="mono text-sky-600 hover:text-sky-700">
                   {formatMiddleEllipsis(result.hash)}
@@ -499,13 +513,13 @@ function WriteExecutionPreview({
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Status</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.status}</dt>
               <dd className="mt-1">
                 <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getReceiptStatusClasses(result.receipt.status)}`}>{result.receipt.status}</span>
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Block Number</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.blockNumber}</dt>
               <dd className="mt-1 text-sm font-medium text-slate-900">
                 <Link href={`/evm/block/${result.receipt.blockNumber}`} className="text-sky-600 hover:text-sky-700">
                   {result.receipt.blockNumber}
@@ -513,15 +527,15 @@ function WriteExecutionPreview({
               </dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Included At</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.includedAt}</dt>
               <dd className="mt-1 text-sm text-slate-900">{formatChainTimestamp(result.receipt.blockTimestamp)}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Used</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.gasUsed}</dt>
               <dd className="mt-1 text-sm text-slate-900">{result.receipt.gasUsed}</dd>
             </div>
             <div>
-              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Effective Gas Price</dt>
+              <dt className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.effectiveGasPrice}</dt>
               <dd className="mt-1 text-sm text-slate-900">{result.receipt.effectiveGasPrice}</dd>
             </div>
           </dl>
@@ -530,7 +544,7 @@ function WriteExecutionPreview({
       {error ? (
         <div className="max-h-32 overflow-auto border-t border-slate-200 px-4 py-4">
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            <p className="break-all whitespace-pre-wrap">{error}</p>
+            <p className="break-all whitespace-pre-wrap">{translateRuntimeText(error, locale)}</p>
           </div>
         </div>
       ) : null}
@@ -569,6 +583,9 @@ function FunctionListSection({
   renderExpanded,
   emptyText,
 }: FunctionListSectionProps) {
+  const messages = useMessages();
+  const txMessages = messages.evmTxDetail;
+
   if (!functions.length) {
     return <div className="rounded-3xl border border-slate-200 bg-white px-5 py-10 text-center text-sm text-slate-500 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">{emptyText}</div>;
   }
@@ -582,11 +599,11 @@ function FunctionListSection({
         <div className="flex items-center gap-2">
           <Button type="button" size="sm" variant="outline" onClick={allExpanded ? onCollapseAll : onExpandAll}>
             {allExpanded ? <IconChevronDown className="mr-1.5 size-3.5 rotate-180" stroke={1.8} /> : <IconSparkles className="mr-1.5 size-3.5" stroke={1.8} />}
-            {allExpanded ? 'Collapse All' : 'Expand All'}
+            {allExpanded ? txMessages.collapseAll : txMessages.expandAll}
           </Button>
           <Button type="button" size="sm" variant="outline" onClick={onReset}>
             <IconRefresh className="mr-1.5 size-3.5" stroke={1.8} />
-            Reset
+            {txMessages.reset}
           </Button>
           {headerTrailingContent}
         </div>
@@ -615,13 +632,13 @@ function FunctionListSection({
                     event.stopPropagation();
                   }}
                 >
-                  <ActionIconButton className="text-slate-400 hover:text-slate-700" tooltip="Copy signature" aria-label="Copy signature" onClick={() => onCopySignature(fn)}>
+                  <ActionIconButton className="text-slate-400 hover:text-slate-700" tooltip={txMessages.copySignature} aria-label={txMessages.copySignature} onClick={() => onCopySignature(fn)}>
                     <IconCopy className="size-4" stroke={1.8} />
                   </ActionIconButton>
                   <ActionIconButton
                     className="text-slate-400 hover:text-slate-700"
-                    tooltip={isExpanded ? 'Collapse' : 'Expand'}
-                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                    tooltip={isExpanded ? txMessages.collapse : txMessages.expand}
+                    aria-label={isExpanded ? txMessages.collapse : txMessages.expand}
                     onClick={() => onToggle(fn.signature)}
                   >
                     <IconChevronDown className={`size-4 transition ${isExpanded ? 'rotate-180' : ''}`} stroke={1.8} />
@@ -650,6 +667,10 @@ export function AddressContractPanel({
   initialTab?: ContractSubview;
 }) {
   const { showToast } = useToast();
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.evmTxDetail;
+  const contractPanelMessages = messages.contractPanel;
   const [activeTab, setActiveTab] = useState<ContractSubview>(initialTab);
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
   const [expandedReadSignatures, setExpandedReadSignatures] = useState<string[]>([]);
@@ -824,7 +845,7 @@ export function AddressContractPanel({
       });
       setReadErrors((current) => ({
         ...current,
-        [signature]: error instanceof Error ? error.message : 'Failed to read contract method.',
+        [signature]: error instanceof Error ? error.message : txMessages.failedToLoadFallback,
       }));
     } finally {
       setActionLoadingKey(null);
@@ -839,7 +860,7 @@ export function AddressContractPanel({
     }
 
     if (!activeKey) {
-      setErrorMessage('Select a global private key first.');
+      setErrorMessage(txMessages.selectGlobalKeyFirst);
       return;
     }
 
@@ -888,20 +909,26 @@ export function AddressContractPanel({
       showToast(
         result.receipt.status === 'success'
           ? {
-              title: 'Transaction submitted',
-              description: `${fn.name} was sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              title: txMessages.transactionSubmitted,
+              description: translateRuntimeText(
+                `${fn.name} was sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+                locale,
+              ),
               tone: 'success',
             }
           : {
-              title: 'Transaction reverted',
-              description: `${fn.name} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              title: txMessages.transactionReverted,
+              description: translateRuntimeText(
+                `${fn.name} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+                locale,
+              ),
               tone: 'info',
             },
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to submit contract transaction.';
+      const message = error instanceof Error ? error.message : txMessages.failedToSubmitContractTransaction;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingWriteAction({ signature, type: 'write' });
         setUnlockPassword('');
         setUnlockError(null);
@@ -911,7 +938,7 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: normalizeContractActionErrorMessage(message, 'Failed to submit contract transaction.'),
+        [signature]: normalizeContractActionErrorMessage(message, txMessages.failedToSubmitContractTransaction),
       }));
     } finally {
       setActionLoadingKey(null);
@@ -926,7 +953,7 @@ export function AddressContractPanel({
     }
 
     if (!activeKey) {
-      setErrorMessage('Select a global private key first.');
+      setErrorMessage(txMessages.selectGlobalKeyFirst);
       return;
     }
 
@@ -970,12 +997,12 @@ export function AddressContractPanel({
         gasLimit: defaults.estimatedGas,
         nonce: 'auto',
       });
-      setManualWriteDialogError(defaults.simulationError ? normalizeContractActionErrorMessage(defaults.simulationError, 'Failed to prepare manual contract transaction.') : null);
+      setManualWriteDialogError(defaults.simulationError ? normalizeContractActionErrorMessage(defaults.simulationError, txMessages.failedToSubmitContractTransaction) : null);
       setManualWriteTarget(signature);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to prepare manual contract transaction.';
+      const message = error instanceof Error ? error.message : txMessages.failedToSubmitContractTransaction;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingWriteAction({ signature, type: 'manual-open' });
         setUnlockPassword('');
         setUnlockError(null);
@@ -985,7 +1012,7 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: normalizeContractActionErrorMessage(message, 'Failed to prepare manual contract transaction.'),
+        [signature]: normalizeContractActionErrorMessage(message, txMessages.failedToSubmitContractTransaction),
       }));
     } finally {
       setActionLoadingKey(null);
@@ -1000,7 +1027,7 @@ export function AddressContractPanel({
     }
 
     if (!activeKey) {
-      setErrorMessage('Select a global private key first.');
+      setErrorMessage(txMessages.selectGlobalKeyFirst);
       return;
     }
 
@@ -1083,20 +1110,26 @@ export function AddressContractPanel({
       showToast(
         result.receipt.status === 'success'
           ? {
-              title: 'Force-send submitted',
-              description: `${fn.name} was force-sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              title: translateRuntimeText('Force-send submitted', locale),
+              description: translateRuntimeText(
+                `${fn.name} was force-sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+                locale,
+              ),
               tone: 'success',
             }
           : {
-              title: 'Force-send reverted',
-              description: `${fn.name} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              title: translateRuntimeText('Force-send reverted', locale),
+              description: translateRuntimeText(
+                `${fn.name} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+                locale,
+              ),
               tone: 'info',
             },
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to force-send contract transaction.';
+      const message = error instanceof Error ? error.message : txMessages.failedToSubmitContractTransaction;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingWriteAction({ signature, type: 'manual-confirm' });
         setUnlockPassword('');
         setUnlockError(null);
@@ -1106,9 +1139,9 @@ export function AddressContractPanel({
 
       setWriteErrors((current) => ({
         ...current,
-        [signature]: normalizeContractActionErrorMessage(message, 'Failed to force-send contract transaction.'),
+        [signature]: normalizeContractActionErrorMessage(message, txMessages.failedToSubmitContractTransaction),
       }));
-      setManualWriteDialogError(normalizeContractActionErrorMessage(message, 'Failed to force-send contract transaction.'));
+      setManualWriteDialogError(normalizeContractActionErrorMessage(message, txMessages.failedToSubmitContractTransaction));
     } finally {
       setActionLoadingKey(null);
     }
@@ -1132,17 +1165,22 @@ export function AddressContractPanel({
       setUnlockPassword('');
       setPendingWriteAction(null);
     } catch (error) {
-      setUnlockError(normalizeContractActionErrorMessage(error instanceof Error ? error.message : 'Failed to unlock private key.', 'Failed to unlock private key.'));
+      setUnlockError(
+        normalizeContractActionErrorMessage(
+          error instanceof Error ? error.message : txMessages.failedToUnlockPrivateKey,
+          txMessages.failedToUnlockPrivateKey,
+        ),
+      );
     }
   }
 
   const activeKeyStateLabel = !activeKey
-    ? 'No Key Selected'
+    ? translateRuntimeText('No Key Selected', locale)
     : activeKey.securityMode === 'plain'
       ? activeKey.name
       : isEvmStoredPrivateKeyUnlocked(activeKey.id)
-        ? `${activeKey.name} (Unlocked)`
-        : `${activeKey.name} (Locked)`;
+        ? `${activeKey.name} (${translateRuntimeText('Unlocked', locale)})`
+        : `${activeKey.name} (${translateRuntimeText('Locked', locale)})`;
 
   function toggleExpandedSignature(signature: string, setExpanded: Dispatch<SetStateAction<string[]>>) {
     setExpanded((current) => (current.includes(signature) ? current.filter((item) => item !== signature) : [...current, signature]));
@@ -1171,8 +1209,8 @@ export function AddressContractPanel({
   function copyFunctionSignature(fn: EvmContractFunctionDescriptor) {
     void copyText(fn.signature);
     showToast({
-      title: 'Signature copied',
-      description: `${fn.signature} was copied successfully.`,
+      title: txMessages.signatureCopied,
+      description: txMessages.signatureCopiedDescription.replace('{signature}', fn.signature),
     });
   }
 
@@ -1229,9 +1267,9 @@ export function AddressContractPanel({
     <>
       <div className="inline-flex flex-wrap rounded-[14px] bg-slate-100 p-1">
         {[
-          { value: 'code' as const, label: 'Code' },
-          { value: 'read' as const, label: 'Read Contract' },
-          { value: 'write' as const, label: 'Write Contract' },
+          { value: 'code' as const, label: contractPanelMessages.code },
+          { value: 'read' as const, label: contractPanelMessages.readContract },
+          { value: 'write' as const, label: contractPanelMessages.writeContract },
         ].map((tab) => (
           <button
             key={tab.value}
@@ -1254,21 +1292,21 @@ export function AddressContractPanel({
           <article className="rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="grid gap-4 border-b border-slate-200 px-5 py-4 md:grid-cols-2 xl:grid-cols-4">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Binding</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{messages.labels.binding}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{binding.label}</p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Artifact</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{messages.evmTxDetail.artifact}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{artifact.name}</p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Address</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{messages.evmTxDetail.address}</p>
                 <p className="mt-1 break-all text-sm text-slate-700 mono">{binding.address}</p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Environment</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{messages.labels.environment}</p>
                 <p className="mt-1 text-sm text-slate-700">
-                  {environment.providerName} / Chain {environment.chainId}
+                  {translateRuntimeText(`${environment.providerName} / Chain ${environment.chainId}`, locale)}
                 </p>
               </div>
             </div>
@@ -1276,16 +1314,16 @@ export function AddressContractPanel({
             <div className="grid gap-4 px-5 py-5">
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-900">Contract ABI</p>
+                  <p className="text-sm font-semibold text-slate-900">{contractPanelMessages.abiJson}</p>
                   <ActionIconButton
                     className="text-slate-400 hover:text-slate-700"
-                    tooltip="Copy ABI"
-                    aria-label="Copy ABI"
+                    tooltip={contractPanelMessages.copyAbi}
+                    aria-label={contractPanelMessages.copyAbi}
                     onClick={() => {
                       void copyText(artifact.abiJson);
                       showToast({
-                        title: 'ABI copied',
-                        description: 'Contract ABI was copied successfully.',
+                        title: messages.common.copied,
+                        description: contractPanelMessages.abiCopiedDescription,
                       });
                     }}
                   >
@@ -1295,9 +1333,9 @@ export function AddressContractPanel({
                 <JsonViewPanel className="mt-3 max-h-[420px] overflow-auto bg-slate-50 shadow-none" value={abiJsonValue} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-900">Artifact Bytecode</p>
+                <p className="text-sm font-semibold text-slate-900">{contractPanelMessages.artifactBytecode}</p>
                 <pre className="mt-3 max-h-[260px] overflow-y-auto overflow-x-hidden whitespace-pre-wrap break-all rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-800">
-                  {artifact.bytecode ?? 'No bytecode saved for this artifact.'}
+                  {artifact.bytecode ?? contractPanelMessages.noBytecodeSaved}
                 </pre>
               </div>
             </div>
@@ -1308,7 +1346,7 @@ export function AddressContractPanel({
       {activeTab === 'read' ? (
         <div className="mt-4 grid gap-4">
           <FunctionListSection
-            title="Read Contract"
+            title={contractPanelMessages.readContract}
             functions={readFunctions}
             expandedSignatures={expandedReadSignatures}
             onToggle={handleToggleReadSignature}
@@ -1325,8 +1363,8 @@ export function AddressContractPanel({
                 return (
                   <ActionIconButton
                     className={canQuery ? 'text-slate-400 hover:text-slate-700' : 'text-slate-300 hover:text-slate-300'}
-                    tooltip={isLoading ? 'Querying...' : 'Query'}
-                    aria-label={isLoading ? 'Querying...' : 'Query'}
+                    tooltip={isLoading ? messages.common.running : messages.common.query}
+                    aria-label={isLoading ? messages.common.running : messages.common.query}
                     onClick={() => handleQueryAction(fn)}
                     disabled={!canQuery || actionLoadingKey !== null}
                   >
@@ -1335,8 +1373,8 @@ export function AddressContractPanel({
                 );
               })()
             }
-            inputBadgeLabel="Input"
-            emptyText="No read methods are available for this contract."
+            inputBadgeLabel={messages.common.copyInput}
+            emptyText={contractPanelMessages.readMethodsEmpty}
             renderExpanded={(fn) => (
               <div className="grid gap-4">
                 <FunctionArgumentsForm
@@ -1348,9 +1386,11 @@ export function AddressContractPanel({
                 {readResults[fn.signature] ? (
                   <ValuePreview value={readResults[fn.signature]} />
                 ) : readErrors[fn.signature] ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{readErrors[fn.signature]}</div>
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{translateRuntimeText(readErrors[fn.signature], locale)}</div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-400">Query the method to view the returned result.</div>
+                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-400">
+                    {contractPanelMessages.queryMethodToViewResult}
+                  </div>
                 )}
               </div>
             )}
@@ -1363,25 +1403,25 @@ export function AddressContractPanel({
           <article className="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Selected Key</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{txMessages.selectedKey}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{activeKeyStateLabel}</p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Binding</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{messages.labels.binding}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{binding.label}</p>
               </div>
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contract</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{txMessages.contract}</p>
                 <p className="mt-1 text-sm font-semibold text-slate-900">{artifact.name}</p>
               </div>
             </div>
-            {!activeKey ? <p className="mt-4 text-sm text-amber-600">Select a global private key first before preparing or sending contract writes.</p> : null}
+            {!activeKey ? <p className="mt-4 text-sm text-amber-600">{txMessages.selectGlobalKeyFirst}</p> : null}
           </article>
 
-          {errorMessage ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errorMessage}</div> : null}
+          {errorMessage ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{translateRuntimeText(errorMessage, locale)}</div> : null}
 
           <FunctionListSection
-            title="Write Contract"
+            title={contractPanelMessages.writeContract}
             functions={writeFunctions}
             expandedSignatures={expandedWriteSignatures}
             onToggle={(signature) => toggleExpandedSignature(signature, setExpandedWriteSignatures)}
@@ -1397,7 +1437,7 @@ export function AddressContractPanel({
                   checked={manualWriteMode}
                   onChange={(event) => setManualWriteMode(event.target.checked)}
                 />
-                Manual Send
+                {contractPanelMessages.manualSend}
               </label>
             }
             renderHeaderActions={(fn) =>
@@ -1409,8 +1449,8 @@ export function AddressContractPanel({
                 return (
                   <ActionIconButton
                     className={canWrite ? 'text-slate-400 hover:text-slate-700' : 'text-slate-300 hover:text-slate-300'}
-                    tooltip={isLoading ? 'Writing...' : manualWriteMode ? 'Manual Write' : 'Write'}
-                    aria-label={isLoading ? 'Writing...' : manualWriteMode ? 'Manual Write' : 'Write'}
+                    tooltip={isLoading ? txMessages.sending : manualWriteMode ? txMessages.manualWrite : txMessages.write}
+                    aria-label={isLoading ? txMessages.sending : manualWriteMode ? txMessages.manualWrite : txMessages.write}
                     onClick={() => void (manualWriteMode ? openManualWriteDialog(fn.signature) : executeWriteAction(fn.signature))}
                     disabled={!activeKey || !canWrite || actionLoadingKey !== null}
                   >
@@ -1419,8 +1459,8 @@ export function AddressContractPanel({
                 );
               })()
             }
-            inputBadgeLabel="Input"
-            emptyText="No write methods are available for this contract."
+            inputBadgeLabel={messages.common.copyInput}
+            emptyText={contractPanelMessages.writeMethodsEmpty}
             renderExpanded={(fn) => (
               <div className="grid gap-4">
                 <FunctionArgumentsForm
@@ -1431,7 +1471,7 @@ export function AddressContractPanel({
                 />
                 {fn.stateMutability === 'payable' && !manualWriteMode ? (
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Native Value ({environment.nativeCurrency})</label>
+                    <label className="text-sm font-medium text-slate-700">{txMessages.valueNative.replace('{currency}', environment.nativeCurrency)}</label>
                     <Input value={writeValueBySignature[fn.signature] ?? ''} onChange={(event) => updateWriteValue(fn.signature, event.target.value)} placeholder="0" />
                   </div>
                 ) : null}
@@ -1453,12 +1493,12 @@ export function AddressContractPanel({
             setPendingWriteAction(null);
           }
         }}
-        title="Unlock Private Key"
-        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the contract write flow.` : 'Enter the password to continue.'}
+        title={messages.privateKeys.unlockPrivateKey}
+        description={activeKey ? messages.sendTx.unlockDescription.replace('{name}', activeKey.name) : messages.sendTx.unlockFallbackDescription}
         value={unlockPassword}
         onValueChange={setUnlockPassword}
-        placeholder="Password"
-        confirmLabel="Unlock"
+        placeholder={messages.sendTx.password}
+        confirmLabel={messages.sendTx.unlock}
         errorMessage={unlockError}
         confirmDisabled={!unlockPassword.trim()}
         onConfirm={() => void handleConfirmUnlock()}
@@ -1471,8 +1511,8 @@ export function AddressContractPanel({
             setManualWriteDialogError(null);
           }
         }}
-        title="Manual Write"
-        description="Review the simulated values, adjust them if needed, then confirm to force-send the transaction."
+        title={contractPanelMessages.manualWriteTitle}
+        description={contractPanelMessages.manualWriteDescription}
         footer={
           <>
             <Button
@@ -1483,7 +1523,7 @@ export function AddressContractPanel({
                 setManualWriteDialogError(null);
               }}
             >
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button
               type="button"
@@ -1498,10 +1538,10 @@ export function AddressContractPanel({
               {manualWriteTarget && actionLoadingKey === `manual-confirm:${manualWriteTarget}` ? (
                 <>
                   <IconLoader2 className="mr-2 size-4 animate-spin" />
-                  Sending...
+                  {txMessages.sending}
                 </>
               ) : (
-                'Confirm Force Send'
+                txMessages.confirmForceSend
               )}
             </Button>
           </>
@@ -1512,23 +1552,23 @@ export function AddressContractPanel({
           <div className="grid gap-4 pb-1">
             <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.contract}</p>
                 <p className="mt-1 break-all text-sm text-slate-900 mono">{binding.address}</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.method}</p>
                   <p className="mt-1 text-sm text-slate-900">{manualWriteTarget}</p>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
-                  <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? 'No Key Selected'}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.selectedKey}</p>
+                  <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? contractPanelMessages.noKeySelected}</p>
                 </div>
               </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <label className="text-sm font-medium text-slate-700">{txMessages.txnType}</label>
                 <Select
                   value={manualWriteDialogValues.transactionType}
                   onValueChange={(value) =>
@@ -1539,16 +1579,16 @@ export function AddressContractPanel({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select transaction type" />
+                    <SelectValue placeholder={txMessages.selectTransactionType} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="EIP1559">EIP1559</SelectItem>
-                    <SelectItem value="LEGACY">LEGACY</SelectItem>
+                    <SelectItem value="EIP1559">{translateRuntimeText('EIP-1559', locale)}</SelectItem>
+                    <SelectItem value="LEGACY">{messages.sendTx.legacy}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Value ({environment.nativeCurrency})</label>
+                <label className="text-sm font-medium text-slate-700">{txMessages.valueNative.replace('{currency}', environment.nativeCurrency)}</label>
                 <Input
                   value={manualWriteDialogValues.value}
                   onChange={(event) =>
@@ -1562,7 +1602,7 @@ export function AddressContractPanel({
               </div>
               {manualWriteDialogValues.transactionType === 'LEGACY' ? (
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <label className="text-sm font-medium text-slate-700">{txMessages.gasPriceGwei}</label>
                   <Input
                     value={manualWriteDialogValues.gasPrice}
                     onChange={(event) =>
@@ -1571,13 +1611,13 @@ export function AddressContractPanel({
                         gasPrice: event.target.value,
                       }))
                     }
-                    placeholder="auto"
+                    placeholder={messages.sendTx.autoPlaceholder}
                   />
                 </div>
               ) : (
                 <>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">{txMessages.maxFeePerGasGwei}</label>
                     <Input
                       value={manualWriteDialogValues.maxFeePerGas}
                       onChange={(event) =>
@@ -1586,11 +1626,11 @@ export function AddressContractPanel({
                           maxFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="auto"
+                      placeholder={messages.sendTx.autoPlaceholder}
                     />
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">{txMessages.maxPriorityFeePerGasGwei}</label>
                     <Input
                       value={manualWriteDialogValues.maxPriorityFeePerGas}
                       onChange={(event) =>
@@ -1599,13 +1639,13 @@ export function AddressContractPanel({
                           maxPriorityFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="auto"
+                      placeholder={messages.sendTx.autoPlaceholder}
                     />
                   </div>
                 </>
               )}
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <label className="text-sm font-medium text-slate-700">{txMessages.gasLimit}</label>
                 <Input
                   value={manualWriteDialogValues.gasLimit}
                   onChange={(event) =>
@@ -1618,7 +1658,7 @@ export function AddressContractPanel({
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <label className="text-sm font-medium text-slate-700">{txMessages.nonce}</label>
                 <Input
                   value={manualWriteDialogValues.nonce}
                   onChange={(event) =>
@@ -1627,13 +1667,13 @@ export function AddressContractPanel({
                       nonce: event.target.value,
                     }))
                   }
-                  placeholder="auto"
+                  placeholder={messages.sendTx.autoPlaceholder}
                 />
               </div>
             </div>
             {manualWriteDialogError ? (
               <div className="max-h-48 overflow-y-auto whitespace-pre-wrap break-all rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                {manualWriteDialogError}
+                {translateRuntimeText(manualWriteDialogError, locale)}
               </div>
             ) : null}
           </div>

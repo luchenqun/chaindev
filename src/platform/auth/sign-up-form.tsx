@@ -7,12 +7,17 @@ import { signIn } from 'next-auth/react';
 import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AuthFormShell } from '@/platform/auth/auth-form-shell';
 import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 
 type RegisterResponse = { ok: true; data: { userId: string } } | { ok: false; error: { category: string; message: string } };
 
 export function SignUpForm() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const loginMessages = messages.login;
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -28,7 +33,7 @@ export function SignUpForm() {
     setError(null);
 
     if (password !== confirmPassword) {
-      setError('两次输入的密码不一致。');
+      setError(loginMessages.passwordMismatch);
       return;
     }
 
@@ -50,7 +55,7 @@ export function SignUpForm() {
 
     if (!response.ok || !result.ok) {
       setSubmitting(false);
-      setError(result.ok ? '注册失败。' : result.error.message);
+      setError(result.ok ? loginMessages.signUpFailed : result.error.message);
       return;
     }
 
@@ -63,7 +68,7 @@ export function SignUpForm() {
 
     if (!signInResult || signInResult.error) {
       setSubmitting(false);
-      setError('注册成功，但自动登录失败，请返回登录页手动登录。');
+      setError(loginMessages.autoSignInFailed);
       return;
     }
 
@@ -73,56 +78,56 @@ export function SignUpForm() {
 
   return (
     <AuthFormShell
-      title="Sign Up"
+      title={loginMessages.signUpTitle}
       subtitle={
         <>
-          Already have an account?
+          {loginMessages.signUpSubtitlePrefix}
           <Link href="/login" className="ml-2 font-medium text-sky-600 hover:text-sky-700">
-            Sign In here
+            {loginMessages.signInHereLink}
           </Link>
         </>
       }
     >
       <form className="grid gap-5" onSubmit={handleSubmit}>
         <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">Username</span>
+          <span className="text-[15px] font-semibold text-slate-900">{loginMessages.username}</span>
           <Input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            placeholder="Username"
+            placeholder={loginMessages.usernamePlaceholder}
             className="h-14 rounded-2xl px-4 text-lg placeholder:text-slate-400"
             required
           />
         </label>
 
         <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">Email Address</span>
+          <span className="text-[15px] font-semibold text-slate-900">{loginMessages.email}</span>
           <Input
             type="email"
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="Enter your email address"
+            placeholder={loginMessages.emailPlaceholder}
             className="h-14 rounded-2xl px-4 text-lg placeholder:text-slate-400"
             required
           />
         </label>
 
         <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">Password</span>
+          <span className="text-[15px] font-semibold text-slate-900">{loginMessages.password}</span>
           <div className="relative">
             <Input
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter your password"
+              placeholder={loginMessages.passwordPlaceholder}
               className="h-14 rounded-2xl px-4 pr-14 text-lg placeholder:text-slate-400"
               required
             />
             <button
               type="button"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-label={showPassword ? loginMessages.hidePassword : loginMessages.showPassword}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
               onClick={() => setShowPassword((current) => !current)}
             >
@@ -132,20 +137,20 @@ export function SignUpForm() {
         </label>
 
         <label className="grid gap-2">
-          <span className="text-[15px] font-semibold text-slate-900">Confirm Password</span>
+          <span className="text-[15px] font-semibold text-slate-900">{loginMessages.confirmPassword}</span>
           <div className="relative">
             <Input
               type={showConfirmPassword ? 'text' : 'password'}
               autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              placeholder="Re-enter your password"
+              placeholder={loginMessages.confirmPasswordPlaceholder}
               className="h-14 rounded-2xl px-4 pr-14 text-lg placeholder:text-slate-400"
               required
             />
             <button
               type="button"
-              aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+              aria-label={showConfirmPassword ? loginMessages.hidePassword : loginMessages.showPassword}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
               onClick={() => setShowConfirmPassword((current) => !current)}
             >
@@ -154,10 +159,10 @@ export function SignUpForm() {
           </div>
         </label>
 
-        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
+        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{translateRuntimeText(error, locale)}</div> : null}
 
         <Button type="submit" className="mt-2 h-14 rounded-2xl text-[18px] font-semibold" disabled={submitting}>
-          {submitting ? 'Creating Account...' : 'Create an Account'}
+          {submitting ? loginMessages.signUpSubmitting : loginMessages.signUpButton}
         </Button>
       </form>
     </AuthFormShell>

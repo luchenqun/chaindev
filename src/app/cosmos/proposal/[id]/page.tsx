@@ -13,9 +13,14 @@ import {
   CosmosDetailTag as DetailTag,
   formatTimestampWithSeconds,
 } from '@/domains/cosmos/ui/detail-primitives';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 export default function CosmosProposalPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const proposalMessages = messages.cosmosProposals;
   const params = useParams<{ id: string }>();
   const proposalId = params.id;
   const [currentVotePage, setCurrentVotePage] = useState(1);
@@ -46,7 +51,7 @@ export default function CosmosProposalPage() {
       } catch (error) {
         if (!cancelled) {
           setProposal(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos proposal.');
+          setErrorMessage(error instanceof Error ? error.message : proposalMessages.failedToLoadProposalTitle);
         }
       }
     }
@@ -64,8 +69,8 @@ export default function CosmosProposalPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Invalid proposal id</h1>
-          <p>The proposal id is required.</p>
+          <h1>{proposalMessages.invalidProposalIdTitle}</h1>
+          <p>{proposalMessages.invalidProposalIdDescription}</p>
         </main>
       </AppShell>
     );
@@ -83,8 +88,8 @@ export default function CosmosProposalPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Failed to load proposal</h1>
-          <p>{errorMessage}</p>
+          <h1>{proposalMessages.failedToLoadProposalTitle}</h1>
+          <p>{translateRuntimeText(errorMessage, locale)}</p>
         </main>
       </AppShell>
     );
@@ -110,7 +115,7 @@ export default function CosmosProposalPage() {
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'overview' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('overview')}
           >
-            Overview
+            {messages.evmTxDetail.overview}
           </button>
           <button
             type="button"
@@ -124,42 +129,42 @@ export default function CosmosProposalPage() {
               }
             }}
           >
-            {hasVotes ? `Votes (${proposal.votesPage.totalCount})` : 'Votes'}
+            {hasVotes ? `${proposalMessages.votes} (${proposal.votesPage.totalCount})` : proposalMessages.votes}
           </button>
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'json' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('json')}
           >
-            JSON
+            {messages.evmTxDetail.json}
           </button>
         </div>
 
         {resolvedActiveTab === 'overview' ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="mb-3">
-              <p className="text-base font-semibold text-slate-900">Proposal Overview</p>
-              <p className="mt-1 text-sm text-slate-500">Governance proposal metadata and timeline returned by the active Cosmos REST endpoint.</p>
+              <p className="text-base font-semibold text-slate-900">{proposalMessages.proposalOverview}</p>
+              <p className="mt-1 text-sm text-slate-500">{proposalMessages.proposalOverviewDescription}</p>
             </div>
 
             <dl>
               <DetailGroup>
-                <DetailRow label="Proposal ID" value={proposal.id} />
-                <DetailRow label="Title" value={proposal.title} />
-                <DetailRow label="Type" value={<DetailTag>{proposal.typeLabel}</DetailTag>} />
-                <DetailRow label="Status" value={<DetailTag tone={statusTone}>{proposal.statusLabel}</DetailTag>} />
+                <DetailRow label={proposalMessages.proposalId} value={proposal.id} />
+                <DetailRow label={proposalMessages.title} value={translateRuntimeText(proposal.title, locale)} />
+                <DetailRow label={proposalMessages.type} value={<DetailTag>{translateRuntimeText(proposal.typeLabel, locale)}</DetailTag>} />
+                <DetailRow label={proposalMessages.status} value={<DetailTag tone={statusTone}>{translateRuntimeText(proposal.statusLabel, locale)}</DetailTag>} />
               </DetailGroup>
               <DetailGroup>
-                <DetailRow label="Submit Time" value={formatTimestampWithSeconds(proposal.submitTime)} />
-                <DetailRow label="Deposit End" value={formatTimestampWithSeconds(proposal.depositEndTime)} />
-                <DetailRow label="Vote Start" value={formatTimestampWithSeconds(proposal.votingStartTime)} />
-                <DetailRow label="Vote End" value={formatTimestampWithSeconds(proposal.votingEndTime)} />
+                <DetailRow label={proposalMessages.submitTime} value={formatTimestampWithSeconds(proposal.submitTime)} />
+                <DetailRow label={proposalMessages.depositEnd} value={formatTimestampWithSeconds(proposal.depositEndTime)} />
+                <DetailRow label={proposalMessages.voteStart} value={formatTimestampWithSeconds(proposal.votingStartTime)} />
+                <DetailRow label={proposalMessages.voteEnd} value={formatTimestampWithSeconds(proposal.votingEndTime)} />
               </DetailGroup>
               <DetailGroup>
-                <DetailRow label="Total Deposit" value={proposal.totalDepositLabel} />
-                <DetailRow label="Tally" value={proposal.tallyLabel} />
-                <DetailRow label="Summary" value={proposal.summary} />
-                <DetailRow label="Metadata" value={proposal.metadataLabel} mono />
+                <DetailRow label={proposalMessages.totalDeposit} value={translateRuntimeText(proposal.totalDepositLabel, locale)} />
+                <DetailRow label={proposalMessages.tally} value={translateRuntimeText(proposal.tallyLabel, locale)} />
+                <DetailRow label={proposalMessages.summary} value={translateRuntimeText(proposal.summary, locale)} />
+                <DetailRow label={proposalMessages.metadata} value={translateRuntimeText(proposal.metadataLabel, locale)} mono />
               </DetailGroup>
             </dl>
           </section>
@@ -169,8 +174,8 @@ export default function CosmosProposalPage() {
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Votes</p>
-                <p className="mt-1 text-sm text-slate-500">Votes returned by the active Cosmos REST endpoint for proposal #{proposal.id}.</p>
+                <p className="text-base font-semibold text-slate-900">{proposalMessages.votes}</p>
+                <p className="mt-1 text-sm text-slate-500">{`${proposalMessages.votes} #${proposal.id}`}</p>
               </div>
               <PaginationControls
                 page={proposal.votesPage.page}
@@ -186,8 +191,8 @@ export default function CosmosProposalPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Voter</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Option</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.voter}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.option}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -198,7 +203,7 @@ export default function CosmosProposalPage() {
                           {vote.voterLabel}
                         </Link>
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{vote.optionLabel}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">{translateRuntimeText(vote.optionLabel, locale)}</td>
                     </tr>
                   ))}
                 </tbody>

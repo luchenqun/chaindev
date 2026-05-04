@@ -4,6 +4,7 @@ import { IconBraces, IconCode } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { AutoGrowTextarea } from '@/components/ui/auto-grow-textarea';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
+import { useMessages } from '@/i18n/locale-provider';
 import { cn } from '@/lib/utils';
 
 type JsonInputProps = {
@@ -14,6 +15,7 @@ type JsonInputProps = {
 };
 
 export function JsonInput({ value, onChange, placeholder, textareaClassName }: JsonInputProps) {
+  const messages = useMessages();
   const [mode, setMode] = useState<'json' | 'raw'>('raw');
   const parsedValue = useMemo(() => {
     try {
@@ -30,7 +32,7 @@ export function JsonInput({ value, onChange, placeholder, textareaClassName }: J
     <>
       <button
         type="button"
-        aria-label="JSON view"
+        aria-label={messages.common.jsonView}
         className={cn(
           'inline-flex size-5 items-center justify-center text-slate-400 transition hover:text-sky-600 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:text-slate-300',
           activeMode === 'json' && 'text-sky-600',
@@ -46,7 +48,7 @@ export function JsonInput({ value, onChange, placeholder, textareaClassName }: J
       </button>
       <button
         type="button"
-        aria-label="Raw view"
+        aria-label={messages.common.rawView}
         className={cn('inline-flex size-5 items-center justify-center text-slate-400 transition hover:text-sky-600', activeMode === 'raw' && 'text-sky-600')}
         onClick={() => setMode('raw')}
       >

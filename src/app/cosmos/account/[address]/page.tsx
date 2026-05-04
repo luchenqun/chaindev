@@ -24,6 +24,8 @@ import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmK
 import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type AccountPageTab = 'transactions' | 'delegations' | 'json';
@@ -68,6 +70,7 @@ function ScaledInput({
   inputMode?: 'numeric' | 'decimal';
   onChange: (value: string) => void;
 }) {
+  const messages = useMessages();
   const [scaleSelectResetVersion, setScaleSelectResetVersion] = useState(0);
   const hasValue = Boolean(value.trim());
 
@@ -89,7 +92,7 @@ function ScaledInput({
           type="button"
           className="absolute right-[82px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
           onClick={() => onChange('')}
-          aria-label="Clear input"
+          aria-label={messages.evmTxDetail.clearInput}
           disabled={disabled}
         >
           <IconX className="size-4" stroke={1.8} />
@@ -97,7 +100,7 @@ function ScaledInput({
       ) : null}
       <Select key={`scale-${id}-${scaleSelectResetVersion}`} disabled={disabled} onValueChange={(nextValue) => applyScale(Number(nextValue))}>
         <SelectTrigger className="absolute right-1.5 top-1/2 h-[30px] w-[74px] -translate-y-1/2 rounded-xl border-slate-200 bg-slate-50 px-2.5 text-sm font-medium text-slate-700 shadow-none">
-          <SelectValue placeholder="Scale" />
+          <SelectValue placeholder={messages.contractPanel.scale} />
         </SelectTrigger>
         <SelectContent align="end">
           {INTEGER_SCALE_OPTIONS.map((option) => (
@@ -112,13 +115,14 @@ function ScaledInput({
 }
 
 function AccountMetric({ label, value, tooltip }: { label: string; value: React.ReactNode; tooltip?: React.ReactNode }) {
+  const { locale } = useLocale();
   const tooltipTriggerRef = useRef<HTMLSpanElement | null>(null);
   const [tooltipOpen, setTooltipOpen] = useState(false);
 
   return (
     <div>
       <div className="flex items-center gap-1.5">
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{translateRuntimeText(label, locale)}</p>
         {tooltip ? (
           <span
             ref={tooltipTriggerRef}
@@ -158,6 +162,9 @@ function UndelegateDialog({
   onSuccess: () => void;
 }) {
   const { showToast } = useToast();
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const accountMessages = messages.cosmosAccountDetail;
   const [amount, setAmount] = useState('');
   const [denom, setDenom] = useState('');
   const [gasPriceAmount, setGasPriceAmount] = useState('');
@@ -172,7 +179,7 @@ function UndelegateDialog({
   const [unlockError, setUnlockError] = useState<string | null>(null);
 
   const validatorAddress = delegation?.validatorAddress ?? '';
-  const validatorLabel = delegation?.validatorMoniker ?? 'Unknown';
+  const validatorLabel = delegation?.validatorMoniker ?? accountMessages.unknown;
   const accountPrefix = useMemo(() => getCosmosAccountPrefixFromValidatorAddress(validatorAddress), [validatorAddress]);
   const amountPlaceholder = delegation?.rawJson.balance?.amount ?? '1000000000000000000';
   const denomPlaceholder = delegation?.rawJson.balance?.denom ?? 'uatom';
@@ -209,7 +216,7 @@ function UndelegateDialog({
     }
 
     if (!activeKey) {
-      setFormError('Select a global private key first.');
+      setFormError(messages.evmTxDetail.selectGlobalKeyFirst);
       return;
     }
 
@@ -230,7 +237,7 @@ function UndelegateDialog({
       });
 
       showToast({
-        title: 'Undelegate transaction broadcasted',
+        title: accountMessages.undelegateBroadcasted,
         description: (
           <span className="block min-w-0 max-w-full">
             <span className="block truncate font-mono text-xs text-slate-500" title={result.delegatorAddress}>
@@ -250,9 +257,9 @@ function UndelegateDialog({
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to broadcast undelegate transaction.';
+      const message = error instanceof Error ? error.message : accountMessages.failedToBroadcastUndelegate;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
@@ -278,7 +285,7 @@ function UndelegateDialog({
       setUnlockPassword('');
       await submitUndelegate(password);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+      setUnlockError(error instanceof Error ? error.message : messages.evmTxDetail.failedToUnlockPrivateKey);
     }
   }
 
@@ -286,17 +293,17 @@ function UndelegateDialog({
     <>
       <ModalDialog
         open={open}
-        title="Undelegate Transaction"
-        description="Unstake tokens from the selected validator with the active private key."
+        title={accountMessages.undelegateTransaction}
+        description={accountMessages.undelegateDescription}
         maxWidthClassName="max-w-xl"
         onOpenChange={onOpenChange}
         footer={
           <>
             <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button type="button" disabled={submitting || !delegation} onClick={() => void submitUndelegate()}>
-              {submitting ? 'Undelegating...' : 'Undelegate'}
+              {submitting ? accountMessages.undelegating : accountMessages.undelegate}
             </Button>
           </>
         }
@@ -304,9 +311,9 @@ function UndelegateDialog({
         <div className="space-y-6">
           <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Node</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{accountMessages.node}</p>
               <p className="mt-1 truncate text-sm font-semibold text-slate-900" title={validatorAddress}>
-                {validatorLabel}
+                {translateRuntimeText(validatorLabel, locale)}
               </p>
               <p className="mt-1 truncate font-mono text-xs text-slate-500" title={validatorAddress}>
                 {validatorAddress ? formatCompactHash(validatorAddress, 18, 12) : '-'}
@@ -314,9 +321,9 @@ function UndelegateDialog({
             </div>
 
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Key</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{accountMessages.key}</p>
               <p className="mt-1 truncate text-sm font-medium text-slate-900" title={activeKey?.address ?? undefined}>
-                {activeKey ? activeKey.name : 'No active key'}
+                {activeKey ? activeKey.name : accountMessages.noActiveKey}
               </p>
               <p className="mt-1 truncate font-mono text-xs text-slate-500" title={activeKey?.address ?? undefined}>
                 {activeKey ? formatCompactHash(activeKey.address, 12, 8) : '-'}
@@ -325,19 +332,19 @@ function UndelegateDialog({
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">Undelegate Details</h3>
+            <h3 className="text-sm font-semibold text-slate-900">{accountMessages.undelegateDetails}</h3>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-amount">
-                Amount
+                {accountMessages.amount}
               </label>
               <ScaledInput id="undelegate-amount" value={amount} placeholder={amountPlaceholder} disabled={submitting} onChange={setAmount} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-denom">
-                Staking denom
+                {accountMessages.stakingDenom}
               </label>
               <Input id="undelegate-denom" value={denom} placeholder={denomPlaceholder} disabled={submitting} onChange={(event) => setDenom(event.target.value)} />
             </div>
@@ -346,13 +353,13 @@ function UndelegateDialog({
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-gas-price">
-                Gas price
+                {accountMessages.gasPrice}
               </label>
               <ScaledInput id="undelegate-gas-price" value={gasPriceAmount} inputMode="decimal" placeholder="1000000000000000" disabled={submitting} onChange={setGasPriceAmount} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-gas-denom">
-                Gas denom
+                {accountMessages.gasDenom}
               </label>
               <Input id="undelegate-gas-denom" value={gasPriceDenom} placeholder="uatom" disabled={submitting} onChange={(event) => setGasPriceDenom(event.target.value)} />
             </div>
@@ -361,7 +368,7 @@ function UndelegateDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-signing">
-                Signing
+                {accountMessages.signing}
               </label>
               <Select value={signingAlgorithm} disabled={submitting} onValueChange={(value) => setSigningAlgorithm(value as CosmosSigningAlgorithm)}>
                 <SelectTrigger id="undelegate-signing" className="mt-0 h-10">
@@ -375,13 +382,13 @@ function UndelegateDialog({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="undelegate-memo">
-                Memo
+                {accountMessages.memo}
               </label>
-              <Input id="undelegate-memo" value={memo} placeholder="Optional" disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
+              <Input id="undelegate-memo" value={memo} placeholder={accountMessages.optional} disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
             </div>
           </div>
 
-          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
+          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{translateRuntimeText(formError, locale)}</p> : null}
         </div>
       </ModalDialog>
       <SecretInputDialog
@@ -394,12 +401,14 @@ function UndelegateDialog({
             setUnlockError(null);
           }
         }}
-        title="Unlock Private Key"
-        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the undelegate transaction.` : 'Enter the password to continue.'}
+        title={accountMessages.unlockPrivateKey}
+        description={
+          activeKey ? accountMessages.unlockUndelegateDescription.replace('{name}', activeKey.name) : accountMessages.unlockFallbackDescription
+        }
         value={unlockPassword}
         onValueChange={setUnlockPassword}
-        placeholder="Password"
-        confirmLabel="Unlock"
+        placeholder={accountMessages.password}
+        confirmLabel={accountMessages.unlock}
         confirmDisabled={!unlockPassword.trim()}
         errorMessage={unlockError}
         onConfirm={() => void handleConfirmUnlock()}
@@ -409,6 +418,9 @@ function UndelegateDialog({
 }
 
 export default function CosmosAccountPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const accountMessages = messages.cosmosAccountDetail;
   const params = useParams<{ address: string }>();
   const router = useRouter();
   const { status } = useSession();
@@ -426,7 +438,7 @@ export default function CosmosAccountPage() {
   const [selectedUndelegation, setSelectedUndelegation] = useState<AccountDelegationItem | null>(null);
   const isLikelyAddress = useMemo(() => Boolean(address?.trim()), [address]);
   const visibleAddresses = useMemo(
-    () => [...new Set((account?.transactionsPage.items ?? []).map((transaction) => transaction.sender).filter((sender) => sender !== 'Unknown'))],
+    () => [...new Set((account?.transactionsPage.items ?? []).map((transaction) => transaction.sender).filter((sender) => sender !== accountMessages.unknown))],
     [account],
   );
 
@@ -489,7 +501,7 @@ export default function CosmosAccountPage() {
       } catch (error) {
         if (!cancelled) {
           setAccount(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos account.');
+          setErrorMessage(error instanceof Error ? error.message : accountMessages.failedToLoadFallback);
         }
       }
     }
@@ -501,7 +513,7 @@ export default function CosmosAccountPage() {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', load);
     };
-  }, [address, currentTxPage, isLikelyAddress, refreshVersion]);
+  }, [accountMessages.failedToLoadFallback, address, currentTxPage, isLikelyAddress, refreshVersion]);
 
   useEffect(() => {
     if (!account) {
@@ -578,8 +590,8 @@ export default function CosmosAccountPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Invalid account address</h1>
-          <p>The account address is required.</p>
+          <h1>{accountMessages.invalidAccountAddressTitle}</h1>
+          <p>{accountMessages.invalidAccountAddressDescription}</p>
         </main>
       </AppShell>
     );
@@ -597,8 +609,8 @@ export default function CosmosAccountPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Failed to load account</h1>
-          <p>{errorMessage}</p>
+          <h1>{accountMessages.failedToLoadTitle}</h1>
+          <p>{translateRuntimeText(errorMessage, locale)}</p>
         </main>
       </AppShell>
     );
@@ -623,9 +635,9 @@ export default function CosmosAccountPage() {
       <main className="section-block">
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[1.171875rem] font-semibold text-slate-900">Account</h1>
+            <h1 className="text-[1.171875rem] font-semibold text-slate-900">{accountMessages.account}</h1>
             <span className={`${nameTag ? 'text-sm font-semibold text-slate-900' : 'text-sm font-medium text-slate-500 mono'}`}>{nameTag ?? account.address}</span>
-            <ActionIconButton tooltip={nameTag ? 'Edit tag' : 'Add tag'} className="text-slate-400 hover:text-sky-600" onClick={openTagDialog}>
+            <ActionIconButton tooltip={nameTag ? accountMessages.editTag : accountMessages.addTag} className="text-slate-400 hover:text-sky-600" onClick={openTagDialog}>
               <IconTag className="size-4" stroke={1.8} />
             </ActionIconButton>
           </div>
@@ -635,31 +647,31 @@ export default function CosmosAccountPage() {
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="grid sm:grid-cols-2 xl:grid-cols-4">
             <div className="border-b border-slate-200 p-5 sm:border-r xl:border-r xl:border-b-0">
-              <AccountMetric label="Type" value={account.type} />
+              <AccountMetric label={accountMessages.type} value={translateRuntimeText(account.type, locale)} />
             </div>
             <div className="border-b border-slate-200 p-5 xl:border-r xl:border-b-0">
-              <AccountMetric label="Account Number" value={account.accountNumberLabel} />
+              <AccountMetric label={accountMessages.accountNumber} value={account.accountNumberLabel} />
             </div>
             <div className="border-b border-slate-200 p-5 sm:border-r xl:border-r xl:border-b-0">
-              <AccountMetric label="Sequence" value={account.sequenceLabel} />
+              <AccountMetric label={accountMessages.sequence} value={account.sequenceLabel} />
             </div>
             <div className="p-5">
-              <AccountMetric label="Transactions" value={account.transactionsPage.totalCount.toLocaleString('en-US')} />
+              <AccountMetric label={accountMessages.transactions} value={account.transactionsPage.totalCount.toLocaleString(locale)} />
             </div>
           </div>
 
           <div className="border-t border-slate-200">
             <div className="border-b border-slate-200 px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">EVM Hex</p>
-              <p className="mt-2 break-all font-mono text-sm font-medium text-slate-900">{evmHexAddress ?? 'Unavailable'}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{accountMessages.evmHex}</p>
+              <p className="mt-2 break-all font-mono text-sm font-medium text-slate-900">{evmHexAddress ?? messages.common.unavailable}</p>
             </div>
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
               <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Balances</p>
-                <p className="mt-1 text-sm text-slate-500">All balances returned by the active Cosmos REST endpoint.</p>
+                <p className="text-base font-semibold text-slate-900">{accountMessages.balances}</p>
+                <p className="mt-1 text-sm text-slate-500">{accountMessages.balancesDescription}</p>
               </div>
               <ActionIconButton
-                tooltip={balanceDisplayMode === 'readable' ? 'Switch to accurate balances' : 'Switch to readable balances'}
+                tooltip={balanceDisplayMode === 'readable' ? accountMessages.switchToAccurateBalances : accountMessages.switchToReadableBalances}
                 className="text-slate-400 hover:text-slate-600"
                 onClick={() => setBalanceDisplayMode((current) => (current === 'readable' ? 'accurate' : 'readable'))}
               >
@@ -672,8 +684,8 @@ export default function CosmosAccountPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Denom</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.denom}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.amount}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -687,7 +699,7 @@ export default function CosmosAccountPage() {
                 </table>
               </div>
             ) : (
-              <div className="empty-state m-5">No balances returned.</div>
+              <div className="empty-state m-5">{accountMessages.noBalancesReturned}</div>
             )}
           </div>
         </section>
@@ -705,7 +717,7 @@ export default function CosmosAccountPage() {
               }
             }}
           >
-            {hasTransactions ? `Transactions (${account.transactionsPage.totalCount})` : 'Transactions'}
+            {hasTransactions ? `${accountMessages.transactions} (${account.transactionsPage.totalCount})` : accountMessages.transactions}
           </button>
           <button
             type="button"
@@ -719,7 +731,7 @@ export default function CosmosAccountPage() {
               }
             }}
           >
-            {hasDelegations ? `Delegations (${account.delegationsCount})` : 'Delegations'}
+            {hasDelegations ? `${accountMessages.delegations} (${account.delegationsCount})` : accountMessages.delegations}
           </button>
           <button
             type="button"
@@ -734,8 +746,8 @@ export default function CosmosAccountPage() {
           <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">Transactions</p>
-                <p className="mt-1 text-sm text-slate-500">Transactions where this address appears as `message.sender`.</p>
+                <p className="text-base font-semibold text-slate-900">{accountMessages.transactions}</p>
+                <p className="mt-1 text-sm text-slate-500">{accountMessages.transactionsDescription}</p>
               </div>
               <PaginationControls
                 page={account.transactionsPage.page}
@@ -751,13 +763,13 @@ export default function CosmosAccountPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Gas Used / Wanted</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Fee</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.hash}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.type}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosTxDetail.block}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.age}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.from}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.gasUsedWanted}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.fee}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -783,18 +795,18 @@ export default function CosmosAccountPage() {
                         <RelativeTime timestampMs={transaction.timestampMs} />
                       </td>
                       <td className="px-5 py-3 text-sm">
-                        {transaction.sender === 'Unknown' ? (
-                          <span className="text-slate-500">Unknown</span>
+                        {transaction.sender === accountMessages.unknown ? (
+                          <span className="text-slate-500">{translateRuntimeText(accountMessages.unknown, locale)}</span>
                         ) : (
                           <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
-                            {nameTagsByAddress[transaction.sender] ?? transaction.senderLabel}
+                            {translateRuntimeText(nameTagsByAddress[transaction.sender] ?? transaction.senderLabel, locale)}
                           </Link>
                         )}
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
-                        {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
+                        {translateRuntimeText(transaction.gasUsedLabel, locale)}/{translateRuntimeText(transaction.gasWantedLabel, locale)}
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{transaction.feeLabel}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">{translateRuntimeText(transaction.feeLabel, locale)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -806,19 +818,19 @@ export default function CosmosAccountPage() {
         {resolvedActiveTab === 'delegations' ? (
           <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="border-b border-slate-200 px-5 py-4">
-              <p className="text-base font-semibold text-slate-900">Delegations</p>
-              <p className="mt-1 text-sm text-slate-500">Active staking delegations returned by the selected Cosmos REST endpoint.</p>
+              <p className="text-base font-semibold text-slate-900">{accountMessages.delegations}</p>
+              <p className="mt-1 text-sm text-slate-500">{accountMessages.delegationsDescription}</p>
             </div>
 
             <div className="overflow-x-auto">
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Validator</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Validator Address</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Shares</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.validators}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosValidatorDetail.operatorAddress}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.amount}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosValidatorDetail.delegatorShares}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.labels.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -826,7 +838,7 @@ export default function CosmosAccountPage() {
                     <tr key={delegation.validatorAddress} className="border-t border-slate-200">
                       <td className="px-5 py-3 text-sm text-slate-700">
                         <Link className="text-sky-600 hover:text-sky-700" href={`/cosmos/validator/${delegation.validatorAddress}`}>
-                          {delegation.validatorMoniker ?? 'Unknown'}
+                          {translateRuntimeText(delegation.validatorMoniker ?? accountMessages.unknown, locale)}
                         </Link>
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700 mono">
@@ -834,10 +846,10 @@ export default function CosmosAccountPage() {
                           {delegation.validatorAddressLabel}
                         </Link>
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{delegation.amountLabel}</td>
-                      <td className="px-5 py-3 text-sm text-slate-900 mono">{delegation.sharesLabel}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">{translateRuntimeText(delegation.amountLabel, locale)}</td>
+                      <td className="px-5 py-3 text-sm text-slate-900 mono">{translateRuntimeText(delegation.sharesLabel, locale)}</td>
                       <td className="px-5 py-3 text-right text-sm">
-                        <ActionIconButton tooltip="Undelegate" className="text-slate-400 hover:text-sky-600" onClick={() => setSelectedUndelegation(delegation)}>
+                        <ActionIconButton tooltip={accountMessages.undelegate} className="text-slate-400 hover:text-sky-600" onClick={() => setSelectedUndelegation(delegation)}>
                           <IconArrowBackUp className="size-4" stroke={1.8} />
                         </ActionIconButton>
                       </td>
@@ -867,28 +879,28 @@ export default function CosmosAccountPage() {
         <ModalDialog
           open={tagDialogOpen}
           onOpenChange={setTagDialogOpen}
-          title={nameTag ? 'Edit Tag' : 'Add Tag'}
-          description={`Set a label for address ${account.address}.`}
+          title={nameTag ? accountMessages.editTag : accountMessages.addTag}
+          description={`${messages.nameTags.setLabelForAddress} ${account.address}.`}
           footer={
             <>
               {nameTag ? (
                 <Button type="button" variant="outline" onClick={() => void handleRemoveTag()}>
-                  Remove
+                  {messages.nameTags.remove}
                 </Button>
               ) : null}
               <Button type="button" variant="outline" onClick={() => setTagDialogOpen(false)}>
-                Cancel
+                {messages.nameTags.cancel}
               </Button>
               <Button type="button" onClick={() => void handleSaveTag()}>
-                Save
+                {messages.nameTags.save}
               </Button>
             </>
           }
           maxWidthClassName="max-w-lg"
         >
           <label className="grid gap-2 pb-1">
-            <span className="text-sm font-medium text-slate-700">Tag</span>
-            <Input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder="Tag" />
+            <span className="text-sm font-medium text-slate-700">{messages.labels.tag}</span>
+            <Input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder={messages.labels.tag} />
           </label>
         </ModalDialog>
       </main>

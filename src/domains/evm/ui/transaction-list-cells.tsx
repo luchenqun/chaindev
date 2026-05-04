@@ -6,6 +6,8 @@ import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { copyText } from '@/components/ui/copy-text';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 
 export type TransactionPreviewData = {
   hash: string;
@@ -32,6 +34,8 @@ function getCachedStatusClasses(status?: string) {
 }
 
 export function TransactionHashCell(props: TransactionPreviewData) {
+  const messages = useMessages();
+  const txMessages = messages.cosmosTxDetail;
   const { hash, hashLabel, receiptStatus } = props;
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<number | null>(null);
@@ -70,13 +74,13 @@ export function TransactionHashCell(props: TransactionPreviewData) {
           ref={copyButtonRef}
           type="button"
           className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
-          aria-label="Copy transaction hash"
+          aria-label={txMessages.copyTransactionHash}
           onClick={() => void handleCopy()}
         >
           <IconCopy className="size-4" stroke={1.8} />
         </button>
         <FloatingTooltip open={copied} anchorRef={copyButtonRef} className="whitespace-nowrap border border-slate-200 bg-white text-slate-700">
-          <span className="block whitespace-nowrap">Copied!</span>
+          <span className="block whitespace-nowrap">{messages.common.copied}</span>
         </FloatingTooltip>
       </div>
     </div>
@@ -162,6 +166,9 @@ export function TransactionMethodBadge({ methodLabel }: { methodLabel: string })
 }
 
 export function TransactionPreviewButton(props: { transaction: TransactionPreviewData; methodLabel: string }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.evmTxDetail;
   const { transaction, methodLabel } = props;
   const [open, setOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState<{
@@ -231,7 +238,7 @@ export function TransactionPreviewButton(props: { transaction: TransactionPrevie
       <button
         ref={triggerRef}
         type="button"
-        aria-label={open ? 'Hide transaction preview' : 'Show transaction preview'}
+        aria-label={open ? txMessages.hideTransactionPreview : txMessages.showTransactionPreview}
         className={`inline-flex size-5 items-center justify-center transition ${open ? 'text-slate-700' : 'text-slate-500 hover:text-slate-700'}`}
         onClick={() => setOpen((current) => !current)}
       >
@@ -248,42 +255,46 @@ export function TransactionPreviewButton(props: { transaction: TransactionPrevie
               }}
             >
               <div className="border-b border-slate-200 pb-4">
-                <p className="text-lg font-semibold text-slate-900">Additional Info</p>
+                <p className="text-lg font-semibold text-slate-900">{txMessages.additionalInfo}</p>
               </div>
 
               <div className="space-y-2 py-2">
                 <section className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Status</p>
-                  <p className={`text-sm font-semibold ${getCachedStatusClasses(transaction.receiptStatus)}`}>{transaction.receiptStatusLabel ?? 'Unavailable'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.status}</p>
+                  <p className={`text-sm font-semibold ${getCachedStatusClasses(transaction.receiptStatus)}`}>
+                    {translateRuntimeText(transaction.receiptStatusLabel ?? messages.common.unavailable, locale)}
+                  </p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.method}</p>
                   <p className="text-sm font-medium text-slate-900">{methodLabel}</p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Transaction Fee</p>
-                  <p className="text-sm font-medium text-slate-900">{transaction.feeLabel ?? 'Unavailable'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.transactionFee}</p>
+                  <p className="text-sm font-medium text-slate-900">{translateRuntimeText(transaction.feeLabel ?? messages.common.unavailable, locale)}</p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Info</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.gasInfo}</p>
                   <p className="text-sm font-medium text-slate-900">
-                    {transaction.gasUsedLabel ?? 'Unavailable'} gas used from {transaction.gasLimitLabel ?? 'Unavailable'} limit
+                    {txMessages.gasInfoSummary
+                      .replace('{used}', translateRuntimeText(transaction.gasUsedLabel ?? messages.common.unavailable, locale))
+                      .replace('{wanted}', translateRuntimeText(transaction.gasLimitLabel ?? messages.common.unavailable, locale))}
                   </p>
-                  <p className="text-xs text-slate-500">@ {transaction.effectiveGasPriceLabel ?? 'Unavailable'}</p>
+                  <p className="text-xs text-slate-500">@ {translateRuntimeText(transaction.effectiveGasPriceLabel ?? messages.common.unavailable, locale)}</p>
                 </section>
 
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Nonce</p>
-                  <p className="text-sm font-medium text-slate-900">{transaction.nonceLabel ?? 'Unavailable'}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.nonce}</p>
+                  <p className="text-sm font-medium text-slate-900">{translateRuntimeText(transaction.nonceLabel ?? messages.common.unavailable, locale)}</p>
                 </section>
               </div>
 
               <div className="border-t border-slate-200 pt-2">
                 <Link prefetch={false} className="inline-flex items-center gap-1 text-sm font-medium text-sky-600 transition hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
-                  See more details
+                  {messages.navigation.more}
                   <IconArrowUpRight className="size-3.5 text-slate-400" stroke={1.8} />
                 </Link>
               </div>

@@ -9,6 +9,8 @@ import { JsonInput } from '@/components/ui/json-input';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getActiveCosmosProvider } from '@/domains/cosmos/client/queries';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
@@ -267,7 +269,7 @@ function validateBodyParameter(endpoint: RestEndpoint, bodyJson: string): FieldE
   }
 
   if (!bodyJson.trim() || bodyJson.trim() === '{}') {
-    return { body: 'Body is required.' };
+    return { body: '__BODY_REQUIRED__' };
   }
 
   return {};
@@ -300,6 +302,10 @@ async function requestCosmosRestDirect(input: { endpointPath: string; method: Ht
 }
 
 export default function CosmosRestToolPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const restMessages = messages.restApiTool;
+  const commonMessages = messages.common;
   const [endpoints, setEndpoints] = useState<RestEndpoint[]>([]);
   const [apiSpec, setApiSpec] = useState<ApiSpecValue>('cosmos');
   const [selectedEndpointId, setSelectedEndpointId] = useState('');
@@ -353,7 +359,7 @@ export default function CosmosRestToolPage() {
         setSelectedEndpointId(nextEndpoints[0]?.id ?? '');
       } catch (loadError) {
         if (!disposed) {
-          setError(loadError instanceof Error ? loadError.message : `Failed to load ${selectedApiSpec.file}.`);
+          setError(loadError instanceof Error ? loadError.message : restMessages.loadingSpec.replace('{file}', selectedApiSpec.file));
         }
       } finally {
         if (!disposed) {
@@ -407,6 +413,10 @@ export default function CosmosRestToolPage() {
         ...validateBodyParameter(selectedEndpoint, bodyJson),
       };
 
+      if (nextFieldErrors.body === '__BODY_REQUIRED__') {
+        nextFieldErrors.body = restMessages.bodyRequired;
+      }
+
       if (Object.keys(nextFieldErrors).length) {
         setFieldErrors(nextFieldErrors);
         return;
@@ -430,7 +440,7 @@ export default function CosmosRestToolPage() {
 
       setResult(response && typeof response === 'object' && !Array.isArray(response) ? (response as Record<string, unknown>) : { result: response });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to execute REST request.');
+      setError(requestError instanceof Error ? requestError.message : restMessages.failedToExecute);
     } finally {
       setSubmitting(false);
     }
@@ -443,10 +453,10 @@ export default function CosmosRestToolPage() {
           <div className="border-b border-slate-200 px-6 py-4">
             <div className="flex min-w-0 items-baseline justify-between gap-4">
               <div className="flex min-w-0 items-baseline gap-3">
-                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">REST API</h1>
-                <p className="min-w-0 truncate text-sm text-slate-500">Call endpoints generated from YAML specs.</p>
+                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">{restMessages.title}</h1>
+                <p className="min-w-0 truncate text-sm text-slate-500">{restMessages.description}</p>
               </div>
-              <span className="shrink-0 text-sm text-slate-500">{loading ? 'Loading...' : `${endpoints.length} endpoints`}</span>
+              <span className="shrink-0 text-sm text-slate-500">{loading ? restMessages.loadingEndpoints : restMessages.endpointCount.replace('{count}', String(endpoints.length))}</span>
             </div>
           </div>
 
@@ -460,14 +470,14 @@ export default function CosmosRestToolPage() {
                   <SelectContent>
                     {API_SPECS.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
-                        {item.label}
+                        {translateRuntimeText(item.label, locale)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <div className="relative">
                   <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" stroke={1.8} />
-                  <Input value={search} placeholder="Search endpoint" className="pl-9" onChange={(event) => setSearch(event.target.value)} />
+                  <Input value={search} placeholder={restMessages.searchEndpoint} className="pl-9" onChange={(event) => setSearch(event.target.value)} />
                 </div>
               </div>
               <div className="max-h-[720px] overflow-y-auto p-2">
@@ -487,13 +497,15 @@ export default function CosmosRestToolPage() {
                     >
                       <span className="flex items-center gap-2">
                         <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase text-slate-600">{endpoint.method}</span>
-                        <span className="min-w-0 truncate text-sm font-medium">{endpoint.operationId || endpoint.module}</span>
+                        <span className="min-w-0 truncate text-sm font-medium">
+                          {endpoint.operationId ? translateRuntimeText(endpoint.operationId, locale) : translateRuntimeText(endpoint.module, locale)}
+                        </span>
                       </span>
                       <span className="mt-1 block truncate font-mono text-xs text-slate-500">{endpoint.path}</span>
                     </button>
                   );
                 })}
-                {!filteredEndpoints.length ? <div className="px-3 py-8 text-center text-sm text-slate-500">No endpoints found.</div> : null}
+                {!filteredEndpoints.length ? <div className="px-3 py-8 text-center text-sm text-slate-500">{restMessages.noEndpointsFound}</div> : null}
               </div>
             </aside>
 
@@ -505,13 +517,17 @@ export default function CosmosRestToolPage() {
                       <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold uppercase text-slate-700">{selectedEndpoint.method}</span>
                       <span className="truncate font-mono text-sm text-slate-700">{selectedEndpoint.path}</span>
                     </div>
-                    <h2 className="mt-3 text-xl font-semibold text-slate-950">{selectedEndpoint.operationId || selectedEndpoint.summary}</h2>
-                    <p className="mt-1 text-sm text-slate-500">{selectedEndpoint.summary}</p>
+                    <h2 className="mt-3 text-xl font-semibold text-slate-950">
+                      {selectedEndpoint.operationId
+                        ? translateRuntimeText(selectedEndpoint.operationId, locale)
+                        : translateRuntimeText(selectedEndpoint.summary, locale)}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">{translateRuntimeText(selectedEndpoint.summary, locale)}</p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700" htmlFor="rest-endpoint">
-                      Endpoint
+                      {restMessages.endpoint}
                     </label>
                     <Input id="rest-endpoint" value={endpointPath} readOnly className="mt-1 font-mono text-sm" />
                   </div>
@@ -524,16 +540,16 @@ export default function CosmosRestToolPage() {
                       return (
                         <div key={`path-${name}`}>
                           <label className="block text-sm font-medium text-slate-700" htmlFor={`path-${name}`}>
-                            {name} <span className="text-rose-500">*</span> <span className="text-slate-400">(path)</span>
+                            {name} <span className="text-rose-500">*</span> <span className="text-slate-400">({restMessages.pathParam})</span>
                           </label>
                           <Input
                             id={`path-${name}`}
                             value={pathValues[name] ?? ''}
-                            placeholder={parameter.type ?? 'string'}
+                            placeholder={parameter.type ?? restMessages.stringType}
                             className={fieldError ? 'mt-1 border-rose-300 focus-visible:ring-rose-200' : 'mt-1'}
                             onChange={(event) => setPathValues((current) => ({ ...current, [name]: event.target.value }))}
                           />
-                          {fieldError ? <p className="mt-1 text-xs text-rose-600">{fieldError}</p> : null}
+                          {fieldError ? <p className="mt-1 text-xs text-rose-600">{translateRuntimeText(fieldError, locale)}</p> : null}
                         </div>
                       );
                     })}
@@ -545,16 +561,16 @@ export default function CosmosRestToolPage() {
                       return (
                         <div key={`query-${name}`}>
                           <label className="block text-sm font-medium text-slate-700" htmlFor={`query-${name}`}>
-                            {name} {parameter.required ? <span className="text-rose-500">*</span> : null} <span className="text-slate-400">(query)</span>
+                            {name} {parameter.required ? <span className="text-rose-500">*</span> : null} <span className="text-slate-400">({restMessages.queryParam})</span>
                           </label>
                           <Input
                             id={`query-${name}`}
                             value={queryValues[name] ?? ''}
-                            placeholder={parameter.type ?? 'string'}
+                            placeholder={parameter.type ?? restMessages.stringType}
                             className={fieldError ? 'mt-1 border-rose-300 focus-visible:ring-rose-200' : 'mt-1'}
                             onChange={(event) => setQueryValues((current) => ({ ...current, [name]: event.target.value }))}
                           />
-                          {fieldError ? <p className="mt-1 text-xs text-rose-600">{fieldError}</p> : null}
+                          {fieldError ? <p className="mt-1 text-xs text-rose-600">{translateRuntimeText(fieldError, locale)}</p> : null}
                         </div>
                       );
                     })}
@@ -562,21 +578,21 @@ export default function CosmosRestToolPage() {
 
                   {selectedEndpoint.bodyParameter ? (
                     <div>
-                      <label className="block text-sm font-medium text-slate-700">Body {selectedEndpoint.bodyParameter.required ? <span className="text-rose-500">*</span> : null}</label>
+                      <label className="block text-sm font-medium text-slate-700">{restMessages.body} {selectedEndpoint.bodyParameter.required ? <span className="text-rose-500">*</span> : null}</label>
                       <JsonInput
                         value={bodyJson}
                         onChange={setBodyJson}
                         textareaClassName={`mt-1 ${bodyTextareaClassName} ${fieldErrors.body ? 'border-rose-300 focus:border-rose-300 focus:ring-rose-100' : ''}`}
                       />
-                      {fieldErrors.body ? <p className="mt-1 text-xs text-rose-600">{fieldErrors.body}</p> : null}
+                      {fieldErrors.body ? <p className="mt-1 text-xs text-rose-600">{translateRuntimeText(fieldErrors.body, locale)}</p> : null}
                     </div>
                   ) : null}
 
-                  {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
+                  {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{translateRuntimeText(error, locale)}</div> : null}
 
                   <div className="flex justify-end border-t border-slate-200 pt-4">
                     <Button type="button" disabled={submitting || loading} onClick={() => void handleRun()}>
-                      {submitting ? 'Running...' : 'Run'}
+                      {submitting ? commonMessages.running : restMessages.run}
                     </Button>
                   </div>
 
@@ -588,7 +604,7 @@ export default function CosmosRestToolPage() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-                  {loading ? `Loading ${selectedApiSpec.file}...` : 'No REST endpoints available.'}
+                  {loading ? restMessages.loadingSpec.replace('{file}', selectedApiSpec.file) : restMessages.noEndpointsAvailable}
                 </div>
               )}
             </section>

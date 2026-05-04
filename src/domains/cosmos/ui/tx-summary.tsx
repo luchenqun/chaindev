@@ -1,3 +1,5 @@
+import { useMessages } from '@/i18n/locale-provider';
+
 type TxSummaryProps = {
   transaction: {
     hash: string;
@@ -9,28 +11,32 @@ type TxSummaryProps = {
 };
 
 export function CosmosTxSummary({ transaction }: TxSummaryProps) {
+  const messages = useMessages();
+  const txMessages = messages.cosmosTxDetail;
+  const commonMessages = messages.common;
+
   return (
     <div className="detail-card">
       <dl className="detail-list">
         <div>
-          <dt>Hash</dt>
+          <dt>{txMessages.transactionHash}</dt>
           <dd className="mono">{transaction.hash}</dd>
         </div>
         <div>
-          <dt>Height</dt>
+          <dt>{commonMessages.height}</dt>
           <dd>{transaction.height}</dd>
         </div>
         <div>
-          <dt>Code</dt>
+          <dt>{txMessages.code}</dt>
           <dd>{transaction.code}</dd>
         </div>
         <div>
-          <dt>Gas Used</dt>
+          <dt>{txMessages.gasUsedWanted}</dt>
           <dd>{transaction.gasUsed}</dd>
         </div>
         <div>
-          <dt>Raw Log</dt>
-          <dd className="mono">{transaction.rawLog || 'No log'}</dd>
+          <dt>{txMessages.rawLog}</dt>
+          <dd className="mono">{transaction.rawLog || commonMessages.noLog}</dd>
         </div>
       </dl>
     </div>

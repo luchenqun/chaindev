@@ -12,7 +12,10 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatLocalizedDateTime } from '@/i18n/format';
 import { useToast } from '@/components/ui/toast';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import {
   clearActiveRpcProfileCookie,
   createRpcProfile,
@@ -93,14 +96,14 @@ function getDraftFromProfile(profile: RpcProfile): DraftState {
   };
 }
 
-function formatTimestamp(timestamp: number) {
-  return new Intl.DateTimeFormat('en-US', {
+function formatTimestamp(timestamp: number, locale: string) {
+  return formatLocalizedDateTime(timestamp, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  }).format(new Date(timestamp));
+  }, locale);
 }
 
 function renderProviderOption(profile: RpcProfile) {
@@ -138,6 +141,10 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
   const router = useRouter();
   const { status } = useSession();
   const { showToast } = useToast();
+  const { locale } = useLocale();
+  const messages = useMessages();
+  const providerMessages = messages.provider;
+  const labelMessages = messages.labels;
   const isAuthenticated = status === 'authenticated';
   const [loading, setLoading] = useState(() => cachedRpcProviderManagerSnapshot == null);
   const [open, setOpen] = useState(false);
@@ -217,7 +224,7 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
         setError(null);
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : 'Failed to load RPC providers.');
+          setError(loadError instanceof Error ? loadError.message : providerMessages.loading);
         }
       } finally {
         if (!cancelled) {
@@ -257,7 +264,6 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
     if (!preferred) {
       if (cookieProfile) {
         clearActiveRpcProfileCookie(mode);
-        router.refresh();
       }
 
       return;
@@ -265,9 +271,8 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
 
     if (cookieProfile?.id !== preferred.id || cookieProfile.rpcUrl !== preferred.rpcUrl || cookieProfile.restUrl !== preferred.restUrl || cookieProfile.wsUrl !== preferred.wsUrl) {
       writeActiveRpcProfileCookie(preferred);
-      router.refresh();
     }
-  }, [loading, mode, profiles, router, selected]);
+  }, [loading, mode, profiles, selected]);
 
   const saveDisabled = saving || !draft.name.trim() || !draft.rpcUrl.trim() || (draft.mode === 'evm' ? !draft.nativeCurrencySymbol.trim() : !draft.restUrl.trim());
   function goToLogin() {
@@ -278,8 +283,8 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
   function handleOpenProviderSettings() {
     if (status !== 'authenticated') {
       showToast({
-        title: 'Login required',
-        description: 'Sign in before adding a provider.',
+        title: providerMessages.loginRequired,
+        description: providerMessages.signInBeforeAddingProvider,
         tone: 'info',
       });
       return;
@@ -355,7 +360,7 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
         return;
       }
 
-      setError(saveError instanceof Error ? saveError.message : 'Failed to save RPC provider.');
+      setError(saveError instanceof Error ? saveError.message : providerMessages.failedToSave);
     } finally {
       setSaving(false);
     }
@@ -401,7 +406,7 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
         return;
       }
 
-      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete RPC provider.');
+      setError(deleteError instanceof Error ? deleteError.message : providerMessages.failedToDelete);
     } finally {
       setDeletingId(null);
     }
@@ -436,12 +441,12 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
         <table className="data-table">
           <thead>
             <tr>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Mode</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">RPC URL</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Details</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Updated</th>
-              <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.mode}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.name}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.rpcUrl}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.details}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{labelMessages.updated}</th>
+              <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{labelMessages.actions}</th>
             </tr>
           </thead>
           <tbody>
@@ -460,31 +465,31 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
                     </td>
                     <td className="max-w-[20rem] px-5 py-3 text-sm text-slate-500">
                       {profile.mode === 'evm' ? (
-                        <span className="block truncate">Currency: {profile.nativeCurrencySymbol ?? 'ETH'}</span>
+                        <span className="block truncate">{`${labelMessages.currencyName}: ${profile.nativeCurrencySymbol ?? 'ETH'}`}</span>
                       ) : (
                         <div className="grid gap-1">
-                          <span className="block truncate">REST: {profile.restUrl ?? '-'}</span>
-                          <span className="block truncate">WS: {profile.wsUrl ?? '-'}</span>
+                          <span className="block truncate">{`${labelMessages.restUrl}: ${profile.restUrl ?? '-'}`}</span>
+                          <span className="block truncate">{`${labelMessages.websocketUrl}: ${profile.wsUrl ?? '-'}`}</span>
                         </div>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(profile.updatedAt)}</td>
+                    <td className="px-5 py-3 text-sm text-slate-500">{formatTimestamp(profile.updatedAt, locale)}</td>
                     <td className="px-5 py-3 text-sm">
                       <div className="flex items-center justify-end gap-0">
                         {source === 'server' ? (
                           <>
                             <ActionIconButton
                               className="text-slate-400 hover:text-slate-700"
-                              tooltip="Edit provider"
-                              aria-label="Edit provider"
+                              tooltip={providerMessages.editProviderAction}
+                              aria-label={providerMessages.editProviderAction}
                               onClick={() => handleOpenEdit(profile)}
                             >
                               <IconPencil className="size-4" stroke={1.8} />
                             </ActionIconButton>
                             <ActionIconButton
                               className="text-slate-400 hover:text-rose-600"
-                              tooltip="Delete provider"
-                              aria-label="Delete provider"
+                              tooltip={providerMessages.deleteProviderAction}
+                              aria-label={providerMessages.deleteProviderAction}
                               disabled={deletingId === profile.id}
                               onClick={() => setDeleteTarget(profile)}
                             >
@@ -500,7 +505,7 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
             ) : (
               <tr>
                 <td className="px-5 py-10 text-center text-sm text-slate-500" colSpan={6}>
-                  No providers saved yet.
+                  {providerMessages.noProvidersSaved}
                 </td>
               </tr>
             )}
@@ -517,15 +522,15 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
           <div className="border-b border-slate-200 px-5 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-slate-500">Browse, activate, edit, or remove saved EVM and Cosmos providers from one place.</p>
+                <p className="text-sm text-slate-500">{providerMessages.browseDescription}</p>
               </div>
               <Button type="button" size="sm" onClick={handleOpenCreate}>
-                {isAuthenticated ? 'Add' : 'Sign In to Add'}
+                {isAuthenticated ? providerMessages.add : providerMessages.signInToAdd}
               </Button>
             </div>
           </div>
-          {error ? <p className="border-b border-slate-200 px-5 py-4 text-sm text-rose-600">{error}</p> : null}
-          {loading ? <div className="px-5 py-10 text-sm text-slate-500">Loading providers...</div> : renderProfilesTable()}
+          {error ? <p className="border-b border-slate-200 px-5 py-4 text-sm text-rose-600">{translateRuntimeText(error, locale)}</p> : null}
+          {loading ? <div className="px-5 py-10 text-sm text-slate-500">{providerMessages.loading}</div> : renderProfilesTable()}
         </section>
 
         <ModalDialog
@@ -537,15 +542,15 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
               setError(null);
             }
           }}
-          title={editingId ? 'Edit Provider' : 'Add Provider'}
-          description="Choose the chain type first, then enter the RPC endpoint used by explorer and workbench pages."
+          title={editingId ? providerMessages.editProvider : providerMessages.addProvider}
+          description={providerMessages.description}
           footer={
             <>
               <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
+                {messages.common.cancel}
               </Button>
               <Button type="button" disabled={saveDisabled} onClick={() => void handleSave()}>
-                {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Save Provider'}
+                {saving ? providerMessages.saving : editingId ? providerMessages.saveChanges : providerMessages.saveProvider}
               </Button>
             </>
           }
@@ -553,7 +558,7 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
         >
           <div className="grid gap-4 pb-1 md:grid-cols-2">
             <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-700">Chain Type</span>
+              <span className="text-sm font-medium text-slate-700">{labelMessages.chainType}</span>
               <Select
                 value={draft.mode}
                 disabled={Boolean(editingId)}
@@ -565,16 +570,16 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
                 }
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select chain type" />
+                  <SelectValue placeholder={providerMessages.selectChainType} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="evm">EVM</SelectItem>
-                  <SelectItem value="cosmos">Cosmos</SelectItem>
+                  <SelectItem value="evm">{messages.navigation.blockchain}</SelectItem>
+                  <SelectItem value="cosmos">{messages.labels.chain}</SelectItem>
                 </SelectContent>
               </Select>
             </label>
             <label className="grid gap-2">
-              <span className="text-sm font-medium text-slate-700">Provider Name</span>
+              <span className="text-sm font-medium text-slate-700">{labelMessages.providerName}</span>
               <Input
                 value={draft.name}
                 onChange={(event) =>
@@ -583,12 +588,12 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
                     name: event.target.value,
                   }))
                 }
-                placeholder={draft.mode === 'evm' ? 'Local EVM' : 'Local Cosmos'}
+                placeholder={draft.mode === 'evm' ? providerMessages.localEvm : providerMessages.localCosmos}
               />
             </label>
             {draft.mode === 'evm' ? (
               <label className="grid gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Currency Name</span>
+                <span className="text-sm font-medium text-slate-700">{labelMessages.currencyName}</span>
                 <Input
                   value={draft.nativeCurrencySymbol}
                   onChange={(event) =>
@@ -597,12 +602,12 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
                       nativeCurrencySymbol: event.target.value,
                     }))
                   }
-                  placeholder="ETH"
+                  placeholder={providerMessages.nativeCurrencyPlaceholder}
                 />
               </label>
             ) : null}
             <label className="grid gap-2 md:col-span-2">
-              <span className="text-sm font-medium text-slate-700">RPC URL</span>
+              <span className="text-sm font-medium text-slate-700">{labelMessages.rpcUrl}</span>
               <Input
                 value={draft.rpcUrl}
                 onChange={(event) =>
@@ -611,13 +616,13 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
                     rpcUrl: event.target.value,
                   }))
                 }
-                placeholder={draft.mode === 'evm' ? 'http://127.0.0.1:8545' : 'http://127.0.0.1:26657'}
+                placeholder={draft.mode === 'evm' ? providerMessages.evmRpcPlaceholder : providerMessages.cosmosRpcPlaceholder}
               />
             </label>
             {draft.mode === 'cosmos' ? (
               <>
                 <label className="grid gap-2 md:col-span-2">
-                  <span className="text-sm font-medium text-slate-700">REST URL</span>
+                  <span className="text-sm font-medium text-slate-700">{labelMessages.restUrl}</span>
                   <Input
                     value={draft.restUrl}
                     onChange={(event) =>
@@ -626,11 +631,11 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
                         restUrl: event.target.value,
                       }))
                     }
-                    placeholder="http://127.0.0.1:1317"
+                    placeholder={providerMessages.cosmosRestPlaceholder}
                   />
                 </label>
                 <label className="grid gap-2 md:col-span-2">
-                  <span className="text-sm font-medium text-slate-700">WebSocket URL</span>
+                  <span className="text-sm font-medium text-slate-700">{labelMessages.websocketUrl}</span>
                   <Input
                     value={draft.wsUrl}
                     onChange={(event) =>
@@ -639,13 +644,13 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
                         wsUrl: event.target.value,
                       }))
                     }
-                    placeholder="ws://127.0.0.1:26657/websocket"
+                    placeholder={providerMessages.cosmosWsPlaceholder}
                   />
                 </label>
               </>
             ) : null}
           </div>
-          {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
+          {error ? <p className="mt-4 text-sm text-rose-600">{translateRuntimeText(error, locale)}</p> : null}
         </ModalDialog>
 
         <ConfirmDialog
@@ -655,9 +660,9 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
               setDeleteTarget(null);
             }
           }}
-          title="Delete Provider"
-          description={deleteTarget ? `Remove provider "${deleteTarget.name}" and its saved endpoint configuration?` : undefined}
-          confirmLabel="Delete"
+          title={providerMessages.deleteProvider}
+          description={deleteTarget ? providerMessages.deleteProviderDescription.replace('{name}', deleteTarget.name) : undefined}
+          confirmLabel={providerMessages.deleteProvider}
           onConfirm={() => {
             if (deleteTarget) {
               void handleDelete(deleteTarget);
@@ -686,12 +691,12 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
         >
           <SelectTrigger className="h-auto min-h-0 w-auto justify-start gap-0.5 rounded-none border-0 bg-transparent px-0 py-0 pr-0.5 text-[13px] leading-none shadow-none focus:ring-0">
             {topbarActiveProfile ? (
-              <span className="flex min-w-0 items-center gap-1.5">
+              <span className="flex min-w-0 items-center gap-1">
                 <span className="shrink-0">{renderModeIcon(topbarActiveProfile.mode)}</span>
                 <span className="truncate">{topbarActiveProfile.name}</span>
               </span>
             ) : (
-              <span className="truncate">{showLoadingProviders ? 'Loading providers...' : 'No provider'}</span>
+              <span className="truncate">{showLoadingProviders ? providerMessages.loading : providerMessages.noProvider}</span>
             )}
           </SelectTrigger>
           <SelectContent className="min-w-[26rem] max-w-[min(40rem,calc(100vw-2rem))]">
@@ -708,7 +713,7 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
             <SelectItem value={ADD_PROVIDER_ACTION_VALUE} className="items-center rounded-none py-2.5">
               <span className="flex items-center gap-2">
                 <IconPlus className="size-4" stroke={2} />
-                <span>Add provider</span>
+                <span>{providerMessages.addProviderAction}</span>
               </span>
             </SelectItem>
           </SelectContent>
@@ -734,7 +739,7 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
               <span className="truncate">{`${getModeLabel(activeProfile.mode)} · ${activeProfile.name}`}</span>
             </span>
           ) : (
-            <span className="truncate">{loading ? 'Loading providers...' : 'No provider'}</span>
+            <span className="truncate">{loading ? providerMessages.loading : providerMessages.noProvider}</span>
           )}
         </SelectTrigger>
         <SelectContent className="min-w-[26rem] max-w-[min(40rem,calc(100vw-2rem))]">

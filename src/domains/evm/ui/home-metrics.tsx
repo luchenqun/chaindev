@@ -5,6 +5,8 @@ import { useRef, useState } from 'react';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { MetricCardsSkeleton } from '@/components/ui/loading-placeholders';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 
 type Metric = {
   label: string;
@@ -17,23 +19,20 @@ type HeaderItem = {
   value: string;
 };
 
-const fallbackMetrics: Metric[] = [
-  { label: 'Latest Block', value: 'Unavailable' },
-  { label: 'Latest Block Time', value: 'Unavailable' },
-  { label: 'Average Block Time', value: 'Unavailable' },
-  { label: 'Gas Price', value: 'Unavailable' },
-  { label: 'Pending Tx Count', value: 'Unavailable' },
-  { label: 'Recent Tx Count', value: 'Unavailable' },
-  { label: 'Cached Transactions', value: 'Unavailable' },
-  { label: 'Observed Accounts', value: 'Unavailable' },
-];
+function translateMetricLabel(label: string, metricMessages: ReturnType<typeof useMessages>['homeMetrics']) {
+  const labelMap: Record<string, string> = {
+    'Latest Block': metricMessages.latestBlock,
+    'Latest Block Time': metricMessages.latestBlockTime,
+    'Average Block Time': metricMessages.averageBlockTime,
+    'Gas Price': metricMessages.gasPrice,
+    'Pending Tx Count': metricMessages.pendingTxCount,
+    'Recent Tx Count': metricMessages.recentTxCount,
+    'Cached Transactions': metricMessages.cachedTransactions,
+    'Observed Accounts': metricMessages.observedAccounts,
+  };
 
-const fallbackHeader: HeaderItem[] = [
-  { label: 'Connection', value: 'Direct JSON-RPC' },
-  { label: 'Provider Name', value: 'Unavailable' },
-  { label: 'Native Currency', value: 'Unavailable' },
-  { label: 'Chain ID', value: 'Unavailable' },
-];
+  return labelMap[label] ?? label;
+}
 
 function MetricCard({ label, value, subtext }: Metric) {
   const tooltipTriggerRef = useRef<HTMLSpanElement | null>(null);
@@ -72,16 +71,39 @@ function MetricCard({ label, value, subtext }: Metric) {
 }
 
 export function EvmHomeMetrics() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const metricMessages = messages.homeMetrics;
   const { snapshot, errorMessage } = useEvmHomeData();
-  const metrics = (snapshot?.metrics as Metric[] | undefined) ?? fallbackMetrics;
+  const fallbackMetrics: Metric[] = [
+    { label: metricMessages.latestBlock, value: messages.common.unavailable },
+    { label: metricMessages.latestBlockTime, value: messages.common.unavailable },
+    { label: metricMessages.averageBlockTime, value: messages.common.unavailable },
+    { label: metricMessages.gasPrice, value: messages.common.unavailable },
+    { label: metricMessages.pendingTxCount, value: messages.common.unavailable },
+    { label: metricMessages.recentTxCount, value: messages.common.unavailable },
+    { label: metricMessages.cachedTransactions, value: messages.common.unavailable },
+    { label: metricMessages.observedAccounts, value: messages.common.unavailable },
+  ];
+  const fallbackHeader: HeaderItem[] = [
+    { label: metricMessages.connection, value: metricMessages.directJsonRpc },
+    { label: metricMessages.providerName, value: messages.common.unavailable },
+    { label: metricMessages.nativeCurrency, value: messages.common.unavailable },
+    { label: metricMessages.chainId, value: messages.common.unavailable },
+  ];
+  const metrics =
+    (snapshot?.metrics as Metric[] | undefined)?.map((metric) => ({
+      ...metric,
+      label: translateMetricLabel(metric.label, metricMessages),
+    })) ?? fallbackMetrics;
   const firstRowMetrics = metrics.slice(0, 4);
   const secondRowMetrics = metrics.slice(4, 8);
   const headerItems = snapshot
     ? [
-        { label: 'Connection', value: snapshot.header.connection },
-        { label: 'Provider Name', value: snapshot.header.providerName },
-        { label: 'Native Currency', value: snapshot.header.nativeCurrency },
-        { label: 'Chain ID', value: snapshot.header.chainId },
+        { label: metricMessages.connection, value: snapshot.header.connection },
+        { label: metricMessages.providerName, value: snapshot.header.providerName },
+        { label: metricMessages.nativeCurrency, value: snapshot.header.nativeCurrency },
+        { label: metricMessages.chainId, value: snapshot.header.chainId },
       ]
     : fallbackHeader;
 
@@ -94,8 +116,8 @@ export function EvmHomeMetrics() {
       <div className="grid divide-y divide-slate-200 md:grid-cols-4 md:divide-x md:divide-y-0">
         {headerItems.map((item) => (
           <div key={item.label} className="bg-slate-50 px-5 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">{item.value}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{translateRuntimeText(item.label, locale)}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-900">{translateRuntimeText(item.value, locale)}</p>
           </div>
         ))}
       </div>

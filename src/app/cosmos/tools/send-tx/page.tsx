@@ -13,6 +13,9 @@ import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import type { Locale } from '@/i18n/config';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import {
   broadcastCosmosGenericMessage,
   COSMOS_GENERIC_MESSAGE_TYPES,
@@ -80,6 +83,7 @@ function ScaledInput({
   inputMode?: 'numeric' | 'decimal';
   onChange: (value: string) => void;
 }) {
+  const messages = useMessages();
   const [scaleSelectResetVersion, setScaleSelectResetVersion] = useState(0);
   const hasValue = Boolean(value.trim());
 
@@ -101,7 +105,7 @@ function ScaledInput({
           type="button"
           className="absolute right-[82px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
           onClick={() => onChange('')}
-          aria-label="Clear input"
+          aria-label={messages.evmTxDetail.clearInput}
           disabled={disabled}
         >
           <IconX className="size-4" stroke={1.8} />
@@ -109,7 +113,7 @@ function ScaledInput({
       ) : null}
       <Select key={`scale-${id}-${scaleSelectResetVersion}`} disabled={disabled} onValueChange={(nextValue) => applyScale(Number(nextValue))}>
         <SelectTrigger className="absolute right-1.5 top-1/2 h-[30px] w-[74px] -translate-y-1/2 rounded-xl border-slate-200 bg-slate-50 px-2.5 text-sm font-medium text-slate-700 shadow-none">
-          <SelectValue placeholder="Scale" />
+          <SelectValue placeholder={messages.contractPanel.scale} />
         </SelectTrigger>
         <SelectContent align="end">
           {INTEGER_SCALE_OPTIONS.map((option) => (
@@ -123,8 +127,9 @@ function ScaledInput({
   );
 }
 
-function getActionLabel(type: CosmosTxType) {
-  return COSMOS_GENERIC_MESSAGE_TYPES.find((item) => item.typeUrl === type)?.label ?? 'Transaction';
+function getActionLabel(type: CosmosTxType, fallbackLabel: string, locale: Locale) {
+  const label = COSMOS_GENERIC_MESSAGE_TYPES.find((item) => item.typeUrl === type)?.label ?? fallbackLabel;
+  return translateRuntimeText(label, locale);
 }
 
 function resultToastDescription(result: CosmosBroadcastResult) {
@@ -188,7 +193,7 @@ function isSupportedCosmosMessageType(typeUrl: unknown): typeUrl is string {
   return typeof typeUrl === 'string' && COSMOS_GENERIC_MESSAGE_TYPES.some((item) => item.typeUrl === typeUrl);
 }
 
-function parseRepeatCount(value: string) {
+function parseRepeatCount(value: string, invalidMessage: string) {
   const trimmedValue = value.trim();
 
   if (!trimmedValue) {
@@ -196,13 +201,13 @@ function parseRepeatCount(value: string) {
   }
 
   if (!/^\d+$/.test(trimmedValue)) {
-    throw new Error('Repeat count must be a positive integer.');
+    throw new Error(invalidMessage);
   }
 
   const parsedValue = Number.parseInt(trimmedValue, 10);
 
   if (!Number.isSafeInteger(parsedValue) || parsedValue <= 0) {
-    throw new Error('Repeat count must be a positive integer.');
+    throw new Error(invalidMessage);
   }
 
   return parsedValue;
@@ -264,6 +269,9 @@ type BroadcastProgress = {
 };
 
 function CosmosSendTxContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const pageMessages = messages.cosmosSendTx;
   const { showToast } = useToast();
   const [transactionType, setTransactionType] = useState<CosmosTxType>(DEFAULT_TRANSACTION_TYPE);
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
@@ -291,7 +299,7 @@ function CosmosSendTxContent() {
   const addressCopyButtonRef = useRef<HTMLButtonElement | null>(null);
   const stopRequestedRef = useRef(false);
 
-  const actionLabel = getActionLabel(transactionType);
+  const actionLabel = getActionLabel(transactionType, pageMessages.genericTransaction, locale);
 
   function handleTransactionTypeChange(nextType: string) {
     setTransactionType(nextType);
@@ -385,7 +393,7 @@ function CosmosSendTxContent() {
 
   async function broadcast(password?: string) {
     if (!activeKey) {
-      setFormError('Select a global private key first.');
+      setFormError(messages.evmTxDetail.selectGlobalKeyFirst);
       return;
     }
 
@@ -403,7 +411,7 @@ function CosmosSendTxContent() {
     });
 
     try {
-      const totalCount = parseRepeatCount(repeatCount);
+      const totalCount = parseRepeatCount(repeatCount, pageMessages.repeatCountMustBePositiveInteger);
       setBroadcastProgress(
         totalCount > 1
           ? {
@@ -504,16 +512,16 @@ function CosmosSendTxContent() {
         title:
           totalCount > 1
             ? stopRequestedRef.current
-              ? `${actionLabel} broadcast stopped`
-              : `${actionLabel} transactions broadcasted`
-            : `${actionLabel} transaction broadcasted`,
+              ? pageMessages.transactionBroadcastStopped.replace('{action}', actionLabel)
+              : pageMessages.transactionsBroadcasted.replace('{action}', actionLabel)
+            : pageMessages.transactionBroadcasted.replace('{action}', actionLabel),
         description: resultToastDescription(latestResult),
         durationMs: 8000,
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : `Failed to broadcast ${actionLabel.toLowerCase()} transaction.`;
+      const message = error instanceof Error ? translateRuntimeText(error.message, locale) : pageMessages.failedToBroadcastTransaction.replace('{action}', actionLabel.toLowerCase());
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
@@ -560,7 +568,7 @@ function CosmosSendTxContent() {
       setUnlockPassword('');
       await broadcast(password);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+      setUnlockError(error instanceof Error ? translateRuntimeText(error.message, locale) : messages.evmTxDetail.failedToUnlockPrivateKey);
     }
   }
 
@@ -606,8 +614,8 @@ function CosmosSendTxContent() {
           <div className="border-b border-slate-200 px-6 py-4">
             <div className="flex min-w-0 items-center justify-between gap-4">
               <div className="flex min-w-0 items-baseline gap-3">
-                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Send Transaction</h1>
-                <p className="min-w-0 truncate text-sm text-slate-500">Broadcast Cosmos transactions.</p>
+                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">{pageMessages.pageTitle}</h1>
+              <p className="min-w-0 truncate text-sm text-slate-500">{pageMessages.pageDescription}</p>
               </div>
               <span className="inline-flex min-w-0 shrink-0 items-center gap-1.5 truncate text-sm font-medium text-slate-700" title={activeCosmosAddress || activeKey?.address || undefined}>
                 {activeKey ? (
@@ -624,18 +632,18 @@ function CosmosSendTxContent() {
                         ref={addressCopyButtonRef}
                         type="button"
                         className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
-                        aria-label="Copy address"
+                        aria-label={pageMessages.copyAddress}
                         onClick={() => void handleCopyActiveAddress()}
                       >
                         <IconCopy className="size-4" stroke={1.8} />
                       </button>
                       <FloatingTooltip open={addressCopied} anchorRef={addressCopyButtonRef} className="whitespace-nowrap border border-slate-200 bg-white text-slate-700">
-                        <span className="block whitespace-nowrap">Copied!</span>
+                        <span className="block whitespace-nowrap">{pageMessages.copied}</span>
                       </FloatingTooltip>
                     </span>
                   </>
                 ) : (
-                  'No active address'
+                  pageMessages.noActiveAddress
                 )}
               </span>
             </div>
@@ -647,7 +655,7 @@ function CosmosSendTxContent() {
                 <div className="grid items-end gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-slate-700" htmlFor="cosmos-tx-type">
-                      Transaction type
+                      {pageMessages.transactionType}
                     </label>
                     <Select value={transactionType} disabled={submitting} onValueChange={handleTransactionTypeChange}>
                       <SelectTrigger id="cosmos-tx-type" className="mt-1 h-10">
@@ -656,7 +664,7 @@ function CosmosSendTxContent() {
                       <SelectContent className="max-h-[420px]">
                         {COSMOS_GENERIC_MESSAGE_TYPES.map((item) => (
                           <SelectItem key={item.typeUrl} value={item.typeUrl}>
-                            {`${item.label} (${item.module})`}
+                            {`${translateRuntimeText(item.label, locale)} (${translateRuntimeText(item.module, locale)})`}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -665,7 +673,7 @@ function CosmosSendTxContent() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700" htmlFor="cosmos-signing">
-                      Signing
+                      {pageMessages.signing}
                     </label>
                     <Select value={signingAlgorithm} disabled={submitting} onValueChange={(value) => setSigningAlgorithm(value as CosmosSigningAlgorithm)}>
                       <SelectTrigger id="cosmos-signing" className="mt-1 h-10">
@@ -681,11 +689,24 @@ function CosmosSendTxContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="tx-gas-price">
-                    Gas price
+                    {pageMessages.gasPrice}
                   </label>
                   <div className="mt-1 grid items-end gap-2 sm:grid-cols-[minmax(0,1fr)_100px]">
-                    <ScaledInput id="tx-gas-price" value={gasPriceAmount} inputMode="decimal" placeholder="1000000000000000" disabled={submitting} onChange={setGasPriceAmount} />
-                    <Input id="tx-gas-denom" value={gasPriceDenom} placeholder="uatom" disabled={submitting} onChange={(event) => setGasPriceDenom(event.target.value)} />
+                    <ScaledInput
+                      id="tx-gas-price"
+                      value={gasPriceAmount}
+                      inputMode="decimal"
+                      placeholder={pageMessages.gasPricePlaceholder}
+                      disabled={submitting}
+                      onChange={setGasPriceAmount}
+                    />
+                    <Input
+                      id="tx-gas-denom"
+                      value={gasPriceDenom}
+                      placeholder={pageMessages.gasDenomPlaceholder}
+                      disabled={submitting}
+                      onChange={(event) => setGasPriceDenom(event.target.value)}
+                    />
                   </div>
                 </div>
               </div>
@@ -693,20 +714,28 @@ function CosmosSendTxContent() {
               <div className="grid gap-4 sm:grid-cols-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="tx-gas-limit">
-                    Gas limit
+                    {pageMessages.gasLimit}
                   </label>
-                  <Input id="tx-gas-limit" value={gasLimit} inputMode="numeric" placeholder="Auto" disabled={submitting} className="mt-1" onChange={(event) => setGasLimit(event.target.value)} />
+                  <Input
+                    id="tx-gas-limit"
+                    value={gasLimit}
+                    inputMode="numeric"
+                    placeholder={pageMessages.auto}
+                    disabled={submitting}
+                    className="mt-1"
+                    onChange={(event) => setGasLimit(event.target.value)}
+                  />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="tx-repeat-count">
-                    Repeat broadcasts
+                    {pageMessages.repeatBroadcasts}
                   </label>
                   <Input
                     id="tx-repeat-count"
                     value={repeatCount}
                     inputMode="numeric"
-                    placeholder="e.g. 10"
+                    placeholder={pageMessages.repeatBroadcastsPlaceholder}
                     disabled={submitting}
                     className="mt-1"
                     onChange={(event) => setRepeatCount(event.target.value)}
@@ -715,13 +744,13 @@ function CosmosSendTxContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="tx-receipt-poll-interval">
-                    Receipt poll interval (ms)
+                    {pageMessages.receiptPollInterval}
                   </label>
                   <Input
                     id="tx-receipt-poll-interval"
                     value={receiptPollIntervalMs}
                     inputMode="numeric"
-                    placeholder="Optional"
+                    placeholder={pageMessages.optional}
                     disabled={submitting}
                     className="mt-1"
                     onChange={(event) => setReceiptPollIntervalMs(event.target.value)}
@@ -730,14 +759,14 @@ function CosmosSendTxContent() {
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700" htmlFor="tx-memo">
-                    Memo
+                    {pageMessages.memo}
                   </label>
-                  <Input id="tx-memo" value={memo} placeholder="Optional" disabled={submitting} className="mt-1" onChange={(event) => setMemo(event.target.value)} />
+                  <Input id="tx-memo" value={memo} placeholder={pageMessages.optional} disabled={submitting} className="mt-1" onChange={(event) => setMemo(event.target.value)} />
                 </div>
 
                 <div className="sm:col-span-4">
                   <label className="block text-sm font-medium text-slate-700" htmlFor="message-json">
-                    Message value
+                    {pageMessages.messageValue}
                   </label>
                   <JsonInput
                     value={messageJson}
@@ -747,7 +776,7 @@ function CosmosSendTxContent() {
                   />
                 </div>
 
-                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{formError}</p> : null}
+                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{translateRuntimeText(formError, locale)}</p> : null}
               </div>
 
               {broadcastProgress ? (
@@ -755,20 +784,20 @@ function CosmosSendTxContent() {
                   <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
                     <span>
                       {broadcastProgress.status === 'cancel-requested'
-                        ? `Cancel requested at ${broadcastProgress.completed}/${broadcastProgress.total}`
+                        ? pageMessages.progressCancelRequested.replace('{completed}', String(broadcastProgress.completed)).replace('{total}', String(broadcastProgress.total))
                         : broadcastProgress.status === 'stopped'
-                          ? `Stopped at ${broadcastProgress.completed}/${broadcastProgress.total}`
+                          ? pageMessages.progressStopped.replace('{completed}', String(broadcastProgress.completed)).replace('{total}', String(broadcastProgress.total))
                           : broadcastProgress.status === 'completed'
-                            ? `Completed ${broadcastProgress.completed}/${broadcastProgress.total}`
-                            : `Progress ${broadcastProgress.completed}/${broadcastProgress.total}`}
+                            ? pageMessages.progressCompleted.replace('{completed}', String(broadcastProgress.completed)).replace('{total}', String(broadcastProgress.total))
+                            : pageMessages.progressRunning.replace('{completed}', String(broadcastProgress.completed)).replace('{total}', String(broadcastProgress.total))}
                     </span>
                     <span>
                       {broadcastProgress.status === 'cancel-requested'
-                        ? 'Waiting for current tx'
+                        ? pageMessages.waitingForCurrentTx
                         : broadcastProgress.status === 'stopped'
-                          ? 'Stopped'
+                          ? pageMessages.stopped
                           : broadcastProgress.completed < broadcastProgress.total && submitting
-                            ? `Sending ${Math.min(broadcastProgress.current, broadcastProgress.total)}/${broadcastProgress.total}`
+                            ? pageMessages.progressSending.replace('{current}', String(Math.min(broadcastProgress.current, broadcastProgress.total))).replace('{total}', String(broadcastProgress.total))
                             : `${progressPercent}%`}
                     </span>
                   </div>
@@ -787,7 +816,7 @@ function CosmosSendTxContent() {
                 <div className="min-w-0">
                   {typeof latestTransactionHash === 'string' ? (
                     <span className="inline-flex min-w-0 max-w-full items-center text-sm leading-5 text-slate-700">
-                      <span className="shrink-0 font-medium leading-5">View tx&nbsp;</span>
+                      <span className="shrink-0 font-medium leading-5">{pageMessages.viewTx}&nbsp;</span>
                       <Link className="translate-y-[1px] truncate text-sm font-semibold leading-5 text-sky-600 hover:text-sky-700" href={`/cosmos/tx/${latestTransactionHash}`}>
                         {formatCompactHash(latestTransactionHash, 10, 8)}
                       </Link>
@@ -796,20 +825,20 @@ function CosmosSendTxContent() {
                 </div>
                 <div className="flex shrink-0 justify-end gap-2">
                   <Button type="button" variant="outline" disabled={submitting} onClick={clearForm}>
-                    Clear
+                    {pageMessages.clear}
                   </Button>
                   {submitting && broadcastProgress?.status === 'running' ? (
                     <Button type="button" variant="outline" onClick={handleStopBroadcast}>
-                      Stop
+                      {pageMessages.stop}
                     </Button>
                   ) : null}
                   {submitting && broadcastProgress?.status === 'cancel-requested' ? (
                     <Button type="button" variant="outline" disabled>
-                      Cancel requested
+                      {pageMessages.cancelRequested}
                     </Button>
                   ) : null}
                   <Button type="button" disabled={submitting} onClick={() => void broadcast()}>
-                    {submitting ? (broadcastProgress?.status === 'cancel-requested' ? 'Stopping...' : 'Broadcasting...') : 'Broadcast'}
+                    {submitting ? (broadcastProgress?.status === 'cancel-requested' ? pageMessages.stopping : pageMessages.broadcasting) : pageMessages.broadcast}
                   </Button>
                 </div>
               </div>
@@ -839,12 +868,12 @@ function CosmosSendTxContent() {
             setUnlockError(null);
           }
         }}
-        title="Unlock Private Key"
-        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the ${actionLabel.toLowerCase()} transaction.` : 'Enter the password to continue.'}
+        title={pageMessages.unlockPrivateKey}
+        description={activeKey ? pageMessages.unlockDescription.replace('{name}', activeKey.name).replace('{action}', actionLabel.toLowerCase()) : pageMessages.unlockFallbackDescription}
         value={unlockPassword}
         onValueChange={setUnlockPassword}
-        placeholder="Password"
-        confirmLabel="Unlock"
+        placeholder={pageMessages.password}
+        confirmLabel={pageMessages.unlock}
         confirmDisabled={!unlockPassword.trim()}
         errorMessage={unlockError}
         onConfirm={() => void handleConfirmUnlock()}

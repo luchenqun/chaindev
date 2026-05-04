@@ -7,10 +7,15 @@ import { signIn } from 'next-auth/react';
 import { IconEye, IconEyeOff } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AuthFormShell } from '@/platform/auth/auth-form-shell';
 import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 
 export function SignInForm() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const loginMessages = messages.login;
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = useMemo(() => searchParams.get('callbackUrl') ?? '/', [searchParams]);
@@ -36,7 +41,7 @@ export function SignInForm() {
 
     if (!result || result.error) {
       setSubmitting(false);
-      setError('用户名、邮箱或密码错误。');
+      setError(loginMessages.invalidCredentials);
       return;
     }
 
@@ -46,25 +51,25 @@ export function SignInForm() {
 
   return (
     <AuthFormShell
-      title="Sign In"
+      title={loginMessages.signInTitle}
       subtitle={
         <>
-          No account?
+          {loginMessages.signInSubtitlePrefix}
           <Link href="/signup" className="ml-2 font-medium text-sky-600 hover:text-sky-700">
-            Sign Up
+            {loginMessages.signUpLink}
           </Link>
         </>
       }
     >
       <form className="grid gap-7" onSubmit={handleSubmit}>
         <label className="grid gap-3">
-          <span className="text-[15px] font-semibold text-slate-900">Username or Email</span>
+          <span className="text-[15px] font-semibold text-slate-900">{loginMessages.usernameOrEmail}</span>
           <Input
             type="text"
             autoComplete="username"
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
-            placeholder="Enter your username or email"
+            placeholder={loginMessages.usernameOrEmailPlaceholder}
             className="h-16 rounded-2xl px-5 text-xl placeholder:text-slate-400"
             required
           />
@@ -72,7 +77,7 @@ export function SignInForm() {
 
         <label className="grid gap-3">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[15px] font-semibold text-slate-900">Password</span>
+            <span className="text-[15px] font-semibold text-slate-900">{loginMessages.password}</span>
           </div>
           <div className="relative">
             <Input
@@ -80,13 +85,13 @@ export function SignInForm() {
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter your password"
+              placeholder={loginMessages.passwordPlaceholder}
               className="h-16 rounded-2xl px-5 pr-14 text-xl placeholder:text-slate-400"
               required
             />
             <button
               type="button"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-label={showPassword ? loginMessages.hidePassword : loginMessages.showPassword}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
               onClick={() => setShowPassword((current) => !current)}
             >
@@ -95,10 +100,10 @@ export function SignInForm() {
           </div>
         </label>
 
-        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div> : null}
+        {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{translateRuntimeText(error, locale)}</div> : null}
 
         <Button type="submit" className="h-16 rounded-2xl text-[18px] font-semibold uppercase" disabled={submitting}>
-          {submitting ? 'Signing In...' : 'Login'}
+          {submitting ? loginMessages.signInSubmitting : loginMessages.signInButton}
         </Button>
       </form>
     </AuthFormShell>

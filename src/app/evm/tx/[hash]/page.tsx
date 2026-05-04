@@ -35,12 +35,17 @@ import { decodeBoundEvmReceiptLog, decodeBoundEvmTransactionInput, decodeHexToUt
 import { getEvmTransactionByHashDirect, getEvmTransactionDebugTraceDirect } from '@/domains/evm/client/queries';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { formatLocalizedDateTime } from '@/i18n/format';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 function DetailRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  const { locale } = useLocale();
+
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
-      <dt className="text-sm font-medium text-slate-500">{label}</dt>
+      <dt className="text-sm font-medium text-slate-500">{translateRuntimeText(label, locale)}</dt>
       <dd className={mono ? 'self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono' : 'self-start text-sm text-slate-900'}>{value}</dd>
     </div>
   );
@@ -101,15 +106,23 @@ function splitInputDataWords(inputData: string) {
   return words;
 }
 
-function buildDefaultInputDataView(inputData: string, functionSignature?: string, selector?: string) {
+function buildDefaultInputDataView(
+  inputData: string,
+  labels: {
+    functionLabel: string;
+    methodId: string;
+  },
+  functionSignature?: string,
+  selector?: string,
+) {
   const lines: string[] = [];
 
   if (functionSignature) {
-    lines.push(`Function: ${functionSignature}`);
+    lines.push(`${labels.functionLabel}: ${functionSignature}`);
     lines.push('');
   }
 
-  lines.push(`MethodID: ${selector ?? inputData.slice(0, 10)}`);
+  lines.push(`${labels.methodId}: ${selector ?? inputData.slice(0, 10)}`);
 
   for (const [index, word] of splitInputDataWords(inputData).entries()) {
     lines.push(`[${index}]:  ${word}`);
@@ -178,17 +191,24 @@ function isRewriteDialogReady(state: RewriteDialogState) {
   );
 }
 
-function normalizeContractActionErrorMessage(message: string, fallback: string) {
+function normalizeContractActionErrorMessage(
+  message: string,
+  fallback: string,
+  labels: {
+    transactionRejectedMissingRole: string;
+    transactionRevertedWithReason: string;
+  },
+) {
   const roleMissingMatch = message.match(/missing role\s+(0x[a-fA-F0-9]+)/i);
 
   if (roleMissingMatch) {
-    return `Transaction rejected. The current account is missing required role ${roleMissingMatch[1]}.`;
+    return labels.transactionRejectedMissingRole.replace('{role}', roleMissingMatch[1]);
   }
 
   const revertReasonMatch = message.match(/execution reverted:\s*(.+?)(?:\s+Version:|$)/i);
 
   if (revertReasonMatch?.[1]) {
-    return `Transaction reverted: ${revertReasonMatch[1].trim()}.`;
+    return labels.transactionRevertedWithReason.replace('{reason}', revertReasonMatch[1].trim());
   }
 
   const rpcDescMatch = message.match(/desc\s*=\s*(.+?)(?:\s+Version:|$)/i);
@@ -201,7 +221,7 @@ function normalizeContractActionErrorMessage(message: string, fallback: string) 
 }
 
 function formatChainTimestamp(timestamp: number) {
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(timestamp * 1000, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -209,7 +229,7 @@ function formatChainTimestamp(timestamp: number) {
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(new Date(timestamp * 1000));
+  });
 }
 
 function formatMiddleEllipsis(value: string, leading = 10, trailing = 8) {
@@ -270,9 +290,9 @@ function normalizeReceiptLogs(logs: unknown): ReceiptLogRecord[] {
   });
 }
 
-function formatEventArgumentDisplayValue(value: string) {
+function formatEventArgumentDisplayValue(value: string, unavailableLabel: string) {
   if (value === 'undefined') {
-    return 'Unavailable';
+    return unavailableLabel;
   }
 
   return value;
@@ -300,6 +320,8 @@ function DecodedReceiptLogsSection({
   }>;
   nameTagsByAddress: Record<string, string | null>;
 }) {
+  const messages = useMessages();
+  const txMessages = messages.evmTxDetail;
   const [topicViews, setTopicViews] = useState<Record<string, DecodedLogViewMode>>({});
   const [dataViews, setDataViews] = useState<Record<string, DecodedLogViewMode>>({});
 
@@ -309,7 +331,7 @@ function DecodedReceiptLogsSection({
 
   return (
     <div className="mb-1">
-      <h3 className="mb-4 text-sm font-semibold text-slate-900">Transaction Receipt Event Logs</h3>
+      <h3 className="mb-4 text-sm font-semibold text-slate-900">{txMessages.receiptEventLogs}</h3>
       <div className="divide-y divide-slate-200">
         {logs.map((log, index) => {
           const decoded = log.decoded;
@@ -326,7 +348,7 @@ function DecodedReceiptLogsSection({
             <section key={log.key} className={index === 0 ? 'pb-3' : 'pt-3 pb-3'}>
               <dl className="space-y-2">
                 <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                  <dt className="text-xs font-semibold text-slate-600">Address</dt>
+                  <dt className="text-xs font-semibold text-slate-600">{txMessages.address}</dt>
                   <dd className="min-w-0 text-xs text-slate-900">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <DecodedLogAddress address={log.raw.address} nameTagsByAddress={nameTagsByAddress} />
@@ -335,7 +357,7 @@ function DecodedReceiptLogsSection({
                 </div>
 
                 <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                  <dt className="text-xs font-semibold text-slate-600">Name</dt>
+                  <dt className="text-xs font-semibold text-slate-600">{txMessages.name}</dt>
                   <dd className="min-w-0 text-xs text-slate-900">
                     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                       <span className="font-semibold text-slate-800">{decoded.eventName}</span>
@@ -345,7 +367,7 @@ function DecodedReceiptLogsSection({
                 </div>
 
                 <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                  <dt className="text-xs font-semibold text-slate-600">Topics</dt>
+                  <dt className="text-xs font-semibold text-slate-600">{txMessages.topics}</dt>
                   <dd className="min-w-0 space-y-2 text-xs text-slate-900">
                     {decoded.topic0 ? (
                       <div className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 mono text-xs text-slate-700">
@@ -357,7 +379,8 @@ function DecodedReceiptLogsSection({
                     {indexedArgs.map((arg, argIndex) => {
                       const viewKey = `${log.key}-topic-${argIndex}`;
                       const view = topicViews[viewKey] ?? 'dec';
-                      const displayValue = view === 'hex' ? (arg.rawHex ?? 'Unavailable') : formatEventArgumentDisplayValue(arg.value);
+                      const displayValue =
+                        view === 'hex' ? (arg.rawHex ?? messages.common.unavailable) : formatEventArgumentDisplayValue(arg.value, messages.common.unavailable);
 
                       return (
                         <div key={viewKey} className="flex flex-wrap items-center gap-1.5">
@@ -380,7 +403,7 @@ function DecodedReceiptLogsSection({
                                   }))
                                 }
                               >
-                                Dec
+                                {txMessages.dec}
                               </button>
                               <button
                                 type="button"
@@ -396,7 +419,7 @@ function DecodedReceiptLogsSection({
                                   }))
                                 }
                               >
-                                Hex
+                                {txMessages.hex}
                               </button>
                             </div>
                             {view === 'dec' && isAddressValue(arg.value) ? (
@@ -412,7 +435,7 @@ function DecodedReceiptLogsSection({
                 </div>
 
                 <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                  <dt className="text-xs font-semibold text-slate-600">Data</dt>
+                  <dt className="text-xs font-semibold text-slate-600">{txMessages.data}</dt>
                   <dd className="min-w-0 text-xs text-slate-900">
                     <div className="relative min-h-[30px] rounded-lg border border-slate-200 bg-white px-3 pr-[132px]">
                       <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
@@ -430,7 +453,7 @@ function DecodedReceiptLogsSection({
                             }))
                           }
                         >
-                          Dec
+                          {txMessages.dec}
                         </button>
                         <button
                           type="button"
@@ -446,7 +469,7 @@ function DecodedReceiptLogsSection({
                             }))
                           }
                         >
-                          Hex
+                          {txMessages.hex}
                         </button>
                       </div>
                       {dataView === 'hex' ? (
@@ -461,7 +484,7 @@ function DecodedReceiptLogsSection({
                               {isAddressValue(arg.value) ? (
                                 <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
                               ) : (
-                                <span className="break-all mono">{formatEventArgumentDisplayValue(arg.value)}</span>
+                                <span className="break-all mono">{formatEventArgumentDisplayValue(arg.value, messages.common.unavailable)}</span>
                               )}
                             </div>
                           ))}
@@ -477,12 +500,12 @@ function DecodedReceiptLogsSection({
                             </>
                           ) : (
                             <span className="break-all mono">
-                              {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) : {formatEventArgumentDisplayValue(nonIndexedArgs[0].value)}
+                              {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) : {formatEventArgumentDisplayValue(nonIndexedArgs[0].value, messages.common.unavailable)}
                             </span>
                           )}
                         </div>
                       ) : (
-                        <p className="flex min-h-[30px] items-center py-1.5 pr-2 mono text-xs text-slate-500">No non-indexed event data.</p>
+                        <p className="flex min-h-[30px] items-center py-1.5 pr-2 mono text-xs text-slate-500">{txMessages.noNonIndexedEventData}</p>
                       )}
                     </div>
                   </dd>
@@ -569,6 +592,9 @@ function RewriteArgumentsForm({ args, values, onChange }: { args: Array<{ name: 
 }
 
 export default function EvmTxPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.evmTxDetail;
   const params = useParams<{ hash: string }>();
   const { showToast } = useToast();
   const hash = params.hash;
@@ -646,7 +672,18 @@ export default function EvmTxPage() {
   }, [transaction, decodeVersion]);
   const utf8InputData = useMemo(() => (transaction ? decodeHexToUtf8(transaction.inputData) : null), [transaction]);
   const defaultInputDataView = useMemo(
-    () => (transaction ? buildDefaultInputDataView(transaction.inputData, decodedTransactionInput?.functionSignature, decodedTransactionInput?.selector) : ''),
+    () =>
+      transaction
+        ? buildDefaultInputDataView(
+            transaction.inputData,
+            {
+              functionLabel: txMessages.functionLabel,
+              methodId: txMessages.methodId,
+            },
+            decodedTransactionInput?.functionSignature,
+            decodedTransactionInput?.selector,
+          )
+        : '',
     [transaction, decodedTransactionInput],
   );
   const rewriteTargetAddress = useMemo(() => transaction?.interactedWith ?? transaction?.to ?? null, [transaction]);
@@ -678,7 +715,7 @@ export default function EvmTxPage() {
       } catch (error) {
         if (!cancelled) {
           setTransaction(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load transaction.');
+          setErrorMessage(error instanceof Error ? error.message : txMessages.failedToLoadFallback);
         }
       }
     }
@@ -858,27 +895,38 @@ export default function EvmTxPage() {
       showToast(
         result.receipt.status === 'success'
           ? {
-              title: 'Rewrite submitted',
-              description: `${decodedTransactionInput?.functionName ?? 'Transfer'} was re-sent successfully. Included at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              title: txMessages.rewriteSubmitted,
+              description: txMessages.rewriteSubmittedDescription
+                .replace('{name}', decodedTransactionInput?.functionName ?? txMessages.transfer)
+                .replace('{time}', formatChainTimestamp(result.receipt.blockTimestamp))
+                .replace('{hash}', formatMiddleEllipsis(result.hash)),
               tone: 'success',
             }
           : {
-              title: 'Rewrite reverted',
-              description: `${decodedTransactionInput?.functionName ?? 'Transfer'} reverted on-chain at ${formatChainTimestamp(result.receipt.blockTimestamp)}. Tx: ${formatMiddleEllipsis(result.hash)}`,
+              title: txMessages.rewriteReverted,
+              description: txMessages.rewriteRevertedDescription
+                .replace('{name}', decodedTransactionInput?.functionName ?? txMessages.transfer)
+                .replace('{time}', formatChainTimestamp(result.receipt.blockTimestamp))
+                .replace('{hash}', formatMiddleEllipsis(result.hash)),
               tone: 'info',
             },
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to rewrite transaction.';
+      const message = error instanceof Error ? error.message : txMessages.failedToRewriteTransaction;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setRewriteUnlockPassword('');
         setRewriteUnlockError(null);
         setRewriteUnlockDialogOpen(true);
         return;
       }
 
-      setRewriteError(normalizeContractActionErrorMessage(message, 'Failed to rewrite transaction.'));
+      setRewriteError(
+        normalizeContractActionErrorMessage(message, txMessages.failedToRewriteTransaction, {
+          transactionRejectedMissingRole: txMessages.transactionRejectedMissingRole,
+          transactionRevertedWithReason: txMessages.transactionRevertedWithReason,
+        }),
+      );
     } finally {
       if (!rewriteSucceeded) {
         setRewriteActionLoading(null);
@@ -898,7 +946,12 @@ export default function EvmTxPage() {
       setRewriteUnlockError(null);
       await executeRewriteAction(rewriteUnlockPassword);
     } catch (error) {
-      setRewriteUnlockError(normalizeContractActionErrorMessage(error instanceof Error ? error.message : 'Failed to unlock private key.', 'Failed to unlock private key.'));
+      setRewriteUnlockError(
+        normalizeContractActionErrorMessage(error instanceof Error ? error.message : txMessages.failedToUnlockPrivateKey, txMessages.failedToUnlockPrivateKey, {
+          transactionRejectedMissingRole: txMessages.transactionRejectedMissingRole,
+          transactionRevertedWithReason: txMessages.transactionRevertedWithReason,
+        }),
+      );
     }
   }
 
@@ -916,7 +969,7 @@ export default function EvmTxPage() {
       const next = await getEvmTransactionDebugTraceDirect(hash);
       setTraceData(next);
     } catch (error) {
-      setTraceErrorMessage(error instanceof Error ? error.message : 'The selected provider does not expose debug_traceTransaction.');
+      setTraceErrorMessage(error instanceof Error ? error.message : txMessages.providerNoDebugTrace);
     } finally {
       setTraceLoading(false);
     }
@@ -926,8 +979,8 @@ export default function EvmTxPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Invalid transaction hash</h1>
-          <p>The transaction hash must be a 32-byte hex string.</p>
+          <h1>{txMessages.invalidHashTitle}</h1>
+          <p>{txMessages.invalidHashDescription}</p>
         </main>
       </AppShell>
     );
@@ -945,8 +998,8 @@ export default function EvmTxPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Failed to load transaction</h1>
-          <p>{errorMessage}</p>
+          <h1>{txMessages.failedToLoadTitle}</h1>
+          <p>{translateRuntimeText(errorMessage, locale)}</p>
         </main>
       </AppShell>
     );
@@ -958,7 +1011,7 @@ export default function EvmTxPage() {
   const hasLogs = transaction.logsCount > 0;
   const liveConfirmationsLabel =
     transaction.blockNumber && status?.latestBlockNumber != null
-      ? Math.max(0, status.latestBlockNumber - Number(transaction.blockNumber) + 1).toLocaleString('en-US')
+      ? Math.max(0, status.latestBlockNumber - Number(transaction.blockNumber) + 1).toLocaleString(locale)
       : transaction.confirmationsLabel;
 
   return (
@@ -966,7 +1019,7 @@ export default function EvmTxPage() {
       <main className="section-block">
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[1.171875rem] font-semibold text-slate-900">Transaction Details</h1>
+            <h1 className="text-[1.171875rem] font-semibold text-slate-900">{txMessages.transactionDetails}</h1>
           </div>
         </div>
 
@@ -976,7 +1029,7 @@ export default function EvmTxPage() {
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${activeTab === 'overview' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('overview')}
           >
-            Overview
+            {txMessages.overview}
           </button>
           <button
             type="button"
@@ -991,7 +1044,7 @@ export default function EvmTxPage() {
             disabled={!hasLogs}
             aria-disabled={!hasLogs}
           >
-            Logs ({transaction.logsCount})
+            {txMessages.logs} ({transaction.logsCount})
           </button>
           {showDebugTraceTab ? (
             <button
@@ -999,7 +1052,7 @@ export default function EvmTxPage() {
               className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${activeTab === 'debugTrace' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
               onClick={() => void handleOpenDebugTraceTab()}
             >
-              Debug Trace
+              {txMessages.debugTrace}
             </button>
           ) : null}
           <button
@@ -1007,7 +1060,7 @@ export default function EvmTxPage() {
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${activeTab === 'json' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('json')}
           >
-            JSON
+            {txMessages.json}
           </button>
         </div>
 
@@ -1017,9 +1070,9 @@ export default function EvmTxPage() {
               <div className="p-5">
                 <DetailGroup>
                   <dl>
-                    <DetailRow label="Transaction Hash" value={transaction.hash} mono />
+                    <DetailRow label={txMessages.transactionHash} value={transaction.hash} mono />
                     <DetailRow
-                      label="Status"
+                      label={txMessages.status}
                       value={
                         <span
                           className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
@@ -1030,12 +1083,12 @@ export default function EvmTxPage() {
                                 : 'bg-amber-50 text-amber-700'
                           }`}
                         >
-                          {transaction.statusLabel}
+                          {translateRuntimeText(transaction.statusLabel, locale)}
                         </span>
                       }
                     />
                     <DetailRow
-                      label="Block"
+                      label={messages.common.block}
                       value={
                         transaction.blockNumber ? (
                           <span className="inline-flex flex-wrap items-center gap-2">
@@ -1043,26 +1096,28 @@ export default function EvmTxPage() {
                               {transaction.blockNumber}
                             </Link>
                             {liveConfirmationsLabel ? (
-                              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">{liveConfirmationsLabel} Block Confirmations</span>
+                              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">
+                                {translateRuntimeText(`${liveConfirmationsLabel} ${messages.common.block} ${txMessages.confirmations}`, locale)}
+                              </span>
                             ) : null}
                           </span>
                         ) : (
-                          'Pending'
+                          messages.common.pending
                         )
                       }
                     />
                     <DetailRow
-                      label="Timestamp"
+                      label={txMessages.timestamp}
                       value={
                         transaction.timestampMs ? (
                           <span className="inline-flex flex-wrap items-center gap-2">
                             <span>
                               <RelativeTime timestampMs={transaction.timestampMs} />
                             </span>
-                            <span className="text-slate-500">({transaction.timestampLabel})</span>
+                            <span className="text-slate-500">({translateRuntimeText(transaction.timestampLabel, locale)})</span>
                           </span>
                         ) : (
-                          'Unavailable'
+                          messages.common.unavailable
                         )
                       }
                     />
@@ -1072,7 +1127,7 @@ export default function EvmTxPage() {
                 <DetailGroup separated>
                   <dl>
                     <DetailRow
-                      label="From"
+                      label={messages.common.from}
                       value={
                         <AddressLink
                           address={transaction.from}
@@ -1084,7 +1139,7 @@ export default function EvmTxPage() {
                       }
                     />
                     <DetailRow
-                      label="Interacted With (To)"
+                      label={txMessages.interactedWithTo}
                       value={
                         transaction.interactedWith ? (
                           <AddressLink
@@ -1095,12 +1150,12 @@ export default function EvmTxPage() {
                             tooltipClassName="max-w-[90vw]"
                           />
                         ) : (
-                          'Contract Creation'
+                          txMessages.contractCreation
                         )
                       }
                     />
                     <DetailRow
-                      label="Method"
+                      label={txMessages.method}
                       value={
                         decodedTransactionInput ? (
                           <span className="inline-flex flex-wrap items-center gap-2">
@@ -1117,20 +1172,23 @@ export default function EvmTxPage() {
 
                 <DetailGroup separated>
                   <dl>
-                    <DetailRow label="Value" value={transaction.valueLabel} />
-                    <DetailRow label="Transaction Fee" value={transaction.feeLabel} />
-                    <DetailRow label="Gas Fees" value={transaction.gasFeesLabel} />
-                    <DetailRow label="Gas Limit & Usage by Txn" value={`${transaction.gasLimitLabel} | ${transaction.gasUsedLabel} (${transaction.gasUsedPercent})`} />
-                    <DetailRow label="Nonce" value={transaction.nonceLabel} />
-                    <DetailRow label="Position In Block" value={transaction.positionLabel} />
-                    <DetailRow label="Txn Type" value={transaction.typeLabel} />
+                    <DetailRow label={txMessages.value} value={translateRuntimeText(transaction.valueLabel, locale)} />
+                    <DetailRow label={txMessages.transactionFee} value={translateRuntimeText(transaction.feeLabel, locale)} />
+                    <DetailRow label={txMessages.gasFees} value={translateRuntimeText(transaction.gasFeesLabel, locale)} />
+                    <DetailRow
+                      label={txMessages.gasLimitAndUsageByTxn}
+                      value={translateRuntimeText(`${transaction.gasLimitLabel} | ${transaction.gasUsedLabel} (${transaction.gasUsedPercent})`, locale)}
+                    />
+                    <DetailRow label={txMessages.nonce} value={translateRuntimeText(transaction.nonceLabel, locale)} />
+                    <DetailRow label={txMessages.positionInBlock} value={translateRuntimeText(transaction.positionLabel, locale)} />
+                    <DetailRow label={txMessages.txnType} value={transaction.typeLabel} />
                   </dl>
                 </DetailGroup>
 
                 <DetailGroup separated>
                   <dl>
                     <DetailRow
-                      label="Input Data"
+                      label={txMessages.inputData}
                       value={
                         showDecodedInputTable && decodedTransactionInput ? (
                           <div className="space-y-3">
@@ -1140,9 +1198,9 @@ export default function EvmTxPage() {
                                   <thead className="bg-slate-50">
                                     <tr>
                                       <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">#</th>
-                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Name</th>
-                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
-                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Data</th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.name}</th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.type}</th>
+                                      <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.data}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -1169,7 +1227,7 @@ export default function EvmTxPage() {
                                                 }}
                                                 type="button"
                                                 className="inline-flex h-5 w-5 items-center justify-center text-slate-400 transition hover:text-sky-600"
-                                                aria-label="Copy input data value"
+                                                aria-label={txMessages.copyInputData}
                                                 onClick={() => void handleCopyDecodedInputData(arg.value, `decoded-input-${index}`)}
                                               >
                                                 <IconCopy className="size-3.5" stroke={1.8} />
@@ -1179,7 +1237,7 @@ export default function EvmTxPage() {
                                                 anchorRef={{ current: decodedInputCopyButtonRefs.current[`decoded-input-${index}`] }}
                                                 className="whitespace-nowrap border border-slate-200 bg-white text-slate-700"
                                               >
-                                                <span className="block whitespace-nowrap">Copied!</span>
+                                                <span className="block whitespace-nowrap">{messages.common.copied}</span>
                                               </FloatingTooltip>
                                             </span>
                                           </div>
@@ -1192,7 +1250,7 @@ export default function EvmTxPage() {
                             </div>
                             <Button type="button" variant="secondary" size="sm" onClick={() => setShowDecodedInputTable(false)}>
                               <IconArrowsExchange className="mr-1.5 size-3.5" stroke={1.8} />
-                              Switch Back
+                              {txMessages.switchBack}
                             </Button>
                           </div>
                         ) : (
@@ -1204,7 +1262,7 @@ export default function EvmTxPage() {
                                 inputDataView === 'default'
                                   ? defaultInputDataView
                                   : inputDataView === 'utf8'
-                                    ? utf8InputData || 'Unable to decode input data as UTF-8.'
+                                    ? utf8InputData || txMessages.unableToDecodeUtf8
                                     : transaction.inputData
                               }
                             />
@@ -1212,21 +1270,21 @@ export default function EvmTxPage() {
                               <div className="w-[170px]">
                                 <Select value={inputDataView} onValueChange={(value) => setInputDataView(value as 'default' | 'utf8' | 'original')}>
                                   <SelectTrigger className="h-8 rounded-md px-3 text-xs">
-                                    <SelectValue placeholder="View Input As" />
+                                    <SelectValue placeholder={txMessages.viewInputAs} />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="default">Default View</SelectItem>
-                                    <SelectItem value="utf8">UTF-8</SelectItem>
-                                    <SelectItem value="original">Original</SelectItem>
+                                    <SelectItem value="default">{txMessages.defaultView}</SelectItem>
+                                    <SelectItem value="utf8">{txMessages.utf8}</SelectItem>
+                                    <SelectItem value="original">{txMessages.original}</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
                               <Button type="button" variant="secondary" size="sm" disabled={!decodedTransactionInput} onClick={() => setShowDecodedInputTable(true)}>
                                 <IconCode className="mr-1.5 size-3.5" stroke={1.8} />
-                                Decode Input Data
+                                {txMessages.decodeInputData}
                               </Button>
                               <Button type="button" variant="secondary" size="sm" disabled={!canRewriteTransaction} onClick={openRewriteDialog}>
-                                ReWrite
+                                {txMessages.rewrite}
                               </Button>
                             </div>
                           </div>
@@ -1245,13 +1303,13 @@ export default function EvmTxPage() {
               {transaction.logsCount ? (
                 <DecodedReceiptLogsSection logs={decodedReceiptLogs.filter((log) => log.decoded)} nameTagsByAddress={nameTagsByAddress} />
               ) : (
-                <p className="text-sm text-slate-500">No receipt logs were returned for this transaction.</p>
+                <p className="text-sm text-slate-500">{txMessages.noReceiptLogs}</p>
               )}
             </section>
 
             {transaction.logsCount ? (
               <section>
-                <h3 className="mb-4 text-sm font-semibold text-slate-900">Raw JSON</h3>
+                <h3 className="mb-4 text-sm font-semibold text-slate-900">{txMessages.rawJson}</h3>
                 <JsonViewPanel value={transaction.logs as object} />
               </section>
             ) : null}
@@ -1265,14 +1323,14 @@ export default function EvmTxPage() {
                 <Skeleton className="h-4 w-56" />
               </div>
             ) : traceErrorMessage ? (
-              <p className="text-sm text-slate-500">{traceErrorMessage}</p>
+              <p className="text-sm text-slate-500">{translateRuntimeText(traceErrorMessage, locale)}</p>
             ) : traceReturnValue ? (
               <div className="space-y-2">
-                <DetailRow label="Raw Return Value" value={traceReturnValue} mono />
-                <DetailRow label="Decoded Return Value" value={decodedTraceReturnValue ?? 'Unable to decode'} />
+                <DetailRow label={txMessages.rawReturnValue} value={traceReturnValue} mono />
+                <DetailRow label={txMessages.decodedReturnValue} value={decodedTraceReturnValue ?? txMessages.unableToDecode} />
               </div>
             ) : (
-              <p className="text-sm text-slate-500">No returnValue was returned by debug_traceTransaction.</p>
+              <p className="text-sm text-slate-500">{txMessages.noTraceReturnValue}</p>
             )}
           </section>
         ) : (
@@ -1289,11 +1347,11 @@ export default function EvmTxPage() {
             setRewriteActionLoading(null);
           }
         }}
-        title="ReWrite Transaction"
+        title={txMessages.rewriteTransaction}
         description={
           decodedTransactionInput
-            ? 'Modify the decoded function arguments and resend this call as a force write.'
-            : 'Resend this transfer with updated value and transaction settings.'
+            ? txMessages.rewriteDecodedDescription
+            : txMessages.rewriteTransferDescription
         }
         footer={
           <>
@@ -1305,7 +1363,7 @@ export default function EvmTxPage() {
                 setRewriteError(null);
               }}
             >
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button
               type="button"
@@ -1316,10 +1374,10 @@ export default function EvmTxPage() {
               {rewriteActionLoading === 'rewrite' ? (
                 <>
                   <IconLoader2 className="mr-2 size-4 animate-spin" />
-                  Sending...
+                  {txMessages.sending}
                 </>
               ) : (
-                'Confirm Force Send'
+                txMessages.confirmForceSend
               )}
             </Button>
           </>
@@ -1330,30 +1388,30 @@ export default function EvmTxPage() {
           <div className="grid gap-4 pb-1">
             <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:grid-cols-2">
               <div className="min-w-0 sm:col-span-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Contract</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.contract}</p>
                 <p className="mt-1 break-all text-sm text-slate-900 mono">{rewriteTargetAddress}</p>
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Method</p>
-                <p className="mt-1 text-sm text-slate-900">{decodedTransactionInput ? decodedTransactionInput.functionSignature : 'Transfer'}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.method}</p>
+                <p className="mt-1 text-sm text-slate-900">{decodedTransactionInput ? decodedTransactionInput.functionSignature : messages.labels.sendTransaction}</p>
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Selected Key</p>
-                <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? 'No Key Selected'}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.selectedKey}</p>
+                <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? txMessages.noKeySelected}</p>
               </div>
               {decodedTransactionInput ? (
                 <div className="min-w-0 sm:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Artifact</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.artifact}</p>
                   <p className="mt-1 text-sm text-slate-900">{decodedTransactionInput.artifactName}</p>
                 </div>
               ) : null}
             </div>
 
-            {!activeKey ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Select a global private key first.</div> : null}
+            {!activeKey ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{txMessages.selectGlobalKeyFirst}</div> : null}
 
             {decodedTransactionInput ? (
               <div className="grid gap-3">
-                <p className="text-sm font-medium text-slate-700">Function Arguments</p>
+                <p className="text-sm font-medium text-slate-700">{txMessages.functionArguments}</p>
                 <div className="max-h-64 overflow-y-auto pr-1">
                   <RewriteArgumentsForm
                     args={decodedTransactionInput.args.map((arg) => ({
@@ -1372,13 +1430,13 @@ export default function EvmTxPage() {
               </div>
             ) : (
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                This transaction is a native transfer. No function arguments are required.
+                {txMessages.nativeTransferNoArgs}
               </div>
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Txn Type</label>
+                <label className="text-sm font-medium text-slate-700">{txMessages.txnType}</label>
                 <Select
                   value={rewriteDialogValues.transactionType}
                   onValueChange={(value) =>
@@ -1389,16 +1447,16 @@ export default function EvmTxPage() {
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select transaction type" />
+                    <SelectValue placeholder={txMessages.selectTransactionType} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="EIP1559">EIP1559</SelectItem>
-                    <SelectItem value="LEGACY">LEGACY</SelectItem>
+                    <SelectItem value="EIP1559">{translateRuntimeText('EIP-1559', locale)}</SelectItem>
+                    <SelectItem value="LEGACY">{messages.sendTx.legacy}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Value ({rewriteEnvironment?.nativeCurrency ?? 'Native'})</label>
+                <label className="text-sm font-medium text-slate-700">{txMessages.valueNative.replace('{currency}', rewriteEnvironment?.nativeCurrency ?? 'Native')}</label>
                 <Input
                   value={rewriteDialogValues.value}
                   onChange={(event) =>
@@ -1407,12 +1465,12 @@ export default function EvmTxPage() {
                       value: event.target.value,
                     }))
                   }
-                  placeholder="0"
+                  placeholder={messages.sendTx.zeroPlaceholder}
                 />
               </div>
               {rewriteDialogValues.transactionType === 'LEGACY' ? (
                 <div className="grid gap-2">
-                  <label className="text-sm font-medium text-slate-700">Gas Price (Gwei)</label>
+                  <label className="text-sm font-medium text-slate-700">{txMessages.gasPriceGwei}</label>
                 <Input
                   value={rewriteDialogValues.gasPrice}
                   onChange={(event) =>
@@ -1421,13 +1479,13 @@ export default function EvmTxPage() {
                       gasPrice: event.target.value,
                     }))
                   }
-                  placeholder="auto"
+                  placeholder={messages.sendTx.autoPlaceholder}
                 />
               </div>
               ) : (
                 <>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">{txMessages.maxFeePerGasGwei}</label>
                     <Input
                       value={rewriteDialogValues.maxFeePerGas}
                       onChange={(event) =>
@@ -1436,11 +1494,11 @@ export default function EvmTxPage() {
                           maxFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="auto"
+                      placeholder={messages.sendTx.autoPlaceholder}
                     />
                   </div>
                   <div className="grid gap-2">
-                    <label className="text-sm font-medium text-slate-700">Max Priority Fee Per Gas (Gwei)</label>
+                    <label className="text-sm font-medium text-slate-700">{txMessages.maxPriorityFeePerGasGwei}</label>
                     <Input
                       value={rewriteDialogValues.maxPriorityFeePerGas}
                       onChange={(event) =>
@@ -1449,13 +1507,13 @@ export default function EvmTxPage() {
                           maxPriorityFeePerGas: event.target.value,
                         }))
                       }
-                      placeholder="auto"
+                      placeholder={messages.sendTx.autoPlaceholder}
                     />
                   </div>
                 </>
               )}
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Gas Limit</label>
+                <label className="text-sm font-medium text-slate-700">{txMessages.gasLimit}</label>
                 <Input
                   value={rewriteDialogValues.gasLimit}
                   onChange={(event) =>
@@ -1464,11 +1522,11 @@ export default function EvmTxPage() {
                       gasLimit: event.target.value,
                     }))
                   }
-                  placeholder="0"
+                  placeholder={messages.sendTx.zeroPlaceholder}
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-sm font-medium text-slate-700">Nonce</label>
+                <label className="text-sm font-medium text-slate-700">{txMessages.nonce}</label>
                 <Input
                   value={rewriteDialogValues.nonce}
                   onChange={(event) =>
@@ -1477,14 +1535,14 @@ export default function EvmTxPage() {
                       nonce: event.target.value,
                     }))
                   }
-                  placeholder="auto"
+                  placeholder={messages.sendTx.autoPlaceholder}
                 />
               </div>
             </div>
 
             {rewriteError ? (
               <div className="max-h-32 overflow-auto rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                <p className="break-all whitespace-pre-wrap">{rewriteError}</p>
+                <p className="break-all whitespace-pre-wrap">{translateRuntimeText(rewriteError, locale)}</p>
               </div>
             ) : null}
           </div>
@@ -1500,12 +1558,12 @@ export default function EvmTxPage() {
             setRewriteUnlockError(null);
           }
         }}
-        title="Unlock Private Key"
-        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the rewrite flow.` : 'Enter the password to continue.'}
+        title={messages.privateKeys.unlockPrivateKey}
+        description={activeKey ? txMessages.unlockDescription.replace('{name}', activeKey.name) : txMessages.unlockFallbackDescription}
         value={rewriteUnlockPassword}
         onValueChange={setRewriteUnlockPassword}
-        placeholder="Password"
-        confirmLabel="Unlock"
+        placeholder={messages.sendTx.password}
+        confirmLabel={messages.sendTx.unlock}
         errorMessage={rewriteUnlockError}
         confirmDisabled={!rewriteUnlockPassword.trim()}
         onConfirm={() => void handleConfirmRewriteUnlock()}

@@ -1,6 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { formatLocalizedDateTime } from '@/i18n/format';
+import { useLocale } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 
 export function formatTimestampWithSeconds(value: string | null | undefined, fallback = '-') {
   if (!value) {
@@ -13,20 +16,22 @@ export function formatTimestampWithSeconds(value: string | null | undefined, fal
     return value;
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(timestamp, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(timestamp);
+  });
 }
 
 export function CosmosDetailRow({ label, value, mono = false }: { label: string; value: ReactNode; mono?: boolean }) {
+  const { locale } = useLocale();
+
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
-      <dt className="text-sm font-medium text-slate-500">{label}</dt>
+      <dt className="text-sm font-medium text-slate-500">{translateRuntimeText(label, locale)}</dt>
       <dd className={mono ? 'self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono' : 'self-start text-sm text-slate-900'}>{value}</dd>
     </div>
   );

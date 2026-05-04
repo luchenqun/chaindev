@@ -17,6 +17,8 @@ import { deleteEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsert
 import { getEvmObservedAccountsPage } from '@/domains/evm/client/transaction-cache';
 import { getEvmAddressBalancesDirect } from '@/domains/evm/client/queries';
 import { AddressLink } from '@/domains/evm/ui/address-link';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
@@ -45,6 +47,9 @@ function buildPageHref(pathname: string, searchParams: URLSearchParams, page: nu
 }
 
 function EvmAccountsPageContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const accountMessages = messages.cosmosAccountDetail;
   const pathname = usePathname();
   const router = useRouter();
   const { status } = useSession();
@@ -95,7 +100,7 @@ function EvmAccountsPageContent() {
       } catch (error) {
         if (!cancelled) {
           setData(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load observed accounts.');
+          setErrorMessage(error instanceof Error ? error.message : messages.common.failedToLoadObservedAccounts);
         }
       } finally {
         if (!cancelled) {
@@ -192,7 +197,7 @@ function EvmAccountsPageContent() {
         return;
       }
 
-      setTagErrorMessage(error instanceof Error ? error.message : 'Failed to save tag.');
+      setTagErrorMessage(error instanceof Error ? error.message : messages.common.failedToSaveTag);
     }
   }
 
@@ -226,8 +231,8 @@ function EvmAccountsPageContent() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Accounts are unavailable</h1>
-          <p>{errorMessage}</p>
+          <h1>{messages.labels.accounts}</h1>
+          <p>{errorMessage ? translateRuntimeText(errorMessage, locale) : errorMessage}</p>
         </main>
       </AppShell>
     );
@@ -237,14 +242,14 @@ function EvmAccountsPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Accounts</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{messages.labels.accounts}</h1>
         </div>
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
-              <p className="text-lg font-semibold text-slate-900">Observed {data.totalAccounts.toLocaleString('en-US')} accounts from cached transactions</p>
-              <p className="mt-1 text-sm text-slate-500">Showing locally indexed addresses discovered from recent block scans only.</p>
+              <p className="text-lg font-semibold text-slate-900">{messages.common.observedAccountsSummary.replace('{count}', data.totalAccounts.toLocaleString(locale))}</p>
+              <p className="mt-1 text-sm text-slate-500">{messages.common.observedAccountsDescription}</p>
             </div>
             <div className="flex items-center gap-0.5 lg:justify-end">
               <PaginationControls
@@ -257,14 +262,14 @@ function EvmAccountsPageContent() {
                 onPageChange={handlePageChange}
               />
               <ActionIconButton
-                tooltip="Refresh accounts from cache"
+                tooltip={messages.common.refreshAccountsFromCache}
                 className="text-slate-400 hover:text-sky-600"
                 onClick={() => setRefreshVersion((current) => current + 1)}
               >
                 <IconRefresh className="size-4" stroke={1.8} />
               </ActionIconButton>
               <ActionIconButton
-                tooltip={balanceLoading ? 'Loading balances...' : 'Load balances'}
+                tooltip={balanceLoading ? messages.common.loadingBalances : messages.common.loadBalances}
                 className={balanceLoading ? 'cursor-wait text-sky-600' : 'text-slate-400 hover:text-sky-600'}
                 disabled={!data.accounts.length || balanceLoading}
                 onClick={() => void handleLoadBalances()}
@@ -279,12 +284,12 @@ function EvmAccountsPageContent() {
               <thead>
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">#</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Address</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Balance</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Count</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Last Seen</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Tag</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.address}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.balances}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.common.block}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.homeMetrics.recentTxCount}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.privateKeys.lastUsed}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.tag}</th>
                 </tr>
               </thead>
               <tbody>
@@ -300,9 +305,9 @@ function EvmAccountsPageContent() {
                           className="font-medium text-sky-600 hover:text-sky-700"
                         />
                       </td>
-                      <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{balancesByAddress[account.address] ?? 'Not loaded'}</td>
+                      <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{balancesByAddress[account.address] ?? messages.common.notLoaded}</td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.lastSeenBlockNumber}</td>
-                      <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.totalTxCount.toLocaleString('en-US')}</td>
+                      <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.totalTxCount.toLocaleString(locale)}</td>
                       <td className="px-5 py-3 text-sm text-slate-700">
                         <RelativeTime timestampMs={account.lastSeenTimestampMs} />
                       </td>
@@ -313,16 +318,16 @@ function EvmAccountsPageContent() {
                             <div className="flex shrink-0 items-center">
                               <ActionIconButton
                                 className="text-slate-400 hover:text-slate-700"
-                                tooltip="Edit tag"
-                                aria-label="Edit tag"
+                                tooltip={messages.nameTags.editTooltip}
+                                aria-label={messages.nameTags.editTooltip}
                                 onClick={() => handleStartTagEdit(account.address)}
                               >
                                 <IconPencil className="size-4" stroke={1.8} />
                               </ActionIconButton>
                               <ActionIconButton
                                 className="text-slate-400 hover:text-rose-600"
-                                tooltip="Delete tag"
-                                aria-label="Delete tag"
+                                tooltip={messages.nameTags.deleteTooltip}
+                                aria-label={messages.nameTags.deleteTooltip}
                                 onClick={() => {
                                   if (status !== 'authenticated') {
                                     goToLogin();
@@ -342,8 +347,8 @@ function EvmAccountsPageContent() {
                         ) : (
                           <ActionIconButton
                             className="text-slate-400 hover:text-slate-700"
-                            tooltip="Add tag"
-                            aria-label="Add tag"
+                            tooltip={messages.nameTags.createTitle}
+                            aria-label={messages.nameTags.createTitle}
                             onClick={() => handleStartTagEdit(account.address)}
                           >
                             <IconPlus className="size-4" stroke={1.8} />
@@ -355,7 +360,7 @@ function EvmAccountsPageContent() {
                 ) : (
                   <tr>
                     <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">
-                      No observed accounts yet. Browse recent blocks or transactions first so addresses can be indexed into IndexedDB.
+                      {messages.common.noObservedAccounts}
                     </td>
                   </tr>
                 )}
@@ -370,9 +375,15 @@ function EvmAccountsPageContent() {
               setDeleteTarget(null);
             }
           }}
-          title="Delete Tag"
-          description={deleteTarget ? `Delete the label "${deleteTarget.nameTag}" for ${deleteTarget.address.slice(0, 8)}...${deleteTarget.address.slice(-6)}?` : undefined}
-          confirmLabel="Delete"
+          title={messages.nameTags.deleteTitle}
+          description={
+            deleteTarget
+              ? messages.nameTags.deleteDescription
+                  .replace('{label}', deleteTarget.nameTag)
+                  .replace('{address}', `${deleteTarget.address.slice(0, 8)}...${deleteTarget.address.slice(-6)}`)
+              : undefined
+          }
+          confirmLabel={messages.common.delete}
           onConfirm={() => {
             if (deleteTarget) {
               void handleDeleteTag(deleteTarget.address);
@@ -386,17 +397,17 @@ function EvmAccountsPageContent() {
               handleCancelTagEdit();
             }
           }}
-          title={editingTagAddress && nameTagsByAddress[editingTagAddress] ? 'Edit Tag' : 'Add Tag'}
+          title={editingTagAddress && nameTagsByAddress[editingTagAddress] ? messages.nameTags.editTooltip : messages.nameTags.createTitle}
           description={
             editingTagAddress
-              ? `Set a label for address ${editingTagAddress}.`
+              ? `${messages.nameTags.setLabelForAddress} ${editingTagAddress}.`
               : undefined
           }
           maxWidthClassName="max-w-md"
           footer={
             <>
               <Button type="button" variant="ghost" onClick={handleCancelTagEdit}>
-                Cancel
+                {messages.common.cancel}
               </Button>
               <Button
                 type="button"
@@ -413,7 +424,7 @@ function EvmAccountsPageContent() {
                   void handleSaveTag(editingTagAddress);
                 }}
               >
-                Save
+                {messages.nameTags.save}
               </Button>
             </>
           }
@@ -421,17 +432,17 @@ function EvmAccountsPageContent() {
           <div className="space-y-3">
             <div className="space-y-2">
               <label htmlFor="evm-account-name-tag-input" className="text-sm font-medium text-slate-700">
-                Tag
+                {messages.labels.tag}
               </label>
               <Input
                 id="evm-account-name-tag-input"
                 value={tagInputValue}
                 onChange={(event) => setTagInputValue(event.target.value)}
-                placeholder="Tag"
+                placeholder={messages.nameTags.nameTagPlaceholder}
                 autoFocus
               />
             </div>
-            {tagErrorMessage ? <p className="text-sm text-rose-600">{tagErrorMessage}</p> : null}
+            {tagErrorMessage ? <p className="text-sm text-rose-600">{translateRuntimeText(tagErrorMessage, locale)}</p> : null}
           </div>
         </ModalDialog>
       </main>

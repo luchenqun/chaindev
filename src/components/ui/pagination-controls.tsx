@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
 
 type PaginationControlsProps = {
   page: number;
@@ -25,6 +26,8 @@ export function PaginationControls({
   plain = false,
   onPageChange,
 }: PaginationControlsProps) {
+  const messages = useMessages();
+  const { locale } = useLocale();
   const visiblePages = getVisiblePages(page, totalPages);
   const formId = useId();
   const inputId = useId();
@@ -104,23 +107,23 @@ export function PaginationControls({
       <ModalDialog
         open={jumpDialogOpen}
         onOpenChange={setJumpDialogOpen}
-        title="Jump to page"
-        description={`Enter a page number from 1 to ${totalPages.toLocaleString('en-US')}.`}
+        title={messages.common.jumpToPage}
+        description={`${messages.common.page} 1 - ${totalPages.toLocaleString(locale)}`}
         maxWidthClassName="max-w-sm"
         footer={
           <>
             <Button type="button" variant="outline" onClick={() => setJumpDialogOpen(false)}>
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button type="submit" form={formId} disabled={!Number.isFinite(parsedJumpPage)}>
-              Go
+              {messages.common.go}
             </Button>
           </>
         }
       >
         <form id={formId} className="space-y-2" onSubmit={handleJumpSubmit}>
           <label className="block text-sm font-medium text-slate-700" htmlFor={inputId}>
-            Page
+            {messages.common.page}
           </label>
           <Input
             id={inputId}
@@ -132,7 +135,9 @@ export function PaginationControls({
             onChange={(event) => setJumpPageText(event.target.value)}
           />
           <p className="text-xs text-slate-500">
-            {Number.isFinite(parsedJumpPage) ? `Will open page ${normalizedJumpPage.toLocaleString('en-US')}.` : `Current page is ${page.toLocaleString('en-US')}.`}
+            {Number.isFinite(parsedJumpPage)
+              ? messages.common.willOpenPage.replace('{page}', normalizedJumpPage.toLocaleString(locale))
+              : messages.common.currentPageIs.replace('{page}', page.toLocaleString(locale))}
           </p>
         </form>
       </ModalDialog>

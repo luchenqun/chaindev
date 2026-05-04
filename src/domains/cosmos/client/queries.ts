@@ -3,6 +3,7 @@
 import 'client-only';
 
 import { fromBech32, toBech32 } from '@cosmjs/encoding';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '@/i18n/format';
 import { formatCosmosBlock } from '@/domains/cosmos/server/formatters';
 import {
   decodeCosmosTransactionSummary,
@@ -1028,10 +1029,7 @@ function formatInteger(value: string | number | bigint | null | undefined, fallb
     return fallback;
   }
 
-  const negative = normalized.startsWith('-');
-  const digits = negative ? normalized.slice(1) : normalized;
-  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${negative ? '-' : ''}${grouped}`;
+  return formatLocalizedNumber(BigInt(normalized));
 }
 
 function formatCosmosGasLabel(value: string | number | bigint | null | undefined) {
@@ -1045,7 +1043,7 @@ function formatCosmosGasLabel(value: string | number | bigint | null | undefined
     return '--';
   }
 
-  return BigInt(normalized).toLocaleString('en-US');
+  return formatLocalizedNumber(BigInt(normalized));
 }
 
 function formatLocalTimestamp(value: string | undefined) {
@@ -1059,14 +1057,14 @@ function formatLocalTimestamp(value: string | undefined) {
     return value;
   }
 
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(timestamp, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(timestamp);
+  });
 }
 
 function normalizeBaseAccount(account: unknown): {
@@ -2128,7 +2126,7 @@ export async function getCosmosBlocksPageDirect(requestedPage = 1, pageSize = 20
       {
         label: 'Average Block Time',
         value: formatDurationSeconds(averageBlockTime),
-        note: `Computed from the ${blocks.length.toLocaleString('en-US')} blocks on this page.`,
+        note: `Computed from the ${formatLocalizedNumber(blocks.length)} blocks on this page.`,
       },
       {
         label: 'Validator Count',
@@ -3133,7 +3131,7 @@ export async function getCosmosProposalByIdDirect(id: string, requestedVotePage 
   return {
     id: proposal.id ?? proposal.proposal_id ?? proposalId,
     title: extractCosmosProposalTitle(proposal),
-    summary: proposal.summary?.trim() || '-',
+    summary: proposal.summary?.trim() || 'None',
     metadataLabel: proposal.metadata?.trim() || '-',
     typeLabel: extractCosmosProposalType(proposal),
     status: proposal.status ?? 'Unknown',

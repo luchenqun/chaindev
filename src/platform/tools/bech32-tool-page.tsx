@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type Bech32Action = 'encode' | 'decode';
@@ -137,7 +139,7 @@ function createEthResult(input: string, prefix: string) {
     // Let the uniform validation error below explain the accepted inputs.
   }
 
-  throw new Error('Input must be a hex address, private key, compressed public key, or mnemonic.');
+  throw new Error('__BECH32_INVALID_INPUT__');
 }
 
 async function createSecp256k1Result(input: string, prefix: string) {
@@ -148,7 +150,7 @@ async function createSecp256k1Result(input: string, prefix: string) {
     const [account] = await wallet.getAccounts();
 
     if (!account) {
-      throw new Error('Failed to derive account.');
+      throw new Error('__BECH32_DERIVE_ACCOUNT_FAILED__');
     }
 
     const addressHex = toHex(fromBech32(account.address).data);
@@ -203,7 +205,7 @@ async function createSecp256k1Result(input: string, prefix: string) {
     // Let the uniform validation error below explain the accepted inputs.
   }
 
-  throw new Error('Input must be a hex address, private key, compressed public key, or mnemonic.');
+  throw new Error('__BECH32_INVALID_INPUT__');
 }
 
 function decodeBech32Address(input: string) {
@@ -219,6 +221,10 @@ function decodeBech32Address(input: string) {
 }
 
 export function Bech32ToolPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const bech32Messages = messages.bech32;
+  const commonMessages = messages.common;
   const [action, setAction] = useState<Bech32Action>('encode');
   const [crypto, setCrypto] = useState<Bech32Crypto>('ethsecp256k1');
   const [prefix, setPrefix] = useState('cosmos');
@@ -270,7 +276,17 @@ export function Bech32ToolPage() {
         ...payload,
       });
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Failed to process Bech32 input.');
+      if (submitError instanceof Error) {
+        setError(
+          submitError.message === '__BECH32_INVALID_INPUT__'
+            ? bech32Messages.invalidInput
+            : submitError.message === '__BECH32_DERIVE_ACCOUNT_FAILED__'
+              ? bech32Messages.failedToDeriveAccount
+              : submitError.message,
+        );
+      } else {
+        setError(bech32Messages.failedToProcess);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -307,7 +323,7 @@ export function Bech32ToolPage() {
         <button
           type="button"
           className="relative inline-flex size-7 items-center justify-center justify-self-end text-slate-500 transition hover:text-sky-600"
-          aria-label={`Copy ${label}`}
+          aria-label={`${commonMessages.copyInput} ${label}`}
           onClick={() => void handleCopy(label, value)}
         >
           <IconCopy className="size-4" stroke={1.8} />
@@ -316,7 +332,7 @@ export function Bech32ToolPage() {
               copiedField === label ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            Copied
+            {commonMessages.copied}
           </span>
         </button>
       </div>
@@ -331,8 +347,8 @@ export function Bech32ToolPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-baseline gap-3">
-                  <h1 className="shrink-0 text-2xl font-semibold text-slate-950">Bech32</h1>
-                  <p className="min-w-0 truncate text-sm text-slate-500">Convert Bech32, addresses, keys, and mnemonics.</p>
+                  <h1 className="shrink-0 text-2xl font-semibold text-slate-950">{bech32Messages.title}</h1>
+                  <p className="min-w-0 truncate text-sm text-slate-500">{bech32Messages.description}</p>
                 </div>
               </div>
 
@@ -346,7 +362,7 @@ export function Bech32ToolPage() {
                   }
                   onClick={() => handleActionChange('encode')}
                 >
-                  Encode
+                  {bech32Messages.encode}
                 </button>
                 <button
                   type="button"
@@ -357,7 +373,7 @@ export function Bech32ToolPage() {
                   }
                   onClick={() => handleActionChange('decode')}
                 >
-                  Decode
+                  {bech32Messages.decode}
                 </button>
               </div>
             </div>
@@ -370,7 +386,7 @@ export function Bech32ToolPage() {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-slate-700" htmlFor="bech32-crypto">
-                        Crypto
+                        {bech32Messages.crypto}
                       </label>
                       <Select value={crypto} onValueChange={(value) => setCrypto(value as Bech32Crypto)}>
                         <SelectTrigger id="bech32-crypto" className="mt-1">
@@ -385,7 +401,7 @@ export function Bech32ToolPage() {
 
                     <div>
                       <label className="block text-sm font-medium text-slate-700" htmlFor="bech32-prefix">
-                        Prefix
+                        {bech32Messages.prefix}
                       </label>
                       <Input id="bech32-prefix" value={prefix} className="mt-1" onChange={(event) => setPrefix(event.target.value)} />
                     </div>
@@ -396,20 +412,20 @@ export function Bech32ToolPage() {
                   <>
                     <div>
                       <label className="block text-sm font-medium text-slate-700" htmlFor="bech32-input">
-                        Input
+                        {bech32Messages.input}
                       </label>
                       <Input
                         id="bech32-input"
                         type="text"
                         value={input}
                         className="mt-1 font-mono text-sm"
-                        placeholder="Enter a Bech32 address, e.g. cosmos1qqqqhe5pnaq5qq39wqkn957aydnrm45s0jk6ae"
+                        placeholder={bech32Messages.decodePlaceholder}
                         onChange={(event) => setInput(event.target.value)}
                       />
                     </div>
 
                     <Button type="button" className="w-[120px]" disabled={submitting} onClick={() => void handleSubmit()}>
-                      {submitting ? 'Running...' : 'Submit'}
+                      {submitting ? commonMessages.running : commonMessages.submit}
                     </Button>
                   </>
                 ) : null}
@@ -418,16 +434,16 @@ export function Bech32ToolPage() {
               {action === 'encode' ? (
                 <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_120px] lg:items-end">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700" htmlFor="bech32-input">
-                      Input
-                    </label>
+                      <label className="block text-sm font-medium text-slate-700" htmlFor="bech32-input">
+                        {bech32Messages.input}
+                      </label>
                     <div className="relative mt-1">
                       <Input
                         id="bech32-input"
                         type={inputIsSecret && !showSecretInput ? 'password' : 'text'}
                         value={resolvedInputValue}
                         className={inputIsSecret ? 'pr-20 font-mono text-sm' : 'font-mono text-sm'}
-                        placeholder="hex address / private key / public key / mnemonic"
+                        placeholder={bech32Messages.encodePlaceholder}
                         onChange={(event) => handleInputChange(event.target.value)}
                       />
                       {inputIsSecret ? (
@@ -435,7 +451,7 @@ export function Bech32ToolPage() {
                           <button
                             type="button"
                             className="relative inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"
-                            aria-label={copiedField === 'secret-input' ? 'Input copied' : 'Copy input'}
+                            aria-label={copiedField === 'secret-input' ? commonMessages.inputCopied : commonMessages.copyInput}
                             onClick={() => void handleCopy('secret-input', generatedPrivateKey ?? input)}
                           >
                             <IconCopy className="size-4.5" stroke={1.8} />
@@ -444,13 +460,13 @@ export function Bech32ToolPage() {
                                 copiedField === 'secret-input' ? 'opacity-100' : 'opacity-0'
                               }`}
                             >
-                              Copied
+                              {commonMessages.copied}
                             </span>
                           </button>
                           <button
                             type="button"
                             className="inline-flex size-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"
-                            aria-label={showSecretInput ? 'Hide input' : 'Show input'}
+                            aria-label={showSecretInput ? commonMessages.hideInput : commonMessages.showInput}
                             onClick={() => setShowSecretInput((current) => !current)}
                           >
                             {showSecretInput ? <IconEyeOff className="size-4.5" stroke={1.8} /> : <IconEye className="size-4.5" stroke={1.8} />}
@@ -461,28 +477,28 @@ export function Bech32ToolPage() {
                   </div>
 
                   <Button type="button" className="w-[120px]" disabled={submitting} onClick={() => void handleSubmit()}>
-                    {submitting ? 'Running...' : 'Submit'}
+                    {submitting ? commonMessages.running : commonMessages.submit}
                   </Button>
                 </div>
               ) : null}
             </div>
 
-            {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
+            {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{translateRuntimeText(error, locale)}</div> : null}
 
             {result ? (
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                 {result.action === 'encode' ? (
                   <>
-                    {renderResultRow('Bech32 address', result.bechAddress)}
-                    {renderResultRow('Hex address', result.address)}
-                    {renderResultRow('Public key', result.publicKey)}
-                    {renderResultRow('Compressed public key', result.compressedPublicKey)}
+                    {renderResultRow(bech32Messages.bech32Address, result.bechAddress)}
+                    {renderResultRow(bech32Messages.hexAddress, result.address)}
+                    {renderResultRow(bech32Messages.publicKey, result.publicKey)}
+                    {renderResultRow(bech32Messages.compressedPublicKey, result.compressedPublicKey)}
                   </>
                 ) : (
                   <>
-                    {renderResultRow('Prefix', result.sourcePrefix ?? result.prefix)}
-                    {renderResultRow('Bech32 address', result.bechAddress)}
-                    {renderResultRow('Hex address', result.address)}
+                    {renderResultRow(bech32Messages.sourcePrefix, result.sourcePrefix ?? result.prefix)}
+                    {renderResultRow(bech32Messages.bech32Address, result.bechAddress)}
+                    {renderResultRow(bech32Messages.hexAddress, result.address)}
                   </>
                 )}
               </div>

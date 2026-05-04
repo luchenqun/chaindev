@@ -16,6 +16,8 @@ import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { COSMOS_TRANSACTIONS_AVAILABLE_EVENT, type CosmosTransactionsAvailableEventDetail } from '@/domains/cosmos/ui/live-events';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/platform/layout/app-shell';
 import { useLiveInsertAnimationKey } from '@/platform/home/use-live-insert-animation-key';
@@ -81,7 +83,7 @@ function describeActiveFilters(filters: AppliedCosmosTransactionSearchFilters) {
     filters.moduleName ? `module ${filters.moduleName}` : null,
     filters.action ? `action ${filters.action}` : null,
     filters.startBlockNumber != null || filters.endBlockNumber != null ? 'block range' : null,
-  ].filter(Boolean);
+  ].filter((value): value is string => value != null);
 }
 
 function buildCosmosTransactionsSearchQuery(filters: AppliedCosmosTransactionSearchFilters) {
@@ -120,7 +122,7 @@ function buildCosmosTransactionsSearchQuery(filters: AppliedCosmosTransactionSea
   return clauses.join(' AND ');
 }
 
-function parseCosmosTransactionSearchForm(form: CosmosTransactionSearchFormState): {
+function parseCosmosTransactionSearchForm(form: CosmosTransactionSearchFormState, messages: ReturnType<typeof useMessages>['cosmosTxDetail']): {
   error: string | null;
   filters: AppliedCosmosTransactionSearchFilters;
 } {
@@ -140,14 +142,14 @@ function parseCosmosTransactionSearchForm(form: CosmosTransactionSearchFormState
 
   if (hash && !isLikelyCosmosTxHash(hash)) {
     return {
-      error: 'Transaction hash must be a 64-character hex string.',
+      error: messages.transactionHashMustBeHex,
       filters: EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH,
     };
   }
 
   if ([sender, recipient, moduleName, action].some((value) => containsQueryQuote(value))) {
     return {
-      error: 'Filter values must not contain quotation marks.',
+      error: messages.filterValuesNoQuotes,
       filters: EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH,
     };
   }
@@ -162,14 +164,14 @@ function parseCosmosTransactionSearchForm(form: CosmosTransactionSearchFormState
     (endBlockNumber != null && endBlockNumber < 0)
   ) {
     return {
-      error: 'Block range must use non-negative integers.',
+      error: messages.blockRangeNonNegative,
       filters: EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH,
     };
   }
 
   if (startBlockNumber != null && endBlockNumber != null && startBlockNumber > endBlockNumber) {
     return {
-      error: 'Start block must not be greater than end block.',
+      error: messages.startBlockNotGreater,
       filters: EMPTY_APPLIED_COSMOS_TRANSACTION_SEARCH,
     };
   }
@@ -190,6 +192,10 @@ function parseCosmosTransactionSearchForm(form: CosmosTransactionSearchFormState
 }
 
 function CosmosTransactionsPageContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.cosmosTxDetail;
+  const commonMessages = messages.common;
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -230,7 +236,7 @@ function CosmosTransactionsPageContent() {
   }
 
   function handleApplySearch() {
-    const next = parseCosmosTransactionSearchForm(searchForm);
+    const next = parseCosmosTransactionSearchForm(searchForm, txMessages);
     setSearchErrorMessage(next.error);
 
     if (next.error) {
@@ -283,7 +289,7 @@ function CosmosTransactionsPageContent() {
         if (!cancelled) {
           hasLoadedDataRef.current = false;
           setData(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos transactions.');
+          setErrorMessage(error instanceof Error ? error.message : messages.cosmosAccountDetail.failedToLoadFallback);
         }
       } finally {
         if (!cancelled) {
@@ -348,29 +354,29 @@ function CosmosTransactionsPageContent() {
             totalTransactions,
             totalPages,
             hasNextPage: totalPages > current.page,
-            totalLabel: totalTransactions ? `${totalTransactions.toLocaleString('en-US')} transactions` : current.totalLabel,
-            summary: current.summary.map((item) => {
-              if (item.label === 'Latest Block') {
+            totalLabel: totalTransactions ? txMessages.matchingTransactions.replace('{count}', totalTransactions.toLocaleString(locale)) : current.totalLabel,
+            summary: current.summary.map((item, index) => {
+              if (index === 0) {
                 return {
                   ...item,
-                  value: Number.parseInt(height, 10).toLocaleString('en-US'),
-                  note: 'Live head from the active Cosmos WebSocket subscription.',
+                  value: Number.parseInt(height, 10).toLocaleString(locale),
+                  note: messages.cosmosBlocksPage.summaryLatestBlockNote,
                 };
               }
 
-              if (item.label === 'Results') {
+              if (index === 2) {
                 return {
                   ...item,
-                  value: totalTransactions.toLocaleString('en-US'),
-                  note: `Showing page ${current.page} of ${totalPages}.`,
+                  value: totalTransactions.toLocaleString(locale),
+                  note: messages.cosmosBlocksPage.summaryCurrentRangeNote.replace('{page}', String(current.page)).replace('{totalPages}', String(totalPages)),
                 };
               }
 
-              if (item.label === 'Current Range') {
+              if (index === 3) {
                 return {
                   ...item,
-                  value: `#${topBlock} - #${bottomBlock}`,
-                  note: `Loaded ${mergedTransactions.length} transactions on this page.`,
+                  value: messages.cosmosBlocksPage.blockRangeValue.replace('{topBlock}', String(topBlock)).replace('{bottomBlock}', String(bottomBlock)),
+                  note: txMessages.matchingTransactions.replace('{count}', mergedTransactions.length.toLocaleString(locale)),
                 };
               }
 
@@ -406,7 +412,7 @@ function CosmosTransactionsPageContent() {
     return () => {
       window.removeEventListener(COSMOS_TRANSACTIONS_AVAILABLE_EVENT, handleTransactionsAvailable);
     };
-  }, [activeSearchFilters.hasFilters, autoRefreshEnabled, currentPage]);
+  }, [activeSearchFilters.hasFilters, autoRefreshEnabled, currentPage, locale, messages.cosmosBlocksPage.blockRangeValue, messages.cosmosBlocksPage.summaryCurrentRangeNote, messages.cosmosBlocksPage.summaryLatestBlockNote, txMessages.matchingTransactions]);
 
   if (loading) {
     return (
@@ -420,8 +426,8 @@ function CosmosTransactionsPageContent() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Transactions are unavailable</h1>
-          <p>{errorMessage}</p>
+          <h1>{messages.evmTxDetail.transactionsUnavailable}</h1>
+          <p>{errorMessage ? translateRuntimeText(errorMessage, locale) : errorMessage}</p>
         </main>
       </AppShell>
     );
@@ -431,7 +437,7 @@ function CosmosTransactionsPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Transactions</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{messages.labels.transactions}</h1>
         </div>
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
@@ -439,15 +445,18 @@ function CosmosTransactionsPageContent() {
             <div className="min-w-0">
               <p className="text-lg font-semibold text-slate-900">
                 {data.totalTransactions
-                  ? `${data.totalTransactions.toLocaleString('en-US')} matching transactions`
+                  ? txMessages.matchingTransactions.replace('{count}', data.totalTransactions.toLocaleString(locale))
                   : activeSearchFilters.hasFilters
-                    ? 'No transactions matched'
-                    : 'No transactions returned'}
+                    ? txMessages.noTransactionsMatched
+                    : txMessages.noTransactionsReturned}
               </p>
               <p className="mt-1 text-sm text-slate-500">
                 {activeFilterDescriptions.length
-                  ? `Searching direct Cosmos RPC transactions by ${activeFilterDescriptions.join(', ')}.`
-                  : 'Querying the selected Cosmos RPC provider directly.'}
+                  ? txMessages.searchingDirectRpcBy.replace(
+                      '{filters}',
+                      activeFilterDescriptions.map((item) => translateRuntimeText(item, locale)).join(locale === 'zh' ? '，' : ', '),
+                    )
+                  : txMessages.queryingSelectedProvider}
               </p>
             </div>
             <div className="flex items-center gap-0.5 lg:justify-end">
@@ -461,7 +470,7 @@ function CosmosTransactionsPageContent() {
                 onPageChange={handlePageChange}
               />
               <ActionIconButton
-                tooltip={activeSearchFilters.hasFilters ? 'Edit transaction filters' : 'Search transactions'}
+                tooltip={activeSearchFilters.hasFilters ? txMessages.editTransactionFilters : txMessages.searchTransactionsAction}
                 aria-pressed={activeSearchFilters.hasFilters}
                 className={activeSearchFilters.hasFilters ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
                 onClick={() => setSearchDialogOpen(true)}
@@ -469,14 +478,14 @@ function CosmosTransactionsPageContent() {
                 <IconSearch className="size-4" stroke={1.8} />
               </ActionIconButton>
               <ActionIconButton
-                tooltip={addressDisplayMode === 'bech32' ? 'Switch to hex addresses' : 'Switch to bech32 addresses'}
+                tooltip={addressDisplayMode === 'bech32' ? txMessages.switchToHex : txMessages.switchToBech32}
                 className="text-slate-400 hover:text-slate-600"
                 onClick={() => setAddressDisplayMode((current) => (current === 'bech32' ? 'hex' : 'bech32'))}
               >
                 <IconArrowsExchange className="size-4" stroke={1.8} />
               </ActionIconButton>
               <ActionIconButton
-                tooltip="Refresh transactions"
+                tooltip={txMessages.refreshTransactions}
                 className="text-slate-400 hover:text-slate-600"
                 disabled={loading}
                 onClick={() => setRefreshVersion((current) => current + 1)}
@@ -486,12 +495,12 @@ function CosmosTransactionsPageContent() {
               <ActionIconButton
                 tooltip={
                   activeSearchFilters.hasFilters
-                    ? 'Auto refresh is unavailable while transaction filters are active.'
+                    ? txMessages.autoRefreshUnavailableWithFilters
                     : currentPage !== 1
-                      ? 'Auto refresh is only available on the first page.'
+                      ? txMessages.autoRefreshFirstPageOnly
                       : autoRefreshEnabled
-                        ? 'Disable auto refresh'
-                        : 'Enable auto refresh'
+                        ? messages.homeMetrics.disableAutoRefresh
+                        : messages.homeMetrics.enableAutoRefresh
                 }
                 aria-pressed={autoRefreshEnabled}
                 className={`${autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'} ${activeSearchFilters.hasFilters || currentPage !== 1 ? 'cursor-not-allowed opacity-40' : ''}`}
@@ -528,13 +537,13 @@ function CosmosTransactionsPageContent() {
               </colgroup>
               <thead className="relative z-10 bg-white">
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Gas Used / Wanted</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Fee</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.transactionHash}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.type}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.block}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.age}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.from}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.gasUsedWanted}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.fee}</th>
                 </tr>
               </thead>
               <tbody
@@ -547,7 +556,7 @@ function CosmosTransactionsPageContent() {
               >
                 {data.transactions.length ? (
                   pushedTransactions.map(({ item: transaction, key, phase }) => {
-                    const displaySender = transaction.sender !== 'Unknown' ? formatCosmosAddressForDisplay(transaction.sender, addressDisplayMode) : null;
+                    const displaySender = transaction.sender !== txMessages.unknown ? formatCosmosAddressForDisplay(transaction.sender, addressDisplayMode) : null;
 
                     return (
                       <tr key={key} className={cn('cosmos-transaction-table-row', `pushed-table-row-${phase}`)}>
@@ -575,21 +584,21 @@ function CosmosTransactionsPageContent() {
                             {displaySender ? (
                               <CosmosAddressLink prefetch={false} href={`/cosmos/account/${transaction.sender}`} label={displaySender.label} copyValue={displaySender.full} />
                             ) : (
-                              <span className="text-slate-500">Unknown</span>
+                              <span className="text-slate-500">{translateRuntimeText(txMessages.unknown, locale)}</span>
                             )}
                           </div>
                         </td>
                         <td className="truncate px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-700">
-                          {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
+                          {translateRuntimeText(transaction.gasUsedLabel, locale)}/{translateRuntimeText(transaction.gasWantedLabel, locale)}
                         </td>
-                        <td className="truncate px-5 py-2.5 text-sm leading-6 text-slate-700">{transaction.feeLabel}</td>
+                        <td className="truncate px-5 py-2.5 text-sm leading-6 text-slate-700">{translateRuntimeText(transaction.feeLabel, locale)}</td>
                       </tr>
                     );
                   })
                 ) : (
                   <tr>
                     <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">
-                      {activeSearchFilters.hasFilters ? 'No transactions matched the current filters.' : 'No transactions returned by the selected Cosmos RPC provider.'}
+                      {activeSearchFilters.hasFilters ? txMessages.noTransactionsMatchedCurrentFilters : txMessages.noTransactionsReturnedByProvider}
                     </td>
                   </tr>
                 )}
@@ -602,8 +611,8 @@ function CosmosTransactionsPageContent() {
       <ModalDialog
         open={searchDialogOpen}
         onOpenChange={setSearchDialogOpen}
-        title="Search Transactions"
-        description="Filter direct Cosmos RPC transactions by hash, address, module, action, or block range."
+        title={txMessages.searchTransactions}
+        description={txMessages.searchTransactionsDescription}
         maxWidthClassName="max-w-2xl"
         footer={
           <>
@@ -612,28 +621,28 @@ function CosmosTransactionsPageContent() {
               className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
               onClick={handleClearSearch}
             >
-              Clear
+              {messages.toolsBigNumber.clear}
             </button>
             <button
               type="button"
               className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
               onClick={() => setSearchDialogOpen(false)}
             >
-              Cancel
+              {commonMessages.cancel}
             </button>
             <button
               type="button"
               className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white transition hover:bg-slate-800"
               onClick={handleApplySearch}
             >
-              Search
+              {messages.search.submit}
             </button>
           </>
         }
       >
         <div className="grid gap-3 pb-1 md:grid-cols-2">
           <label className="grid gap-1.5 md:col-span-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Transaction Hash</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.transactionHashLabel}</span>
             <input
               value={searchForm.hash}
               onChange={(event) => handleSearchInputChange('hash', event.target.value)}
@@ -642,7 +651,7 @@ function CosmosTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sender</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.sender}</span>
             <input
               value={searchForm.sender}
               onChange={(event) => handleSearchInputChange('sender', event.target.value)}
@@ -651,7 +660,7 @@ function CosmosTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Recipient</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.recipient}</span>
             <input
               value={searchForm.recipient}
               onChange={(event) => handleSearchInputChange('recipient', event.target.value)}
@@ -660,7 +669,7 @@ function CosmosTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Module</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.module}</span>
             <input
               value={searchForm.moduleName}
               onChange={(event) => handleSearchInputChange('moduleName', event.target.value)}
@@ -669,7 +678,7 @@ function CosmosTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Action</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.action}</span>
             <input
               value={searchForm.action}
               onChange={(event) => handleSearchInputChange('action', event.target.value)}
@@ -678,7 +687,7 @@ function CosmosTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Block</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.startBlock}</span>
             <input
               value={searchForm.startBlock}
               onChange={(event) => handleSearchInputChange('startBlock', event.target.value)}
@@ -687,7 +696,7 @@ function CosmosTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">End Block</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.endBlock}</span>
             <input
               value={searchForm.endBlock}
               onChange={(event) => handleSearchInputChange('endBlock', event.target.value)}
@@ -696,7 +705,7 @@ function CosmosTransactionsPageContent() {
             />
           </label>
         </div>
-        {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{searchErrorMessage}</p> : null}
+        {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{translateRuntimeText(searchErrorMessage, locale)}</p> : null}
       </ModalDialog>
     </AppShell>
   );

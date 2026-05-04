@@ -17,24 +17,29 @@ import {
   formatTimestampWithSeconds,
 } from '@/domains/cosmos/ui/detail-primitives';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 function DetailRowBlockHeight({
+  label,
   height,
   canOpenPrevious,
   previousBlockHeight,
   onOpenPrevious,
   onOpenNext,
 }: {
+  label: string;
   height: string;
   canOpenPrevious: boolean;
   previousBlockHeight: number;
   onOpenPrevious: () => void;
   onOpenNext: () => void;
 }) {
+  const messages = useMessages();
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
-      <dt className="text-sm font-medium text-slate-500">Block Height</dt>
+      <dt className="text-sm font-medium text-slate-500">{label}</dt>
       <dd className="flex flex-wrap items-center gap-2 self-start text-sm text-slate-900">
         <span>{height}</span>
         <button
@@ -42,7 +47,7 @@ function DetailRowBlockHeight({
           className="inline-flex size-5 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!canOpenPrevious}
           onClick={onOpenPrevious}
-          aria-label={`Open block ${previousBlockHeight}`}
+          aria-label={messages.common.openBlock.replace('{height}', String(previousBlockHeight))}
         >
           <IconChevronLeft className="size-3" stroke={2} />
         </button>
@@ -50,7 +55,7 @@ function DetailRowBlockHeight({
           type="button"
           className="inline-flex size-5 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800"
           onClick={onOpenNext}
-          aria-label={`Open block ${Number(height) + 1}`}
+          aria-label={messages.common.openBlock.replace('{height}', String(Number(height) + 1))}
         >
           <IconChevronRight className="size-3" stroke={2} />
         </button>
@@ -75,6 +80,9 @@ function CosmosBlockEventSection({
     }>;
   }>;
 }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.cosmosTxDetail;
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const timeoutRef = useRef<number | null>(null);
   const keyColumnClassName = 'w-[180px] min-w-[180px] whitespace-nowrap text-left';
@@ -105,7 +113,7 @@ function CosmosBlockEventSection({
     <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
       <div className="mb-4">
         <p className="text-base font-semibold text-slate-900">{title}</p>
-        <p className="mt-1 text-sm text-slate-500">{summaryLabel}</p>
+        <p className="mt-1 text-sm text-slate-500">{translateRuntimeText(summaryLabel, locale)}</p>
       </div>
 
       {events.length ? (
@@ -119,8 +127,7 @@ function CosmosBlockEventSection({
                 <div className="mb-3 flex flex-wrap items-center gap-2.5">
                   <DetailTag>{`${index + 1}. ${event.type}`}</DetailTag>
                   <span className="text-xs text-slate-500">
-                    {visibleAttributes.length} attribute
-                    {visibleAttributes.length === 1 ? '' : 's'}
+                    {txMessages.attributeCount.replace('{count}', String(visibleAttributes.length))}
                   </span>
                 </div>
 
@@ -129,9 +136,9 @@ function CosmosBlockEventSection({
                     <table className="min-w-full w-max border-collapse whitespace-nowrap">
                       <thead>
                         <tr>
-                          <th className={`border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 ${keyColumnClassName}`}>Key</th>
-                          <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Value</th>
-                          {showIndexedColumn ? <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">Indexed</th> : null}
+                          <th className={`border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700 ${keyColumnClassName}`}>{txMessages.key}</th>
+                          <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">{txMessages.value}</th>
+                          {showIndexedColumn ? <th className="border-b border-slate-200 px-3 py-2 text-left text-[12px] font-semibold text-slate-700">{txMessages.indexed}</th> : null}
                         </tr>
                       </thead>
                       <tbody>
@@ -140,15 +147,17 @@ function CosmosBlockEventSection({
 
                           return (
                             <tr key={copyId} className="border-t border-slate-200">
-                              <td className={`px-3 py-2 text-sm text-slate-700 mono ${keyColumnClassName}`}>{attribute.key || 'Unknown'}</td>
+                              <td className={`px-3 py-2 text-sm text-slate-700 mono ${keyColumnClassName}`}>
+                                {translateRuntimeText(attribute.key || txMessages.unknown, locale)}
+                              </td>
                               <td className="px-3 py-2 text-sm text-slate-900">
                                 <div className="flex items-start gap-2">
-                                  <span className="mono whitespace-pre-wrap break-all">{attribute.value || 'Empty'}</span>
+                                  <span className="mono whitespace-pre-wrap break-all">{attribute.value || txMessages.emptyValue}</span>
                                   <span className="relative inline-flex">
                                     <button
                                       type="button"
                                       className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-slate-400 transition hover:text-sky-600"
-                                      aria-label="Copy value"
+                                      aria-label={txMessages.copyEventValue}
                                       onClick={() => void handleCopy(attribute.value || '', copyId)}
                                     >
                                       <IconCopy className="size-3.5" stroke={1.8} />
@@ -158,12 +167,12 @@ function CosmosBlockEventSection({
                                         copiedKey === copyId ? 'opacity-100' : 'opacity-0'
                                       }`}
                                     >
-                                      <span className="block whitespace-nowrap">Copied!</span>
+                                      <span className="block whitespace-nowrap">{messages.common.copied}</span>
                                     </span>
                                   </span>
                                 </div>
                               </td>
-                              {showIndexedColumn ? <td className="px-3 py-2 text-sm text-slate-700">{attribute.indexed ? 'true' : 'false'}</td> : null}
+                              {showIndexedColumn ? <td className="px-3 py-2 text-sm text-slate-700">{attribute.indexed ? txMessages.booleanTrue : txMessages.booleanFalse}</td> : null}
                             </tr>
                           );
                         })}
@@ -171,20 +180,23 @@ function CosmosBlockEventSection({
                     </table>
                   </div>
                 ) : (
-                  <div className="empty-state">No attributes returned.</div>
+                  <div className="empty-state">{txMessages.noAttributes}</div>
                 )}
               </article>
             );
           })}
         </div>
       ) : (
-        <div className="empty-state">No events returned.</div>
+        <div className="empty-state">{txMessages.noTransactionEvents}</div>
       )}
     </section>
   );
 }
 
 export default function CosmosBlockDetailPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.cosmosTxDetail;
   const router = useRouter();
   const params = useParams<{ height: string }>();
   const searchParams = useSearchParams();
@@ -218,7 +230,7 @@ export default function CosmosBlockDetailPage() {
       } catch (error) {
         if (!cancelled) {
           setBlock(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load Cosmos block.');
+          setErrorMessage(error instanceof Error ? error.message : messages.common.failedToLoadBlockTitle);
         }
       }
     }
@@ -236,8 +248,8 @@ export default function CosmosBlockDetailPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Invalid block height</h1>
-          <p>The block height must be a non-negative integer.</p>
+          <h1>{messages.common.invalidBlockHeightTitle}</h1>
+          <p>{messages.common.invalidBlockHeightDescription}</p>
         </main>
       </AppShell>
     );
@@ -255,8 +267,8 @@ export default function CosmosBlockDetailPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Failed to load block</h1>
-          <p>{errorMessage}</p>
+          <h1>{messages.common.failedToLoadBlockTitle}</h1>
+          <p>{translateRuntimeText(errorMessage, locale)}</p>
         </main>
       </AppShell>
     );
@@ -277,7 +289,7 @@ export default function CosmosBlockDetailPage() {
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'overview' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('overview')}
           >
-            Overview
+            {txMessages.overview}
           </button>
           <button
             type="button"
@@ -292,28 +304,28 @@ export default function CosmosBlockDetailPage() {
             disabled={!hasTransactions}
             aria-disabled={!hasTransactions}
           >
-            {hasTransactions ? `Transactions (${block.transactionsPage.totalCount})` : 'Transactions'}
+            {hasTransactions ? `${messages.labels.transactions} (${block.transactionsPage.totalCount})` : messages.labels.transactions}
           </button>
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'events' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('events')}
           >
-            {`Events (${block.eventsCount})`}
+            {`${txMessages.events} (${block.eventsCount})`}
           </button>
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'commits' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('commits')}
           >
-            {`Commits (${block.signaturesCount})`}
+            {`${messages.common.commits} (${block.signaturesCount})`}
           </button>
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'json' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('json')}
           >
-            JSON
+            {txMessages.json}
           </button>
         </div>
 
@@ -324,6 +336,7 @@ export default function CosmosBlockDetailPage() {
                 <DetailGroup>
                   <dl>
                     <DetailRowBlockHeight
+                      label={messages.homeMetrics.blockHeight}
                       height={block.height}
                       canOpenPrevious={canOpenPrevious}
                       previousBlockHeight={previousBlockHeight}
@@ -334,52 +347,55 @@ export default function CosmosBlockDetailPage() {
                       }}
                       onOpenNext={() => router.push(`/cosmos/block/${Number(block.height) + 1}`)}
                     />
-                    <DetailRow label="Status" value={<DetailTag tone="success">Confirmed</DetailTag>} />
+                    <DetailRow label={txMessages.status} value={<DetailTag tone="success">{messages.evmBlocksPage.confirmed}</DetailTag>} />
                     <DetailRow
-                      label="Age"
+                      label={messages.cosmosAccountDetail.age}
                       value={
                         block.timestampMs ? (
                           <div className="flex flex-wrap items-center gap-2">
                             <span>
                               <RelativeTime timestampMs={block.timestampMs} />
                             </span>
-                            <span className="text-slate-400">{`(${formatTimestampWithSeconds(block.timestamp, 'Unavailable')})`}</span>
+                            <span className="text-slate-400">{`(${formatTimestampWithSeconds(block.timestamp, messages.common.unavailable)})`}</span>
                           </div>
                         ) : (
                           block.timeLabel
                         )
                       }
                     />
-                    <DetailRow label="Transactions" value={block.txCountLabel} />
+                    <DetailRow label={messages.labels.transactions} value={block.txCountLabel} />
                   </dl>
                 </DetailGroup>
 
                 <DetailGroup>
                   <dl>
-                    <DetailRow label="Hash" value={block.hash} mono />
+                    <DetailRow label={messages.cosmosBlockTable.hash} value={block.hash} mono />
                     <DetailRow
-                      label="Proposer"
+                      label={messages.cosmosBlockTable.proposer}
                       value={
                         block.proposerOperatorAddress ? (
                           <Link className="text-sky-600 hover:text-sky-700" href={`/cosmos/validator/${block.proposerOperatorAddress}`}>
-                            {block.proposerLabel}
+                            {translateRuntimeText(block.proposerLabel, locale)}
                           </Link>
                         ) : (
-                          block.proposerLabel
+                          translateRuntimeText(block.proposerLabel, locale)
                         )
                       }
                     />
-                    <DetailRow label="Proposer Address" value={block.proposer} mono />
-                    <DetailRow label="App Hash" value={block.appHash} mono />
+                    <DetailRow label={messages.cosmosBlockTable.proposerAddress} value={block.proposer} mono />
+                    <DetailRow label={messages.common.appHash} value={block.appHash} mono />
                   </dl>
                 </DetailGroup>
 
                 <DetailGroup>
                   <dl>
-                    <DetailRow label="Chain ID" value={block.chainId} />
-                    <DetailRow label="Block Size" value={block.blockSizeLabel} />
-                    <DetailRow label="Gas Used / Wanted" value={`${block.gasUsedLabel} / ${block.gasWantedLabel}`} />
-                    <DetailRow label="Signatures" value={block.signaturesLabel} />
+                    <DetailRow label={messages.homeMetrics.chainId} value={block.chainId} />
+                    <DetailRow label={messages.evmBlocksPage.blockSize} value={translateRuntimeText(block.blockSizeLabel, locale)} />
+                    <DetailRow
+                      label={messages.cosmosAccountDetail.gasUsedWanted}
+                      value={`${translateRuntimeText(block.gasUsedLabel, locale)} / ${translateRuntimeText(block.gasWantedLabel, locale)}`}
+                    />
+                    <DetailRow label={messages.common.commits} value={translateRuntimeText(block.signaturesLabel, locale)} />
                   </dl>
                 </DetailGroup>
               </div>
@@ -390,8 +406,7 @@ export default function CosmosBlockDetailPage() {
             <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <p className="text-base font-semibold text-slate-900">
-                  {block.transactionsPage.totalCount} transaction
-                  {block.transactionsPage.totalCount === 1 ? '' : 's'}
+                  {messages.evmBlocksPage.totalTransactionsFound.replace('{count}', String(block.transactionsPage.totalCount))}
                 </p>
               </div>
               {block.transactionsPage.totalPages > 1 ? (
@@ -410,13 +425,13 @@ export default function CosmosBlockDetailPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Gas Used / Wanted</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Fee</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.hash}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.type}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.block}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.age}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.from}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.gasUsedWanted}</th>
+                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.fee}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -442,18 +457,18 @@ export default function CosmosBlockDetailPage() {
                         <RelativeTime timestampMs={block.timestampMs} />
                       </td>
                       <td className="px-5 py-3 text-sm">
-                        {transaction.sender === 'Unknown' ? (
-                          <span className="text-slate-500">Unknown</span>
+                        {transaction.sender === txMessages.unknown ? (
+                          <span className="text-slate-500">{translateRuntimeText(txMessages.unknown, locale)}</span>
                         ) : (
                           <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${transaction.sender}`}>
-                            {transaction.senderLabel}
+                            {translateRuntimeText(transaction.senderLabel, locale)}
                           </Link>
                         )}
                       </td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
-                        {transaction.gasUsedLabel}/{transaction.gasWantedLabel}
+                        {translateRuntimeText(transaction.gasUsedLabel, locale)}/{translateRuntimeText(transaction.gasWantedLabel, locale)}
                       </td>
-                      <td className="px-5 py-3 text-sm text-slate-700">{transaction.feeLabel}</td>
+                      <td className="px-5 py-3 text-sm text-slate-700">{translateRuntimeText(transaction.feeLabel, locale)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -462,16 +477,18 @@ export default function CosmosBlockDetailPage() {
           </section>
         ) : resolvedActiveTab === 'events' ? (
           <div className="grid gap-4">
-            <CosmosBlockEventSection title="Begin Block Events" summaryLabel={block.beginBlockEventsLabel} events={block.beginBlockEvents} />
-            <CosmosBlockEventSection title="End Block Events" summaryLabel={block.endBlockEventsLabel} events={block.endBlockEvents} />
+            <CosmosBlockEventSection title={txMessages.beginBlockEvents} summaryLabel={block.beginBlockEventsLabel} events={block.beginBlockEvents} />
+            <CosmosBlockEventSection title={txMessages.endBlockEvents} summaryLabel={block.endBlockEventsLabel} events={block.endBlockEvents} />
           </div>
         ) : resolvedActiveTab === 'commits' ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <p className="text-base font-semibold text-slate-900">Commits</p>
+                <p className="text-base font-semibold text-slate-900">{messages.common.commits}</p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Showing {visibleCommitSignatures.length} of {block.signaturesCount} signatures.
+                  {txMessages.commitsSummary
+                    .replace('{visible}', String(visibleCommitSignatures.length))
+                    .replace('{total}', String(block.signaturesCount))}
                 </p>
               </div>
             </div>
@@ -481,9 +498,9 @@ export default function CosmosBlockDetailPage() {
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Moniker</th>
-                      <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Validator</th>
-                      <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">Result</th>
+                      <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosValidatorDetail.moniker}</th>
+                      <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosValidatorDetail.operatorAddress}</th>
+                      <th className="border-b border-slate-200 px-4 py-2.5 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosProposals.actions}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -492,15 +509,15 @@ export default function CosmosBlockDetailPage() {
                         <td className="px-4 py-2.5 text-sm text-slate-900">
                           {signature.operatorAddress ? (
                             <Link className="text-sky-600 hover:text-sky-700" href={`/cosmos/validator/${signature.operatorAddress}`}>
-                              {signature.moniker}
+                              {translateRuntimeText(signature.moniker, locale)}
                             </Link>
                           ) : (
-                            signature.moniker
+                            translateRuntimeText(signature.moniker, locale)
                           )}
                         </td>
                         <td className="px-4 py-2.5 text-sm text-slate-600 mono">{signature.validatorAddress}</td>
                         <td className="px-4 py-2.5 text-sm">
-                          <DetailTag tone={signature.hasSignature ? 'success' : 'neutral'}>{signature.flagLabel}</DetailTag>
+                          <DetailTag tone={signature.hasSignature ? 'success' : 'neutral'}>{translateRuntimeText(signature.flagLabel, locale)}</DetailTag>
                         </td>
                       </tr>
                     ))}
@@ -508,7 +525,7 @@ export default function CosmosBlockDetailPage() {
                 </table>
               </div>
             ) : (
-              <div className="empty-state">No commit signatures returned.</div>
+              <div className="empty-state">{messages.common.commits} {messages.common.unavailable}</div>
             )}
           </section>
         ) : (

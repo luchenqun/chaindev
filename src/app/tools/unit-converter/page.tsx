@@ -4,6 +4,8 @@ import { IconCopy } from '@tabler/icons-react';
 import { useMemo, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { copyText } from '@/components/ui/copy-text';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 type UnitDefinition = {
@@ -29,17 +31,22 @@ function toUnitPower(decimals: number) {
   return 10n ** BigInt(decimals);
 }
 
-function parseUnitValueToWei(rawValue: string, unit: UnitDefinition) {
+function parseUnitValueToWei(
+  rawValue: string,
+  unit: UnitDefinition,
+  messages: { enterValidNumber: string; decimalPlacesLimit: string },
+  locale: 'en' | 'zh',
+) {
   const normalizedValue = rawValue.trim();
 
   if (!DECIMAL_INPUT_PATTERN.test(normalizedValue)) {
-    throw new Error('Enter a valid numeric value.');
+    throw new Error(messages.enterValidNumber);
   }
 
   const [integerPartRaw = '0', fractionalPartRaw = ''] = normalizedValue.split('.');
 
   if (fractionalPartRaw.length > unit.decimals) {
-    throw new Error(`${unit.label} supports up to ${unit.decimals} decimal places.`);
+    throw new Error(messages.decimalPlacesLimit.replace('{unit}', translateRuntimeText(unit.label, locale)).replace('{decimals}', String(unit.decimals)));
   }
 
   const integerPart = integerPartRaw || '0';
@@ -69,10 +76,16 @@ function formatWeiToUnit(weiValue: string, unit: UnitDefinition) {
 }
 
 function buildInitialWeiValue() {
-  return parseUnitValueToWei('1', UNIT_DEFINITIONS[UNIT_DEFINITIONS.length - 1]);
+  return parseUnitValueToWei('1', UNIT_DEFINITIONS[UNIT_DEFINITIONS.length - 1], {
+    enterValidNumber: 'Enter a valid numeric value.',
+    decimalPlacesLimit: '{unit} supports up to {decimals} decimal places.',
+  }, 'en');
 }
 
 export default function UnitConverterPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const toolMessages = messages.toolsUnitConverter;
   const [activeUnitId, setActiveUnitId] = useState<UnitDefinition['id']>('eth');
   const [draftValue, setDraftValue] = useState('1');
   const [weiValue, setWeiValue] = useState<string | null>(buildInitialWeiValue);
@@ -108,11 +121,16 @@ export default function UnitConverterPage() {
     }
 
     try {
-      setWeiValue(parseUnitValueToWei(nextValue, unit));
+      setWeiValue(
+        parseUnitValueToWei(nextValue, unit, {
+          enterValidNumber: toolMessages.enterValidNumber,
+          decimalPlacesLimit: toolMessages.decimalPlacesLimit,
+        }, locale),
+      );
       setError(null);
     } catch (nextError) {
       setWeiValue(null);
-      setError(nextError instanceof Error ? nextError.message : 'Failed to convert value.');
+      setError(nextError instanceof Error ? nextError.message : toolMessages.conversionFailed);
     }
   }
 
@@ -133,9 +151,9 @@ export default function UnitConverterPage() {
       <main className="mx-auto max-w-[1400px] px-3 pb-10">
         <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.05)]">
           <div className="border-b border-slate-200 px-6 py-5">
-            <h1 className="text-2xl font-semibold text-slate-950">Unit Converter</h1>
+            <h1 className="text-2xl font-semibold text-slate-950">{toolMessages.title}</h1>
             <p className="mt-2 max-w-[1100px] text-sm leading-6 text-slate-600">
-              Convert between ETH denominations such as Wei, Gwei, Szabo, and Finney directly in the browser.
+              {toolMessages.description}
             </p>
           </div>
 
@@ -149,8 +167,12 @@ export default function UnitConverterPage() {
                   <div key={unit.id} className="flex h-[45px] items-stretch overflow-hidden rounded-xl border border-slate-200 bg-white">
                     <div className="flex w-16 shrink-0 items-center justify-center border-r border-slate-200 bg-slate-50">
                       <ActionIconButton
-                        tooltip={copied ? 'Copied' : 'Copy value'}
-                        aria-label={copied ? `${unit.label} copied` : `Copy ${unit.label} value`}
+                        tooltip={copied ? messages.common.copied : messages.common.copyValue}
+                        aria-label={
+                          copied
+                            ? `${translateRuntimeText(unit.label, locale)} ${messages.common.copied}`
+                            : `${messages.common.copyValue} ${translateRuntimeText(unit.label, locale)}`
+                        }
                         className={currentValue ? 'text-slate-400 hover:text-sky-600' : 'text-slate-300 hover:text-slate-300'}
                         disabled={!currentValue}
                         onClick={() => void handleCopy(unit.id, currentValue)}
@@ -165,13 +187,13 @@ export default function UnitConverterPage() {
                       onChange={(event) => handleValueChange(unit, event.target.value)}
                     />
                     <div className="flex min-w-[220px] shrink-0 items-center border-l border-slate-200 bg-slate-50 px-5 text-[18px] font-medium text-slate-800">
-                      {unit.label} ({unit.exponentLabel})
+                      {translateRuntimeText(unit.label, locale)} ({unit.exponentLabel})
                     </div>
                   </div>
                 );
               })}
             </div>
-            {error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
+            {error ? <p className="mt-3 text-sm text-rose-600">{translateRuntimeText(error, locale)}</p> : null}
           </div>
         </section>
       </main>

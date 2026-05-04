@@ -15,6 +15,8 @@ import {
   getEvmRpcCategoryLabel,
   type EvmRpcMethodCategory,
 } from '@/domains/evm/lib/rpc-method-catalog';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const JSON_TEXTAREA_CLASS_NAME =
@@ -94,6 +96,10 @@ function persistEvmRpcParams(methodName: string, paramsJson: string) {
 }
 
 export default function EvmRpcPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const rpcMessages = messages.evmRpcTool;
+  const commonMessages = messages.common;
   const [category, setCategory] = useState<EvmRpcMethodCategory>('ethereum-json-rpc');
   const [selectedMethodName, setSelectedMethodName] = useState('eth_blockNumber');
   const [search, setSearch] = useState('');
@@ -147,14 +153,14 @@ export default function EvmRpcPage() {
       const parsed = JSON.parse(paramsJson) as unknown;
 
       if (!Array.isArray(parsed)) {
-        throw new Error('Params must be a JSON array.');
+        throw new Error(rpcMessages.paramsMustBeArray);
       }
 
       persistEvmRpcParams(selectedMethod.name, paramsJson);
       const payload = await requestEvmRpcDirect(selectedMethod.name, parsed);
       setResult(payload && typeof payload === 'object' && !Array.isArray(payload) ? (payload as Record<string, unknown>) : { result: payload });
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Failed to execute RPC request.');
+      setError(requestError instanceof Error ? translateRuntimeText(requestError.message, locale) : rpcMessages.failedToExecute);
     } finally {
       setSubmitting(false);
     }
@@ -169,10 +175,10 @@ export default function EvmRpcPage() {
           <div className="border-b border-slate-200 px-6 py-4">
             <div className="flex min-w-0 items-baseline justify-between gap-4">
               <div className="flex min-w-0 items-baseline gap-3">
-                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">EVM RPC API</h1>
-                <p className="min-w-0 truncate text-sm text-slate-500">Call Ethereum, debug, and trace RPC methods directly from the browser.</p>
+                <h1 className="shrink-0 text-2xl font-semibold text-slate-950">{rpcMessages.title}</h1>
+                <p className="min-w-0 truncate text-sm text-slate-500">{rpcMessages.description}</p>
               </div>
-              <span className="shrink-0 text-sm text-slate-500">{methodsInCategory.length} methods</span>
+              <span className="shrink-0 text-sm text-slate-500">{rpcMessages.methodCount.replace('{count}', String(methodsInCategory.length))}</span>
             </div>
           </div>
 
@@ -186,17 +192,17 @@ export default function EvmRpcPage() {
                   <SelectContent>
                     {CATEGORY_OPTIONS.map((item) => (
                       <SelectItem key={item.value} value={item.value}>
-                        {item.label}
+                        {translateRuntimeText(item.label, locale)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <div>
-                  <p className="text-xs leading-5 text-slate-500">{selectedCategory.description}</p>
+                  <p className="text-xs leading-5 text-slate-500">{translateRuntimeText(selectedCategory.description, locale)}</p>
                 </div>
                 <div className="relative">
                   <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" stroke={1.8} />
-                  <Input value={search} placeholder="Search RPC method" className="pl-9" onChange={(event) => setSearch(event.target.value)} />
+                  <Input value={search} placeholder={rpcMessages.searchMethod} className="pl-9" onChange={(event) => setSearch(event.target.value)} />
                 </div>
               </div>
               <div className="max-h-[720px] overflow-y-auto p-2">
@@ -215,11 +221,11 @@ export default function EvmRpcPage() {
                       onClick={() => setSelectedMethodName(method.name)}
                     >
                       <span className="block truncate text-sm font-medium">{method.name}</span>
-                      <span className="mt-1 block line-clamp-2 text-xs text-slate-500">{method.summary}</span>
+                      <span className="mt-1 block line-clamp-2 text-xs text-slate-500">{translateRuntimeText(method.summary, locale)}</span>
                     </button>
                   );
                 })}
-                {!filteredMethods.length ? <div className="px-3 py-8 text-center text-sm text-slate-500">No RPC methods found.</div> : null}
+                {!filteredMethods.length ? <div className="px-3 py-8 text-center text-sm text-slate-500">{rpcMessages.noMethodsFound}</div> : null}
               </div>
             </aside>
 
@@ -229,7 +235,7 @@ export default function EvmRpcPage() {
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold uppercase text-slate-700">
-                        {getEvmRpcCategoryLabel(selectedMethod.category)}
+                        {translateRuntimeText(getEvmRpcCategoryLabel(selectedMethod.category), locale)}
                       </span>
                       <span className="truncate font-mono text-sm text-slate-700">{selectedMethod.name}</span>
                     </div>
@@ -241,23 +247,23 @@ export default function EvmRpcPage() {
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 text-sm font-medium text-sky-700 hover:text-sky-800"
                       >
-                        <span>QuickNode Docs</span>
+                        <span>{rpcMessages.quickNodeDocs}</span>
                         <IconExternalLink className="size-4" stroke={1.8} />
                       </Link>
                     </div>
-                    <p className="mt-1 text-sm text-slate-500">{selectedMethod.summary}</p>
+                    <p className="mt-1 text-sm text-slate-500">{translateRuntimeText(selectedMethod.summary, locale)}</p>
                   </div>
 
                   {selectedMethod.notes?.length ? (
                     <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
                       {selectedMethod.notes.map((note) => (
-                        <p key={note}>{note}</p>
+                        <p key={note}>{translateRuntimeText(note, locale)}</p>
                       ))}
                     </div>
                   ) : null}
 
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <h3 className="text-sm font-semibold text-slate-900">Parameters</h3>
+                    <h3 className="text-sm font-semibold text-slate-900">{rpcMessages.parameters}</h3>
                     {selectedMethod.params.length ? (
                       <div className="mt-3 space-y-3">
                         {selectedMethod.params.map((param, index) => (
@@ -265,33 +271,33 @@ export default function EvmRpcPage() {
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="font-mono text-sm text-slate-900">{param.name}</span>
                               <span className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600">{param.type}</span>
-                              {param.required ? <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-medium text-rose-600">required</span> : null}
+                              {param.required ? <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[11px] font-medium text-rose-600">{rpcMessages.required}</span> : null}
                             </div>
-                            {param.description ? <p className="mt-1 text-sm leading-6 text-slate-500">{param.description}</p> : null}
+                            {param.description ? <p className="mt-1 text-sm leading-6 text-slate-500">{translateRuntimeText(param.description, locale)}</p> : null}
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-2 text-sm text-slate-500">This RPC method does not require parameters.</p>
+                      <p className="mt-2 text-sm text-slate-500">{rpcMessages.noParameters}</p>
                     )}
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-slate-700">Params</label>
+                    <label className="block text-sm font-medium text-slate-700">{rpcMessages.params}</label>
                     <JsonInput
                       value={paramsJson}
                       onChange={setParamsJson}
-                      placeholder="[]"
+                      placeholder={rpcMessages.paramsPlaceholder}
                       textareaClassName={`mt-1 ${JSON_TEXTAREA_CLASS_NAME}`}
                     />
-                    <p className="mt-2 text-xs text-slate-500">Use a JSON array in the exact argument order expected by the upstream RPC method.</p>
+                    <p className="mt-2 text-xs text-slate-500">{rpcMessages.paramsHint}</p>
                   </div>
 
-                  {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div> : null}
+                  {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{translateRuntimeText(error, locale)}</div> : null}
 
                   <div className="flex justify-end border-t border-slate-200 pt-4">
                     <Button type="button" disabled={submitting} onClick={() => void handleRun()}>
-                      {submitting ? 'Running...' : 'Run'}
+                      {submitting ? commonMessages.running : rpcMessages.run}
                     </Button>
                   </div>
 
@@ -302,7 +308,7 @@ export default function EvmRpcPage() {
                   ) : null}
                 </div>
               ) : (
-                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">No RPC methods available.</div>
+                <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">{rpcMessages.noMethodsAvailable}</div>
               )}
             </section>
           </div>

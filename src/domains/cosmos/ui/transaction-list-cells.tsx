@@ -4,6 +4,8 @@ import { IconAlertCircle, IconEye } from '@tabler/icons-react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 
 type CosmosTransactionPreviewData = {
   hash: string;
@@ -32,6 +34,9 @@ export function CosmosTransactionHashCell({ hash, hashLabel, status }: Pick<Cosm
 }
 
 export function CosmosTransactionPreviewButton({ transaction }: { transaction: CosmosTransactionPreviewData }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.cosmosTxDetail;
   const [open, setOpen] = useState(false);
   const [panelPosition, setPanelPosition] = useState<{
     top: number;
@@ -100,7 +105,7 @@ export function CosmosTransactionPreviewButton({ transaction }: { transaction: C
       <button
         ref={triggerRef}
         type="button"
-        aria-label={open ? 'Hide transaction preview' : 'Show transaction preview'}
+        aria-label={open ? txMessages.hideTransactionPreview : txMessages.showTransactionPreview}
         className={`inline-flex size-5 items-center justify-center transition ${open ? 'text-slate-700' : 'text-slate-500 hover:text-slate-700'}`}
         onClick={() => setOpen((current) => !current)}
       >
@@ -117,55 +122,57 @@ export function CosmosTransactionPreviewButton({ transaction }: { transaction: C
               }}
             >
               <div className="border-b border-slate-200 pb-4">
-                <p className="text-lg font-semibold text-slate-900">Additional Info</p>
+                <p className="text-lg font-semibold text-slate-900">{txMessages.additionalInfo}</p>
               </div>
 
               <div className="space-y-2 py-2">
                 <section className="space-y-1">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Status</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.status}</p>
                   <p className={transaction.status === 'failed' ? 'text-sm font-semibold text-rose-600' : 'text-sm font-semibold text-emerald-600'}>
-                    {transaction.statusLabel}
+                    {translateRuntimeText(transaction.statusLabel, locale)}
                   </p>
                 </section>
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Type</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.type}</p>
                   <p className="text-sm font-medium text-slate-900">{transaction.type}</p>
                 </section>
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Block</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.block}</p>
                   <p className="text-sm font-medium text-slate-900">{transaction.height}</p>
                 </section>
                 {transaction.timeLabel ? (
                   <section className="space-y-1 border-t border-slate-200 pt-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Timestamp</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.timestamp}</p>
                     <p className="text-sm font-medium text-slate-900">{transaction.timeLabel}</p>
                   </section>
                 ) : null}
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">From</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{messages.evmTxDetail.from}</p>
                   <p className="break-all font-mono text-sm text-slate-900">{transaction.sender}</p>
                 </section>
                 {transaction.target ? (
                   <section className="space-y-1 border-t border-slate-200 pt-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">To</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{messages.common.to}</p>
                     <p className="break-all font-mono text-sm text-slate-900">{transaction.target}</p>
                   </section>
                 ) : null}
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Transaction Fee</p>
-                  <p className="text-sm font-medium text-slate-900">{transaction.feeLabel}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.transactionFee}</p>
+                  <p className="text-sm font-medium text-slate-900">{translateRuntimeText(transaction.feeLabel, locale)}</p>
                 </section>
                 <section className="space-y-1 border-t border-slate-200 pt-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Gas Info</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.gasInfo}</p>
                   <p className="text-sm font-medium text-slate-900">
-                    {transaction.gasUsedLabel} gas used from {transaction.gasWantedLabel} wanted
+                    {txMessages.gasInfoSummary
+                      .replace('{used}', translateRuntimeText(transaction.gasUsedLabel, locale))
+                      .replace('{wanted}', translateRuntimeText(transaction.gasWantedLabel, locale))}
                   </p>
                 </section>
               </div>
 
               <div className="border-t border-slate-200 pt-3">
                 <Link prefetch={false} href={`/cosmos/tx/${transaction.hash}`} className="inline-flex items-center text-sm font-medium text-sky-600 transition hover:text-sky-700">
-                  View Full Transaction
+                  {txMessages.viewFullTransaction}
                 </Link>
               </div>
             </div>,

@@ -13,23 +13,29 @@ import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-regi
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { getEvmBlockByNumberDirect } from '@/domains/evm/client/queries';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
 
 function DetailRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  const { locale } = useLocale();
+
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
-      <dt className="text-sm font-medium text-slate-500">{label}</dt>
+      <dt className="text-sm font-medium text-slate-500">{translateRuntimeText(label, locale)}</dt>
       <dd className={mono ? 'self-start break-all whitespace-pre-wrap text-sm text-slate-900 mono' : 'self-start text-sm text-slate-900'}>{value}</dd>
     </div>
   );
 }
 
 function DetailRowWithAction({ label, value, action, mono = false }: { label: string; value: React.ReactNode; action: React.ReactNode; mono?: boolean }) {
+  const { locale } = useLocale();
+
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
       <dt className="flex items-center gap-0.5 text-sm font-medium text-slate-500">
-        <span>{label}</span>
+        <span>{translateRuntimeText(label, locale)}</span>
         {action}
       </dt>
       <dd className={mono ? 'self-start break-all whitespace-pre-wrap text-left text-sm text-slate-900 mono' : 'self-start text-left text-sm text-slate-900'}>{value}</dd>
@@ -38,21 +44,25 @@ function DetailRowWithAction({ label, value, action, mono = false }: { label: st
 }
 
 function DetailRowBlockHeight({
+  label,
   height,
   canOpenPrevious,
   previousBlockNumber,
   onOpenPrevious,
   onOpenNext,
 }: {
+  label: string;
   height: string;
   canOpenPrevious: boolean;
   previousBlockNumber: number;
   onOpenPrevious: () => void;
   onOpenNext: () => void;
 }) {
+  const { locale } = useLocale();
+
   return (
     <div className="grid gap-1 py-2 md:grid-cols-[180px_minmax(0,1fr)] md:items-start md:gap-4">
-      <dt className="text-sm font-medium text-slate-500">Block Height</dt>
+      <dt className="text-sm font-medium text-slate-500">{translateRuntimeText(label, locale)}</dt>
       <dd className="flex flex-wrap items-center gap-2 self-start text-sm text-slate-900">
         <span>{height}</span>
         <button
@@ -60,7 +70,7 @@ function DetailRowBlockHeight({
           className="inline-flex size-5 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
           disabled={!canOpenPrevious}
           onClick={onOpenPrevious}
-          aria-label={`Open block ${previousBlockNumber}`}
+          aria-label={label}
         >
           <IconChevronLeft className="size-3" stroke={2} />
         </button>
@@ -68,7 +78,7 @@ function DetailRowBlockHeight({
           type="button"
           className="inline-flex size-5 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:text-slate-800"
           onClick={onOpenNext}
-          aria-label={`Open block ${Number(height) + 1}`}
+          aria-label={label}
         >
           <IconChevronRight className="size-3" stroke={2} />
         </button>
@@ -89,7 +99,7 @@ function decodeHexToAscii(value: string) {
   const hex = value.slice(2);
 
   if (!hex || hex.length % 2 !== 0) {
-    return 'ASCII unavailable';
+    return null;
   }
 
   let output = '';
@@ -98,7 +108,7 @@ function decodeHexToAscii(value: string) {
     const byte = Number.parseInt(hex.slice(index, index + 2), 16);
 
     if (Number.isNaN(byte)) {
-      return 'ASCII unavailable';
+      return null;
     }
 
     if (byte === 0) {
@@ -108,10 +118,14 @@ function decodeHexToAscii(value: string) {
     output += byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.';
   }
 
-  return output || 'ASCII unavailable';
+  return output || null;
 }
 
 export default function EvmBlockDetailPage() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.evmTxDetail;
+  const blockMessages = messages.evmBlocksPage;
   const router = useRouter();
   const params = useParams<{ number: string }>();
   const searchParams = useSearchParams();
@@ -162,7 +176,7 @@ export default function EvmBlockDetailPage() {
       } catch (error) {
         if (!cancelled) {
           setBlock(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load block detail.');
+          setErrorMessage(error instanceof Error ? error.message : messages.common.failedToLoadBlockTitle);
         }
       }
     }
@@ -220,8 +234,8 @@ export default function EvmBlockDetailPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Invalid block number</h1>
-          <p>The block number must be a non-negative integer.</p>
+          <h1>{messages.common.invalidBlockNumberTitle}</h1>
+          <p>{messages.common.invalidBlockNumberDescription}</p>
         </main>
       </AppShell>
     );
@@ -239,8 +253,8 @@ export default function EvmBlockDetailPage() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Failed to load block</h1>
-          <p>{errorMessage}</p>
+          <h1>{messages.common.failedToLoadBlockTitle}</h1>
+          <p>{translateRuntimeText(errorMessage, locale)}</p>
         </main>
       </AppShell>
     );
@@ -259,7 +273,7 @@ export default function EvmBlockDetailPage() {
       <main className="section-block">
         <div className="mb-4 border-b border-slate-200 pb-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[1.171875rem] font-semibold text-slate-900">Block</h1>
+            <h1 className="text-[1.171875rem] font-semibold text-slate-900">{messages.common.block}</h1>
             <span className="text-sm font-medium text-slate-500">{block.height}</span>
           </div>
         </div>
@@ -270,7 +284,7 @@ export default function EvmBlockDetailPage() {
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'overview' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('overview')}
           >
-            Overview
+            {txMessages.overview}
           </button>
           <button
             type="button"
@@ -285,14 +299,14 @@ export default function EvmBlockDetailPage() {
             disabled={!hasTransactions}
             aria-disabled={!hasTransactions}
           >
-            {hasTransactions ? `Transactions (${block.transactions.length})` : 'Transactions'}
+            {hasTransactions ? `${messages.labels.transactions} (${block.transactions.length})` : messages.labels.transactions}
           </button>
           <button
             type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'json' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('json')}
           >
-            JSON
+            {txMessages.json}
           </button>
         </div>
 
@@ -303,6 +317,7 @@ export default function EvmBlockDetailPage() {
                 <DetailGroup>
                   <dl>
                     <DetailRowBlockHeight
+                      label={messages.homeMetrics.blockHeight}
                       height={block.height}
                       canOpenPrevious={canOpenPrevious}
                       previousBlockNumber={previousBlockNumber}
@@ -313,32 +328,32 @@ export default function EvmBlockDetailPage() {
                       }}
                       onOpenNext={() => router.push(`/evm/block/${Number(block.height) + 1}`)}
                     />
-                    <DetailRow label="Status" value={<span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">Confirmed</span>} />
+                    <DetailRow label={blockMessages.status} value={<span className="inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">{blockMessages.confirmed}</span>} />
                     <DetailRow
-                      label="Timestamp"
+                      label={messages.common.timestamp}
                       value={
                         <span className="inline-flex flex-wrap items-center gap-2">
                           <span>
                             <RelativeTime timestampMs={block.timestamp} />
                           </span>
-                          <span className="text-slate-500">({block.timestampLabel})</span>
+                          <span className="text-slate-500">({translateRuntimeText(block.timestampLabel, locale)})</span>
                         </span>
                       }
                     />
                     <DetailRow
-                      label="Transactions"
+                      label={messages.labels.transactions}
                       value={
                         hasTransactions ? (
                           <button type="button" className="font-medium text-sky-600 transition hover:text-sky-700" onClick={() => setActiveTab('transactions')}>
-                            {block.txCount} transactions
+                            {block.txCount} {messages.labels.transactions.toLowerCase()}
                           </button>
                         ) : (
-                          `${block.txCount} transactions`
+                          `${block.txCount} ${messages.labels.transactions.toLowerCase()}`
                         )
                       }
                     />
                     <DetailRow
-                      label="Miner"
+                      label={messages.common.miner}
                       value={
                         <AddressLink
                           address={block.miner}
@@ -349,45 +364,52 @@ export default function EvmBlockDetailPage() {
                         />
                       }
                     />
-                    <DetailRow label="Withdrawals" value={block.withdrawalsCount ? `${block.withdrawalsCount} withdrawals` : '0 withdrawals'} />
+                    <DetailRow
+                      label={blockMessages.withdrawals}
+                      value={
+                        block.withdrawalsCount
+                          ? translateRuntimeText(`${block.withdrawalsCount} ${blockMessages.withdrawals.toLowerCase()}`, locale)
+                          : translateRuntimeText(`0 ${blockMessages.withdrawals.toLowerCase()}`, locale)
+                      }
+                    />
                   </dl>
                 </DetailGroup>
 
                 <DetailGroup separated>
                   <dl>
-                    <DetailRow label="Block Size" value={block.sizeLabel} />
+                    <DetailRow label={blockMessages.blockSize} value={translateRuntimeText(block.sizeLabel, locale)} />
                     <DetailRow
-                      label="Gas Used"
+                      label={blockMessages.gasUsed}
                       value={
                         <span>
-                          {block.gasUsedLabel} <span className="text-slate-500">({block.gasUsedPercent})</span>
+                          {translateRuntimeText(block.gasUsedLabel, locale)} <span className="text-slate-500">({translateRuntimeText(block.gasUsedPercent, locale)})</span>
                         </span>
                       }
                     />
-                    <DetailRow label="Gas Limit" value={block.gasLimitLabel} />
-                    <DetailRow label="Base Fee Per Gas" value={block.baseFeeLabel} />
-                    <DetailRow label="Difficulty" value={block.difficultyLabel} />
-                    <DetailRow label="Total Difficulty" value={block.totalDifficultyLabel} />
-                    <DetailRow label="Blob Gas Used" value={block.blobGasUsedLabel} />
+                    <DetailRow label={messages.common.gasLimit} value={translateRuntimeText(block.gasLimitLabel, locale)} />
+                    <DetailRow label={blockMessages.baseFeePerGas} value={translateRuntimeText(block.baseFeeLabel, locale)} />
+                    <DetailRow label={blockMessages.difficulty} value={translateRuntimeText(block.difficultyLabel, locale)} />
+                    <DetailRow label={blockMessages.totalDifficulty} value={translateRuntimeText(block.totalDifficultyLabel, locale)} />
+                    <DetailRow label={blockMessages.blobGasUsed} value={translateRuntimeText(block.blobGasUsedLabel, locale)} />
                   </dl>
                 </DetailGroup>
 
                 <DetailGroup separated>
                   <dl>
                     <DetailRowWithAction
-                      label="Extra Data"
+                      label={messages.common.extraData}
                       action={
                         <button
                           type="button"
                           className="inline-flex size-4 shrink-0 items-center justify-center text-slate-400 transition hover:text-slate-700"
                           onClick={() => setExtraDataView((current) => (current === 'hex' ? 'ascii' : 'hex'))}
-                          aria-label={extraDataView === 'hex' ? 'Convert extra data to ASCII' : 'Show extra data as hex'}
-                          title={extraDataView === 'hex' ? 'Hex to ASCII' : 'Show Hex'}
+                          aria-label={extraDataView === 'hex' ? messages.common.convertExtraDataToAscii : messages.common.showExtraDataAsHex}
+                          title={extraDataView === 'hex' ? messages.common.hexToAscii : messages.common.showHex}
                         >
                           <IconLanguage className="size-3.5" stroke={1.8} />
                         </button>
                       }
-                      value={extraDataView === 'hex' ? block.extraData : decodedExtraData}
+                      value={extraDataView === 'hex' ? translateRuntimeText(block.extraData, locale) : (decodedExtraData ?? messages.common.asciiUnavailable)}
                       mono
                     />
                   </dl>
@@ -399,7 +421,7 @@ export default function EvmBlockDetailPage() {
               <div className="p-5">
                 {!showMoreDetails ? (
                   <div className="grid gap-1 md:grid-cols-[180px_minmax(0,1fr)] md:gap-4">
-                    <dt className="text-sm font-medium text-slate-500">More Details</dt>
+                    <dt className="text-sm font-medium text-slate-500">{blockMessages.moreDetails}</dt>
                     <dd>
                       <button
                         type="button"
@@ -407,16 +429,16 @@ export default function EvmBlockDetailPage() {
                         onClick={() => setShowMoreDetails(true)}
                       >
                         <IconPlus className="size-4" stroke={2} />
-                        Click to show more
+                        {blockMessages.showMore}
                       </button>
                     </dd>
                   </div>
                 ) : (
                   <div className="mt-0 pt-0">
                     <dl>
-                      <DetailRow label="Hash" value={block.hash} mono />
+                      <DetailRow label={messages.common.hash} value={block.hash} mono />
                       <DetailRow
-                        label="Parent Hash"
+                        label={messages.common.parentHash}
                         value={
                           canOpenPrevious ? (
                             <Link className="text-sky-600 hover:text-sky-700 mono" href={`/evm/block/${previousBlockNumber}`}>
@@ -428,17 +450,17 @@ export default function EvmBlockDetailPage() {
                         }
                         mono
                       />
-                      <DetailRow label="State Root" value={block.stateRoot} mono />
-                      <DetailRow label="Transactions Root" value={block.transactionsRoot} mono />
-                      <DetailRow label="Receipts Root" value={block.receiptsRoot} mono />
-                      <DetailRow label="Withdrawals Root" value={block.withdrawalsRoot} mono />
-                      <DetailRow label="Nonce" value={block.nonce} mono />
-                      <DetailRow label="SHA3 Uncles" value={block.sha3Uncles} mono />
+                      <DetailRow label={messages.common.stateRoot} value={translateRuntimeText(block.stateRoot, locale)} mono />
+                      <DetailRow label={blockMessages.transactionsRoot} value={translateRuntimeText(block.transactionsRoot, locale)} mono />
+                      <DetailRow label={messages.common.receiptsRoot} value={translateRuntimeText(block.receiptsRoot, locale)} mono />
+                      <DetailRow label={blockMessages.withdrawalsRoot} value={translateRuntimeText(block.withdrawalsRoot, locale)} mono />
+                      <DetailRow label={messages.common.nonce} value={translateRuntimeText(block.nonce, locale)} mono />
+                      <DetailRow label={messages.common.sha3Uncles} value={translateRuntimeText(block.sha3Uncles, locale)} mono />
                     </dl>
 
                     <div className="mt-4 border-t border-slate-200 pt-4">
                       <div className="grid gap-1 md:grid-cols-[180px_minmax(0,1fr)] md:gap-4">
-                        <dt className="text-sm font-medium text-slate-500">More Details</dt>
+                        <dt className="text-sm font-medium text-slate-500">{blockMessages.moreDetails}</dt>
                         <dd>
                           <button
                             type="button"
@@ -446,7 +468,7 @@ export default function EvmBlockDetailPage() {
                             onClick={() => setShowMoreDetails(false)}
                           >
                             <IconMinus className="size-4" stroke={2} />
-                            Click to show less
+                            {blockMessages.showLess}
                           </button>
                         </dd>
                       </div>
@@ -460,20 +482,20 @@ export default function EvmBlockDetailPage() {
           <div className="p-5">
             <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
-                <p className="text-base font-semibold text-slate-900">A total of {block.transactions.length} transactions found</p>
+                <p className="text-base font-semibold text-slate-900">{blockMessages.totalTransactionsFound.replace('{count}', String(block.transactions.length))}</p>
               </div>
               <div className="overflow-x-auto">
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">To</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Fee</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.hash}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.method}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.common.block}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.age}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.common.from}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.common.to}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{blockMessages.amount}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{blockMessages.txnFee}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -522,11 +544,13 @@ export default function EvmBlockDetailPage() {
                                 className="font-medium text-sky-600 hover:text-sky-700"
                               />
                             ) : (
-                              <span className="text-slate-500">{transaction.toLabel}</span>
+                              <span className="text-slate-500">{translateRuntimeText(transaction.toLabel, locale)}</span>
                             )}
                           </td>
-                          <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{transaction.valueLabel}</td>
-                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
+                          <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{translateRuntimeText(transaction.valueLabel, locale)}</td>
+                          <td className="px-5 py-3 text-sm tabular-nums text-slate-500">
+                            {transaction.feeLabel ? translateRuntimeText(transaction.feeLabel, locale) : <span className="text-slate-400">--</span>}
+                          </td>
                         </tr>
                       );
                     })}

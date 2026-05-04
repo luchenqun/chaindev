@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLogout, IconSearch, IconSend, IconUserCircle, IconWallet } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconSearch, IconSend, IconUserCircle, IconWallet } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -9,12 +9,13 @@ import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type PlatformMode } from '@/config/chains';
-import { getMessages } from '@/i18n';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 import { getAccountMenuSections } from '@/platform/layout/account-menu-config';
 import { ActiveEvmKeySelector } from '@/platform/layout/active-evm-key-selector';
 import { ChainStatusStrip } from '@/platform/layout/chain-status-strip';
 import { GlobalSearch } from '@/platform/search/global-search';
+import { useActivePlatformMode } from '@/platform/workbench/active-platform-mode-provider';
 import { RpcProviderManager } from '@/platform/workbench/rpc-provider-manager';
 
 type NavItem = {
@@ -96,36 +97,39 @@ function matchesNavItem(pathname: string, href: string) {
 }
 
 export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
-  const messages = getMessages();
+  const messages = useMessages();
+  const labelMessages = messages.labels;
+  const { locale, toggleLocale } = useLocale();
   const pathname = usePathname();
   const router = useRouter();
-  const mode = modeOverride ?? inferMode(pathname);
+  const { activeMode } = useActivePlatformMode();
+  const mode = modeOverride ?? (pathname.startsWith('/tools/') ? activeMode : inferMode(pathname));
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [providerReady, setProviderReady] = useState(false);
   const [keyReady, setKeyReady] = useState(false);
   const closeTimeoutRef = useRef<number | null>(null);
   const { data: session, status } = useSession();
-  const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? session?.user?.email ?? 'Account';
+  const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? session?.user?.email ?? messages.topNav.account;
   const showStatusSkeleton = pathname === '/' && (modeOverride == null || !providerReady || !keyReady);
 
   const primaryNavItems: NavItem[] =
     mode === 'cosmos'
       ? [
-          { href: '/cosmos/blocks', label: 'Blocks' },
-          { href: '/cosmos/txs', label: 'Transactions' },
-          { href: '/cosmos/accounts', label: 'Accounts' },
-          { href: '/cosmos/validators', label: 'Validators' },
-          { href: '/cosmos/proposals', label: 'Proposals' },
-          { href: '/cosmos/params', label: 'Params' },
+          { href: '/cosmos/blocks', label: labelMessages.blocks },
+          { href: '/cosmos/txs', label: labelMessages.transactions },
+          { href: '/cosmos/accounts', label: labelMessages.accounts },
+          { href: '/cosmos/validators', label: labelMessages.validators },
+          { href: '/cosmos/proposals', label: labelMessages.proposals },
+          { href: '/cosmos/params', label: labelMessages.params },
         ]
       : [
-          { href: '/evm/blocks', label: 'Blocks' },
-          { href: '/evm/txs', label: 'Transactions' },
-          { href: '/evm/accounts', label: 'Accounts' },
+          { href: '/evm/blocks', label: labelMessages.blocks },
+          { href: '/evm/txs', label: labelMessages.transactions },
+          { href: '/evm/accounts', label: labelMessages.accounts },
           { href: '/evm/contracts', label: messages.navigation.contracts },
         ];
 
-  const userMenuSections = getAccountMenuSections(mode);
+  const userMenuSections = getAccountMenuSections(mode, messages);
   const userMenuActive = userMenuSections.some((section) => section.items.some((item) => matchesNavItem(pathname, item.href)));
 
   const moreGroups: NavGroup[] =
@@ -133,60 +137,60 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
       ? [
           {
             id: 'chain',
-            label: 'Chain',
+            label: messages.topNav.chain,
             items: [
-              { href: '/cosmos/tools/send-tx', label: 'Send Transaction', icon: IconSend },
-              { href: '/cosmos/tools/rest', label: 'REST API', icon: IconCloudCode },
+              { href: '/cosmos/tools/send-tx', label: labelMessages.sendTransaction, icon: IconSend },
+              { href: '/cosmos/tools/rest', label: labelMessages.restApi, icon: IconCloudCode },
             ],
           },
           {
             id: 'tools',
-            label: 'Tools',
+            label: messages.topNav.tools,
             items: [
-              { href: '/tools/hash', label: 'Hash & Encoding', icon: IconHash },
-              { href: '/tools/big-number', label: 'Big Number', icon: IconFunction },
-              { href: '/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
-              { href: '/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
-              { href: '/tools/4byte', label: 'Signature Lookup', icon: IconSearch },
+              { href: '/tools/hash', label: labelMessages.hashEncoding, icon: IconHash },
+              { href: '/tools/big-number', label: labelMessages.bigNumber, icon: IconFunction },
+              { href: '/tools/unit-converter', label: labelMessages.unitConverter, icon: IconCalculator },
+              { href: '/tools/bech32', label: labelMessages.bech32, icon: IconArrowsExchange },
+              { href: '/tools/4byte', label: labelMessages.signatureLookup, icon: IconSearch },
             ],
           },
           {
             id: 'security',
-            label: 'Security',
+            label: messages.topNav.security,
             items: [
-              { href: '/tools/keystore', label: 'Keystore', icon: IconKey },
-              { href: '/tools/wallet-generator', label: 'Wallet Generator', icon: IconWallet },
+              { href: '/tools/keystore', label: labelMessages.keystore, icon: IconKey },
+              { href: '/tools/wallet-generator', label: labelMessages.walletGenerator, icon: IconWallet },
             ],
           },
         ]
       : [
           {
             id: 'chain',
-            label: 'Chain',
+            label: messages.topNav.chain,
             items: [
-              { href: '/evm/tools/send-tx', label: 'Send Transaction', icon: IconSend },
-              { href: '/evm/tools/historical-balance', label: 'Historical Balance', icon: IconClockSearch },
-              { href: '/evm/tools/token-supply', label: 'Token Supply', icon: IconChartHistogram },
-              { href: '/evm/tools/rpc', label: 'RPC API', icon: IconCloudCode },
+              { href: '/evm/tools/send-tx', label: labelMessages.sendTransaction, icon: IconSend },
+              { href: '/evm/tools/historical-balance', label: labelMessages.historicalBalance, icon: IconClockSearch },
+              { href: '/evm/tools/token-supply', label: labelMessages.tokenSupply, icon: IconChartHistogram },
+              { href: '/evm/tools/rpc', label: labelMessages.rpcApi, icon: IconCloudCode },
             ],
           },
           {
             id: 'tools',
-            label: 'Tools',
+            label: messages.topNav.tools,
             items: [
-              { href: '/tools/hash', label: 'Hash & Encoding', icon: IconHash },
-              { href: '/tools/big-number', label: 'Big Number', icon: IconFunction },
-              { href: '/tools/unit-converter', label: 'Unit Converter', icon: IconCalculator },
-              { href: '/tools/bech32', label: 'Bech32', icon: IconArrowsExchange },
-              { href: '/tools/4byte', label: 'Signature Lookup', icon: IconSearch },
+              { href: '/tools/hash', label: labelMessages.hashEncoding, icon: IconHash },
+              { href: '/tools/big-number', label: labelMessages.bigNumber, icon: IconFunction },
+              { href: '/tools/unit-converter', label: labelMessages.unitConverter, icon: IconCalculator },
+              { href: '/tools/bech32', label: labelMessages.bech32, icon: IconArrowsExchange },
+              { href: '/tools/4byte', label: labelMessages.signatureLookup, icon: IconSearch },
             ],
           },
           {
             id: 'security',
-            label: 'Security',
+            label: messages.topNav.security,
             items: [
-              { href: '/tools/keystore', label: 'Keystore', icon: IconKey },
-              { href: '/tools/wallet-generator', label: 'Wallet Generator', icon: IconWallet },
+              { href: '/tools/keystore', label: labelMessages.keystore, icon: IconKey },
+              { href: '/tools/wallet-generator', label: labelMessages.walletGenerator, icon: IconWallet },
             ],
           },
         ];
@@ -233,8 +237,8 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 <Skeleton className="h-3.5 w-[118px] rounded-sm" />
               </div>
               <div className="flex min-w-0 flex-col gap-1 lg:border-l lg:border-slate-200 lg:pl-3">
-                <Skeleton className="h-3.5 w-[160px] rounded-sm" />
-                <Skeleton className="h-3.5 w-[160px] rounded-sm" />
+                <Skeleton className="h-3.5 w-[96px] rounded-sm" />
+                <Skeleton className="h-3.5 w-[96px] rounded-sm" />
               </div>
             </>
           ) : (
@@ -266,8 +270,16 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             </div>
           ) : null}
         </div>
-        <div className="flex w-full justify-end lg:max-w-[400px] lg:shrink-0">
-          <GlobalSearch mode={mode} variant="topbar" showLabel={false} placeholder="Search by Address / Txn Hash / Block" />
+        <div className="flex w-full items-center justify-end gap-2 lg:max-w-[460px] lg:shrink-0">
+          <GlobalSearch mode={mode} variant="topbar" showLabel={false} placeholder={messages.search.topbarPlaceholder} />
+          <button
+            type="button"
+            className="inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition hover:border-sky-300 hover:text-sky-600"
+            aria-label={locale === 'en' ? messages.language.switchToChinese : messages.language.switchToEnglish}
+            onClick={toggleLocale}
+          >
+            <IconLanguage className="size-4" stroke={2} />
+          </button>
         </div>
       </div>
 
@@ -275,10 +287,10 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
         <div className="mx-auto grid max-w-[1400px] gap-5 px-3 py-0.5 lg:grid-cols-[auto_1fr_auto] lg:items-center">
           <div className="flex items-center gap-3">
             <Link prefetch={false} href="/" className="flex items-center gap-3 py-1">
-              <Image alt="Chain Dev for EVM & Cosmos" className="h-9 w-9" height={36} src="/brand-mark.svg" width={36} />
+              <Image alt={messages.topNav.brandAlt} className="h-9 w-9" height={36} src="/brand-mark.svg" width={36} />
               <span className="flex flex-col leading-none">
-                <span className="text-[24px] font-semibold tracking-[-0.04em] text-slate-950">Chain Dev</span>
-                <span className="mt-1 text-[11px] font-medium tracking-[0.08em] text-slate-500">for EVM &amp; Cosmos</span>
+                <span className="text-[24px] font-semibold tracking-[-0.04em] text-slate-950">{messages.topNav.brandTitle}</span>
+                <span className="mt-1 text-[11px] font-medium tracking-[0.08em] text-slate-500">{messages.topNav.brandSubtitle}</span>
               </span>
             </Link>
           </div>
@@ -306,7 +318,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 }
                 aria-expanded={openGroup === 'tools-more'}
               >
-                <span>More</span>
+                <span>{messages.navigation.more}</span>
                 <IconChevronDown className="size-3.5" stroke={2.2} />
               </button>
               {openGroup === 'tools-more' ? (
@@ -316,8 +328,8 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                     <div className="border-t-[3px] border-[#19a7f2]" />
                     <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-0">
                       <div className="bg-slate-50 px-6 py-6">
-                        <div className="text-[15px] font-semibold text-slate-950">More</div>
-                        <p className="mt-3 text-[14px] leading-6 text-slate-600">Discover chain actions and utility tools in one place.</p>
+                        <div className="text-[15px] font-semibold text-slate-950">{messages.navigation.more}</div>
+                        <p className="mt-3 text-[14px] leading-6 text-slate-600">{messages.topNav.moreDescription}</p>
                       </div>
                       <div className="grid grid-cols-3 gap-5 px-6 py-5">
                         {moreGroups.map((group) => (
@@ -418,7 +430,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                             }
                           >
                             <IconLogout className="size-4" stroke={2} />
-                            Sign Out
+                            {messages.navigation.signOut}
                           </Button>
                         </div>
                       </div>

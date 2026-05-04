@@ -1,3 +1,5 @@
+import { useMessages } from '@/i18n/locale-provider';
+
 type TxSummaryProps = {
   currencyName: string;
   transaction: {
@@ -12,38 +14,42 @@ type TxSummaryProps = {
 };
 
 export function EvmTxSummary({ transaction, currencyName }: TxSummaryProps) {
+  const messages = useMessages();
+  const txMessages = messages.evmTxDetail;
+  const commonMessages = messages.common;
+
   return (
     <div className="detail-card">
       <dl className="detail-list">
         <div>
-          <dt>Hash</dt>
+          <dt>{txMessages.hash}</dt>
           <dd className="mono">{transaction.hash}</dd>
         </div>
         <div>
-          <dt>Block</dt>
-          <dd>{transaction.blockNumber ?? 'Pending'}</dd>
+          <dt>{commonMessages.block}</dt>
+          <dd>{transaction.blockNumber ?? txMessages.pending}</dd>
         </div>
         <div>
-          <dt>From</dt>
+          <dt>{txMessages.from}</dt>
           <dd className="mono">{transaction.from}</dd>
         </div>
         <div>
-          <dt>To</dt>
-          <dd className="mono">{transaction.to ?? 'Contract Creation'}</dd>
+          <dt>{commonMessages.to}</dt>
+          <dd className="mono">{transaction.to ?? txMessages.contractCreation}</dd>
         </div>
         <div>
-          <dt>Value</dt>
+          <dt>{txMessages.value}</dt>
           <dd>
             {transaction.value} {currencyName}
           </dd>
         </div>
         <div>
-          <dt>Nonce</dt>
-          <dd>{transaction.nonce ?? 'N/A'}</dd>
+          <dt>{txMessages.nonce}</dt>
+          <dd>{transaction.nonce ?? commonMessages.unavailable}</dd>
         </div>
         <div>
-          <dt>Gas</dt>
-          <dd>{transaction.gas ?? 'N/A'}</dd>
+          <dt>{txMessages.gasUsed}</dt>
+          <dd>{transaction.gas ?? commonMessages.unavailable}</dd>
         </div>
       </dl>
     </div>

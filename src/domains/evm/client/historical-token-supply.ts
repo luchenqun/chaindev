@@ -3,6 +3,7 @@
 import 'client-only';
 
 import { erc20Abi, formatUnits, isAddress } from 'viem';
+import { formatLocalizedDateTime } from '@/i18n/format';
 import { createEvmClient } from '@/domains/evm/client/rpc-client';
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
@@ -42,7 +43,7 @@ function getActiveEvmProvider() {
 }
 
 function formatSnapshotTimestamp(timestampMs: number) {
-  return new Intl.DateTimeFormat('en-US', {
+  return formatLocalizedDateTime(timestampMs, {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -50,7 +51,7 @@ function formatSnapshotTimestamp(timestampMs: number) {
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(new Date(timestampMs));
+  });
 }
 
 function normalizeTokenAddress(value: string) {

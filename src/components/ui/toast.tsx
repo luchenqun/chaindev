@@ -2,6 +2,8 @@
 
 import { IconAlertCircleFilled, IconCircleCheckFilled, IconInfoCircleFilled } from '@tabler/icons-react';
 import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from 'react';
+import { useLocale } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { cn } from '@/lib/utils';
 
 type ToastTone = 'success' | 'info' | 'error';
@@ -26,6 +28,7 @@ type ToastContextValue = {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 function ToastCard({ title, description, tone }: { title: string; description?: ReactNode; tone: ToastTone }) {
+  const { locale } = useLocale();
   return (
     <div
       className={cn(
@@ -44,8 +47,8 @@ function ToastCard({ title, description, tone }: { title: string; description?: 
           <IconInfoCircleFilled className="mt-0.5 size-5 shrink-0 text-sky-600" />
         )}
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          {description ? <div className="mt-1 text-sm text-slate-600">{description}</div> : null}
+          <p className="text-sm font-semibold text-slate-900">{translateRuntimeText(title, locale)}</p>
+          {description ? <div className="mt-1 text-sm text-slate-600">{typeof description === 'string' ? translateRuntimeText(description, locale) : description}</div> : null}
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { copyText } from '@/components/ui/copy-text';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
+import { useMessages } from '@/i18n/locale-provider';
 import { cn } from '@/lib/utils';
 
 type AddressLinkProps = {
@@ -18,6 +19,7 @@ type AddressLinkProps = {
 
 export function AddressLink({ address, href, label, className, tooltipClassName, showCopyButton = true }: AddressLinkProps) {
   void tooltipClassName;
+  const messages = useMessages();
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<number | null>(null);
   const copyButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -57,13 +59,13 @@ export function AddressLink({ address, href, label, className, tooltipClassName,
             ref={copyButtonRef}
             type="button"
             className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
-            aria-label="Copy address"
+            aria-label={messages.common.copyAddress}
             onClick={() => void handleCopy()}
           >
             <IconCopy className="size-4" stroke={1.8} />
           </button>
           <FloatingTooltip open={copied} anchorRef={copyButtonRef} className={cn('whitespace-nowrap border border-slate-200 bg-white text-slate-700')}>
-            <span className="block whitespace-nowrap">Copied!</span>
+            <span className="block whitespace-nowrap">{messages.common.addressCopied}</span>
           </FloatingTooltip>
         </span>
       ) : null}

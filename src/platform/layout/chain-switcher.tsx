@@ -1,6 +1,7 @@
 'use client';
 
 import type { PlatformMode } from '@/config/chains';
+import { useMessages } from '@/i18n/locale-provider';
 
 type ChainSwitcherProps = {
   mode: PlatformMode;
@@ -8,8 +9,9 @@ type ChainSwitcherProps = {
 };
 
 export function ChainSwitcher({ mode, onModeChange }: ChainSwitcherProps) {
+  const messages = useMessages();
   return (
-    <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1" aria-label="Mode Switch">
+    <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 p-1" aria-label={messages.common.modeSwitch}>
       <button
         type="button"
         className={

@@ -28,17 +28,13 @@ import { formatCompactHash } from '@/domains/cosmos/client/tx-helpers';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { formatTimestampWithSeconds } from '@/domains/cosmos/ui/detail-primitives';
 import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 const textareaClassName =
   'min-h-[96px] w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-50';
-const VOTE_OPTIONS: Array<{ value: CosmosProposalVoteOption; label: string }> = [
-  { value: 'yes', label: 'Yes' },
-  { value: 'no', label: 'No' },
-  { value: 'no_with_veto', label: 'No with veto' },
-  { value: 'abstain', label: 'Abstain' },
-];
 const INTEGER_SCALE_OPTIONS = [6, 9, 12, 15, 18] as const;
 
 type ProposalsPageData = Awaited<ReturnType<typeof getCosmosProposalsDirect>>;
@@ -83,6 +79,8 @@ function ScaledInput({
   inputMode?: 'numeric' | 'decimal';
   onChange: (value: string) => void;
 }) {
+  const messages = useMessages();
+  const proposalMessages = messages.cosmosProposals;
   const [scaleSelectResetVersion, setScaleSelectResetVersion] = useState(0);
   const hasValue = Boolean(value.trim());
 
@@ -104,7 +102,7 @@ function ScaledInput({
           type="button"
           className="absolute right-[82px] top-1/2 inline-flex -translate-y-1/2 items-center justify-center p-0 text-slate-400 transition hover:text-slate-700"
           onClick={() => onChange('')}
-          aria-label="Clear input"
+          aria-label={proposalMessages.clearInput}
           disabled={disabled}
         >
           <IconX className="size-4" stroke={1.8} />
@@ -112,7 +110,7 @@ function ScaledInput({
       ) : null}
       <Select key={`scale-${id}-${scaleSelectResetVersion}`} disabled={disabled} onValueChange={(nextValue) => applyScale(Number(nextValue))}>
         <SelectTrigger className="absolute right-1.5 top-1/2 h-[30px] w-[74px] -translate-y-1/2 rounded-xl border-slate-200 bg-slate-50 px-2.5 text-sm font-medium text-slate-700 shadow-none">
-          <SelectValue placeholder="Scale" />
+          <SelectValue placeholder={proposalMessages.scale} />
         </SelectTrigger>
         <SelectContent align="end">
           {INTEGER_SCALE_OPTIONS.map((option) => (
@@ -156,6 +154,9 @@ function SubmitProposalDialog({
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
 }) {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const proposalMessages = messages.cosmosProposals;
   const { showToast } = useToast();
   const [title, setTitle] = useState('');
   const [summary, setSummary] = useState('');
@@ -223,7 +224,7 @@ function SubmitProposalDialog({
 
   async function submitProposal(password?: string) {
     if (!activeKey) {
-      setFormError('Select a global private key first.');
+      setFormError(messages.evmTxDetail.selectGlobalKeyFirst);
       return;
     }
 
@@ -247,11 +248,11 @@ function SubmitProposalDialog({
       });
 
       showToast({
-        title: 'Proposal transaction broadcasted',
+        title: proposalMessages.proposalTransactionBroadcasted,
         description: (
           <span className="block min-w-0 max-w-full">
             <span className="block truncate text-xs text-slate-500" title={title}>
-              {title}
+              {translateRuntimeText(title, locale)}
             </span>
             <span className="block truncate font-mono text-xs text-slate-500" title={result.delegatorAddress}>
               {formatCompactHash(result.delegatorAddress, 12, 8)}
@@ -270,9 +271,9 @@ function SubmitProposalDialog({
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to broadcast proposal transaction.';
+      const message = error instanceof Error ? error.message : proposalMessages.failedToBroadcastProposal;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
@@ -298,7 +299,7 @@ function SubmitProposalDialog({
       setUnlockPassword('');
       await submitProposal(password);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+      setUnlockError(error instanceof Error ? error.message : messages.evmTxDetail.failedToUnlockPrivateKey);
     }
   }
 
@@ -306,17 +307,17 @@ function SubmitProposalDialog({
     <>
       <ModalDialog
         open={open}
-        title="Submit Proposal"
-        description="Broadcast a Cosmos SDK gov v1 proposal with the active private key."
+        title={proposalMessages.submit}
+        description={proposalMessages.proposalTypeDescription}
         maxWidthClassName="max-w-2xl"
         onOpenChange={onOpenChange}
         footer={
           <>
             <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button type="button" disabled={submitting} onClick={() => void submitProposal()}>
-              {submitting ? 'Submitting...' : 'Submit Proposal'}
+              {submitting ? messages.common.running : proposalMessages.submit}
             </Button>
           </>
         }
@@ -324,15 +325,15 @@ function SubmitProposalDialog({
         <div className="space-y-6">
           <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Proposal Type</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">Gov v1 Proposal</p>
-              <p className="mt-1 text-xs text-slate-500">Messages are encoded into proposal Any messages.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{proposalMessages.proposalType}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">{proposalMessages.govV1Proposal}</p>
+              <p className="mt-1 text-xs text-slate-500">{proposalMessages.proposalTypeDescription}</p>
             </div>
 
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Key</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{proposalMessages.key}</p>
               <p className="mt-1 truncate text-sm font-medium text-slate-900" title={activeKey?.address ?? undefined}>
-                {activeKey ? activeKey.name : 'No active key'}
+                {activeKey ? activeKey.name : messages.evmTxDetail.noKeySelected}
               </p>
               <p className="mt-1 truncate font-mono text-xs text-slate-500" title={activeKey?.address ?? undefined}>
                 {activeKey ? formatCompactHash(activeKey.address, 12, 8) : '-'}
@@ -342,19 +343,25 @@ function SubmitProposalDialog({
 
           <div>
             <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-title">
-              Title
+              {proposalMessages.title}
             </label>
-            <Input id="submit-proposal-title" value={title} placeholder="Proposal title" disabled={submitting} onChange={(event) => setTitle(event.target.value)} />
+            <Input
+              id="submit-proposal-title"
+              value={title}
+              placeholder={proposalMessages.proposalTitlePlaceholder}
+              disabled={submitting}
+              onChange={(event) => setTitle(event.target.value)}
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-summary">
-              Summary
+              {proposalMessages.summary}
             </label>
             <AutoGrowTextarea
               id="submit-proposal-summary"
               value={summary}
-              placeholder="Summarize the proposal."
+              placeholder={proposalMessages.summarizeProposalPlaceholder}
               disabled={submitting}
               className={textareaClassName}
               onChange={(event) => setSummary(event.target.value)}
@@ -363,7 +370,7 @@ function SubmitProposalDialog({
 
           <div>
             <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-messages">
-              Messages JSON
+              {proposalMessages.messagesJson}
             </label>
             <AutoGrowTextarea
               id="submit-proposal-messages"
@@ -378,7 +385,7 @@ function SubmitProposalDialog({
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-deposit-amount">
-                Initial deposit amount
+                {proposalMessages.initialDepositAmount}
               </label>
               <ScaledInput
                 id="submit-proposal-deposit-amount"
@@ -390,7 +397,7 @@ function SubmitProposalDialog({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-deposit-denom">
-                Deposit denom
+                {proposalMessages.depositDenom}
               </label>
               <Input id="submit-proposal-deposit-denom" value={depositDenom} placeholder="uatom" disabled={submitting} onChange={(event) => setDepositDenom(event.target.value)} />
             </div>
@@ -399,7 +406,7 @@ function SubmitProposalDialog({
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-gas-price-amount">
-                Gas price amount
+                {proposalMessages.gasPriceAmount}
               </label>
               <ScaledInput
                 id="submit-proposal-gas-price-amount"
@@ -412,7 +419,7 @@ function SubmitProposalDialog({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-gas-denom">
-                Gas denom
+                {proposalMessages.gasDenom}
               </label>
               <Input id="submit-proposal-gas-denom" value={gasPriceDenom} placeholder="uatom" disabled={submitting} onChange={(event) => setGasPriceDenom(event.target.value)} />
             </div>
@@ -421,7 +428,7 @@ function SubmitProposalDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-signing">
-                Signing
+                {proposalMessages.signing}
               </label>
               <Select value={signingAlgorithm} disabled={submitting} onValueChange={(value) => setSigningAlgorithm(value as CosmosSigningAlgorithm)}>
                 <SelectTrigger id="submit-proposal-signing" className="mt-0 h-10">
@@ -435,20 +442,32 @@ function SubmitProposalDialog({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-metadata">
-                Metadata
+                {proposalMessages.metadata}
               </label>
-              <Input id="submit-proposal-metadata" value={metadata} placeholder="Optional" disabled={submitting} onChange={(event) => setMetadata(event.target.value)} />
+              <Input
+                id="submit-proposal-metadata"
+                value={metadata}
+                placeholder={proposalMessages.optional}
+                disabled={submitting}
+                onChange={(event) => setMetadata(event.target.value)}
+              />
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700" htmlFor="submit-proposal-memo">
-              Memo
+              {messages.sendTx.memo}
             </label>
-            <Input id="submit-proposal-memo" value={memo} placeholder="Optional" disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
+            <Input
+              id="submit-proposal-memo"
+              value={memo}
+              placeholder={proposalMessages.optional}
+              disabled={submitting}
+              onChange={(event) => setMemo(event.target.value)}
+            />
           </div>
 
-          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
+          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{translateRuntimeText(formError, locale)}</p> : null}
         </div>
       </ModalDialog>
       <SecretInputDialog
@@ -461,12 +480,12 @@ function SubmitProposalDialog({
             setUnlockError(null);
           }
         }}
-        title="Unlock Private Key"
-        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the submit proposal transaction.` : 'Enter the password to continue.'}
+        title={messages.privateKeys.unlockPrivateKey}
+        description={activeKey ? messages.evmTxDetail.unlockDescription.replace('{name}', activeKey.name) : messages.evmTxDetail.unlockFallbackDescription}
         value={unlockPassword}
         onValueChange={setUnlockPassword}
-        placeholder="Password"
-        confirmLabel="Unlock"
+        placeholder={proposalMessages.password}
+        confirmLabel={messages.sendTx.unlock}
         confirmDisabled={!unlockPassword.trim()}
         errorMessage={unlockError}
         onConfirm={() => void handleConfirmUnlock()}
@@ -487,6 +506,9 @@ function DepositProposalDialog({
   onSuccess: () => void;
 }) {
   const { showToast } = useToast();
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const proposalMessages = messages.cosmosProposals;
   const [accountPrefix, setAccountPrefix] = useState('cosmos');
   const [amount, setAmount] = useState('');
   const [denom, setDenom] = useState('');
@@ -549,7 +571,7 @@ function DepositProposalDialog({
     }
 
     if (!activeKey) {
-      setFormError('Select a global private key first.');
+      setFormError(messages.evmTxDetail.selectGlobalKeyFirst);
       return;
     }
 
@@ -570,11 +592,11 @@ function DepositProposalDialog({
       });
 
       showToast({
-        title: 'Deposit transaction broadcasted',
+        title: proposalMessages.depositTransactionBroadcasted,
         description: (
           <span className="block min-w-0 max-w-full">
             <span className="block truncate text-xs text-slate-500">
-              {`Proposal #${proposal.id} · ${amount.trim()}${denom.trim()}`}
+              {proposalMessages.proposalTransactionDescription.replace('{id}', proposal.id).replace('{label}', `${amount.trim()}${denom.trim()}`)}
             </span>
             <span className="block truncate font-mono text-xs text-slate-500" title={result.delegatorAddress}>
               {formatCompactHash(result.delegatorAddress, 12, 8)}
@@ -593,9 +615,9 @@ function DepositProposalDialog({
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to broadcast deposit transaction.';
+      const message = error instanceof Error ? error.message : proposalMessages.failedToBroadcastDeposit;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
@@ -621,7 +643,7 @@ function DepositProposalDialog({
       setUnlockPassword('');
       await submitDeposit(password);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+      setUnlockError(error instanceof Error ? error.message : messages.evmTxDetail.failedToUnlockPrivateKey);
     }
   }
 
@@ -629,17 +651,17 @@ function DepositProposalDialog({
     <>
       <ModalDialog
         open={open}
-        title="Deposit to Proposal"
-        description="Broadcast a governance deposit with the active private key."
+        title={proposalMessages.depositToProposal}
+        description={proposalMessages.governanceDepositDescription}
         maxWidthClassName="max-w-xl"
         onOpenChange={onOpenChange}
         footer={
           <>
             <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button type="button" disabled={submitting || !proposal} onClick={() => void submitDeposit()}>
-              {submitting ? 'Depositing...' : 'Deposit'}
+              {submitting ? proposalMessages.depositing : proposalMessages.deposit}
             </Button>
           </>
         }
@@ -647,17 +669,17 @@ function DepositProposalDialog({
         <div className="space-y-6">
           <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Proposal</p>
-              <p className="mt-1 truncate text-sm font-semibold text-slate-900" title={proposal?.title ?? undefined}>
-                {proposal ? `#${proposal.id}. ${proposal.title}` : '-'}
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{proposalMessages.proposal}</p>
+              <p className="mt-1 truncate text-sm font-semibold text-slate-900" title={proposal ? translateRuntimeText(proposal.title, locale) : undefined}>
+                {proposal ? proposalMessages.proposalTitleWithId.replace('{id}', proposal.id).replace('{title}', translateRuntimeText(proposal.title, locale)) : '-'}
               </p>
-              <p className="mt-1 text-xs text-slate-500">{proposal?.statusLabel ?? '-'}</p>
+              <p className="mt-1 text-xs text-slate-500">{proposal?.statusLabel ? translateRuntimeText(proposal.statusLabel, locale) : '-'}</p>
             </div>
 
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Key</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{proposalMessages.key}</p>
               <p className="mt-1 truncate text-sm font-medium text-slate-900" title={activeKey?.address ?? undefined}>
-                {activeKey ? activeKey.name : 'No active key'}
+                {activeKey ? activeKey.name : proposalMessages.noActiveKey}
               </p>
               <p className="mt-1 truncate font-mono text-xs text-slate-500" title={activeKey?.address ?? undefined}>
                 {activeKey ? formatCompactHash(activeKey.address, 12, 8) : '-'}
@@ -668,13 +690,13 @@ function DepositProposalDialog({
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-amount">
-                Deposit amount
+                {proposalMessages.depositAmount}
               </label>
               <ScaledInput id="proposal-deposit-amount" value={amount} placeholder="10000000" disabled={submitting} onChange={setAmount} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-denom">
-                Deposit denom
+                {proposalMessages.depositDenom}
               </label>
               <Input id="proposal-deposit-denom" value={denom} placeholder="uatom" disabled={submitting} onChange={(event) => setDenom(event.target.value)} />
             </div>
@@ -683,7 +705,7 @@ function DepositProposalDialog({
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-gas-price-amount">
-                Gas price amount
+                {proposalMessages.gasPriceAmount}
               </label>
               <ScaledInput
                 id="proposal-deposit-gas-price-amount"
@@ -696,7 +718,7 @@ function DepositProposalDialog({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-gas-denom">
-                Gas denom
+                {proposalMessages.gasDenom}
               </label>
               <Input id="proposal-deposit-gas-denom" value={gasPriceDenom} placeholder="uatom" disabled={submitting} onChange={(event) => setGasPriceDenom(event.target.value)} />
             </div>
@@ -705,7 +727,7 @@ function DepositProposalDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-signing">
-                Signing
+                {proposalMessages.signing}
               </label>
               <Select value={signingAlgorithm} disabled={submitting} onValueChange={(value) => setSigningAlgorithm(value as CosmosSigningAlgorithm)}>
                 <SelectTrigger id="proposal-deposit-signing" className="mt-0 h-10">
@@ -719,13 +741,13 @@ function DepositProposalDialog({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-deposit-memo">
-                Memo
+                {messages.sendTx.memo}
               </label>
-              <Input id="proposal-deposit-memo" value={memo} placeholder="Optional" disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
+              <Input id="proposal-deposit-memo" value={memo} placeholder={proposalMessages.optional} disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
             </div>
           </div>
 
-          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
+          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{translateRuntimeText(formError, locale)}</p> : null}
         </div>
       </ModalDialog>
       <SecretInputDialog
@@ -738,12 +760,12 @@ function DepositProposalDialog({
             setUnlockError(null);
           }
         }}
-        title="Unlock Private Key"
-        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the deposit transaction.` : 'Enter the password to continue.'}
+        title={messages.privateKeys.unlockPrivateKey}
+        description={activeKey ? proposalMessages.unlockDepositDescription.replace('{name}', activeKey.name) : messages.evmTxDetail.unlockFallbackDescription}
         value={unlockPassword}
         onValueChange={setUnlockPassword}
-        placeholder="Password"
-        confirmLabel="Unlock"
+        placeholder={proposalMessages.password}
+        confirmLabel={messages.sendTx.unlock}
         confirmDisabled={!unlockPassword.trim()}
         errorMessage={unlockError}
         onConfirm={() => void handleConfirmUnlock()}
@@ -764,6 +786,9 @@ function VoteProposalDialog({
   onSuccess: () => void;
 }) {
   const { showToast } = useToast();
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const proposalMessages = messages.cosmosProposals;
   const [accountPrefix, setAccountPrefix] = useState('cosmos');
   const [voteOption, setVoteOption] = useState<CosmosProposalVoteOption>('yes');
   const [gasPriceAmount, setGasPriceAmount] = useState('');
@@ -778,7 +803,13 @@ function VoteProposalDialog({
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState<string | null>(null);
 
-  const selectedVoteLabel = VOTE_OPTIONS.find((option) => option.value === voteOption)?.label ?? 'Vote';
+  const voteOptions: Array<{ value: CosmosProposalVoteOption; label: string }> = [
+    { value: 'yes', label: proposalMessages.yes },
+    { value: 'no', label: proposalMessages.no },
+    { value: 'no_with_veto', label: proposalMessages.noWithVeto },
+    { value: 'abstain', label: proposalMessages.abstain },
+  ];
+  const selectedVoteLabel = voteOptions.find((option) => option.value === voteOption)?.label ?? proposalMessages.voteAction;
 
   useEffect(() => {
     function loadActiveKey() {
@@ -828,7 +859,7 @@ function VoteProposalDialog({
     }
 
     if (!activeKey) {
-      setFormError('Select a global private key first.');
+      setFormError(messages.evmTxDetail.selectGlobalKeyFirst);
       return;
     }
 
@@ -849,11 +880,11 @@ function VoteProposalDialog({
       });
 
       showToast({
-        title: 'Vote transaction broadcasted',
+        title: proposalMessages.voteTransactionBroadcasted,
         description: (
           <span className="block min-w-0 max-w-full">
             <span className="block truncate text-xs text-slate-500">
-              {`Proposal #${proposal.id} · ${selectedVoteLabel}`}
+              {proposalMessages.proposalTransactionDescription.replace('{id}', proposal.id).replace('{label}', selectedVoteLabel)}
             </span>
             <span className="block truncate font-mono text-xs text-slate-500" title={result.delegatorAddress}>
               {formatCompactHash(result.delegatorAddress, 12, 8)}
@@ -872,9 +903,9 @@ function VoteProposalDialog({
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to broadcast vote transaction.';
+      const message = error instanceof Error ? error.message : proposalMessages.failedToBroadcastVote;
 
-      if (message === 'Password is required.') {
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setUnlockPassword('');
         setUnlockError(null);
         setUnlockDialogOpen(true);
@@ -900,7 +931,7 @@ function VoteProposalDialog({
       setUnlockPassword('');
       await submitVote(password);
     } catch (error) {
-      setUnlockError(error instanceof Error ? error.message : 'Failed to unlock private key.');
+      setUnlockError(error instanceof Error ? error.message : messages.evmTxDetail.failedToUnlockPrivateKey);
     }
   }
 
@@ -908,17 +939,17 @@ function VoteProposalDialog({
     <>
       <ModalDialog
         open={open}
-        title="Vote on Proposal"
-        description="Broadcast a governance vote with the active private key."
+        title={proposalMessages.voteOnProposal}
+        description={proposalMessages.governanceVoteDescription}
         maxWidthClassName="max-w-xl"
         onOpenChange={onOpenChange}
         footer={
           <>
             <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
-              Cancel
+              {messages.common.cancel}
             </Button>
             <Button type="button" disabled={submitting || !proposal} onClick={() => void submitVote()}>
-              {submitting ? 'Voting...' : 'Vote'}
+              {submitting ? proposalMessages.votingAction : proposalMessages.voteAction}
             </Button>
           </>
         }
@@ -926,17 +957,17 @@ function VoteProposalDialog({
         <div className="space-y-6">
           <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-4 sm:grid-cols-2">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Proposal</p>
-              <p className="mt-1 truncate text-sm font-semibold text-slate-900" title={proposal?.title ?? undefined}>
-                {proposal ? `#${proposal.id}. ${proposal.title}` : '-'}
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{proposalMessages.proposal}</p>
+              <p className="mt-1 truncate text-sm font-semibold text-slate-900" title={proposal ? translateRuntimeText(proposal.title, locale) : undefined}>
+                {proposal ? proposalMessages.proposalTitleWithId.replace('{id}', proposal.id).replace('{title}', translateRuntimeText(proposal.title, locale)) : '-'}
               </p>
-              <p className="mt-1 text-xs text-slate-500">{proposal?.statusLabel ?? '-'}</p>
+              <p className="mt-1 text-xs text-slate-500">{proposal?.statusLabel ? translateRuntimeText(proposal.statusLabel, locale) : '-'}</p>
             </div>
 
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">Key</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-400">{proposalMessages.key}</p>
               <p className="mt-1 truncate text-sm font-medium text-slate-900" title={activeKey?.address ?? undefined}>
-                {activeKey ? activeKey.name : 'No active key'}
+                {activeKey ? activeKey.name : proposalMessages.noActiveKey}
               </p>
               <p className="mt-1 truncate font-mono text-xs text-slate-500" title={activeKey?.address ?? undefined}>
                 {activeKey ? formatCompactHash(activeKey.address, 12, 8) : '-'}
@@ -945,17 +976,17 @@ function VoteProposalDialog({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-vote-option">
-              Vote
-            </label>
+              <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-vote-option">
+                {proposalMessages.vote}
+              </label>
             <Select value={voteOption} disabled={submitting} onValueChange={(value) => setVoteOption(value as CosmosProposalVoteOption)}>
               <SelectTrigger id="proposal-vote-option" className="mt-0 h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {VOTE_OPTIONS.map((option) => (
+                {voteOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {translateRuntimeText(option.label, locale)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -965,7 +996,7 @@ function VoteProposalDialog({
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_180px]">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-gas-price-amount">
-                Gas price amount
+                {proposalMessages.gasPriceAmount}
               </label>
               <ScaledInput
                 id="proposal-gas-price-amount"
@@ -978,7 +1009,7 @@ function VoteProposalDialog({
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-gas-denom">
-                Gas denom
+                {proposalMessages.gasDenom}
               </label>
               <Input id="proposal-gas-denom" value={gasPriceDenom} placeholder="uatom" disabled={submitting} onChange={(event) => setGasPriceDenom(event.target.value)} />
             </div>
@@ -987,7 +1018,7 @@ function VoteProposalDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-signing">
-                Signing
+                {proposalMessages.signing}
               </label>
               <Select value={signingAlgorithm} disabled={submitting} onValueChange={(value) => setSigningAlgorithm(value as CosmosSigningAlgorithm)}>
                 <SelectTrigger id="proposal-signing" className="mt-0 h-10">
@@ -1004,19 +1035,19 @@ function VoteProposalDialog({
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-memo">
-                Memo
+                {messages.sendTx.memo}
               </label>
-              <Input id="proposal-memo" value={memo} placeholder="Optional" disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
+              <Input id="proposal-memo" value={memo} placeholder={proposalMessages.optional} disabled={submitting} onChange={(event) => setMemo(event.target.value)} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700" htmlFor="proposal-metadata">
-                Metadata
+                {proposalMessages.metadata}
               </label>
-              <Input id="proposal-metadata" value={metadata} placeholder="Optional" disabled={submitting} onChange={(event) => setMetadata(event.target.value)} />
+              <Input id="proposal-metadata" value={metadata} placeholder={proposalMessages.optional} disabled={submitting} onChange={(event) => setMetadata(event.target.value)} />
             </div>
           </div>
 
-          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p> : null}
+          {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{translateRuntimeText(formError, locale)}</p> : null}
         </div>
       </ModalDialog>
       <SecretInputDialog
@@ -1029,12 +1060,12 @@ function VoteProposalDialog({
             setUnlockError(null);
           }
         }}
-        title="Unlock Private Key"
-        description={activeKey ? `Enter the password for "${activeKey.name}" to continue the vote transaction.` : 'Enter the password to continue.'}
+        title={messages.privateKeys.unlockPrivateKey}
+        description={activeKey ? proposalMessages.unlockVoteDescription.replace('{name}', activeKey.name) : messages.evmTxDetail.unlockFallbackDescription}
         value={unlockPassword}
         onValueChange={setUnlockPassword}
-        placeholder="Password"
-        confirmLabel="Unlock"
+        placeholder={proposalMessages.password}
+        confirmLabel={messages.sendTx.unlock}
         confirmDisabled={!unlockPassword.trim()}
         errorMessage={unlockError}
         onConfirm={() => void handleConfirmUnlock()}
@@ -1044,6 +1075,9 @@ function VoteProposalDialog({
 }
 
 function CosmosProposalsPageContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const proposalMessages = messages.cosmosProposals;
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1095,7 +1129,7 @@ function CosmosProposalsPageContent() {
       } catch (error) {
         if (!cancelled) {
           setData(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load proposals.');
+          setErrorMessage(error instanceof Error ? error.message : proposalMessages.failedToLoadProposalsTitle);
         }
       } finally {
         if (!cancelled) {
@@ -1130,8 +1164,8 @@ function CosmosProposalsPageContent() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Failed to load proposals</h1>
-          <p>{errorMessage}</p>
+          <h1>{proposalMessages.failedToLoadProposalsTitle}</h1>
+          <p>{errorMessage ? translateRuntimeText(errorMessage, locale) : errorMessage}</p>
         </main>
       </AppShell>
     );
@@ -1141,15 +1175,17 @@ function CosmosProposalsPageContent() {
     <AppShell>
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Proposals</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{messages.labels.proposals}</h1>
         </div>
 
         <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <p className="text-lg font-semibold text-slate-900">{data.totalLabel}</p>
-                <p className="mt-1 text-sm text-slate-500">Showing governance proposals returned by the active Cosmos REST provider.</p>
+                <p className="text-lg font-semibold text-slate-900">
+                  {data.totalProposals ? proposalMessages.totalProposalsLabel.replace('{count}', data.totalProposals.toLocaleString(locale)) : proposalMessages.noProposalsReturned}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">{proposalMessages.proposalsDescription}</p>
               </div>
               <div className="flex items-center gap-0 lg:justify-end">
                 <PaginationControls
@@ -1163,13 +1199,13 @@ function CosmosProposalsPageContent() {
                 />
                 <button
                   type="button"
-                  aria-label="Refresh proposals"
+                  aria-label={proposalMessages.refreshProposals}
                   className="inline-flex h-8 w-8 items-center justify-center text-slate-400 transition hover:text-slate-600"
                   onClick={() => setRefreshVersion((current) => current + 1)}
                 >
                   <IconRefresh className="size-4" stroke={1.8} />
                 </button>
-                <ActionIconButton tooltip="Submit Proposal" className="text-slate-400 hover:text-sky-600" onClick={() => setSubmitDialogOpen(true)}>
+                <ActionIconButton tooltip={proposalMessages.submitProposalAction} className="text-slate-400 hover:text-sky-600" onClick={() => setSubmitDialogOpen(true)}>
                   <IconFilePlus className="size-4" stroke={1.8} />
                 </ActionIconButton>
               </div>
@@ -1189,13 +1225,13 @@ function CosmosProposalsPageContent() {
               </colgroup>
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Proposal</th>
-                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Type</th>
-                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Submission</th>
-                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Voting</th>
-                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Tally</th>
-                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">Status</th>
-                  <th className="border-b border-slate-200 px-4 py-3 text-right text-[13px] font-semibold text-slate-800">Actions</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.proposal}</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.type}</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.submission}</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.voting}</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.tallyColumn}</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.status}</th>
+                  <th className="border-b border-slate-200 px-4 py-3 text-right text-[13px] font-semibold text-slate-800">{proposalMessages.actions}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1206,22 +1242,22 @@ function CosmosProposalsPageContent() {
 
                     return (
                       <tr key={proposal.id} className="cursor-pointer border-t border-slate-200 hover:bg-slate-50/70" onClick={() => router.push(`/cosmos/proposal/${proposal.id}`)}>
-                        <td className="overflow-hidden px-4 py-3 text-sm" title={`#${proposal.id}. ${proposal.title}`}>
+                        <td className="overflow-hidden px-4 py-3 text-sm" title={`#${proposal.id}. ${translateRuntimeText(proposal.title, locale)}`}>
                           <div className="min-w-0 truncate">
                             <Link prefetch={false} className="inline-block max-w-full truncate align-middle font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/proposal/${proposal.id}`}>
-                              {`#${proposal.id}. ${proposal.title}`}
+                              {proposalMessages.proposalTitleWithId.replace('{id}', proposal.id).replace('{title}', translateRuntimeText(proposal.title, locale))}
                             </Link>
                           </div>
                         </td>
-                        <td className="overflow-hidden truncate px-4 py-3 text-sm text-slate-700">{proposal.typeLabel}</td>
+                        <td className="overflow-hidden truncate px-4 py-3 text-sm text-slate-700">{translateRuntimeText(proposal.typeLabel, locale)}</td>
                         <td className="overflow-hidden px-4 py-3 text-xs text-slate-700 tabular-nums">
                           <div className="space-y-1">
                             <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-                              <span className="shrink-0 font-medium text-slate-500">Submit</span>
+                              <span className="shrink-0 font-medium text-slate-500">{proposalMessages.submitTime}</span>
                               <span className="truncate">{formatTimestampWithSeconds(proposal.submitTime)}</span>
                             </div>
                             <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-                              <span className="shrink-0 font-medium text-slate-500">Deposit End</span>
+                              <span className="shrink-0 font-medium text-slate-500">{proposalMessages.depositEndShort}</span>
                               <span className="truncate">{formatTimestampWithSeconds(proposal.depositEndTime)}</span>
                             </div>
                           </div>
@@ -1229,25 +1265,25 @@ function CosmosProposalsPageContent() {
                         <td className="overflow-hidden px-4 py-3 text-xs text-slate-700 tabular-nums">
                           <div className="space-y-1">
                             <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-                              <span className="shrink-0 font-medium text-slate-500">Start</span>
+                              <span className="shrink-0 font-medium text-slate-500">{proposalMessages.start}</span>
                               <span className="truncate">{formatTimestampWithSeconds(proposal.votingStartTime)}</span>
                             </div>
                             <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
-                              <span className="shrink-0 font-medium text-slate-500">End</span>
+                              <span className="shrink-0 font-medium text-slate-500">{proposalMessages.end}</span>
                               <span className="truncate">{formatTimestampWithSeconds(proposal.votingEndTime)}</span>
                             </div>
                           </div>
                         </td>
-                        <td className="overflow-hidden px-4 py-3 text-sm text-slate-700" title={proposal.tallyLabel}>
-                          <div className="truncate">{proposal.tallyLabel}</div>
+                        <td className="overflow-hidden px-4 py-3 text-sm text-slate-700" title={translateRuntimeText(proposal.tallyLabel, locale)}>
+                          <div className="truncate">{translateRuntimeText(proposal.tallyLabel, locale)}</div>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-sm">
-                          <StatusBadge status={proposal.status} label={proposal.statusLabel} />
+                          <StatusBadge status={proposal.status} label={translateRuntimeText(proposal.statusLabel, locale)} />
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-right text-sm" onClick={(event) => event.stopPropagation()}>
                           <span className="inline-flex items-center justify-end gap-0">
                             <ActionIconButton
-                              tooltip={canDeposit ? 'Deposit' : 'Deposit period only'}
+                              tooltip={canDeposit ? proposalMessages.deposit : proposalMessages.depositPeriodOnly}
                               disabled={!canDeposit}
                               className={canDeposit ? 'text-slate-400 hover:text-sky-600' : 'cursor-not-allowed text-slate-300'}
                               onClick={() => setSelectedDepositProposal(proposal)}
@@ -1255,7 +1291,7 @@ function CosmosProposalsPageContent() {
                               <IconCoins className="size-4" stroke={1.8} />
                             </ActionIconButton>
                             <ActionIconButton
-                              tooltip={canVote ? 'Vote' : 'Voting period only'}
+                              tooltip={canVote ? proposalMessages.voteAction : proposalMessages.votingPeriodOnly}
                               disabled={!canVote}
                               className={canVote ? 'text-slate-400 hover:text-sky-600' : 'cursor-not-allowed text-slate-300'}
                               onClick={() => setSelectedProposal(proposal)}
@@ -1270,7 +1306,7 @@ function CosmosProposalsPageContent() {
                 ) : (
                   <tr>
                     <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">
-                      No proposals were returned by the current provider.
+                      {proposalMessages.noProposalsReturned}
                     </td>
                   </tr>
                 )}

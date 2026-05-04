@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { type ReactNode } from 'react';
 import type { PlatformMode } from '@/config/chains';
+import { useMessages } from '@/i18n/locale-provider';
 import { getAccountMenuSections } from '@/platform/layout/account-menu-config';
 
 function matchesAccountMenuItem(pathname: string, href: string) {
@@ -12,11 +13,12 @@ function matchesAccountMenuItem(pathname: string, href: string) {
 }
 
 export function AccountWorkbenchShell({ mode, children }: { mode: PlatformMode; children: ReactNode }) {
+  const messages = useMessages();
   const pathname = usePathname();
   const { data: session } = useSession();
-  const sections = getAccountMenuSections(mode);
-  const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? 'Account';
-  const email = session?.user?.email ?? 'Signed-in workspace';
+  const sections = getAccountMenuSections(mode, messages);
+  const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? messages.topNav.account;
+  const email = session?.user?.email ?? messages.topNav.signedInWorkspace;
 
   return (
     <main className="section-block">

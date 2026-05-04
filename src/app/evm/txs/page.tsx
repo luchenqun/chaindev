@@ -16,13 +16,21 @@ import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { subscribeEvmContractRegistry } from '@/domains/evm/client/contract-registry';
-import { clearEvmTransactionCache, getEvmCachedTransactionsPage, getEvmTransactionCacheSummary, searchEvmCachedTransactions } from '@/domains/evm/client/transaction-cache';
+import {
+  clearEvmTransactionCache,
+  getEvmCachedTransactionsPage,
+  getEvmTransactionCacheSummary,
+  searchEvmCachedTransactions,
+  subscribeEvmTransactionCache,
+} from '@/domains/evm/client/transaction-cache';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { syncLatestEvmTransactionsDirect, validateActiveEvmCacheDirect } from '@/domains/evm/client/queries';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { PendingTransactionsPanel } from '@/domains/evm/ui/pending-transactions-panel';
 import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
+import { useLocale, useMessages } from '@/i18n/locale-provider';
+import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/platform/layout/app-shell';
 import { useLiveInsertAnimationKey } from '@/platform/home/use-live-insert-animation-key';
@@ -49,11 +57,15 @@ type TransactionsPageData = {
 type CacheValidationResult = Awaited<ReturnType<typeof validateActiveEvmCacheDirect>>;
 
 function SummaryCard({ label, value, note, valueClassName }: { label: string; value: ReactNode; note: ReactNode; valueClassName?: string }) {
+  const { locale } = useLocale();
+
   return (
     <article className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
-      <div className={`mt-2 min-w-0 text-[30px] font-semibold leading-none text-slate-900 ${valueClassName ?? ''}`}>{value}</div>
-      <div className="mt-2 text-sm text-slate-500">{note}</div>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{translateRuntimeText(label, locale)}</p>
+      <div className={`mt-2 min-w-0 text-[30px] font-semibold leading-none text-slate-900 ${valueClassName ?? ''}`}>
+        {typeof value === 'string' ? translateRuntimeText(value, locale) : value}
+      </div>
+      <div className="mt-2 text-sm text-slate-500">{typeof note === 'string' ? translateRuntimeText(note, locale) : note}</div>
     </article>
   );
 }
@@ -138,8 +150,10 @@ function buildPageHref(pathname: string, searchParams: URLSearchParams, page: nu
 function buildCachedTransactionsPageData(input: {
   page: Awaited<ReturnType<typeof getEvmCachedTransactionsPage>>;
   latestCachedTransaction: Awaited<ReturnType<typeof getEvmTransactionCacheSummary>>['latestSeenTransaction'];
+  messages: ReturnType<typeof useMessages>['evmTxDetail'];
+  locale: ReturnType<typeof useLocale>['locale'];
 }): TransactionsPageData {
-  const { page, latestCachedTransaction } = input;
+  const { page, latestCachedTransaction, messages, locale } = input;
   const latestBlockNumber = latestCachedTransaction?.blockNumber ?? 'Unavailable';
   const oldestBlockNumber = page.transactions[page.transactions.length - 1]?.blockNumber ?? latestCachedTransaction?.blockNumber ?? 'Unavailable';
 
@@ -147,8 +161,8 @@ function buildCachedTransactionsPageData(input: {
     ...page,
     latestBlockNumber,
     oldestBlockNumber,
-    title: page.totalTransactions ? `${page.totalTransactions.toLocaleString('en-US')} cached recent transactions` : 'No cached transactions yet',
-    subtitle: page.totalTransactions ? `Showing cached transactions up to block #${latestBlockNumber}` : 'Loading latest on-chain transactions will populate this table.',
+    title: page.totalTransactions ? messages.cachedRecentTransactionsTitle.replace('{count}', page.totalTransactions.toLocaleString(locale)) : messages.noCachedTransactionsYet,
+    subtitle: page.totalTransactions ? messages.cachedRecentTransactionsSubtitle.replace('{block}', latestBlockNumber) : messages.cachedTransactionsPopulateHint,
     transactions: page.transactions,
   };
 }
@@ -157,8 +171,10 @@ function buildFilteredTransactionsPageData(input: {
   page: Awaited<ReturnType<typeof searchEvmCachedTransactions>>;
   latestCachedTransaction: Awaited<ReturnType<typeof getEvmTransactionCacheSummary>>['latestSeenTransaction'];
   filters: AppliedTransactionSearchFilters;
+  messages: ReturnType<typeof useMessages>['evmTxDetail'];
+  locale: ReturnType<typeof useLocale>['locale'];
 }): TransactionsPageData {
-  const { page, latestCachedTransaction, filters } = input;
+  const { page, latestCachedTransaction, filters, messages, locale } = input;
   const latestBlockNumber = latestCachedTransaction?.blockNumber ?? 'Unavailable';
   const oldestBlockNumber = page.transactions[page.transactions.length - 1]?.blockNumber ?? latestCachedTransaction?.blockNumber ?? 'Unavailable';
   const activeParts = [
@@ -169,19 +185,20 @@ function buildFilteredTransactionsPageData(input: {
     filters.startTimeMs != null || filters.endTimeMs != null ? 'time range' : null,
     filters.startBlockNumber != null || filters.endBlockNumber != null ? 'block range' : null,
     filters.minValueWei != null || filters.maxValueWei != null ? 'amount range' : null,
-  ].filter(Boolean);
+  ].filter((value): value is string => value != null);
+  const filterSeparator = locale === 'zh' ? '，' : ', ';
 
   return {
     ...page,
     latestBlockNumber,
     oldestBlockNumber,
-    title: page.totalTransactions ? `${page.totalTransactions.toLocaleString('en-US')} cached matching transactions` : 'No cached transactions matched',
-    subtitle: activeParts.length ? `Searching cached transactions by ${activeParts.join(', ')}` : 'Searching cached transactions.',
+    title: page.totalTransactions ? messages.cachedMatchingTransactionsTitle.replace('{count}', page.totalTransactions.toLocaleString(locale)) : messages.noCachedTransactionsMatched,
+    subtitle: activeParts.length ? messages.searchingCachedBy.replace('{filters}', activeParts.map((item) => translateRuntimeText(item, locale)).join(filterSeparator)) : messages.searchingCachedTransactions,
     transactions: page.transactions,
   };
 }
 
-function parseTransactionSearchForm(form: TransactionSearchFormState): {
+function parseTransactionSearchForm(form: TransactionSearchFormState, messages: ReturnType<typeof useMessages>['evmTxDetail']): {
   error: string | null;
   filters: AppliedTransactionSearchFilters;
 } {
@@ -200,14 +217,14 @@ function parseTransactionSearchForm(form: TransactionSearchFormState): {
 
   if (from && !isAddress(from)) {
     return {
-      error: 'From must be a valid EVM address.',
+      error: messages.fromMustBeValidAddress,
       filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
     };
   }
 
   if (to && !isAddress(to)) {
     return {
-      error: 'To must be a valid EVM address.',
+      error: messages.toMustBeValidAddress,
       filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
     };
   }
@@ -217,14 +234,14 @@ function parseTransactionSearchForm(form: TransactionSearchFormState): {
 
   if ((form.startTime && !Number.isFinite(startTimeMs)) || (form.endTime && !Number.isFinite(endTimeMs))) {
     return {
-      error: 'Time range is invalid.',
+      error: messages.timeRangeInvalid,
       filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
     };
   }
 
   if (startTimeMs != null && endTimeMs != null && startTimeMs > endTimeMs) {
     return {
-      error: 'Start time must not be later than end time.',
+      error: messages.startTimeAfterEndTime,
       filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
     };
   }
@@ -239,14 +256,14 @@ function parseTransactionSearchForm(form: TransactionSearchFormState): {
     (endBlockNumber != null && endBlockNumber < 0)
   ) {
     return {
-      error: 'Block range must use non-negative integers.',
+      error: messages.blockRangeMustBeNonNegativeIntegers,
       filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
     };
   }
 
   if (startBlockNumber != null && endBlockNumber != null && startBlockNumber > endBlockNumber) {
     return {
-      error: 'Start block must not be greater than end block.',
+      error: messages.startBlockGreaterThanEndBlock,
       filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
     };
   }
@@ -257,7 +274,7 @@ function parseTransactionSearchForm(form: TransactionSearchFormState): {
 
     if (minValueWei != null && maxValueWei != null && minValueWei > maxValueWei) {
       return {
-        error: 'Min amount must not be greater than max amount.',
+        error: messages.minAmountGreaterThanMaxAmount,
         filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
       };
     }
@@ -280,7 +297,7 @@ function parseTransactionSearchForm(form: TransactionSearchFormState): {
     };
   } catch {
     return {
-      error: 'Amount range is invalid.',
+      error: messages.amountRangeInvalid,
       filters: EMPTY_APPLIED_TRANSACTION_SEARCH,
     };
   }
@@ -306,6 +323,10 @@ function TransactionsAutoRefreshBridge(props: { enabled: boolean; onLatestFeed: 
 }
 
 function EvmTransactionsPageContent() {
+  const messages = useMessages();
+  const { locale } = useLocale();
+  const txMessages = messages.evmTxDetail;
+  const commonMessages = messages.common;
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -390,10 +411,14 @@ function EvmTransactionsPageContent() {
                 page: cachedPage,
                 latestCachedTransaction: cacheSummary.latestSeenTransaction,
                 filters: activeSearchFilters,
+                messages: txMessages,
+                locale,
               })
             : buildCachedTransactionsPageData({
                 page: cachedPage,
                 latestCachedTransaction: cacheSummary.latestSeenTransaction,
+                messages: txMessages,
+                locale,
               });
 
           setData(next);
@@ -409,7 +434,7 @@ function EvmTransactionsPageContent() {
           hasLoadedDataRef.current = false;
           setData(null);
           setCacheSummary(null);
-          setErrorMessage(error instanceof Error ? error.message : 'Failed to load transactions.');
+          setErrorMessage(error instanceof Error ? error.message : txMessages.failedToLoadTransactions);
         }
       } finally {
         if (!cancelled) {
@@ -418,19 +443,66 @@ function EvmTransactionsPageContent() {
       }
     }
 
+    async function refreshCacheSummaryOnly() {
+      try {
+        const nextSummary = await getEvmTransactionCacheSummary();
+
+        if (cancelled) {
+          return;
+        }
+
+        setCacheSummary(nextSummary);
+        setData((current) => {
+          if (!current || activeSearchFilters.hasFilters) {
+            return current;
+          }
+
+          const latestBlockNumber = nextSummary.latestSeenTransaction?.blockNumber ?? 'Unavailable';
+          const oldestBlockNumber = current.transactions[current.transactions.length - 1]?.blockNumber ?? latestBlockNumber;
+          const totalTransactions = nextSummary.totalTransactions;
+          const totalPages = Math.max(1, Math.ceil(Math.max(totalTransactions, 1) / current.pageSize));
+
+          return {
+            ...current,
+            totalTransactions,
+            totalPages,
+            hasNextPage: totalPages > current.page,
+            latestBlockNumber,
+            oldestBlockNumber,
+            title: totalTransactions
+              ? txMessages.cachedRecentTransactionsTitle.replace('{count}', totalTransactions.toLocaleString(locale))
+              : txMessages.noCachedTransactionsYet,
+            subtitle: totalTransactions ? txMessages.cachedRecentTransactionsSubtitle.replace('{block}', latestBlockNumber) : txMessages.cachedTransactionsPopulateHint,
+          };
+        });
+      } catch {
+        return;
+      }
+    }
+
     void load();
 
     const handleProfileChanged = () => {
       void load(true);
     };
+    const handleCacheChanged = () => {
+      if (activeSearchFilters.hasFilters || currentPage !== 1) {
+        void load();
+        return;
+      }
+
+      void refreshCacheSummaryOnly();
+    };
 
     window.addEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
+    const unsubscribeTransactionCache = subscribeEvmTransactionCache(handleCacheChanged);
 
     return () => {
       cancelled = true;
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
+      unsubscribeTransactionCache();
     };
-  }, [activeSearchFilters, cacheRefreshVersion, currentPage, pathname, router, searchParamsText]);
+  }, [activeSearchFilters, cacheRefreshVersion, currentPage, locale, pathname, router, searchParamsText, txMessages]);
 
   function handleAutoRefreshFeed(latestFeed: NonNullable<ReturnType<typeof useEvmHomeData>['latestFeed']>) {
     if (currentPage !== 1 || activeSearchFilters.hasFilters) {
@@ -460,8 +532,8 @@ function EvmTransactionsPageContent() {
         hasNextPage: totalPages > current.page,
         latestBlockNumber: latestFeed.latestBlock,
         oldestBlockNumber: mergedTransactions[mergedTransactions.length - 1]?.blockNumber ?? current.oldestBlockNumber,
-        title: totalTransactions ? `${totalTransactions.toLocaleString('en-US')} cached recent transactions` : current.title,
-        subtitle: `Showing cached transactions up to block ${latestFeed.latestBlock}`,
+        title: totalTransactions ? txMessages.cachedRecentTransactionsTitle.replace('{count}', totalTransactions.toLocaleString(locale)) : current.title,
+        subtitle: txMessages.showingCachedTransactionsUpToBlock.replace('{block}', latestFeed.latestBlock),
         transactions: mergedTransactions,
       };
     });
@@ -478,7 +550,7 @@ function EvmTransactionsPageContent() {
     } catch (error) {
       setCacheActionState({
         status: 'failed',
-        label: error instanceof Error ? error.message : 'Failed to validate cache.',
+        label: error instanceof Error ? error.message : txMessages.validateCache,
       });
     } finally {
       setCacheActionLoading(null);
@@ -492,14 +564,14 @@ function EvmTransactionsPageContent() {
       await clearEvmTransactionCache();
       setCacheActionState({
         status: 'cleared',
-        label: 'Cleared current local EVM cache.',
+        label: txMessages.clearingCache,
       });
       setClearDialogOpen(false);
       setCacheRefreshVersion((current) => current + 1);
     } catch (error) {
       setCacheActionState({
         status: 'failed',
-        label: error instanceof Error ? error.message : 'Failed to clear cache.',
+        label: error instanceof Error ? error.message : txMessages.clearCache,
       });
     } finally {
       setCacheActionLoading(null);
@@ -517,14 +589,17 @@ function EvmTransactionsPageContent() {
       });
       setCacheActionState({
         status: 'valid',
-        label: `Reloaded ${result.syncedTransactions.toLocaleString('en-US')} transactions from ${result.scannedBlocks.toLocaleString('en-US')} recent blocks.`,
+        label: translateRuntimeText(
+          `Reloaded ${result.syncedTransactions.toLocaleString(locale)} transactions from ${result.scannedBlocks.toLocaleString(locale)} recent blocks.`,
+          locale,
+        ),
       });
       setClearDialogOpen(false);
       setCacheRefreshVersion((current) => current + 1);
     } catch (error) {
       setCacheActionState({
         status: 'failed',
-        label: error instanceof Error ? error.message : 'Failed to reload cache.',
+        label: error instanceof Error ? error.message : txMessages.reloadCache,
       });
     } finally {
       setCacheActionLoading(null);
@@ -549,7 +624,7 @@ function EvmTransactionsPageContent() {
   }
 
   function handleApplySearch() {
-    const next = parseTransactionSearchForm(searchForm);
+    const next = parseTransactionSearchForm(searchForm, txMessages);
     setSearchErrorMessage(next.error);
 
     if (next.error) {
@@ -626,8 +701,8 @@ function EvmTransactionsPageContent() {
     return (
       <AppShell>
         <main className="content-panel">
-          <h1>Transactions are unavailable</h1>
-          <p>{errorMessage}</p>
+          <h1>{txMessages.transactionsUnavailable}</h1>
+          <p>{errorMessage ? translateRuntimeText(errorMessage, locale) : errorMessage}</p>
         </main>
       </AppShell>
     );
@@ -640,7 +715,7 @@ function EvmTransactionsPageContent() {
       ) : null}
       <main className="section-block">
         <div className="mb-6 border-b border-slate-200 pb-4">
-          <h1 className="text-[1.171875rem] font-semibold text-slate-900">Transactions</h1>
+          <h1 className="text-[1.171875rem] font-semibold text-slate-900">{messages.labels.transactions}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -654,7 +729,7 @@ function EvmTransactionsPageContent() {
                 setSearchDialogOpen(false);
               }}
             >
-              Historical Transactions
+              {txMessages.historicalTransactions}
             </button>
             <button
               type="button"
@@ -668,7 +743,7 @@ function EvmTransactionsPageContent() {
                 setSearchDialogOpen(false);
               }}
             >
-              Pending Transactions
+              {txMessages.pendingTransactionsTab}
             </button>
           </div>
         </div>
@@ -677,17 +752,17 @@ function EvmTransactionsPageContent() {
           <>
             <section className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <SummaryCard
-                label="Cached Transactions"
-                value={(cacheSummary?.totalTransactions ?? 0).toLocaleString('en-US')}
-                note="Stored in local IndexedDB"
+                label={txMessages.cachedTransactionsCount}
+                value={(cacheSummary?.totalTransactions ?? 0).toLocaleString(locale)}
+                note={txMessages.storedInIndexedDb}
               />
               <SummaryCard
-                label="Observed Accounts"
-                value={(cacheSummary?.totalObservedAccounts ?? 0).toLocaleString('en-US')}
-                note="Derived from cached transaction participants"
+                label={txMessages.observedAccountsCount}
+                value={(cacheSummary?.totalObservedAccounts ?? 0).toLocaleString(locale)}
+                note={txMessages.derivedFromCachedParticipants}
               />
               <SummaryCard
-                label="Latest Cached Transaction"
+                label={txMessages.latestCachedTransaction}
                 value={
                   cacheSummary?.latestSeenTransaction ? (
                     <Link prefetch={false}
@@ -698,7 +773,7 @@ function EvmTransactionsPageContent() {
                       {cacheSummary.latestSeenTransaction.hashLabel}
                     </Link>
                   ) : (
-                    'Unavailable'
+                    commonMessages.unavailable
                   )
                 }
                 valueClassName="text-[22px] leading-tight"
@@ -706,24 +781,24 @@ function EvmTransactionsPageContent() {
                   cacheSummary?.latestSeenTransaction ? (
                     <span>
                       <RelativeTime timestampMs={cacheSummary.latestSeenTransaction.timestampMs} />
-                      {` - Block ${cacheSummary.latestSeenTransaction.blockNumber}`}
+                      {` - ${translateRuntimeText(`Block ${cacheSummary.latestSeenTransaction.blockNumber}`, locale)}`}
                     </span>
                   ) : (
-                    'No cached transaction snapshot yet'
+                    txMessages.noCachedSnapshotYet
                   )
                 }
               />
               <SummaryCard
-                label="Validation Status"
-                value={<span className={validationToneClassName}>{cacheActionState?.label ?? 'Not checked'}</span>}
-                note="Validate against the active provider cache"
+                label={txMessages.validationStatus}
+                value={<span className={validationToneClassName}>{cacheActionState?.label ?? txMessages.notChecked}</span>}
+                note={txMessages.validateAgainstActiveProvider}
               />
             </section>
 
             <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm text-slate-500">{data.subtitle}</p>
+                  <p className="text-sm text-slate-500">{translateRuntimeText(data.subtitle, locale)}</p>
                 </div>
                 <div className="flex items-center gap-0.5 lg:justify-end">
                   <PaginationControls
@@ -736,7 +811,7 @@ function EvmTransactionsPageContent() {
                     onPageChange={handlePageChange}
                   />
                   <ActionIconButton
-                    tooltip={activeSearchFilters.hasFilters ? 'Edit cache search filters' : 'Search cached transactions'}
+                    tooltip={activeSearchFilters.hasFilters ? txMessages.editCacheSearchFilters : txMessages.searchCachedTransactions}
                     aria-pressed={activeSearchFilters.hasFilters}
                     className={activeSearchFilters.hasFilters ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'}
                     onClick={() => setSearchDialogOpen(true)}
@@ -746,10 +821,10 @@ function EvmTransactionsPageContent() {
                   <ActionIconButton
                     tooltip={
                       activeSearchFilters.hasFilters
-                        ? 'Auto refresh is unavailable while cache search filters are active.'
+                        ? txMessages.autoRefreshUnavailableWithCacheFilters
                         : autoRefreshEnabled
-                          ? 'Disable auto refresh'
-                          : 'Enable auto refresh'
+                          ? txMessages.disableAutoRefresh
+                          : txMessages.enableAutoRefresh
                     }
                     aria-pressed={autoRefreshEnabled}
                     className={`${autoRefreshEnabled ? 'text-sky-600' : 'text-slate-400 hover:text-slate-600'} ${activeSearchFilters.hasFilters ? 'cursor-not-allowed opacity-40' : ''}`}
@@ -759,7 +834,7 @@ function EvmTransactionsPageContent() {
                     {autoRefreshEnabled ? <IconPlayerPause className="size-4" stroke={1.8} /> : <IconPlayerPlay className="size-4" stroke={1.8} />}
                   </ActionIconButton>
                   <ActionIconButton
-                    tooltip={cacheActionLoading === 'validate' ? 'Validating cache...' : 'Validate cache'}
+                    tooltip={cacheActionLoading === 'validate' ? txMessages.validatingCache : txMessages.validateCache}
                     className={cacheActionLoading === 'validate' ? 'cursor-wait text-sky-600' : 'text-slate-400 hover:text-sky-600'}
                     disabled={cacheActionLoading != null}
                     onClick={() => void handleValidateCache()}
@@ -767,7 +842,7 @@ function EvmTransactionsPageContent() {
                     <IconShieldCheck className="size-4" stroke={1.8} />
                   </ActionIconButton>
                   <ActionIconButton
-                    tooltip={cacheActionLoading === 'reload' ? 'Reloading cache...' : 'Reload cache'}
+                    tooltip={cacheActionLoading === 'reload' ? txMessages.reloadingCache : txMessages.reloadCache}
                     className={cacheActionLoading === 'reload' ? 'cursor-wait text-sky-600' : 'text-slate-400 hover:text-sky-600'}
                     disabled={cacheActionLoading != null}
                     onClick={() => void handleReloadCache()}
@@ -775,7 +850,7 @@ function EvmTransactionsPageContent() {
                     <IconRefresh className="size-4" stroke={1.8} />
                   </ActionIconButton>
                   <ActionIconButton
-                    tooltip={cacheActionLoading === 'clear' ? 'Clearing cache...' : 'Clear cache'}
+                    tooltip={cacheActionLoading === 'clear' ? txMessages.clearingCache : txMessages.clearCache}
                     className={cacheActionLoading === 'clear' ? 'cursor-wait text-rose-600' : 'text-slate-400 hover:text-rose-600'}
                     disabled={cacheActionLoading != null}
                     onClick={() => setClearDialogOpen(true)}
@@ -808,14 +883,14 @@ function EvmTransactionsPageContent() {
                   </colgroup>
                   <thead className="relative z-10 bg-white">
                     <tr>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Hash</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Method</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Block</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Age</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">From</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">To</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Amount</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">Txn Fee</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.hash}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.method}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{commonMessages.block}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.age}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{commonMessages.from}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{commonMessages.to}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.amount}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.txnFee}</th>
                     </tr>
                   </thead>
                   <tbody
@@ -871,19 +946,21 @@ function EvmTransactionsPageContent() {
                                     className="font-medium text-sky-600 hover:text-sky-700"
                                   />
                                 ) : (
-                                  <span className="text-slate-500">Contract Creation</span>
+                                  <span className="text-slate-500">{txMessages.contractCreation}</span>
                                 )}
                               </div>
                             </td>
-                            <td className="truncate px-5 py-2.5 text-sm font-medium leading-6 tabular-nums text-slate-900">{transaction.amountLabel}</td>
-                            <td className="truncate px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-500">{transaction.feeLabel ?? <span className="text-slate-400">--</span>}</td>
+                            <td className="truncate px-5 py-2.5 text-sm font-medium leading-6 tabular-nums text-slate-900">{translateRuntimeText(transaction.amountLabel, locale)}</td>
+                            <td className="truncate px-5 py-2.5 text-sm leading-6 tabular-nums text-slate-500">
+                              {transaction.feeLabel ? translateRuntimeText(transaction.feeLabel, locale) : <span className="text-slate-400">--</span>}
+                            </td>
                           </tr>
                         );
                       })
                     ) : (
                       <tr>
                         <td colSpan={8} className="px-5 py-10 text-center text-sm text-slate-500">
-                          No cached transactions available yet.
+                          {txMessages.noCachedTransactionsAvailableYet}
                         </td>
                       </tr>
                     )}
@@ -899,9 +976,9 @@ function EvmTransactionsPageContent() {
       <ConfirmDialog
         open={clearDialogOpen}
         onOpenChange={setClearDialogOpen}
-        title="Clear Cache"
-        description="Clear all locally cached EVM transactions and observed accounts from IndexedDB?"
-        confirmLabel="Clear Cache"
+        title={txMessages.clearCacheTitle}
+        description={txMessages.clearCacheDescription}
+        confirmLabel={txMessages.clearCache}
         onConfirm={() => {
           void handleClearCache();
         }}
@@ -909,8 +986,8 @@ function EvmTransactionsPageContent() {
       <ModalDialog
         open={searchDialogOpen}
         onOpenChange={setSearchDialogOpen}
-        title="Search Cached Transactions"
-        description="Filter cached transactions by address, method, time, block range, or amount range."
+        title={txMessages.searchCachedTransactionsTitle}
+        description={txMessages.searchCachedTransactionsDescription}
         maxWidthClassName="max-w-2xl"
         footer={
           <>
@@ -919,28 +996,28 @@ function EvmTransactionsPageContent() {
               className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
               onClick={handleClearSearch}
             >
-              Clear
+              {messages.toolsBigNumber.clear}
             </button>
             <button
               type="button"
               className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
               onClick={() => setSearchDialogOpen(false)}
             >
-              Cancel
+              {commonMessages.cancel}
             </button>
             <button
               type="button"
               className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white transition hover:bg-slate-800"
               onClick={handleApplySearch}
             >
-              Search
+              {messages.search.submit}
             </button>
           </>
         }
       >
         <div className="grid gap-3 pb-1 md:grid-cols-2">
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">From</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{commonMessages.from}</span>
             <input
               value={searchForm.from}
               onChange={(event) => handleSearchInputChange('from', event.target.value)}
@@ -949,7 +1026,7 @@ function EvmTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">To</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{commonMessages.to}</span>
             <input
               value={searchForm.to}
               onChange={(event) => handleSearchInputChange('to', event.target.value)}
@@ -958,7 +1035,7 @@ function EvmTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Time</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.startTime}</span>
             <input
               type="datetime-local"
               value={searchForm.startTime}
@@ -967,7 +1044,7 @@ function EvmTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">End Time</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.endTime}</span>
             <input
               type="datetime-local"
               value={searchForm.endTime}
@@ -976,7 +1053,7 @@ function EvmTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Start Block</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{messages.cosmosTxDetail.startBlock}</span>
             <input
               value={searchForm.startBlock}
               onChange={(event) => handleSearchInputChange('startBlock', event.target.value)}
@@ -985,7 +1062,7 @@ function EvmTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">End Block</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{messages.cosmosTxDetail.endBlock}</span>
             <input
               value={searchForm.endBlock}
               onChange={(event) => handleSearchInputChange('endBlock', event.target.value)}
@@ -994,7 +1071,7 @@ function EvmTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Min Amount</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.minAmount}</span>
             <input
               value={searchForm.minAmount}
               onChange={(event) => handleSearchInputChange('minAmount', event.target.value)}
@@ -1003,7 +1080,7 @@ function EvmTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Max Amount</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.maxAmount}</span>
             <input
               value={searchForm.maxAmount}
               onChange={(event) => handleSearchInputChange('maxAmount', event.target.value)}
@@ -1012,29 +1089,29 @@ function EvmTransactionsPageContent() {
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Method</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.method}</span>
             <input
               value={searchForm.method}
               onChange={(event) => handleSearchInputChange('method', event.target.value)}
-              placeholder="transfer / create / 0xa9059cbb"
+              placeholder={txMessages.methodPlaceholder}
               className="h-10 rounded-lg border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
             />
           </label>
           <label className="grid gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Status</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.status}</span>
             <Select value={searchForm.status} onValueChange={(value: TransactionSearchFormState['status']) => handleSearchInputChange('status', value)}>
               <SelectTrigger className="h-10 rounded-lg border-slate-200 text-sm text-slate-700">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="any">Any</SelectItem>
-                <SelectItem value="success">Success</SelectItem>
-                <SelectItem value="reverted">Failed</SelectItem>
+                <SelectItem value="any">{txMessages.any}</SelectItem>
+                <SelectItem value="success">{txMessages.success}</SelectItem>
+                <SelectItem value="reverted">{txMessages.failed}</SelectItem>
               </SelectContent>
             </Select>
           </label>
         </div>
-        {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{searchErrorMessage}</p> : null}
+        {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{translateRuntimeText(searchErrorMessage, locale)}</p> : null}
       </ModalDialog>
     </AppShell>
   );
