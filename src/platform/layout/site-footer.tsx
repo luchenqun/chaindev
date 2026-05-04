@@ -68,6 +68,7 @@ export function SiteFooter() {
       items: [
         { href: '/evm/tools/rpc', label: labelMessages.rpcApi },
         { href: '/cosmos/tools/rest', label: labelMessages.restApi },
+        { href: '/tools/decode-evm-tx', label: labelMessages.decodeEvmTx },
         { href: '/tools/4byte', label: labelMessages.signatureLookup },
         { href: '/tools/wallet-generator', label: labelMessages.walletGenerator },
       ],

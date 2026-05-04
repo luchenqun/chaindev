@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconSearch, IconSend, IconUserCircle, IconWallet } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconSearch, IconSend, IconUserCircle, IconWallet, IconBinaryTree2 } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -151,6 +151,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/tools/big-number', label: labelMessages.bigNumber, icon: IconFunction },
               { href: '/tools/unit-converter', label: labelMessages.unitConverter, icon: IconCalculator },
               { href: '/tools/bech32', label: labelMessages.bech32, icon: IconArrowsExchange },
+              { href: '/tools/decode-evm-tx', label: labelMessages.decodeEvmTx, icon: IconBinaryTree2 },
               { href: '/tools/4byte', label: labelMessages.signatureLookup, icon: IconSearch },
             ],
           },
@@ -182,6 +183,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/tools/big-number', label: labelMessages.bigNumber, icon: IconFunction },
               { href: '/tools/unit-converter', label: labelMessages.unitConverter, icon: IconCalculator },
               { href: '/tools/bech32', label: labelMessages.bech32, icon: IconArrowsExchange },
+              { href: '/tools/decode-evm-tx', label: labelMessages.decodeEvmTx, icon: IconBinaryTree2 },
               { href: '/tools/4byte', label: labelMessages.signatureLookup, icon: IconSearch },
             ],
           },
@@ -331,7 +333,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                         <div className="text-[15px] font-semibold text-slate-950">{messages.navigation.more}</div>
                         <p className="mt-3 text-[14px] leading-6 text-slate-600">{messages.topNav.moreDescription}</p>
                       </div>
-                      <div className="flex flex-col gap-5 px-6 py-5">
+                      <div className="flex flex-col gap-3.5 px-6 py-5">
                         {moreGroups.map((group) => (
                           <div key={group.id} className="grid min-w-0 grid-cols-[84px_minmax(0,1fr)] items-start gap-4">
                             <div className="pt-1 text-[15px] font-semibold text-slate-950">{group.label}</div>
