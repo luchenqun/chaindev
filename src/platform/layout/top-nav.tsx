@@ -322,20 +322,20 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 <IconChevronDown className="size-3.5" stroke={2.2} />
               </button>
               {openGroup === 'tools-more' ? (
-                <div className="absolute right-0 top-full z-20 pt-2" onMouseEnter={cancelScheduledClose} onMouseLeave={() => scheduleClose('tools-more')}>
+                <div className="absolute right-0 top-full z-20 pt-2 translate-x-32" onMouseEnter={cancelScheduledClose} onMouseLeave={() => scheduleClose('tools-more')}>
                   <div className="absolute inset-x-0 top-0 h-2" aria-hidden="true" />
-                  <div className="w-[960px] overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                  <div className="w-max max-w-[min(1280px,calc(100vw-32px))] overflow-hidden rounded-b-2xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
                     <div className="border-t-[3px] border-[#19a7f2]" />
                     <div className="grid grid-cols-[220px_minmax(0,1fr)] gap-0">
                       <div className="bg-slate-50 px-6 py-6">
                         <div className="text-[15px] font-semibold text-slate-950">{messages.navigation.more}</div>
                         <p className="mt-3 text-[14px] leading-6 text-slate-600">{messages.topNav.moreDescription}</p>
                       </div>
-                      <div className="grid grid-cols-3 gap-5 px-6 py-5">
+                      <div className="flex flex-col gap-5 px-6 py-5">
                         {moreGroups.map((group) => (
-                          <div key={group.id} className="min-w-0">
-                            <div className="text-[15px] font-semibold text-slate-950">{group.label}</div>
-                            <div className="mt-2 space-y-0.5">
+                          <div key={group.id} className="grid min-w-0 grid-cols-[84px_minmax(0,1fr)] items-start gap-4">
+                            <div className="pt-1 text-[15px] font-semibold text-slate-950">{group.label}</div>
+                            <div className="grid min-w-0 grid-cols-4 gap-x-4 gap-y-0.5">
                               {group.items.map((item) => {
                                 const itemActive = matchesNavItem(pathname, item.href);
                                 const Icon = item.icon ?? IconSend;
@@ -347,12 +347,12 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                                     href={item.href}
                                     className={
                                       itemActive
-                                        ? 'flex items-center gap-2 rounded-lg px-2 py-1 text-[14px] font-[450] text-[#1697ea]'
-                                        : 'flex items-center gap-2 rounded-lg px-2 py-1 text-[14px] font-[450] text-slate-700 hover:bg-slate-100 hover:text-[#1697ea]'
+                                        ? 'flex w-full min-w-[max-content] items-center gap-2 rounded-lg px-2 py-1 text-[14px] font-[450] text-[#1697ea]'
+                                        : 'flex w-full min-w-[max-content] items-center gap-2 rounded-lg px-2 py-1 text-[14px] font-[450] text-slate-700 hover:bg-slate-100 hover:text-[#1697ea]'
                                     }
                                   >
                                     <Icon className="size-4 shrink-0" stroke={1.9} />
-                                    {item.label}
+                                    <span>{item.label}</span>
                                   </Link>
                                 );
                               })}

@@ -127,7 +127,7 @@ export function EvmHomeActivity() {
                           </p>
                           <p className="mt-1 text-sm text-slate-500">
                             <Link prefetch={false} className="font-semibold text-sky-600 hover:text-sky-700" href={`/evm/block/${block.number}?tab=transactions`}>
-                              {block.txCount}
+                              {block.txCount} {messages.common.txs}
                             </Link>
                           </p>
                         </div>

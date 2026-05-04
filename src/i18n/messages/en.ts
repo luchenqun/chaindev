@@ -388,7 +388,7 @@ export const en = {
     computationFailed: 'Computation failed.',
   },
   toolsBigNumber: {
-    title: 'Big Number Calculator',
+    title: 'Big Num Calc',
     description: 'Large integer math in the browser.',
     operands: 'Operands',
     expression: 'Expression',
@@ -433,7 +433,7 @@ export const en = {
     restApi: 'REST API',
     rpcApi: 'RPC API',
     hashEncoding: 'Hash & Encoding',
-    bigNumber: 'Big Number Calculator',
+    bigNumber: 'Big Num Calc',
     unitConverter: 'Unit Converter',
     bech32: 'Bech32',
     signatureLookup: 'Signature Lookup',

@@ -275,7 +275,7 @@ function formatHomeBlockItem(block: { number: bigint; hash: string | null; miner
     hashLabel: shortenHash(block.hash),
     miner: block.miner,
     minerLabel: shortenAddress(block.miner),
-    txCount: `${block.transactions.length} txns`,
+    txCount: String(block.transactions.length),
     timestampMs: block.timestamp ? Number(block.timestamp) * 1000 : null,
     gasUsedLabel: formatGasUsed(block.gasUsed),
   };
