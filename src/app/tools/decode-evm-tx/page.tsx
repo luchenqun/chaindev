@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { parseContractAbiJson } from '@/domains/evm/client/abi-utils';
 import { listEvmContractArtifacts, subscribeEvmContractRegistry, type EvmContractArtifact } from '@/domains/evm/client/contract-registry';
 import { decodeHexToUtf8 } from '@/domains/evm/client/transaction-decoder';
+import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
@@ -374,6 +375,10 @@ function dedupeCandidatesBySignature(candidates: DecodedCandidate[]) {
   return uniqueCandidates;
 }
 
+function TxAddressLink({ address }: { address: string }) {
+  return <AddressLink address={address} href={`/evm/address/${address}`} label={address} className="break-all text-sky-600 hover:text-sky-700" showCopyButton />;
+}
+
 export default function DecodeEvmTxPage() {
   const messages = useMessages();
   const { locale } = useLocale();
@@ -564,10 +569,7 @@ export default function DecodeEvmTxPage() {
               </div>
 
               <div className="grid gap-2">
-                <div className="flex items-center justify-between gap-3">
-                  <label className="text-sm font-medium text-slate-700">{pageMessages.abiInput}</label>
-                  <span className="text-xs text-slate-500">{pageMessages.abiInputHint}</span>
-                </div>
+                <label className="text-sm font-medium text-slate-700">{pageMessages.abiInput}</label>
                 <JsonInput value={abiInput} onChange={setAbiInput} placeholder={pageMessages.abiInputPlaceholder} textareaClassName={TEXTAREA_CLASS_NAME} />
               </div>
 
@@ -643,9 +645,7 @@ export default function DecodeEvmTxPage() {
                                     <div className="flex flex-wrap items-center gap-1.5">
                                       <div className="min-w-0 max-w-full">
                                         {arg.type === 'address' && isAddress(arg.value) ? (
-                                          <Link href={`/evm/address/${arg.value}`} className="break-all text-[#6d4aff] hover:text-[#5935ff]">
-                                            {arg.value}
-                                          </Link>
+                                          <TxAddressLink address={arg.value} />
                                         ) : (
                                           <span className="break-all whitespace-pre-wrap">{arg.value}</span>
                                         )}

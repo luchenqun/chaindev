@@ -217,7 +217,7 @@ export const en = {
     workbench: 'Workbench',
     brandDescription: 'Unified development workbench for EVM and Cosmos chain builders.',
     builtBy: 'Built by Luke',
-    donations: 'Donations:',
+    donations: 'Donations',
     donationTitle: 'Donation Address',
     donationDescription: 'Scan this address with your wallet, or copy it directly from the footer.',
     close: 'Close',
