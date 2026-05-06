@@ -2,7 +2,7 @@
 
 import { IconCopy } from '@tabler/icons-react';
 import { type KeyboardEvent, useEffect, useState } from 'react';
-import { decodeEventLog, isAddress, parseAbiItem, toEventSelector, type Abi, type AbiEvent, type AbiParameter, type Hex } from 'viem';
+import { decodeAbiParameters, decodeEventLog, isAddress, parseAbiItem, toEventSelector, type Abi, type AbiEvent, type AbiParameter, type Hex } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
@@ -306,6 +306,44 @@ function resolveIndexedTopicHex(event: AbiEvent, topics: string[], inputIndex: n
   return topics[(event.anonymous ? 0 : 1) + indexedPosition - 1] ?? null;
 }
 
+function decodeEventArgumentsFromLog(event: AbiEvent, log: EventLogRecord) {
+  const indexedValues = new Map<number, unknown>();
+  const nonIndexedInputs = event.inputs.flatMap((input, index) => (input.indexed ? [] : [{ input, index }]));
+  const nonIndexedDecoded = nonIndexedInputs.length
+    ? decodeAbiParameters(
+        nonIndexedInputs.map(({ input }) => input),
+        normalizeHexValue(log.data, '0x'),
+      )
+    : [];
+
+  event.inputs.forEach((input, index) => {
+    if (!input.indexed) {
+      return;
+    }
+
+    const topicHex = resolveIndexedTopicHex(event, log.topics, index);
+
+    if (!topicHex) {
+      return;
+    }
+
+    const [decodedValue] = decodeAbiParameters([input], normalizeHexValue(topicHex));
+    indexedValues.set(index, decodedValue);
+  });
+
+  let nonIndexedCursor = 0;
+
+  return event.inputs.map((input, index) => {
+    if (input.indexed) {
+      return indexedValues.get(index);
+    }
+
+    const decodedValue = nonIndexedDecoded[nonIndexedCursor];
+    nonIndexedCursor += 1;
+    return decodedValue;
+  });
+}
+
 function splitHexWords(value: string | undefined) {
   const normalized = (value ?? '0x').replace(/^0x/i, '');
 
@@ -322,16 +360,25 @@ function splitHexWords(value: string | undefined) {
   return words;
 }
 
-function isStaticAbiType(type: string) {
-  if (type === 'string' || type === 'bytes' || type === 'tuple') {
-    return false;
+function isDynamicAbiParameter(parameter: AbiParameter): boolean {
+  if (parameter.type === 'string' || parameter.type === 'bytes') {
+    return true;
   }
 
-  if (type.includes('[')) {
-    return !/\[\]$/.test(type);
+  if (parameter.type.endsWith('[]')) {
+    return true;
   }
 
-  return !type.startsWith('tuple');
+  if (parameter.type === 'tuple') {
+    const components = hasTupleComponents(parameter) ? parameter.components : [];
+    return components.some(isDynamicAbiParameter);
+  }
+
+  if (parameter.type.startsWith('tuple[')) {
+    return true;
+  }
+
+  return false;
 }
 
 function inferIndexedEventFromLog(event: AbiEvent, log: EventLogRecord) {
@@ -344,13 +391,13 @@ function inferIndexedEventFromLog(event: AbiEvent, log: EventLogRecord) {
   }
 
   const indexedCount = Math.max(log.topics.length - 1, 0);
-  const dataWordCount = splitHexWords(log.data).length;
 
-  if (indexedCount <= 0 || indexedCount + dataWordCount !== event.inputs.length) {
+  if (indexedCount <= 0 || indexedCount > event.inputs.length) {
     return null;
   }
 
-  if (!event.inputs.every((input) => isStaticAbiType(input.type))) {
+  const indexedInputs = event.inputs.slice(0, indexedCount);
+  if (indexedInputs.some(isDynamicAbiParameter)) {
     return null;
   }
 
@@ -441,6 +488,8 @@ function decodeLogWithSources(input: {
         topics: decodedTopics,
         strict: false,
       });
+      const decodedArgs =
+        Array.isArray(decoded.args) && decoded.args.length === matchedEvent.inputs.length ? decoded.args : decodeEventArgumentsFromLog(matchedEvent, input.log);
 
       return {
         key: `log-${input.logIndex}`,
@@ -454,7 +503,7 @@ function decodeLogWithSources(input: {
           name: eventInput.name || `arg${index + 1}`,
           type: eventInput.type,
           indexed: Boolean(eventInput.indexed),
-          value: stringifyValue(readDecodedEventArgument(decoded.args, eventInput, index)),
+          value: stringifyValue(readDecodedEventArgument(decodedArgs, eventInput, index)),
           rawHex: eventInput.indexed ? resolveIndexedTopicHex(matchedEvent, input.log.topics, index) : null,
         })),
       } satisfies DecodedEventLogResult;
