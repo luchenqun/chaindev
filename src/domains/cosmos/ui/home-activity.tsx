@@ -54,6 +54,7 @@ export function CosmosHomeActivity() {
   const getTransactionKey = useCallback((transaction: (typeof transactionItems)[number]) => transaction.hash, []);
   const pushedBlockItems = usePushedListItems(blockItems, getBlockKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
   const pushedTransactionItems = usePushedListItems(transactionItems, getTransactionKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
+  const hasTransactions = pushedTransactionItems.length > 0;
   const pushedTransactionEnteringRows = pushedTransactionItems.filter((item) => item.phase === 'entering').length || 1;
 
   if (!snapshot && !errorMessage) {
@@ -134,15 +135,20 @@ export function CosmosHomeActivity() {
             </Link>
           </div>
           <div
-            className="home-activity-push-viewport overflow-hidden border-t border-slate-200 pt-1"
+            className={cn(
+              'border-t border-slate-200',
+              hasTransactions ? 'home-activity-push-viewport overflow-hidden pt-1' : 'flex min-h-[18rem] items-center justify-center',
+            )}
             style={
-              {
-                '--home-activity-visible-items': transactionVisibleItems,
-                '--home-activity-entering-rows': pushedTransactionEnteringRows,
-              } as HomeActivityViewportStyle
+              hasTransactions
+                ? ({
+                    '--home-activity-visible-items': transactionVisibleItems,
+                    '--home-activity-entering-rows': pushedTransactionEnteringRows,
+                  } as HomeActivityViewportStyle)
+                : undefined
             }
           >
-            {pushedTransactionItems.length ? (
+            {hasTransactions ? (
               <div className={cn('grid', pushedTransactionItems.some((item) => item.phase !== 'stable') && 'home-activity-push-list-moving')}>
                 {pushedTransactionItems.map(({ item: transaction, key, phase }, index) => (
                   <div key={key} className={cn('home-activity-push-row', index ? 'border-t border-slate-200' : '', `home-activity-push-row-${phase}`)}>

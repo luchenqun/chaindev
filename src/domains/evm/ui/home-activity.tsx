@@ -34,6 +34,20 @@ function EmptyState({ title, message }: { title: string; message: string }) {
   );
 }
 
+function EmptyTransactionState() {
+  const messages = useMessages();
+
+  return (
+    <div className="flex h-full min-h-[8rem] flex-col items-center justify-center px-6 py-8 text-center">
+      <div className="flex size-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+        <IconFileText className="size-5" stroke={1.8} />
+      </div>
+      <p className="mt-3 text-sm font-semibold text-slate-700">{messages.common.noRecentTransactions}</p>
+      <p className="mt-1 max-w-72 text-sm text-slate-500">{messages.evmTxDetail.noCachedTransactionsAvailableYet}</p>
+    </div>
+  );
+}
+
 export function EvmHomeActivity() {
   const messages = useMessages();
   const { locale } = useLocale();
@@ -46,6 +60,7 @@ export function EvmHomeActivity() {
   const getTransactionKey = useCallback((transaction: (typeof transactionItems)[number]) => transaction.hash, []);
   const pushedBlockItems = usePushedListItems(blockItems, getBlockKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
   const pushedTransactionItems = usePushedListItems(transactionItems, getTransactionKey, true, HOME_ACTIVITY_VISIBLE_ITEMS);
+  const hasTransactions = pushedTransactionItems.length > 0;
   const pushedTransactionEnteringRows = pushedTransactionItems.filter((item) => item.phase === 'entering').length || 1;
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const visibleAddresses = useMemo(
@@ -155,15 +170,20 @@ export function EvmHomeActivity() {
             </Link>
           </div>
           <div
-            className="home-activity-push-viewport overflow-hidden border-t border-slate-200 pt-1"
+            className={cn(
+              'border-t border-slate-200',
+              hasTransactions ? 'home-activity-push-viewport overflow-hidden pt-1' : 'flex min-h-[18rem] items-center justify-center',
+            )}
             style={
-              {
-                '--home-activity-visible-items': transactionVisibleItems,
-                '--home-activity-entering-rows': pushedTransactionEnteringRows,
-              } as HomeActivityViewportStyle
+              hasTransactions
+                ? ({
+                    '--home-activity-visible-items': transactionVisibleItems,
+                    '--home-activity-entering-rows': pushedTransactionEnteringRows,
+                  } as HomeActivityViewportStyle)
+                : undefined
             }
           >
-            {pushedTransactionItems.length ? (
+            {hasTransactions ? (
               <div className={cn('grid', pushedTransactionItems.some((item) => item.phase !== 'stable') && 'home-activity-push-list-moving')}>
                 {pushedTransactionItems.map(({ item: transaction, key, phase }, index) => (
                   <div key={key} className={cn('home-activity-push-row', index ? 'border-t border-slate-200' : '', `home-activity-push-row-${phase}`)}>
@@ -222,7 +242,11 @@ export function EvmHomeActivity() {
                 ))}
               </div>
             ) : (
-              <EmptyState title={LATEST_TRANSACTIONS_TITLE} message={errorMessage ? translateRuntimeText(errorMessage, locale) : messages.common.addEvmProviderForTransactions} />
+              errorMessage ? (
+                <EmptyState title={LATEST_TRANSACTIONS_TITLE} message={translateRuntimeText(errorMessage, locale)} />
+              ) : (
+                <EmptyTransactionState />
+              )
             )}
           </div>
         </CardContent>
