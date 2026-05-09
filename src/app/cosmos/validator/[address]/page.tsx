@@ -1,10 +1,12 @@
 'use client';
 
-import { IconReceiptRefund, IconX } from '@tabler/icons-react';
+import { IconLogout, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
@@ -23,6 +25,9 @@ import {
   type CosmosSigningAlgorithm,
 } from '@/domains/cosmos/client/signing-transactions';
 import { getCosmosValidatorDetailDirect } from '@/domains/cosmos/client/queries';
+import { formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
+import { decodeCosmosAddressToEvmHexAddress } from '@/domains/cosmos/ui/address-display';
+import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { CosmosDetailGroup as DetailGroup, CosmosDetailRow as DetailRow, CosmosDetailTag as DetailTag, formatTimestampWithSeconds } from '@/domains/cosmos/ui/detail-primitives';
 import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
 import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
@@ -124,14 +129,153 @@ function RewardSummaryRow({ label, value, actionLabel, onAction }: { label: stri
       <p className="text-sm font-medium text-slate-500">{translateRuntimeText(label, locale)}</p>
       <p className="min-w-0 break-words text-sm font-semibold text-slate-900">{value || '0'}</p>
       {actionLabel && onAction ? (
-        <Button type="button" variant="outline" size="sm" className="justify-self-start sm:justify-self-end" onClick={onAction}>
-          <IconReceiptRefund className="mr-1.5 size-4" stroke={1.8} />
-          {translateRuntimeText(actionLabel, locale)}
-        </Button>
+        <span className="justify-self-start sm:justify-self-end">
+          <ActionIconButton tooltip={translateRuntimeText(actionLabel, locale)} className="text-slate-400 hover:text-sky-600" onClick={onAction}>
+            <IconLogout className="size-4" stroke={1.8} />
+          </ActionIconButton>
+        </span>
       ) : (
         <span className="hidden sm:block" />
       )}
     </div>
+  );
+}
+
+function ValidatorRewardTooltipValue({
+  label,
+  rawValues,
+}: {
+  label: string;
+  rawValues: string[];
+}) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current != null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function openTooltip() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    setTooltipOpen(true);
+  }
+
+  function closeTooltipSoon() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+    }
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setTooltipOpen(false);
+      closeTimeoutRef.current = null;
+    }, 120);
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="inline-flex min-w-0 max-w-full items-center text-left outline-none transition hover:text-sky-700 focus-visible:ring-2 focus-visible:ring-sky-400"
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        onFocus={openTooltip}
+        onBlur={closeTooltipSoon}
+      >
+        <span className="truncate">{label || '0'}</span>
+      </button>
+      <FloatingTooltip
+        open={tooltipOpen}
+        anchorRef={triggerRef}
+        interactive
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        className="max-w-[520px] whitespace-normal border border-slate-200 bg-white text-slate-700"
+      >
+        <span className="block space-y-1">
+          {(rawValues.length ? rawValues : ['0']).map((item) => (
+            <span key={item} className="block select-text break-all">
+              {item}
+            </span>
+          ))}
+        </span>
+      </FloatingTooltip>
+    </>
+  );
+}
+
+function ValidatorBalanceTooltipValue({
+  label,
+  rawValue,
+}: {
+  label: string;
+  rawValue: string;
+}) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current != null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function openTooltip() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    setTooltipOpen(true);
+  }
+
+  function closeTooltipSoon() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+    }
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setTooltipOpen(false);
+      closeTimeoutRef.current = null;
+    }, 120);
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="inline-flex min-w-0 max-w-full items-center text-left outline-none transition hover:text-sky-700 focus-visible:ring-2 focus-visible:ring-sky-400"
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        onFocus={openTooltip}
+        onBlur={closeTooltipSoon}
+      >
+        <span className="truncate">{label}</span>
+      </button>
+      <FloatingTooltip
+        open={tooltipOpen}
+        anchorRef={triggerRef}
+        interactive
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        className="max-w-[520px] whitespace-normal border border-slate-200 bg-white text-slate-700"
+      >
+        <span className="block select-text break-all">{rawValue}</span>
+      </FloatingTooltip>
+    </>
   );
 }
 
@@ -395,6 +539,7 @@ export default function CosmosValidatorPage() {
   const messages = useMessages();
   const { locale } = useLocale();
   const validatorMessages = messages.cosmosValidatorDetail;
+  const bankSupplyMessages = messages.cosmosBankSupply;
   const params = useParams<{ address: string }>();
   const address = params.address;
   const [currentTxPage, setCurrentTxPage] = useState(1);
@@ -479,6 +624,7 @@ export default function CosmosValidatorPage() {
   const hasDelegations = validator.delegationsCount > 0;
   const resolvedActiveTab = activeTab === 'transactions' && !hasTransactions ? 'overview' : activeTab === 'delegations' && !hasDelegations ? 'overview' : activeTab;
   const statusTone = validator.status === 'BOND_STATUS_BONDED' ? 'success' : validator.status === 'BOND_STATUS_UNBONDING' ? 'warning' : 'neutral';
+  const validatorAccountHexAddress = validator.accountAddress ? decodeCosmosAddressToEvmHexAddress(validator.accountAddress) : null;
 
   return (
     <AppShell>
@@ -557,6 +703,7 @@ export default function CosmosValidatorPage() {
                     }
                     mono
                   />
+                  <DetailRow label="Hex Address" value={validatorAccountHexAddress ?? '-'} mono />
                   <DetailRow label={validatorMessages.consensusPubkey} value={validator.consensusPubkey ?? '-'} mono />
                 </DetailGroup>
                 <DetailGroup>
@@ -599,19 +746,39 @@ export default function CosmosValidatorPage() {
                 <p className="mt-1 text-sm text-slate-500">{validatorMessages.accountBalancesDescription}</p>
               </div>
               <div>
-                <RewardSummaryRow
-                  label={validatorMessages.accountAddress}
-                  value={
-                    validator.accountAddress ? (
-                      <Link className="font-mono text-sky-600 hover:text-sky-700" href={`/cosmos/account/${validator.accountAddress}`}>
-                        {validator.accountAddress}
-                      </Link>
-                    ) : (
-                      '-'
-                    )
-                  }
-                />
-                <RewardSummaryRow label={messages.cosmosAccountDetail.balances} value={translateRuntimeText(validator.accountReadableBalancesLabel, locale)} />
+                {validator.accountBalances.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="data-table min-w-[1120px] table-fixed">
+                      <thead>
+                        <tr>
+                          <th className="w-[360px] border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.denom}</th>
+                          <th className="w-[360px] border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{bankSupplyMessages.readable}</th>
+                          <th className="w-[400px] border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{bankSupplyMessages.rawAmount}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {validator.accountBalances.map((balance, index) => (
+                          <tr key={`${balance.denom}-${index}`} className="border-t border-slate-200">
+                            <td className="px-5 py-3 text-sm text-slate-700 mono">
+                              <ValidatorBalanceTooltipValue label={balance.denom} rawValue={balance.denom} />
+                            </td>
+                            <td className="px-5 py-3 text-sm text-slate-900 mono">
+                              <ValidatorBalanceTooltipValue
+                                label={`${formatReadableTokenAmount(balance.amount)} ${formatReadableDenom(balance.denom)}`}
+                                rawValue={`${balance.amount} ${balance.denom}`}
+                              />
+                            </td>
+                            <td className="px-5 py-3 text-sm text-slate-700 mono">
+                              <ValidatorBalanceTooltipValue label={balance.amount} rawValue={balance.amount} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <RewardSummaryRow label={messages.cosmosAccountDetail.balances} value="0" />
+                )}
               </div>
             </div>
 
@@ -623,17 +790,35 @@ export default function CosmosValidatorPage() {
               <div>
                 <RewardSummaryRow
                   label={validatorMessages.stakeRewards}
-                  value={translateRuntimeText(validator.stakeRewardsLabel, locale)}
+                  value={
+                    <ValidatorRewardTooltipValue
+                      label={translateRuntimeText(validator.stakeRewardsLabel, locale)}
+                      rawValues={(validator.rawJson.stakeRewards?.rewards ?? []).map((item) => `${item.amount} ${item.denom}`)}
+                    />
+                  }
                   actionLabel={validatorMessages.withdraw}
                   onAction={() => setRewardWithdrawalKind('stake')}
                 />
                 <RewardSummaryRow
                   label={validatorMessages.commissionRewards}
-                  value={translateRuntimeText(validator.commissionRewardsLabel, locale)}
+                  value={
+                    <ValidatorRewardTooltipValue
+                      label={translateRuntimeText(validator.commissionRewardsLabel, locale)}
+                      rawValues={(validator.rawJson.commissionRewards?.commission?.commission ?? []).map((item) => `${item.amount} ${item.denom}`)}
+                    />
+                  }
                   actionLabel={validatorMessages.withdraw}
                   onAction={() => setRewardWithdrawalKind('commission')}
                 />
-                <RewardSummaryRow label={validatorMessages.outstandingRewards} value={translateRuntimeText(validator.outstandingRewardsLabel, locale)} />
+                <RewardSummaryRow
+                  label={validatorMessages.outstandingRewards}
+                  value={
+                    <ValidatorRewardTooltipValue
+                      label={translateRuntimeText(validator.outstandingRewardsLabel, locale)}
+                      rawValues={(validator.rawJson.outstandingRewards?.rewards?.rewards ?? []).map((item) => `${item.amount} ${item.denom}`)}
+                    />
+                  }
+                />
               </div>
             </div>
           </section>
@@ -733,9 +918,11 @@ export default function CosmosValidatorPage() {
                   {validator.delegations.map((delegation) => (
                     <tr key={`${delegation.delegatorAddress}-${delegation.sharesLabel}`} className="border-t border-slate-200">
                       <td className="px-5 py-3 text-sm">
-                        <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/account/${delegation.delegatorAddress}`}>
-                          {delegation.delegatorAddressLabel}
-                        </Link>
+                        <CosmosAddressLink
+                          href={`/cosmos/account/${delegation.delegatorAddress}`}
+                          label={delegation.delegatorAddressLabel}
+                          copyValue={delegation.delegatorAddress}
+                        />
                       </td>
                       <td className="px-5 py-3 text-sm text-slate-700">{translateRuntimeText(delegation.amountLabel, locale)}</td>
                       <td className="px-5 py-3 text-sm text-slate-900 mono">{translateRuntimeText(delegation.sharesLabel, locale)}</td>

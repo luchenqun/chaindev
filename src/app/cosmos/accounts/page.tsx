@@ -2,8 +2,9 @@
 
 import { IconAdjustmentsHorizontal, IconArrowsExchange, IconCode, IconRefresh } from '@tabler/icons-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
@@ -16,6 +17,79 @@ import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
+
+function CosmosAccountBalancesTooltip({
+  label,
+  balances,
+}: {
+  label: string;
+  balances: Array<{ denom: string; amount: string }>;
+}) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+  const rawBalances = balances.length ? balances.map((item) => `${item.amount} ${item.denom}`) : ['0'];
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current != null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function openTooltip() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    setTooltipOpen(true);
+  }
+
+  function closeTooltipSoon() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+    }
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setTooltipOpen(false);
+      closeTimeoutRef.current = null;
+    }, 120);
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="inline-flex min-w-0 max-w-full items-center text-left outline-none transition hover:text-sky-700 focus-visible:ring-2 focus-visible:ring-sky-400"
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        onFocus={openTooltip}
+        onBlur={closeTooltipSoon}
+      >
+        <span className="truncate">{label}</span>
+      </button>
+      <FloatingTooltip
+        open={tooltipOpen}
+        anchorRef={triggerRef}
+        interactive
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        className="max-w-[520px] whitespace-normal border border-slate-200 bg-white text-slate-700"
+      >
+        <span className="block space-y-1">
+          {rawBalances.map((item) => (
+            <span key={item} className="block break-all">
+              {item}
+            </span>
+          ))}
+        </span>
+      </FloatingTooltip>
+    </>
+  );
+}
 
 function CosmosAccountsPageContent() {
   const messages = useMessages();
@@ -126,7 +200,6 @@ function CosmosAccountsPageContent() {
                 />
                 <ActionIconButton
                   tooltip={balanceDisplayMode === 'readable' ? accountMessages.switchToAccurateBalances : accountMessages.switchToReadableBalances}
-                  tooltipPlacement="bottom"
                   className="h-8 w-8 text-slate-400 hover:text-slate-600"
                   onClick={() => setBalanceDisplayMode((current) => (current === 'readable' ? 'accurate' : 'readable'))}
                 >
@@ -134,7 +207,6 @@ function CosmosAccountsPageContent() {
                 </ActionIconButton>
                 <ActionIconButton
                   tooltip={addressDisplayMode === 'bech32' ? messages.cosmosTxDetail.switchToHex : messages.cosmosTxDetail.switchToBech32}
-                  tooltipPlacement="bottom"
                   className="h-8 w-8 text-slate-400 hover:text-slate-600"
                   onClick={() => setAddressDisplayMode((current) => (current === 'bech32' ? 'hex' : 'bech32'))}
                 >
@@ -142,7 +214,6 @@ function CosmosAccountsPageContent() {
                 </ActionIconButton>
                 <ActionIconButton
                   tooltip={messages.common.refresh}
-                  tooltipPlacement="bottom"
                   className="h-8 w-8 text-slate-400 hover:text-slate-600"
                   onClick={() => setRefreshVersion((current) => current + 1)}
                 >
@@ -170,13 +241,22 @@ function CosmosAccountsPageContent() {
                     return (
                       <tr key={account.address} className="border-t border-slate-200">
                         <td className="px-5 py-3 text-sm" title={displayAddress.full}>
-                          <CosmosAddressLink prefetch={false} href={`/cosmos/account/${account.address}`} label={displayAddress.label} copyValue={displayAddress.full} />
+                          <CosmosAddressLink prefetch={false} href={`/cosmos/account/${account.address}`} label={displayAddress.full} copyValue={displayAddress.full} />
                         </td>
                         <td className="px-5 py-3 text-sm text-slate-700">
-                          {translateRuntimeText(balanceDisplayMode === 'readable' ? account.readableBalancesLabel : account.balancesLabel, locale)}
+                          <CosmosAccountBalancesTooltip
+                            label={translateRuntimeText(balanceDisplayMode === 'readable' ? account.readableBalancesLabel : account.balancesLabel, locale)}
+                            balances={account.balances}
+                          />
                         </td>
                         <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{translateRuntimeText(account.sequenceLabel, locale)}</td>
-                        <td className="px-5 py-3 text-sm text-slate-700">{translateRuntimeText(account.type, locale)}</td>
+                        <td className="px-5 py-3 text-sm text-slate-700">
+                          {account.isModuleAccount ? (
+                            <span className="inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">{account.type}</span>
+                          ) : (
+                            account.type
+                          )}
+                        </td>
                       </tr>
                     );
                   })

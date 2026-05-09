@@ -88,49 +88,8 @@ export function TransactionHashCell(props: TransactionPreviewData) {
 }
 
 export function TransactionMethodBadge({ methodLabel }: { methodLabel: string }) {
-  const [tooltipPosition, setTooltipPosition] = useState<{
-    top: number;
-    left: number;
-    placement: 'top' | 'bottom';
-  } | null>(null);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
   const triggerRef = useRef<HTMLSpanElement | null>(null);
-
-  function updateTooltipPosition() {
-    const trigger = triggerRef.current;
-
-    if (!trigger) {
-      return;
-    }
-
-    const rect = trigger.getBoundingClientRect();
-    const placement = rect.top > 44 ? 'top' : 'bottom';
-    const top = placement === 'top' ? rect.top - 8 : rect.bottom + 8;
-    const left = Math.min(Math.max(16, rect.left + rect.width / 2), window.innerWidth - 16);
-
-    setTooltipPosition({ top, left, placement });
-  }
-
-  function handleShowTooltip() {
-    updateTooltipPosition();
-  }
-
-  function handleHideTooltip() {
-    setTooltipPosition(null);
-  }
-
-  useEffect(() => {
-    if (!tooltipPosition) {
-      return;
-    }
-
-    window.addEventListener('resize', updateTooltipPosition);
-    window.addEventListener('scroll', updateTooltipPosition, true);
-
-    return () => {
-      window.removeEventListener('resize', updateTooltipPosition);
-      window.removeEventListener('scroll', updateTooltipPosition, true);
-    };
-  }, [tooltipPosition]);
 
   return (
     <>
@@ -139,28 +98,16 @@ export function TransactionMethodBadge({ methodLabel }: { methodLabel: string })
         className="inline-flex w-full max-w-[150px] min-w-0 items-center justify-start rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700"
         aria-label={methodLabel}
         tabIndex={0}
-        onBlur={handleHideTooltip}
-        onFocus={handleShowTooltip}
-        onMouseEnter={handleShowTooltip}
-        onMouseLeave={handleHideTooltip}
+        onBlur={() => setTooltipOpen(false)}
+        onFocus={() => setTooltipOpen(true)}
+        onMouseEnter={() => setTooltipOpen(true)}
+        onMouseLeave={() => setTooltipOpen(false)}
       >
         <span className="block min-w-0 truncate">{methodLabel}</span>
       </span>
-      {tooltipPosition && typeof document !== 'undefined'
-        ? createPortal(
-            <span
-              className="pointer-events-none fixed z-[80] max-w-[min(420px,calc(100vw-32px))] break-words rounded-md bg-slate-900 px-2.5 py-1.5 text-[11px] font-medium leading-4 text-white shadow-[0_8px_20px_rgba(15,23,42,0.18)]"
-              style={{
-                top: tooltipPosition.top,
-                left: tooltipPosition.left,
-                transform: tooltipPosition.placement === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
-              }}
-            >
-              {methodLabel}
-            </span>,
-            document.body,
-          )
-        : null}
+      <FloatingTooltip open={tooltipOpen} anchorRef={triggerRef} className="max-w-[420px] break-words border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium leading-4 text-slate-700">
+        {methodLabel}
+      </FloatingTooltip>
     </>
   );
 }

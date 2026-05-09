@@ -58,7 +58,7 @@ function MetricCard({ label, value, subtext }: Metric) {
             <FloatingTooltip
               open={tooltipOpen}
               anchorRef={tooltipTriggerRef}
-              className="w-[220px] whitespace-normal bg-slate-800 leading-5 text-white"
+              className="w-[220px] whitespace-normal border border-slate-200 bg-white leading-5 text-slate-700"
             >
               {subtext}
             </FloatingTooltip>

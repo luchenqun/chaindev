@@ -141,6 +141,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             items: [
               { href: '/cosmos/tools/send-tx', label: labelMessages.sendTransaction, icon: IconSend },
               { href: '/cosmos/tools/rest', label: labelMessages.restApi, icon: IconCloudCode },
+              { href: '/cosmos/tools/bank-supply', label: labelMessages.bankSupply, icon: IconChartHistogram },
             ],
           },
           {

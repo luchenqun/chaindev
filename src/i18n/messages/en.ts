@@ -431,6 +431,7 @@ export const en = {
     security: 'Security',
     sendTransaction: 'Send Transaction',
     restApi: 'REST API',
+    bankSupply: 'Bank Supply',
     rpcApi: 'RPC API',
     hashEncoding: 'Hash & Encoding',
     bigNumber: 'Big Num Calc',
@@ -1122,6 +1123,15 @@ export const en = {
     unlock: 'Unlock',
     undelegateBroadcasted: 'Undelegate transaction broadcasted',
     failedToBroadcastUndelegate: 'Failed to broadcast undelegate transaction.',
+  },
+  cosmosBankSupply: {
+    failedToLoadFallback: 'Failed to load bank supply.',
+    totalDenomsLabel: '{count} denoms',
+    emptyDenomsLabel: '0 denoms',
+    description: 'Showing the total supply list returned by the active Cosmos bank module.',
+    denom: 'Denom',
+    readable: 'Readable',
+    rawAmount: 'Raw Amount',
   },
   cosmosValidatorDetail: {
     invalidValidatorAddressTitle: 'Invalid validator address',

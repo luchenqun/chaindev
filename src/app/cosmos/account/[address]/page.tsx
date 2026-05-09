@@ -1,12 +1,13 @@
 'use client';
 
-import { IconAdjustmentsHorizontal, IconArrowBackUp, IconCode, IconInfoCircle, IconTag, IconX } from '@tabler/icons-react';
+import { IconArrowBackUp, IconCopy, IconInfoCircle, IconTag, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
+import { copyText } from '@/components/ui/copy-text';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
@@ -136,7 +137,7 @@ function AccountMetric({ label, value, tooltip }: { label: string; value: React.
             <span className="inline-flex items-center justify-center text-slate-300 outline-none">
               <IconInfoCircle className="size-3.5" stroke={1.8} />
             </span>
-            <FloatingTooltip open={tooltipOpen} anchorRef={tooltipTriggerRef} className="w-[260px] whitespace-normal bg-slate-800 leading-5 text-white">
+            <FloatingTooltip open={tooltipOpen} anchorRef={tooltipTriggerRef} className="w-[260px] whitespace-normal border border-slate-200 bg-white leading-5 text-slate-700">
               {tooltip}
             </FloatingTooltip>
           </span>
@@ -144,6 +145,72 @@ function AccountMetric({ label, value, tooltip }: { label: string; value: React.
       </div>
       <div className="mt-2 text-lg font-semibold text-slate-900">{value}</div>
     </div>
+  );
+}
+
+function AccountBalanceTooltipValue({
+  label,
+  rawValue,
+}: {
+  label: string;
+  rawValue: string;
+}) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current != null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function openTooltip() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    setTooltipOpen(true);
+  }
+
+  function closeTooltipSoon() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+    }
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setTooltipOpen(false);
+      closeTimeoutRef.current = null;
+    }, 120);
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="inline-flex min-w-0 max-w-full items-center text-left outline-none transition hover:text-sky-700 focus-visible:ring-2 focus-visible:ring-sky-400"
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        onFocus={openTooltip}
+        onBlur={closeTooltipSoon}
+      >
+        <span className="truncate">{label}</span>
+      </button>
+      <FloatingTooltip
+        open={tooltipOpen}
+        anchorRef={triggerRef}
+        interactive
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        className="max-w-[520px] whitespace-normal border border-slate-200 bg-white text-slate-700"
+      >
+        <span className="block select-text break-all">{rawValue}</span>
+      </FloatingTooltip>
+    </>
   );
 }
 
@@ -421,13 +488,13 @@ export default function CosmosAccountPage() {
   const messages = useMessages();
   const { locale } = useLocale();
   const accountMessages = messages.cosmosAccountDetail;
+  const bankSupplyMessages = messages.cosmosBankSupply;
   const params = useParams<{ address: string }>();
   const router = useRouter();
   const { status } = useSession();
   const address = params.address;
   const [currentTxPage, setCurrentTxPage] = useState(1);
   const [activeTab, setActiveTab] = useState<AccountPageTab>('transactions');
-  const [balanceDisplayMode, setBalanceDisplayMode] = useState<'readable' | 'accurate'>('readable');
   const [account, setAccount] = useState<Awaited<ReturnType<typeof getCosmosAccountDetailDirect>> | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -436,6 +503,9 @@ export default function CosmosAccountPage() {
   const [tagInput, setTagInput] = useState('');
   const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [selectedUndelegation, setSelectedUndelegation] = useState<AccountDelegationItem | null>(null);
+  const [evmHexCopied, setEvmHexCopied] = useState(false);
+  const evmHexCopyTimeoutRef = useRef<number | null>(null);
+  const evmHexCopyButtonRef = useRef<HTMLButtonElement | null>(null);
   const isLikelyAddress = useMemo(() => Boolean(address?.trim()), [address]);
   const visibleAddresses = useMemo(
     () => [...new Set((account?.transactionsPage.items ?? []).map((transaction) => transaction.sender).filter((sender) => sender !== accountMessages.unknown))],
@@ -543,6 +613,28 @@ export default function CosmosAccountPage() {
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [account, visibleAddresses]);
+
+  useEffect(() => {
+    return () => {
+      if (evmHexCopyTimeoutRef.current != null) {
+        window.clearTimeout(evmHexCopyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  async function handleCopyEvmHex(value: string) {
+    await copyText(value);
+    setEvmHexCopied(true);
+
+    if (evmHexCopyTimeoutRef.current != null) {
+      window.clearTimeout(evmHexCopyTimeoutRef.current);
+    }
+
+    evmHexCopyTimeoutRef.current = window.setTimeout(() => {
+      setEvmHexCopied(false);
+      evmHexCopyTimeoutRef.current = null;
+    }, 1600);
+  }
 
   async function handleSaveTag() {
     try {
@@ -663,36 +755,62 @@ export default function CosmosAccountPage() {
           <div className="border-t border-slate-200">
             <div className="border-b border-slate-200 px-5 py-4">
               <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{accountMessages.evmHex}</p>
-              <p className="mt-2 break-all font-mono text-sm font-medium text-slate-900">{evmHexAddress ?? messages.common.unavailable}</p>
+              <div className="mt-2 inline-flex max-w-full items-start gap-1">
+                <p className="min-w-0 break-all font-mono text-sm font-medium text-slate-900">{evmHexAddress ?? messages.common.unavailable}</p>
+                {evmHexAddress ? (
+                  <span className="relative inline-flex shrink-0">
+                    <button
+                      ref={evmHexCopyButtonRef}
+                      type="button"
+                      className="inline-flex size-4 items-center justify-center text-slate-400 transition hover:text-sky-600"
+                      aria-label={messages.common.copyAddress}
+                      onClick={() => void handleCopyEvmHex(evmHexAddress)}
+                    >
+                      <IconCopy className="size-4" stroke={1.8} />
+                    </button>
+                    <FloatingTooltip
+                      open={evmHexCopied}
+                      anchorRef={evmHexCopyButtonRef}
+                      className="whitespace-nowrap border border-slate-200 bg-white text-slate-700"
+                    >
+                      <span className="block whitespace-nowrap">{messages.common.addressCopied}</span>
+                    </FloatingTooltip>
+                  </span>
+                ) : null}
+              </div>
             </div>
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
               <div className="min-w-0">
                 <p className="text-base font-semibold text-slate-900">{accountMessages.balances}</p>
                 <p className="mt-1 text-sm text-slate-500">{accountMessages.balancesDescription}</p>
               </div>
-              <ActionIconButton
-                tooltip={balanceDisplayMode === 'readable' ? accountMessages.switchToAccurateBalances : accountMessages.switchToReadableBalances}
-                className="text-slate-400 hover:text-slate-600"
-                onClick={() => setBalanceDisplayMode((current) => (current === 'readable' ? 'accurate' : 'readable'))}
-              >
-                {balanceDisplayMode === 'readable' ? <IconAdjustmentsHorizontal className="size-4" stroke={1.8} /> : <IconCode className="size-4" stroke={1.8} />}
-              </ActionIconButton>
             </div>
 
             {account.balances.length ? (
               <div className="overflow-x-auto">
-                <table className="data-table">
+                <table className="data-table min-w-[1120px] table-fixed">
                   <thead>
                     <tr>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.denom}</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.amount}</th>
+                      <th className="w-[360px] border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.denom}</th>
+                      <th className="w-[360px] border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{bankSupplyMessages.readable}</th>
+                      <th className="w-[400px] border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{bankSupplyMessages.rawAmount}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {account.balances.map((balance, index) => (
                       <tr key={`${balance.denom}-${index}`} className="border-t border-slate-200">
-                        <td className="px-5 py-3 text-sm text-slate-700 mono">{balanceDisplayMode === 'readable' ? formatReadableDenom(balance.denom) : balance.denom}</td>
-                        <td className="px-5 py-3 text-sm text-slate-900 mono">{balanceDisplayMode === 'readable' ? formatReadableTokenAmount(balance.amount) : balance.amount}</td>
+                        <td className="px-5 py-3 text-sm text-slate-700 mono">
+                          <AccountBalanceTooltipValue label={balance.denom} rawValue={balance.denom} />
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-900 mono">
+                          <AccountBalanceTooltipValue
+                            label={`${formatReadableTokenAmount(balance.amount)} ${formatReadableDenom(balance.denom)}`}
+                            rawValue={`${balance.amount} ${balance.denom}`}
+                          />
+                        </td>
+                        <td className="px-5 py-3 text-sm text-slate-700 mono">
+                          <AccountBalanceTooltipValue label={balance.amount} rawValue={balance.amount} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>

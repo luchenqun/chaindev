@@ -430,6 +430,7 @@ export const zh = {
     security: '安全',
     sendTransaction: '发送交易',
     restApi: 'REST 接口',
+    bankSupply: '银行总供应量',
     rpcApi: 'RPC 接口',
     hashEncoding: '哈希与编码',
     bigNumber: '大数计算器',
@@ -1121,6 +1122,15 @@ export const zh = {
     unlock: '解锁',
     undelegateBroadcasted: '撤销委托交易已广播',
     failedToBroadcastUndelegate: '广播撤销委托交易失败。',
+  },
+  cosmosBankSupply: {
+    failedToLoadFallback: '加载银行总供应量失败。',
+    totalDenomsLabel: '{count} 个面额',
+    emptyDenomsLabel: '0 个面额',
+    description: '显示当前 Cosmos 银行模块返回的总供应列表。',
+    denom: '面额',
+    readable: '可读值',
+    rawAmount: '原始数量',
   },
   cosmosValidatorDetail: {
     invalidValidatorAddressTitle: '验证人地址无效',

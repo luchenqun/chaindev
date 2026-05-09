@@ -1,17 +1,19 @@
 'use client';
 
-import { IconCoin, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
+import { IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { RelativeTime } from '@/components/relative-time';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
+import { Skeleton } from '@/components/ui/skeleton';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { deleteEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsertEvmAddressTag } from '@/domains/evm/client/address-tags';
 import { getEvmObservedAccountsPage } from '@/domains/evm/client/transaction-cache';
@@ -22,6 +24,8 @@ import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
 
 const PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
+type EvmAddressBalanceMap = Awaited<ReturnType<typeof getEvmAddressBalancesDirect>>;
+type EvmAddressBalanceEntry = EvmAddressBalanceMap[string];
 
 function parsePageParam(rawPage: string | null) {
   const parsed = Number.parseInt(rawPage ?? '1', 10);
@@ -46,6 +50,70 @@ function buildPageHref(pathname: string, searchParams: URLSearchParams, page: nu
   return nextQuery ? `${pathname}?${nextQuery}` : pathname;
 }
 
+function EvmBalanceTooltipValue({ balance }: { balance: EvmAddressBalanceEntry }) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current != null) {
+        window.clearTimeout(closeTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  function openTooltip() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    setTooltipOpen(true);
+  }
+
+  function closeTooltipSoon() {
+    if (closeTimeoutRef.current != null) {
+      window.clearTimeout(closeTimeoutRef.current);
+    }
+
+    closeTimeoutRef.current = window.setTimeout(() => {
+      setTooltipOpen(false);
+      closeTimeoutRef.current = null;
+    }, 120);
+  }
+
+  if (!balance.wei) {
+    return <span>{balance.formatted}</span>;
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="inline-flex items-center rounded-sm text-left outline-none transition hover:text-sky-700 focus-visible:ring-2 focus-visible:ring-sky-400"
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        onFocus={openTooltip}
+        onBlur={closeTooltipSoon}
+      >
+        {balance.formatted}
+      </button>
+      <FloatingTooltip
+        open={tooltipOpen}
+        anchorRef={triggerRef}
+        interactive
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltipSoon}
+        className="whitespace-nowrap border border-slate-200 bg-white text-slate-700"
+      >
+        <span className="block whitespace-nowrap">{balance.wei}</span>
+      </FloatingTooltip>
+    </>
+  );
+}
+
 function EvmAccountsPageContent() {
   const messages = useMessages();
   const { locale } = useLocale();
@@ -60,7 +128,7 @@ function EvmAccountsPageContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [balanceLoading, setBalanceLoading] = useState(false);
-  const [balancesByAddress, setBalancesByAddress] = useState<Record<string, string>>({});
+  const [balancesByAddress, setBalancesByAddress] = useState<Awaited<ReturnType<typeof getEvmAddressBalancesDirect>>>({});
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [editingTagAddress, setEditingTagAddress] = useState<string | null>(null);
   const [tagInputValue, setTagInputValue] = useState('');
@@ -130,6 +198,35 @@ function EvmAccountsPageContent() {
   const visibleAddresses = useMemo(() => data?.accounts.map((account) => account.address) ?? [], [data]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    if (!visibleAddresses.length) {
+      setBalancesByAddress({});
+      setBalanceLoading(false);
+      return;
+    }
+
+    setBalanceLoading(true);
+    setBalancesByAddress({});
+
+    void getEvmAddressBalancesDirect(visibleAddresses)
+      .then((nextBalances) => {
+        if (!cancelled) {
+          setBalancesByAddress(nextBalances);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBalanceLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visibleAddresses]);
+
+  useEffect(() => {
     function loadVisibleTags() {
       setNameTagsByAddress(getEvmAddressTags(visibleAddresses));
     }
@@ -151,21 +248,6 @@ function EvmAccountsPageContent() {
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [visibleAddresses]);
-
-  async function handleLoadBalances() {
-    if (!visibleAddresses.length || balanceLoading) {
-      return;
-    }
-
-    setBalanceLoading(true);
-
-    try {
-      const nextBalances = await getEvmAddressBalancesDirect(visibleAddresses);
-      setBalancesByAddress(nextBalances);
-    } finally {
-      setBalanceLoading(false);
-    }
-  }
 
   function handleStartTagEdit(address: string) {
     if (status !== 'authenticated') {
@@ -222,7 +304,7 @@ function EvmAccountsPageContent() {
   if (loading) {
     return (
       <AppShell>
-        <ListPageSkeleton titleWidth="w-24" columns={7} />
+        <ListPageSkeleton titleWidth="w-24" columns={6} />
       </AppShell>
     );
   }
@@ -268,14 +350,6 @@ function EvmAccountsPageContent() {
               >
                 <IconRefresh className="size-4" stroke={1.8} />
               </ActionIconButton>
-              <ActionIconButton
-                tooltip={balanceLoading ? messages.common.loadingBalances : messages.common.loadBalances}
-                className={balanceLoading ? 'cursor-wait text-sky-600' : 'text-slate-400 hover:text-sky-600'}
-                disabled={!data.accounts.length || balanceLoading}
-                onClick={() => void handleLoadBalances()}
-              >
-                <IconCoin className="size-4" stroke={1.8} />
-              </ActionIconButton>
             </div>
           </div>
 
@@ -283,7 +357,6 @@ function EvmAccountsPageContent() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">#</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.address}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.balances}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.common.block}</th>
@@ -294,18 +367,33 @@ function EvmAccountsPageContent() {
               </thead>
               <tbody>
                 {data.accounts.length ? (
-                  data.accounts.map((account, index) => (
+                  data.accounts.map((account) => (
                     <tr key={account.address} className="border-t border-slate-200">
-                      <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-700">{(data.page - 1) * data.pageSize + index + 1}</td>
-                      <td className="px-5 py-3 text-sm">
-                        <AddressLink
-                          address={account.address}
-                          href={`/evm/address/${account.address}`}
-                          label={account.addressLabel}
-                          className="font-medium text-sky-600 hover:text-sky-700"
-                        />
-                      </td>
-                      <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">{balancesByAddress[account.address] ?? messages.common.notLoaded}</td>
+                      {(() => {
+                        const balance = balancesByAddress[account.address];
+
+                        return (
+                          <>
+                            <td className="px-5 py-3 text-sm">
+                              <AddressLink
+                                address={account.address}
+                                href={`/evm/address/${account.address}`}
+                                label={account.address}
+                                className="font-medium text-sky-600 hover:text-sky-700"
+                              />
+                            </td>
+                            <td className="px-5 py-3 text-sm font-medium tabular-nums text-slate-900">
+                              {balance ? (
+                                <EvmBalanceTooltipValue balance={balance} />
+                              ) : balanceLoading ? (
+                                <Skeleton className="h-5 w-24 rounded-md" />
+                              ) : (
+                                messages.common.unavailable
+                              )}
+                            </td>
+                          </>
+                        );
+                      })()}
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.lastSeenBlockNumber}</td>
                       <td className="px-5 py-3 text-sm tabular-nums text-slate-700">{account.totalTxCount.toLocaleString(locale)}</td>
                       <td className="px-5 py-3 text-sm text-slate-700">
@@ -455,7 +543,7 @@ export default function EvmAccountsPage() {
     <Suspense
       fallback={
         <AppShell>
-          <ListPageSkeleton titleWidth="w-24" columns={7} />
+          <ListPageSkeleton titleWidth="w-24" columns={6} />
         </AppShell>
       }
     >

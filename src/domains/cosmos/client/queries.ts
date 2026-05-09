@@ -545,6 +545,7 @@ export type CosmosAccountsPageItem = {
   accountNumber: number;
   accountNumberLabel: string;
   type: string;
+  isModuleAccount: boolean;
   balances: Array<{
     denom: string;
     amount: string;
@@ -2545,6 +2546,7 @@ export async function getCosmosAccountsPageDirect(requestedPage = 1, pageSize = 
     const address = normalizeAccountAddress(account) ?? 'Unavailable';
     const baseAccount = normalizeBaseAccount(account);
     const rawType = typeof (account as { '@type'?: unknown })['@type'] === 'string' ? ((account as { '@type': string })['@type'] as string) : null;
+    const moduleAccountName = extractCosmosModuleAccountName(account);
     const balances = balanceResults[index]?.status === 'fulfilled' ? (balanceResults[index].value.balances ?? []) : [];
 
     return {
@@ -2554,7 +2556,8 @@ export async function getCosmosAccountsPageDirect(requestedPage = 1, pageSize = 
       sequenceLabel: formatInteger(baseAccount.sequence, '0'),
       accountNumber: baseAccount.accountNumber,
       accountNumberLabel: formatInteger(baseAccount.accountNumber, '0'),
-      type: formatCosmosAccountType(account, rawType),
+      type: moduleAccountName ?? extractTypeLabel(rawType),
+      isModuleAccount: moduleAccountName !== null,
       balances,
       balancesLabel: formatDenomCollection(balances),
       readableBalancesLabel: formatReadableDenomCollection(balances),

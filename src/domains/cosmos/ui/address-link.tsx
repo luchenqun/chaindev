@@ -45,10 +45,17 @@ export function CosmosAddressLink({ href, label, copyValue, className, prefetch 
   }
 
   return (
-    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
-      <Link prefetch={prefetch} className={cn('min-w-0 truncate font-medium text-sky-600 hover:text-sky-700', className)} href={href}>
-        {label}
-      </Link>
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+      <span className="min-w-0 max-w-full">
+        <Link
+          prefetch={prefetch}
+          className={cn('block min-w-0 max-w-full truncate font-medium text-sky-600 hover:text-sky-700', className)}
+          href={href}
+          title={label}
+        >
+          {label}
+        </Link>
+      </span>
       <span className="relative inline-flex shrink-0">
         <button
           ref={copyButtonRef}

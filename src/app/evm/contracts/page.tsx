@@ -274,7 +274,7 @@ function InteractContractLink({ href }: { href: string }) {
       >
         <IconLinkPlus className="size-4" stroke={1.8} />
       </Link>
-      <FloatingTooltip open={tooltipOpen} anchorRef={triggerRef} className="whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-[11px] text-white shadow-[0_8px_20px_rgba(15,23,42,0.18)]">
+      <FloatingTooltip open={tooltipOpen} anchorRef={triggerRef} className="whitespace-nowrap border border-slate-200 bg-white text-slate-700">
         {messages.contractRegistry.interactWithContract}
       </FloatingTooltip>
     </span>

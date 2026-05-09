@@ -1651,12 +1651,24 @@ export async function getEvmAddressBalancesDirect(addresses: string[]) {
       const address = uniqueAddresses[index];
 
       if (result.status === 'fulfilled') {
-        return [address, formatAccountBalance(result.value[1], currencyName)];
+        return [
+          address,
+          {
+            formatted: formatAccountBalance(result.value[1], currencyName),
+            wei: result.value[1].toString(),
+          },
+        ];
       }
 
-      return [address, 'Unavailable'];
+      return [
+        address,
+        {
+          formatted: 'Unavailable',
+          wei: null,
+        },
+      ];
     }),
-  ) as Record<string, string>;
+  ) as Record<string, { formatted: string; wei: string | null }>;
 }
 
 export async function requestEvmRpcDirect(method: string, params: unknown[] = []) {

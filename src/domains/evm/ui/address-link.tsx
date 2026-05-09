@@ -47,14 +47,14 @@ export function AddressLink({ address, href, label, className, tooltipClassName,
   }
 
   return (
-    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
-      <span className="group relative inline-flex min-w-0 max-w-full">
-        <Link className={cn('min-w-0 truncate', className)} href={href}>
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+      <span className="group relative min-w-0 max-w-full">
+        <Link className={cn('block min-w-0 max-w-full truncate', className)} href={href} title={label}>
           {label}
         </Link>
       </span>
       {showCopyButton ? (
-        <span className="relative inline-flex">
+        <span className="relative inline-flex shrink-0">
           <button
             ref={copyButtonRef}
             type="button"
