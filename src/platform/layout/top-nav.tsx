@@ -4,11 +4,12 @@ import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type PlatformMode } from '@/config/chains';
+import { resolveCosmosChainFeature } from '@/domains/cosmos/chain-features';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 import { getAccountMenuSections } from '@/platform/layout/account-menu-config';
@@ -17,6 +18,7 @@ import { ChainStatusStrip } from '@/platform/layout/chain-status-strip';
 import { GlobalSearch } from '@/platform/search/global-search';
 import { useActivePlatformMode } from '@/platform/workbench/active-platform-mode-provider';
 import { RpcProviderManager } from '@/platform/workbench/rpc-provider-manager';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 type NavItem = {
   href: string;
@@ -31,6 +33,14 @@ type NavGroup = {
 };
 
 const NAV_CLOSE_DELAY_MS = 300;
+
+type TendermintStatusResponse = {
+  result?: {
+    node_info?: {
+      network?: string;
+    };
+  };
+};
 
 function inferMode(pathname: string): PlatformMode {
   return pathname.startsWith('/cosmos') ? 'cosmos' : 'evm';
@@ -107,6 +117,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [providerReady, setProviderReady] = useState(false);
   const [keyReady, setKeyReady] = useState(false);
+  const [cosmosChainId, setCosmosChainId] = useState<string | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
   const { data: session, status } = useSession();
   const username = (session?.user as { username?: string } | undefined)?.username ?? session?.user?.name ?? session?.user?.email ?? messages.topNav.account;
@@ -202,6 +213,8 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
 
   const moreItems = moreGroups.flatMap((group) => group.items);
   const moreActive = moreItems.some((item) => matchesNavItem(pathname, item.href));
+  const chainFeature = useMemo(() => (mode === 'cosmos' ? resolveCosmosChainFeature(cosmosChainId) : null), [cosmosChainId, mode]);
+  const chainFeatureActive = chainFeature?.items.some((item) => matchesNavItem(pathname, item.href)) ?? false;
 
   useEffect(() => {
     return () => {
@@ -210,6 +223,58 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'cosmos') {
+      setCosmosChainId(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadChainId() {
+      try {
+        const profile = readActiveRpcProfileCookie('cosmos');
+
+        if (!profile?.rpcUrl) {
+          if (!cancelled) {
+            setCosmosChainId(null);
+          }
+
+          return;
+        }
+
+        const response = await fetch(`${profile.rpcUrl}/status`, { cache: 'no-store' });
+
+        if (!response.ok) {
+          throw new Error('Failed to load cosmos chain id.');
+        }
+
+        const payload = (await response.json()) as TendermintStatusResponse;
+
+        if (!cancelled) {
+          setCosmosChainId(payload.result?.node_info?.network?.trim() || null);
+        }
+      } catch {
+        if (!cancelled) {
+          setCosmosChainId(null);
+        }
+      }
+    }
+
+    void loadChainId();
+
+    const handleActiveRpcProfileChanged = () => {
+      void loadChainId();
+    };
+
+    window.addEventListener('chaindev:active-rpc-profile-changed', handleActiveRpcProfileChanged);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('chaindev:active-rpc-profile-changed', handleActiveRpcProfileChanged);
+    };
+  }, [mode]);
 
   function cancelScheduledClose() {
     if (closeTimeoutRef.current !== null) {
@@ -313,6 +378,52 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
                 </Link>
               );
             })}
+            {chainFeature ? (
+              <div className="relative" onMouseEnter={() => openMenu(`chain-feature-${chainFeature.key}`)} onMouseLeave={() => scheduleClose(`chain-feature-${chainFeature.key}`)}>
+                <button
+                  type="button"
+                  className={
+                    chainFeatureActive || openGroup === `chain-feature-${chainFeature.key}`
+                      ? 'inline-flex items-center gap-1.5 py-2.5 font-[450] text-[#1697ea]'
+                      : 'inline-flex items-center gap-1.5 py-2.5 font-[450] text-slate-950 hover:text-[#1697ea]'
+                  }
+                  aria-expanded={openGroup === `chain-feature-${chainFeature.key}`}
+                >
+                  <span>{chainFeature.label}</span>
+                  <IconChevronDown className="size-3.5" stroke={2.2} />
+                </button>
+                {openGroup === `chain-feature-${chainFeature.key}` ? (
+                  <div className="absolute left-1/2 top-full z-20 pt-2 -translate-x-1/2" onMouseEnter={cancelScheduledClose} onMouseLeave={() => scheduleClose(`chain-feature-${chainFeature.key}`)}>
+                    <div className="absolute inset-x-0 top-0 h-2" aria-hidden="true" />
+                    <div className="min-w-[220px] overflow-hidden rounded-b-xl border border-slate-200 bg-white shadow-[0_16px_32px_rgba(15,23,42,0.12)]">
+                      <div className="border-t-[3px] border-[#19a7f2]" />
+                      <div className="px-2 py-2">
+                        {chainFeature.items.map((item) => {
+                          const itemActive = matchesNavItem(pathname, item.href);
+                          const Icon = item.icon ?? IconSend;
+
+                          return (
+                            <Link
+                              prefetch={false}
+                              key={item.href}
+                              href={item.href}
+                              className={
+                                itemActive
+                                  ? 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[14px] font-[450] text-[#1697ea]'
+                                  : 'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-[14px] font-[450] text-slate-700 hover:bg-slate-100 hover:text-[#1697ea]'
+                              }
+                            >
+                              <Icon className="size-4 shrink-0" stroke={1.9} />
+                              <span>{labelMessages[item.labelKey]}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
             <div className="relative" onMouseEnter={() => openMenu('tools-more')} onMouseLeave={() => scheduleClose('tools-more')}>
               <button
                 type="button"
