@@ -2,6 +2,7 @@
 
 import { IconArrowsExchange, IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
 import { decodeFunctionData, isAddress, parseAbiItem, toFunctionSelector, type Abi, type AbiFunction, type AbiParameter, type Hex } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
@@ -22,6 +23,7 @@ const TEXTAREA_CLASS_NAME =
   'min-h-32 max-h-80 w-full resize-none overflow-y-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400';
 const INPUT_DATA_TEXTAREA_CLASS_NAME =
   'min-h-10 max-h-64 w-full resize-none overflow-y-auto rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-sm leading-6 text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400';
+const DECODE_EVM_TX_STORAGE_KEY = 'chaindev:decode-evm-tx:input-data';
 
 type FourByteSignatureRecord = {
   id: number;
@@ -384,6 +386,7 @@ export default function DecodeEvmTxPage() {
   const { locale } = useLocale();
   const pageMessages = messages.decodeEvmTx;
   const commonMessages = messages.common;
+  const searchParams = useSearchParams();
   const [inputData, setInputData] = useState('');
   const [abiInput, setAbiInput] = useState('');
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
@@ -404,6 +407,28 @@ export default function DecodeEvmTxPage() {
     syncArtifacts();
     return subscribeEvmContractRegistry(syncArtifacts);
   }, []);
+
+  useEffect(() => {
+    const nextInputData = searchParams.get('inputData');
+
+    if (nextInputData) {
+      setInputData(nextInputData);
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedInputData = window.sessionStorage.getItem(DECODE_EVM_TX_STORAGE_KEY);
+
+    if (!storedInputData) {
+      return;
+    }
+
+    setInputData(storedInputData);
+    window.sessionStorage.removeItem(DECODE_EVM_TX_STORAGE_KEY);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!candidates.length) {

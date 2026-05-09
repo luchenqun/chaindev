@@ -1,6 +1,7 @@
 'use client';
 
 import { IconCopy } from '@tabler/icons-react';
+import { useSearchParams } from 'next/navigation';
 import { type KeyboardEvent, useEffect, useState } from 'react';
 import { decodeAbiParameters, decodeEventLog, isAddress, parseAbiItem, toEventSelector, type Abi, type AbiEvent, type AbiParameter, type Hex } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
@@ -18,6 +19,7 @@ import { AppShell } from '@/platform/layout/app-shell';
 
 const TEXTAREA_CLASS_NAME =
   'min-h-32 max-h-80 w-full resize-none overflow-y-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400';
+const DECODE_EVM_EVENT_STORAGE_KEY = 'chaindev:decode-evm-event:logs';
 
 type EventLogRecord = {
   address?: string;
@@ -577,6 +579,7 @@ export default function DecodeEvmEventPage() {
   const pageMessages = messages.decodeEvmEvent;
   const commonMessages = messages.common;
   const txMessages = messages.evmTxDetail;
+  const searchParams = useSearchParams();
   const [logInput, setLogInput] = useState('');
   const [abiInput, setAbiInput] = useState('');
   const [artifacts, setArtifacts] = useState<EvmContractArtifact[]>([]);
@@ -595,6 +598,28 @@ export default function DecodeEvmEventPage() {
     syncArtifacts();
     return subscribeEvmContractRegistry(syncArtifacts);
   }, []);
+
+  useEffect(() => {
+    const nextLogs = searchParams.get('logs');
+
+    if (nextLogs) {
+      setLogInput(nextLogs);
+      return;
+    }
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const storedLogs = window.sessionStorage.getItem(DECODE_EVM_EVENT_STORAGE_KEY);
+
+    if (!storedLogs) {
+      return;
+    }
+
+    setLogInput(storedLogs);
+    window.sessionStorage.removeItem(DECODE_EVM_EVENT_STORAGE_KEY);
+  }, [searchParams]);
 
   async function handleDecode() {
     setLoading(true);

@@ -635,6 +635,7 @@ export const en = {
     description: 'Enter EVM transaction input data and optionally provide ABI. If omitted, local artifacts and 4byte.directory are queried automatically.',
     inputData: 'Transaction Input Data',
     inputDataPlaceholder: 'Enter full 0x transaction input data',
+    openInDecoder: 'Go Decode',
     abiInput: 'ABI / ABI List',
     abiInputHint: 'Paste a single ABI array, a single ABI item, artifact JSON, a JSON array containing multiple ABI/artifact entries, or a raw function signature. Leave empty to query local artifacts and 4byte.directory automatically.',
     abiInputPlaceholder: 'Leave empty for auto-detection, or paste ABI JSON / single ABI item / artifact JSON / a JSON array of ABIs / transfer(address,uint256)',
@@ -681,6 +682,7 @@ export const en = {
   decodeEvmEvent: {
     title: 'Event Decoder',
     description: 'Enter EVM event logs and optionally provide event ABI. If omitted, local artifacts and 4byte.directory are queried automatically.',
+    openInDecoder: 'Go Decode',
     logInput: 'Event Log',
     logInputPlaceholder: 'Enter a single event log JSON, a JSON array of event logs, or a transaction receipt JSON containing logs',
     abiInput: 'Event ABI / ABI List',

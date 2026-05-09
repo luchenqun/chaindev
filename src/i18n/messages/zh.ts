@@ -634,6 +634,7 @@ export const zh = {
     description: '输入 EVM 交易输入数据，可选填 ABI；留空时会自动查询本地构件和 4byte.directory。',
     inputData: '交易输入数据',
     inputDataPlaceholder: '输入完整的 0x 交易输入数据',
+    openInDecoder: '跳转解码',
     abiInput: 'ABI / ABI 列表',
     abiInputHint: '可粘贴单个 ABI 数组、单个 ABI 项、artifact JSON、多个 ABI/Artifact 组成的 JSON 数组，或直接输入函数签名。留空则自动查询本地构件与 4byte.directory。',
     abiInputPlaceholder: '留空自动匹配，或粘贴 ABI JSON / 单个 ABI 项 / artifact JSON / 多个 ABI 的 JSON 数组 / transfer(address,uint256)',
@@ -680,6 +681,7 @@ export const zh = {
   decodeEvmEvent: {
     title: '事件解码',
     description: '输入 EVM 事件日志，可选填事件 ABI；留空时会自动查询本地构件和 4byte.directory。',
+    openInDecoder: '跳转解码',
     logInput: '事件日志',
     logInputPlaceholder: '输入单个事件日志 JSON、多个事件日志的 JSON 数组，或直接粘贴包含 logs 的交易回执 JSON',
     abiInput: '事件 ABI / ABI 列表',

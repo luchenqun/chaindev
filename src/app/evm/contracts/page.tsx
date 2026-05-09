@@ -476,7 +476,16 @@ export default function EvmContractsRegistryPage() {
   const artifactsById = useMemo(() => Object.fromEntries(artifacts.map((artifact) => [artifact.id, artifact])), [artifacts]);
   const isAdmin = Boolean((session?.user as { isAdmin?: boolean } | undefined)?.isAdmin);
   const myArtifacts = useMemo(() => artifacts.filter((artifact) => artifact.scope === 'user'), [artifacts]);
-  const systemArtifacts = useMemo(() => artifacts.filter((artifact) => artifact.scope === 'system'), [artifacts]);
+  const systemArtifacts = useMemo(
+    () =>
+      [...artifacts.filter((artifact) => artifact.scope === 'system')].sort(
+        (left, right) =>
+          Number(Boolean(right.bytecode)) - Number(Boolean(left.bytecode)) ||
+          left.name.localeCompare(right.name, 'en', { sensitivity: 'base' }) ||
+          left.id.localeCompare(right.id, 'en', { sensitivity: 'base' }),
+      ),
+    [artifacts],
+  );
   const deployArtifact = useMemo(() => (deployArtifactId ? (artifacts.find((artifact) => artifact.id === deployArtifactId) ?? null) : null), [artifacts, deployArtifactId]);
   const artifactDetailsGroups = useMemo(() => {
     if (!artifactDetailsTarget) {

@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { IconArrowsExchange, IconCode, IconCopy, IconLoader2 } from '@tabler/icons-react';
+import { IconArrowsExchange, IconArrowRight, IconCode, IconCopy, IconLoader2 } from '@tabler/icons-react';
 import { decodeErrorResult, formatEther } from 'viem';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { copyText } from '@/components/ui/copy-text';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
@@ -39,6 +39,9 @@ import { formatLocalizedDateTime } from '@/i18n/format';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
+
+const DECODE_EVM_TX_STORAGE_KEY = 'chaindev:decode-evm-tx:input-data';
+const DECODE_EVM_EVENT_STORAGE_KEY = 'chaindev:decode-evm-event:logs';
 
 function DetailRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
   const { locale } = useLocale();
@@ -312,6 +315,7 @@ function DecodedLogAddress({ address, nameTagsByAddress }: { address: string; na
 function DecodedReceiptLogsSection({
   logs,
   nameTagsByAddress,
+  onOpenDecoder,
 }: {
   logs: Array<{
     key: string;
@@ -319,6 +323,7 @@ function DecodedReceiptLogsSection({
     decoded: ReturnType<typeof decodeBoundEvmReceiptLog>;
   }>;
   nameTagsByAddress: Record<string, string | null>;
+  onOpenDecoder: () => void;
 }) {
   const messages = useMessages();
   const txMessages = messages.evmTxDetail;
@@ -331,13 +336,32 @@ function DecodedReceiptLogsSection({
 
   return (
     <div className="mb-1">
-      <h3 className="mb-4 text-sm font-semibold text-slate-900">{txMessages.receiptEventLogs}</h3>
-      <div className="divide-y divide-slate-200">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-slate-900">{txMessages.receiptEventLogs}</h3>
+        <button type="button" className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap' })} onClick={onOpenDecoder}>
+          <IconArrowRight className="mr-1.5 size-3.5" stroke={1.8} />
+          {messages.decodeEvmEvent.openInDecoder}
+        </button>
+      </div>
+      <div>
         {logs.map((log, index) => {
           const decoded = log.decoded;
+          const title = decoded ? messages.decodeEvmEvent.logTitle.replace('{index}', String(index + 1)) : messages.decodeEvmEvent.unableToDecodeLog.replace('{index}', String(index + 1));
 
           if (!decoded) {
-            return null;
+            return (
+              <section key={log.key} className={index === 0 ? 'border-t border-slate-200 pt-3 pb-3' : 'pb-3'}>
+                <div className="rounded-2xl border border-slate-200">
+                  <div className="border-b border-slate-200 px-4 py-3">
+                    <h4 className="text-sm font-semibold text-slate-950">{title}</h4>
+                  </div>
+                  <div className="p-4">
+                    <p className="mb-3 text-sm text-slate-500">{messages.decodeEvmEvent.unableToDecodeLog.replace('{index}', String(index + 1))}</p>
+                    <JsonViewPanel value={log.raw as object} className="border-0 p-0 shadow-none" controlsClassName="right-0 top-0" />
+                  </div>
+                </div>
+              </section>
+            );
           }
 
           const indexedArgs = decoded.args.filter((arg) => arg.indexed);
@@ -345,172 +369,180 @@ function DecodedReceiptLogsSection({
           const dataView = dataViews[log.key] ?? 'dec';
 
           return (
-            <section key={log.key} className={index === 0 ? 'pb-3' : 'pt-3 pb-3'}>
-              <dl className="space-y-2">
-                <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                  <dt className="text-xs font-semibold text-slate-600">{txMessages.address}</dt>
-                  <dd className="min-w-0 text-xs text-slate-900">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <DecodedLogAddress address={log.raw.address} nameTagsByAddress={nameTagsByAddress} />
-                    </div>
-                  </dd>
+            <section key={log.key} className={index === 0 ? 'border-t border-slate-200 pt-3 pb-3' : 'pb-3'}>
+              <div className="rounded-2xl border border-slate-200">
+                <div className="border-b border-slate-200 px-4 py-3">
+                  <h4 className="text-sm font-semibold text-slate-950">{title}</h4>
                 </div>
 
-                <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                  <dt className="text-xs font-semibold text-slate-600">{txMessages.name}</dt>
-                  <dd className="min-w-0 text-xs text-slate-900">
-                    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                      <span className="font-semibold text-slate-800">{decoded.eventName}</span>
-                      <span className="text-slate-500">({decoded.eventSignature.slice(decoded.eventName.length + 1, -1)})</span>
-                    </div>
-                  </dd>
-                </div>
-
-                <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                  <dt className="text-xs font-semibold text-slate-600">{txMessages.topics}</dt>
-                  <dd className="min-w-0 space-y-2 text-xs text-slate-900">
-                    {decoded.topic0 ? (
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 mono text-xs text-slate-700">
-                        <span className="mr-2 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">0</span>
-                        {decoded.topic0}
-                      </div>
-                    ) : null}
-
-                    {indexedArgs.map((arg, argIndex) => {
-                      const viewKey = `${log.key}-topic-${argIndex}`;
-                      const view = topicViews[viewKey] ?? 'dec';
-                      const displayValue =
-                        view === 'hex' ? (arg.rawHex ?? messages.common.unavailable) : formatEventArgumentDisplayValue(arg.value, messages.common.unavailable);
-
-                      return (
-                        <div key={viewKey} className="flex flex-wrap items-center gap-1.5">
-                          <span className="inline-flex h-[30px] items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
-                            {argIndex + 1}: {arg.name}
-                          </span>
-                          <div className="relative min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-[132px] text-xs text-slate-700">
-                            <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
-                              <button
-                                type="button"
-                                className={
-                                  view === 'dec'
-                                    ? 'h-full px-3 text-xs font-semibold text-slate-900'
-                                    : 'h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
-                                }
-                                onClick={() =>
-                                  setTopicViews((current) => ({
-                                    ...current,
-                                    [viewKey]: 'dec',
-                                  }))
-                                }
-                              >
-                                {txMessages.dec}
-                              </button>
-                              <button
-                                type="button"
-                                className={
-                                  view === 'hex'
-                                    ? 'h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900'
-                                    : 'h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
-                                }
-                                onClick={() =>
-                                  setTopicViews((current) => ({
-                                    ...current,
-                                    [viewKey]: 'hex',
-                                  }))
-                                }
-                              >
-                                {txMessages.hex}
-                              </button>
-                            </div>
-                            {view === 'dec' && isAddressValue(arg.value) ? (
-                              <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
-                            ) : (
-                              <span className="break-all mono">{displayValue}</span>
-                            )}
-                          </div>
+                <div className="p-4">
+                  <dl className="space-y-2">
+                    <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                      <dt className="text-xs font-semibold text-slate-600">{txMessages.address}</dt>
+                      <dd className="min-w-0 text-xs text-slate-900">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <DecodedLogAddress address={log.raw.address} nameTagsByAddress={nameTagsByAddress} />
                         </div>
-                      );
-                    })}
-                  </dd>
-                </div>
+                      </dd>
+                    </div>
 
-                <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
-                  <dt className="text-xs font-semibold text-slate-600">{txMessages.data}</dt>
-                  <dd className="min-w-0 text-xs text-slate-900">
-                    <div className="relative min-h-[30px] rounded-lg border border-slate-200 bg-white px-3 pr-[132px]">
-                      <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
-                        <button
-                          type="button"
-                          className={
-                            dataView === 'dec'
-                              ? 'h-full px-3 text-xs font-semibold text-slate-900'
-                              : 'h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
-                          }
-                          onClick={() =>
-                            setDataViews((current) => ({
-                              ...current,
-                              [log.key]: 'dec',
-                            }))
-                          }
-                        >
-                          {txMessages.dec}
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            dataView === 'hex'
-                              ? 'h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900'
-                              : 'h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
-                          }
-                          onClick={() =>
-                            setDataViews((current) => ({
-                              ...current,
-                              [log.key]: 'hex',
-                            }))
-                          }
-                        >
-                          {txMessages.hex}
-                        </button>
-                      </div>
-                      {dataView === 'hex' ? (
-                        <p className="flex min-h-[30px] items-center break-all py-1.5 pr-2 mono text-xs text-slate-700">{log.raw.data || '0x'}</p>
-                      ) : nonIndexedArgs.length > 1 ? (
-                        <div className="space-y-1 py-2 pr-2">
-                          {nonIndexedArgs.map((arg, argIndex) => (
-                            <div key={`${log.key}-data-${argIndex}`} className="flex flex-wrap items-center gap-1.5 text-xs text-slate-700">
-                              <span className="font-medium text-slate-500">
-                                {arg.name} ({arg.type}) :
+                    <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                      <dt className="text-xs font-semibold text-slate-600">{txMessages.name}</dt>
+                      <dd className="min-w-0 text-xs text-slate-900">
+                        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                          <span className="font-semibold text-slate-800">{decoded.eventName}</span>
+                          <span className="text-slate-500">({decoded.eventSignature.slice(decoded.eventName.length + 1, -1)})</span>
+                        </div>
+                      </dd>
+                    </div>
+
+                    <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                      <dt className="text-xs font-semibold text-slate-600">{txMessages.topics}</dt>
+                      <dd className="min-w-0 space-y-2 text-xs text-slate-900">
+                        {decoded.topic0 ? (
+                          <div className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 mono text-xs text-slate-700">
+                            <span className="mr-2 inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">0</span>
+                            {decoded.topic0}
+                          </div>
+                        ) : null}
+
+                        {indexedArgs.map((arg, argIndex) => {
+                          const viewKey = `${log.key}-topic-${argIndex}`;
+                          const view = topicViews[viewKey] ?? 'dec';
+                          const displayValue =
+                            view === 'hex' ? (arg.rawHex ?? messages.common.unavailable) : formatEventArgumentDisplayValue(arg.value, messages.common.unavailable);
+
+                          return (
+                            <div key={viewKey} className="flex flex-wrap items-center gap-1.5">
+                              <span className="inline-flex h-[30px] items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700">
+                                {argIndex + 1}: {arg.name}
                               </span>
-                              {isAddressValue(arg.value) ? (
-                                <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
+                              <div className="relative min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 pr-[132px] text-xs text-slate-700">
+                                <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
+                                  <button
+                                    type="button"
+                                    className={
+                                      view === 'dec'
+                                        ? 'h-full px-3 text-xs font-semibold text-slate-900'
+                                        : 'h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
+                                    }
+                                    onClick={() =>
+                                      setTopicViews((current) => ({
+                                        ...current,
+                                        [viewKey]: 'dec',
+                                      }))
+                                    }
+                                  >
+                                    {txMessages.dec}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={
+                                      view === 'hex'
+                                        ? 'h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900'
+                                        : 'h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
+                                    }
+                                    onClick={() =>
+                                      setTopicViews((current) => ({
+                                        ...current,
+                                        [viewKey]: 'hex',
+                                      }))
+                                    }
+                                  >
+                                    {txMessages.hex}
+                                  </button>
+                                </div>
+                                {view === 'dec' && isAddressValue(arg.value) ? (
+                                  <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
+                                ) : (
+                                  <span className="break-all mono">{displayValue}</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </dd>
+                    </div>
+
+                    <div className="grid gap-1 md:grid-cols-[120px_minmax(0,1fr)] md:items-start">
+                      <dt className="text-xs font-semibold text-slate-600">{txMessages.data}</dt>
+                      <dd className="min-w-0 text-xs text-slate-900">
+                        <div className="relative min-h-[30px] rounded-lg border border-slate-200 bg-white px-3 pr-[132px]">
+                          <div className="absolute bottom-0 right-0 top-0 inline-flex overflow-hidden rounded-r-lg border-l border-slate-200 bg-slate-100">
+                            <button
+                              type="button"
+                              className={
+                                dataView === 'dec'
+                                  ? 'h-full px-3 text-xs font-semibold text-slate-900'
+                                  : 'h-full bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
+                              }
+                              onClick={() =>
+                                setDataViews((current) => ({
+                                  ...current,
+                                  [log.key]: 'dec',
+                                }))
+                              }
+                            >
+                              {txMessages.dec}
+                            </button>
+                            <button
+                              type="button"
+                              className={
+                                dataView === 'hex'
+                                  ? 'h-full border-l border-slate-200 px-3 text-xs font-semibold text-slate-900'
+                                  : 'h-full border-l border-slate-200 bg-white px-3 text-xs font-semibold text-slate-500 transition hover:text-slate-700'
+                              }
+                              onClick={() =>
+                                setDataViews((current) => ({
+                                  ...current,
+                                  [log.key]: 'hex',
+                                }))
+                              }
+                            >
+                              {txMessages.hex}
+                            </button>
+                          </div>
+                          {dataView === 'hex' ? (
+                            <p className="flex min-h-[30px] items-center break-all py-1.5 pr-2 mono text-xs text-slate-700">{log.raw.data || '0x'}</p>
+                          ) : nonIndexedArgs.length > 1 ? (
+                            <div className="space-y-1 py-2 pr-2">
+                              {nonIndexedArgs.map((arg, argIndex) => (
+                                <div key={`${log.key}-data-${argIndex}`} className="flex flex-wrap items-center gap-1.5 text-xs text-slate-700">
+                                  <span className="font-medium text-slate-500">
+                                    {arg.name} ({arg.type}) :
+                                  </span>
+                                  {isAddressValue(arg.value) ? (
+                                    <DecodedLogAddress address={arg.value} nameTagsByAddress={nameTagsByAddress} />
+                                  ) : (
+                                    <span className="break-all mono">{formatEventArgumentDisplayValue(arg.value, messages.common.unavailable)}</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : nonIndexedArgs.length === 1 ? (
+                            <div className="flex min-h-[30px] items-center py-1.5 pr-2 text-xs text-slate-700">
+                              {isAddressValue(nonIndexedArgs[0].value) ? (
+                                <>
+                                  <span className="mr-1.5 font-medium text-slate-500">
+                                    {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) :
+                                  </span>
+                                  <DecodedLogAddress address={nonIndexedArgs[0].value} nameTagsByAddress={nameTagsByAddress} />
+                                </>
                               ) : (
-                                <span className="break-all mono">{formatEventArgumentDisplayValue(arg.value, messages.common.unavailable)}</span>
+                                <span className="break-all mono">
+                                  {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) : {formatEventArgumentDisplayValue(nonIndexedArgs[0].value, messages.common.unavailable)}
+                                </span>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      ) : nonIndexedArgs.length === 1 ? (
-                        <div className="flex min-h-[30px] items-center py-1.5 pr-2 text-xs text-slate-700">
-                          {isAddressValue(nonIndexedArgs[0].value) ? (
-                            <>
-                              <span className="mr-1.5 font-medium text-slate-500">
-                                {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) :
-                              </span>
-                              <DecodedLogAddress address={nonIndexedArgs[0].value} nameTagsByAddress={nameTagsByAddress} />
-                            </>
                           ) : (
-                            <span className="break-all mono">
-                              {nonIndexedArgs[0].name} ({nonIndexedArgs[0].type}) : {formatEventArgumentDisplayValue(nonIndexedArgs[0].value, messages.common.unavailable)}
-                            </span>
+                            <p className="flex min-h-[30px] items-center py-1.5 pr-2 mono text-xs text-slate-500">{txMessages.noNonIndexedEventData}</p>
                           )}
                         </div>
-                      ) : (
-                        <p className="flex min-h-[30px] items-center py-1.5 pr-2 mono text-xs text-slate-500">{txMessages.noNonIndexedEventData}</p>
-                      )}
+                      </dd>
                     </div>
-                  </dd>
+                  </dl>
                 </div>
-              </dl>
+              </div>
             </section>
           );
         })}
@@ -592,6 +624,7 @@ function RewriteArgumentsForm({ args, values, onChange }: { args: Array<{ name: 
 }
 
 export default function EvmTxPage() {
+  const router = useRouter();
   const messages = useMessages();
   const { locale } = useLocale();
   const txMessages = messages.evmTxDetail;
@@ -1014,6 +1047,24 @@ export default function EvmTxPage() {
       ? Math.max(0, status.latestBlockNumber - Number(transaction.blockNumber) + 1).toLocaleString(locale)
       : transaction.confirmationsLabel;
 
+  function openTxInputDecoder() {
+    if (!transaction) {
+      return;
+    }
+
+    window.sessionStorage.setItem(DECODE_EVM_TX_STORAGE_KEY, transaction.inputData);
+    router.push('/tools/decode-evm-tx');
+  }
+
+  function openTxLogsDecoder() {
+    if (!transaction) {
+      return;
+    }
+
+    window.sessionStorage.setItem(DECODE_EVM_EVENT_STORAGE_KEY, JSON.stringify(transaction.logs, null, 2));
+    router.push('/tools/decode-evm-event');
+  }
+
   return (
     <AppShell>
       <main className="section-block">
@@ -1283,6 +1334,14 @@ export default function EvmTxPage() {
                                 <IconCode className="mr-1.5 size-3.5" stroke={1.8} />
                                 {txMessages.decodeInputData}
                               </Button>
+                              <button
+                                type="button"
+                                className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap' })}
+                                onClick={openTxInputDecoder}
+                              >
+                                <IconArrowRight className="mr-1.5 size-3.5" stroke={1.8} />
+                                {messages.decodeEvmTx.openInDecoder}
+                              </button>
                               <Button type="button" variant="secondary" size="sm" disabled={!canRewriteTransaction} onClick={openRewriteDialog}>
                                 {txMessages.rewrite}
                               </Button>
@@ -1301,7 +1360,11 @@ export default function EvmTxPage() {
           <div className="space-y-4">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               {transaction.logsCount ? (
-                <DecodedReceiptLogsSection logs={decodedReceiptLogs.filter((log) => log.decoded)} nameTagsByAddress={nameTagsByAddress} />
+                <DecodedReceiptLogsSection
+                  logs={decodedReceiptLogs}
+                  nameTagsByAddress={nameTagsByAddress}
+                  onOpenDecoder={openTxLogsDecoder}
+                />
               ) : (
                 <p className="text-sm text-slate-500">{txMessages.noReceiptLogs}</p>
               )}
