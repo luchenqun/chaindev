@@ -316,6 +316,7 @@ function DecodedReceiptLogsSection({
   logs,
   nameTagsByAddress,
   onOpenDecoder,
+  decoderDisabled = false,
 }: {
   logs: Array<{
     key: string;
@@ -324,6 +325,7 @@ function DecodedReceiptLogsSection({
   }>;
   nameTagsByAddress: Record<string, string | null>;
   onOpenDecoder: () => void;
+  decoderDisabled?: boolean;
 }) {
   const messages = useMessages();
   const txMessages = messages.evmTxDetail;
@@ -338,7 +340,12 @@ function DecodedReceiptLogsSection({
     <div className="mb-1">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-slate-900">{txMessages.receiptEventLogs}</h3>
-        <button type="button" className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap' })} onClick={onOpenDecoder}>
+        <button
+          type="button"
+          disabled={decoderDisabled}
+          className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap disabled:pointer-events-none disabled:opacity-50' })}
+          onClick={onOpenDecoder}
+        >
           <IconArrowRight className="mr-1.5 size-3.5" stroke={1.8} />
           {messages.decodeEvmEvent.openInDecoder}
         </button>
@@ -1042,13 +1049,15 @@ export default function EvmTxPage() {
   const traceReturnValue = extractTraceReturnValue(traceData);
   const decodedTraceReturnValue = decodeTraceReturnValue(traceReturnValue);
   const hasLogs = transaction.logsCount > 0;
+  const canOpenTxInputDecoder = Boolean(transaction.inputData && transaction.inputData !== '0x');
+  const canOpenTxLogsDecoder = Boolean(transaction.logsCount > 0 && Array.isArray(transaction.logs) && transaction.logs.length > 0);
   const liveConfirmationsLabel =
     transaction.blockNumber && status?.latestBlockNumber != null
       ? Math.max(0, status.latestBlockNumber - Number(transaction.blockNumber) + 1).toLocaleString(locale)
       : transaction.confirmationsLabel;
 
   function openTxInputDecoder() {
-    if (!transaction) {
+    if (!transaction || !canOpenTxInputDecoder) {
       return;
     }
 
@@ -1057,7 +1066,7 @@ export default function EvmTxPage() {
   }
 
   function openTxLogsDecoder() {
-    if (!transaction) {
+    if (!transaction || !canOpenTxLogsDecoder) {
       return;
     }
 
@@ -1336,7 +1345,8 @@ export default function EvmTxPage() {
                               </Button>
                               <button
                                 type="button"
-                                className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap' })}
+                                disabled={!canOpenTxInputDecoder}
+                                className={buttonVariants({ variant: 'secondary', size: 'sm', className: 'whitespace-nowrap disabled:pointer-events-none disabled:opacity-50' })}
                                 onClick={openTxInputDecoder}
                               >
                                 <IconArrowRight className="mr-1.5 size-3.5" stroke={1.8} />
@@ -1364,6 +1374,7 @@ export default function EvmTxPage() {
                   logs={decodedReceiptLogs}
                   nameTagsByAddress={nameTagsByAddress}
                   onOpenDecoder={openTxLogsDecoder}
+                  decoderDisabled={!canOpenTxLogsDecoder}
                 />
               ) : (
                 <p className="text-sm text-slate-500">{txMessages.noReceiptLogs}</p>

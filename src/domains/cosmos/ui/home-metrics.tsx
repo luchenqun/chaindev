@@ -1,6 +1,7 @@
 'use client';
 
 import { IconPlayerPause, IconPlayerPlay } from '@tabler/icons-react';
+import Link from 'next/link';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCosmosHomeData } from '@/domains/cosmos/ui/home-data-provider';
@@ -72,15 +73,25 @@ function CosmosHomeMetricsSkeleton() {
 }
 
 function MetricCard({ label, value, subtext }: Metric) {
+  const messages = useMessages();
   const { locale } = useLocale();
-
-  return (
+  const content = (
     <div className="px-5 py-4">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{translateRuntimeText(label, locale)}</p>
       <p className="mt-2 text-2xl font-semibold leading-tight text-slate-900">{translateRuntimeText(value, locale)}</p>
       {subtext ? <p className="mt-2 text-xs leading-5 text-slate-500">{translateRuntimeText(subtext, locale)}</p> : null}
     </div>
   );
+
+  if (label === messages.homeMetrics.bankSupply) {
+    return (
+      <Link href="/cosmos/tools/bank-supply" className="block transition hover:bg-slate-50">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }
 
 export function CosmosHomeMetrics() {
