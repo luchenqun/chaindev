@@ -1,12 +1,13 @@
 'use client';
 
-import { IconCoins, IconRefresh, IconX } from '@tabler/icons-react';
+import { IconCode, IconCoins, IconRefresh, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
@@ -16,9 +17,12 @@ import { useToast } from '@/components/ui/toast';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
+import { getCosmosChainState, subscribeCosmosChainState } from '@/domains/cosmos/client/chain-state';
 import { delegateCosmosTokens, getCosmosAccountPrefixFromValidatorAddress, type CosmosSigningAlgorithm } from '@/domains/cosmos/client/signing-transactions';
 import { getCosmosValidatorsDirect } from '@/domains/cosmos/client/queries';
 import { formatCompactHash } from '@/domains/cosmos/client/tx-helpers';
+import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
+import { QuarixStakingPanels } from '@/domains/cosmos/ui/quarix-staking-panels';
 import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { AppShell } from '@/platform/layout/app-shell';
@@ -402,6 +406,8 @@ function CosmosValidatorsPageContent() {
   const [loading, setLoading] = useState(true);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [selectedValidator, setSelectedValidator] = useState<ValidatorItem | null>(null);
+  const [showRawJson, setShowRawJson] = useState(false);
+  const [shouldShowQuarixStakingPanels, setShouldShowQuarixStakingPanels] = useState(() => getCosmosChainState().isQuarix);
   const delegateDialogOpen = useMemo(() => Boolean(selectedValidator), [selectedValidator]);
 
   function handlePageChange(page: number) {
@@ -455,6 +461,11 @@ function CosmosValidatorsPageContent() {
     };
   }, [currentPage, pageMessages.failedToLoadValidators, pathname, refreshVersion, router, searchParamsText]);
 
+  useEffect(() => {
+    setShouldShowQuarixStakingPanels(getCosmosChainState().isQuarix);
+    return subscribeCosmosChainState((state) => setShouldShowQuarixStakingPanels(state.isQuarix));
+  }, []);
+
   if (loading) {
     return (
       <AppShell>
@@ -500,14 +511,24 @@ function CosmosValidatorsPageContent() {
                   plain
                   onPageChange={handlePageChange}
                 />
-                <button
-                  type="button"
-                  aria-label={pageMessages.refreshValidators}
-                  className="inline-flex h-8 w-8 items-center justify-center text-slate-400 transition hover:text-slate-600"
+                <ActionIconButton
+                  tooltip={showRawJson ? messages.common.hideRawJson : messages.common.showRawJson}
+                  className={
+                    showRawJson
+                      ? 'h-8 w-8 rounded-md bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700'
+                      : 'h-8 w-8 rounded-md text-slate-400 hover:text-slate-700'
+                  }
+                  onClick={() => setShowRawJson((current) => !current)}
+                >
+                  <IconCode className="size-4" stroke={1.8} />
+                </ActionIconButton>
+                <ActionIconButton
+                  tooltip={pageMessages.refreshValidators}
+                  className="h-8 w-8 rounded-md text-slate-400 hover:text-slate-700"
                   onClick={() => setRefreshVersion((current) => current + 1)}
                 >
                   <IconRefresh className="size-4" stroke={1.8} />
-                </button>
+                </ActionIconButton>
               </div>
             </div>
           </div>
@@ -517,11 +538,11 @@ function CosmosValidatorsPageContent() {
               <thead>
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.name}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.operator}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.power}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosValidatorDetail.tokens}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosValidatorDetail.delegatorShares}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.commission}</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.operator}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.jailed}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.status}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.labels.actions}</th>
@@ -538,13 +559,19 @@ function CosmosValidatorsPageContent() {
                           </Link>
                         </div>
                       </td>
+                      <td className="px-5 py-3 text-sm">
+                        <CosmosAddressLink
+                          href={`/cosmos/validator/${validator.operatorAddress}`}
+                          label={translateRuntimeText(validator.operatorAddressLabel, locale)}
+                          copyValue={validator.operatorAddress}
+                          className="font-mono"
+                          prefetch={false}
+                        />
+                      </td>
                       <td className="px-5 py-3 text-sm font-medium text-slate-900 tabular-nums">{translateRuntimeText(validator.votingPowerPercentLabel, locale)}</td>
                       <td className="px-5 py-3 text-sm text-slate-700 tabular-nums">{translateRuntimeText(validator.tokensLabel, locale)}</td>
                       <td className="px-5 py-3 text-sm text-slate-700 tabular-nums">{translateRuntimeText(validator.delegatorSharesLabel, locale)}</td>
                       <td className="px-5 py-3 text-sm text-slate-700 tabular-nums">{translateRuntimeText(validator.commissionRateLabel, locale)}</td>
-                      <td className="px-5 py-3 text-sm text-slate-700 mono" title={validator.operatorAddress}>
-                        {translateRuntimeText(validator.operatorAddressLabel, locale)}
-                      </td>
                       <td className="px-5 py-3 text-sm">
                         <span
                           className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${validator.jailed ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'}`}
@@ -582,6 +609,11 @@ function CosmosValidatorsPageContent() {
               </tbody>
             </table>
           </div>
+          {showRawJson ? (
+            <div className="border-t border-slate-200 px-5 py-4">
+              <JsonViewPanel value={data as object} className="border-0 p-0 shadow-none" controlsClassName="right-0 top-0" />
+            </div>
+          ) : null}
         </section>
         <DelegateDialog
           validator={selectedValidator}
@@ -593,6 +625,7 @@ function CosmosValidatorsPageContent() {
             }
           }}
         />
+        {shouldShowQuarixStakingPanels ? <QuarixStakingPanels /> : null}
       </main>
     </AppShell>
   );

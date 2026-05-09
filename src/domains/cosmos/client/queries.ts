@@ -4,6 +4,7 @@ import 'client-only';
 
 import { fromBech32, toBech32 } from '@cosmjs/encoding';
 import { formatLocalizedDateTime, formatLocalizedNumber } from '@/i18n/format';
+import { isActiveCosmosQuarixChainForProfile } from '@/domains/cosmos/client/chain-state';
 import { formatCosmosBlock } from '@/domains/cosmos/server/formatters';
 import {
   decodeCosmosTransactionSummary,
@@ -21,6 +22,7 @@ import {
 import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
 
 type CosmosProvider = NonNullable<ReturnType<typeof readActiveRpcProfileCookie>>;
+type ActiveCosmosProvider = CosmosProvider & { restUrl: string };
 
 const COSMOS_BLOCK_TIMESTAMP_CONCURRENCY = 10;
 
@@ -316,6 +318,23 @@ type CosmosGovProposalsResponse = {
 
 type CosmosGovProposalTallyResponse = {
   tally?: CosmosGovTallyResult;
+};
+
+export type QuarixProposalVeto = {
+  proposal_id?: string;
+  proposalId?: string;
+  veto_start_time?: string;
+  vetoStartTime?: string;
+  veto_end_time?: string;
+  vetoEndTime?: string;
+  in_veto_period?: boolean;
+  inVetoPeriod?: boolean;
+  vetoed?: boolean;
+};
+
+export type QuarixProposalVetoResponse = {
+  proposal_veto?: QuarixProposalVeto | null;
+  proposalVeto?: QuarixProposalVeto | null;
 };
 
 type CosmosGovProposalResponse = {
@@ -737,10 +756,13 @@ export type CosmosProposalPageItem = {
   rawJson: {
     proposal: NonNullable<CosmosGovProposalsResponse['proposals']>[number];
     tally: CosmosGovProposalTallyResponse | null;
+    veto?: QuarixProposalVetoResponse | null;
   };
 };
 
 export type CosmosProposalsPage = {
+  providerId: string;
+  restUrl: string;
   page: number;
   pageSize: number;
   totalProposals: number;
@@ -788,6 +810,7 @@ export type CosmosProposalDetail = {
   rawJson: {
     proposal: NonNullable<CosmosGovProposalsResponse['proposals']>[number] | null;
     tally: CosmosGovProposalTallyResponse | null;
+    veto?: QuarixProposalVetoResponse | null;
     votes: CosmosGovProposalVotesResponse | null;
   };
 };
@@ -821,7 +844,7 @@ export type CosmosParamsModuleResult = {
   data: Record<string, unknown>;
 };
 
-export function getActiveCosmosProvider() {
+export function getActiveCosmosProvider(): ActiveCosmosProvider {
   const profile = readActiveRpcProfileCookie('cosmos');
 
   if (!profile) {
@@ -832,7 +855,10 @@ export function getActiveCosmosProvider() {
     throw new Error('The selected Cosmos provider is missing a REST URL.');
   }
 
-  return profile;
+  return {
+    ...profile,
+    restUrl: profile.restUrl,
+  };
 }
 
 async function tryFetchJsonObject(url: string) {
@@ -960,7 +986,6 @@ export async function getCosmosParamsDirect() {
     { id: 'protocolpool', label: 'Protocol Pool', paths: ['/cosmos/protocolpool/v1/params'] },
     { id: 'slashing', label: 'Slashing', paths: ['/cosmos/slashing/v1beta1/params'] },
     { id: 'staking', label: 'Staking', paths: ['/cosmos/staking/v1beta1/params'] },
-    { id: 'quarix-gaswaiver', label: 'Quarix Gas Waiver', paths: ['/quarix/gaswaiver/v1/params'] },
     { id: 'quarix-veto', label: 'Quarix Veto', paths: ['/quarix/gov/v1/veto_params'] },
   ] as const;
 
@@ -1370,6 +1395,36 @@ function formatCosmosProposalTallyLabel(tally: CosmosGovTallyResult | undefined 
     `Abstain ${formatTallyAmount(tally.abstain_count)}`,
     `Veto ${formatTallyAmount(tally.no_with_veto_count)}`,
   ].join(' / ');
+}
+
+export function getQuarixProposalVetoPayload(value: QuarixProposalVetoResponse | null | undefined) {
+  return value?.proposal_veto ?? value?.proposalVeto ?? null;
+}
+
+export function formatQuarixProposalVetoLabel(value: QuarixProposalVetoResponse | null | undefined) {
+  const veto = getQuarixProposalVetoPayload(value);
+
+  if (!veto) {
+    return null;
+  }
+
+  const startTime = veto.veto_start_time ?? veto.vetoStartTime ?? null;
+  const endTime = veto.veto_end_time ?? veto.vetoEndTime ?? null;
+  const inVetoPeriod = veto.in_veto_period ?? veto.inVetoPeriod ?? false;
+
+  if (veto.vetoed) {
+    return 'Vetoed';
+  }
+
+  if (inVetoPeriod) {
+    return endTime ? `In veto period until ${formatLocalTimestamp(endTime)}` : 'In veto period';
+  }
+
+  if (startTime || endTime) {
+    return `Veto period ${formatLocalTimestamp(startTime ?? undefined)} - ${formatLocalTimestamp(endTime ?? undefined)}`;
+  }
+
+  return 'Veto info available';
 }
 
 function formatCosmosProposalStatusLabel(status: string | undefined) {
@@ -2752,6 +2807,7 @@ export async function getCosmosValidatorsDirect(requestedPage = 1, pageSize = 50
       },
     })),
     getCosmosOverviewDirect().catch(() => ({
+      chainId: 'Unavailable',
       latestHeight: 'Unavailable',
     })),
   ]);
@@ -2809,6 +2865,7 @@ export async function getCosmosValidatorsDirect(requestedPage = 1, pageSize = 50
     totalPages,
     hasPreviousPage: normalizedPage > 1,
     hasNextPage: normalizedPage < totalPages,
+    chainId: overview.chainId,
     totalLabel: totalValidators ? `${formatInteger(totalValidators)} validators` : 'No validators returned',
     summary: [
       {
@@ -3041,8 +3098,24 @@ export async function getCosmosProposalsDirect(requestedPage = 1, pageSize = 15)
       return fetchJson<CosmosGovProposalTallyResponse>(`${profile.restUrl}/cosmos/gov/v1/proposals/${id}/tally`);
     }),
   );
+  const shouldLoadQuarixVeto = isActiveCosmosQuarixChainForProfile(profile);
+  const vetoResponses = shouldLoadQuarixVeto
+    ? await Promise.allSettled(
+        proposals.map((proposal) => {
+          const id = proposal.id ?? proposal.proposal_id;
+
+          if (!id) {
+            return Promise.resolve(null);
+          }
+
+          return fetchQuarixProposalVeto(profile, id).catch(() => null);
+        }),
+      )
+    : [];
 
   return {
+    providerId: profile.id,
+    restUrl: profile.restUrl,
     page: normalizedPage,
     pageSize: limit,
     totalProposals,
@@ -3054,6 +3127,7 @@ export async function getCosmosProposalsDirect(requestedPage = 1, pageSize = 15)
       .map((proposal, index) => {
         const id = proposal.id ?? proposal.proposal_id ?? 'Unavailable';
         const tallyResponse = tallyResponses[index]?.status === 'fulfilled' ? tallyResponses[index].value : null;
+        const vetoResponse = vetoResponses[index]?.status === 'fulfilled' ? vetoResponses[index].value : null;
         const tally = tallyResponse?.tally ?? proposal.final_tally_result;
 
         return {
@@ -3075,6 +3149,7 @@ export async function getCosmosProposalsDirect(requestedPage = 1, pageSize = 15)
           rawJson: {
             proposal,
             tally: tallyResponse,
+            ...(shouldLoadQuarixVeto ? { veto: vetoResponse } : {}),
           },
         } satisfies CosmosProposalPageItem;
       })
@@ -3088,6 +3163,39 @@ export async function getCosmosProposalsDirect(requestedPage = 1, pageSize = 15)
 
         return right.id.localeCompare(left.id);
       }),
+  };
+}
+
+async function fetchQuarixProposalVeto(profile: ActiveCosmosProvider, proposalId: string) {
+  return fetchJson<QuarixProposalVetoResponse>(`${profile.restUrl}/quarix/gov/v1/proposals/${encodeURIComponent(proposalId)}/veto`);
+}
+
+export async function enrichCosmosProposalsWithQuarixVeto(data: CosmosProposalsPage): Promise<CosmosProposalsPage> {
+  const profile = getActiveCosmosProvider();
+
+  if (profile.id !== data.providerId || profile.restUrl !== data.restUrl) {
+    return data;
+  }
+
+  const vetoResponses = await Promise.allSettled(
+    data.proposals.map((proposal) => {
+      if (!/^[1-9]\d*$/.test(proposal.id)) {
+        return Promise.resolve(null);
+      }
+
+      return fetchQuarixProposalVeto(profile, proposal.id).catch(() => null);
+    }),
+  );
+
+  return {
+    ...data,
+    proposals: data.proposals.map((proposal, index) => ({
+      ...proposal,
+      rawJson: {
+        ...proposal.rawJson,
+        veto: vetoResponses[index]?.status === 'fulfilled' ? vetoResponses[index].value : null,
+      },
+    })),
   };
 }
 
@@ -3112,6 +3220,7 @@ export async function getCosmosProposalByIdDirect(id: string, requestedVotePage 
       pagination: { total: '0' },
     })),
   ]);
+  const vetoPayload = isActiveCosmosQuarixChainForProfile(profile) ? await fetchQuarixProposalVeto(profile, proposalId).catch(() => null) : undefined;
   const proposal = proposalPayload.proposal;
 
   if (!proposal) {
@@ -3178,6 +3287,7 @@ export async function getCosmosProposalByIdDirect(id: string, requestedVotePage 
     rawJson: {
       proposal,
       tally: tallyPayload,
+      ...(vetoPayload !== undefined ? { veto: vetoPayload } : {}),
       votes: effectiveVotesPayload,
     },
   } satisfies CosmosProposalDetail;

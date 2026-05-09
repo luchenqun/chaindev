@@ -23,7 +23,12 @@ import {
   type CosmosProposalVoteOption,
   type CosmosSigningAlgorithm,
 } from '@/domains/cosmos/client/signing-transactions';
-import { getCosmosProposalsDirect } from '@/domains/cosmos/client/queries';
+import {
+  enrichCosmosProposalsWithQuarixVeto,
+  getQuarixProposalVetoPayload,
+  getCosmosProposalsDirect,
+} from '@/domains/cosmos/client/queries';
+import { getCosmosChainState, subscribeCosmosChainState } from '@/domains/cosmos/client/chain-state';
 import { formatCompactHash } from '@/domains/cosmos/client/tx-helpers';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { formatTimestampWithSeconds } from '@/domains/cosmos/ui/detail-primitives';
@@ -127,12 +132,22 @@ function ScaledInput({
 function StatusBadge({ status, label }: { status: string; label: string }) {
   const className =
     status === 'PROPOSAL_STATUS_PASSED'
-      ? 'inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700'
+      ? 'inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700'
       : status === 'PROPOSAL_STATUS_REJECTED' || status === 'PROPOSAL_STATUS_FAILED'
-        ? 'inline-flex rounded-full bg-rose-50 px-2 py-1 text-xs font-semibold text-rose-700'
+        ? 'inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700'
         : status === 'PROPOSAL_STATUS_VOTING_PERIOD'
-          ? 'inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700'
-          : 'inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600';
+          ? 'inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700'
+          : 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600';
+
+  return <span className={className}>{label}</span>;
+}
+
+function VetoStatusBadge({ vetoed, inVetoPeriod, label }: { vetoed: boolean; inVetoPeriod: boolean; label: string }) {
+  const className = vetoed
+    ? 'inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700'
+    : inVetoPeriod
+      ? 'inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700'
+      : 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600';
 
   return <span className={className}>{label}</span>;
 }
@@ -143,6 +158,58 @@ function isVotingProposal(proposal: ProposalItem) {
 
 function isDepositProposal(proposal: ProposalItem) {
   return proposal.status === 'PROPOSAL_STATUS_DEPOSIT_PERIOD' && /^[1-9]\d*$/.test(proposal.id);
+}
+
+function hasLoadedQuarixVeto(data: ProposalsPageData) {
+  return data.proposals.every((proposal) => Object.prototype.hasOwnProperty.call(proposal.rawJson, 'veto'));
+}
+
+function getQuarixProposalVetoTimes(proposal: ProposalItem) {
+  const veto = getQuarixProposalVetoPayload(proposal.rawJson.veto);
+
+  return {
+    veto,
+    startTime: veto?.veto_start_time ?? veto?.vetoStartTime ?? null,
+    endTime: veto?.veto_end_time ?? veto?.vetoEndTime ?? null,
+  };
+}
+
+function splitTallyLabel(
+  label: string,
+  labels: {
+    yes: string;
+    no: string;
+    abstain: string;
+    veto: string;
+  },
+) {
+  const parts = label.split(' / ');
+
+  if (parts.length < 4) {
+    return [label];
+  }
+
+  function formatPart(part: string, fallbackLabel: string) {
+    const match = /^(Yes|No|Abstain|Veto)\s+(.+)$/.exec(part.trim());
+
+    if (!match) {
+      return part;
+    }
+
+    const labelByKey: Record<string, string> = {
+      Yes: labels.yes,
+      No: labels.no,
+      Abstain: labels.abstain,
+      Veto: labels.veto,
+    };
+
+    return `${labelByKey[match[1]] ?? fallbackLabel} ${match[2]}`;
+  }
+
+  return [
+    `${formatPart(parts[0], labels.yes)} / ${formatPart(parts[1], labels.no)}`,
+    `${formatPart(parts[2], labels.abstain)} / ${formatPart(parts[3], labels.veto)}`,
+  ];
 }
 
 function SubmitProposalDialog({
@@ -1090,6 +1157,7 @@ function CosmosProposalsPageContent() {
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<ProposalItem | null>(null);
   const [selectedDepositProposal, setSelectedDepositProposal] = useState<ProposalItem | null>(null);
+  const [showQuarixVetoColumn, setShowQuarixVetoColumn] = useState(() => getCosmosChainState().isQuarix);
   const voteDialogOpen = useMemo(() => Boolean(selectedProposal), [selectedProposal]);
   const depositDialogOpen = useMemo(() => Boolean(selectedDepositProposal), [selectedDepositProposal]);
 
@@ -1110,6 +1178,8 @@ function CosmosProposalsPageContent() {
   }
 
   useEffect(() => {
+    setShowQuarixVetoColumn(getCosmosChainState().isQuarix);
+
     let cancelled = false;
 
     async function load() {
@@ -1151,6 +1221,41 @@ function CosmosProposalsPageContent() {
       window.removeEventListener('chaindev:active-rpc-profile-changed', handleProfileChanged);
     };
   }, [currentPage, pathname, refreshVersion, router, searchParamsText]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function enrich() {
+      const chainState = getCosmosChainState();
+
+      if (!chainState.isQuarix || !data || hasLoadedQuarixVeto(data) || data.providerId !== chainState.profileId || data.restUrl !== chainState.restUrl) {
+        return;
+      }
+
+      const next = await enrichCosmosProposalsWithQuarixVeto(data);
+
+      if (!cancelled) {
+        setData((latest) => (latest === data ? next : latest));
+      }
+    }
+
+    void enrich();
+
+    const unsubscribe = subscribeCosmosChainState((state) => {
+      setShowQuarixVetoColumn(state.isQuarix);
+
+      if (!state.isQuarix) {
+        return;
+      }
+
+      void enrich();
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [data]);
 
   if (loading) {
     return (
@@ -1215,13 +1320,14 @@ function CosmosProposalsPageContent() {
           <div className="overflow-x-auto lg:overflow-x-hidden">
             <table className="data-table w-full table-fixed whitespace-normal">
               <colgroup>
-                <col className="w-[22%]" />
-                <col className="w-[10%]" />
-                <col className="w-[16%]" />
-                <col className="w-[12%]" />
-                <col className="w-[25%]" />
-                <col className="w-[6%]" />
-                <col className="w-[7%]" />
+                <col className={showQuarixVetoColumn ? 'w-[18%]' : 'w-[22%]'} />
+                <col className={showQuarixVetoColumn ? 'w-[8%]' : 'w-[10%]'} />
+                <col className={showQuarixVetoColumn ? 'w-[16%]' : 'w-[16%]'} />
+                <col className={showQuarixVetoColumn ? 'w-[16%]' : 'w-[12%]'} />
+                <col className={showQuarixVetoColumn ? 'w-[14%]' : 'w-[25%]'} />
+                {showQuarixVetoColumn ? <col className="w-[15%]" /> : null}
+                <col className={showQuarixVetoColumn ? 'w-[8%]' : 'w-[6%]'} />
+                <col className={showQuarixVetoColumn ? 'w-[5%]' : 'w-[7%]'} />
               </colgroup>
               <thead>
                 <tr>
@@ -1230,6 +1336,9 @@ function CosmosProposalsPageContent() {
                   <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.submission}</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.voting}</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.tallyColumn}</th>
+                  {showQuarixVetoColumn ? (
+                    <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.vetoTime}</th>
+                  ) : null}
                   <th className="border-b border-slate-200 px-4 py-3 text-left text-[13px] font-semibold text-slate-800">{proposalMessages.status}</th>
                   <th className="border-b border-slate-200 px-4 py-3 text-right text-[13px] font-semibold text-slate-800">{proposalMessages.actions}</th>
                 </tr>
@@ -1239,6 +1348,16 @@ function CosmosProposalsPageContent() {
                   data.proposals.map((proposal) => {
                     const canVote = isVotingProposal(proposal);
                     const canDeposit = isDepositProposal(proposal);
+                    const { veto, startTime: vetoStartTime, endTime: vetoEndTime } = getQuarixProposalVetoTimes(proposal);
+                    const inVetoPeriod = veto?.in_veto_period ?? veto?.inVetoPeriod ?? false;
+                    const vetoStatusLabel = veto ? (veto.vetoed ? proposalMessages.vetoed : inVetoPeriod ? proposalMessages.inVetoPeriod : proposalMessages.notVetoed) : null;
+                    const tallyLines = splitTallyLabel(proposal.tallyLabel, {
+                      yes: proposalMessages.yes,
+                      no: proposalMessages.no,
+                      abstain: proposalMessages.abstain,
+                      veto: proposalMessages.veto,
+                    });
+                    const tallyTitle = tallyLines.join(' / ');
 
                     return (
                       <tr key={proposal.id} className="cursor-pointer border-t border-slate-200 hover:bg-slate-50/70" onClick={() => router.push(`/cosmos/proposal/${proposal.id}`)}>
@@ -1274,11 +1393,38 @@ function CosmosProposalsPageContent() {
                             </div>
                           </div>
                         </td>
-                        <td className="overflow-hidden px-4 py-3 text-sm text-slate-700" title={translateRuntimeText(proposal.tallyLabel, locale)}>
-                          <div className="truncate">{translateRuntimeText(proposal.tallyLabel, locale)}</div>
+                        <td className="overflow-hidden px-4 py-3 text-xs text-slate-700" title={tallyTitle}>
+                          <div className="space-y-1">
+                            {tallyLines.map((line, index) => (
+                              <div key={`${proposal.id}-tally-${index}`} className="truncate">
+                                {line}
+                              </div>
+                            ))}
+                          </div>
                         </td>
+                        {showQuarixVetoColumn ? (
+                          <td className="overflow-hidden px-4 py-3 text-xs text-slate-700 tabular-nums">
+                            {veto ? (
+                              <div className="space-y-1">
+                                <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                                  <span className="shrink-0 font-medium text-slate-500">{proposalMessages.start}</span>
+                                  <span className="truncate">{formatTimestampWithSeconds(vetoStartTime)}</span>
+                                </div>
+                                <div className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                                  <span className="shrink-0 font-medium text-slate-500">{proposalMessages.end}</span>
+                                  <span className="truncate">{formatTimestampWithSeconds(vetoEndTime)}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                        ) : null}
                         <td className="whitespace-nowrap px-3 py-3 text-sm">
-                          <StatusBadge status={proposal.status} label={translateRuntimeText(proposal.statusLabel, locale)} />
+                          <div className="flex flex-col items-start gap-1">
+                            <StatusBadge status={proposal.status} label={translateRuntimeText(proposal.statusLabel, locale)} />
+                            {veto && vetoStatusLabel ? <VetoStatusBadge vetoed={Boolean(veto.vetoed)} inVetoPeriod={Boolean(inVetoPeriod)} label={vetoStatusLabel} /> : null}
+                          </div>
                         </td>
                         <td className="whitespace-nowrap px-3 py-3 text-right text-sm" onClick={(event) => event.stopPropagation()}>
                           <span className="inline-flex items-center justify-end gap-0">
@@ -1305,7 +1451,7 @@ function CosmosProposalsPageContent() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">
+                    <td colSpan={showQuarixVetoColumn ? 8 : 7} className="px-5 py-10 text-center text-sm text-slate-500">
                       {proposalMessages.noProposalsReturned}
                     </td>
                   </tr>

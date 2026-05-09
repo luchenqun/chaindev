@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ListPageSkeleton } from '@/components/ui/loading-placeholders';
 import { RelativeTime } from '@/components/relative-time';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
+import { Input } from '@/components/ui/input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,7 +26,7 @@ import {
 } from '@/domains/evm/client/transaction-cache';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
-import { syncLatestEvmTransactionsDirect, validateActiveEvmCacheDirect } from '@/domains/evm/client/queries';
+import { syncEvmTransactionsByBlockRangeDirect, syncLatestEvmTransactionsDirect, validateActiveEvmCacheDirect } from '@/domains/evm/client/queries';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { PendingTransactionsPanel } from '@/domains/evm/ui/pending-transactions-panel';
 import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
@@ -348,6 +349,10 @@ function EvmTransactionsPageContent() {
   const [cacheActionState, setCacheActionState] = useState<CacheValidationResult | null>(null);
   const [cacheActionLoading, setCacheActionLoading] = useState<'validate' | 'reload' | 'clear' | null>(null);
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [reloadDialogOpen, setReloadDialogOpen] = useState(false);
+  const [reloadStartBlockNumber, setReloadStartBlockNumber] = useState('');
+  const [reloadEndBlockNumber, setReloadEndBlockNumber] = useState('');
+  const [reloadErrorMessage, setReloadErrorMessage] = useState<string | null>(null);
   const hasLoadedDataRef = useRef(false);
   const visibleAddresses = useMemo(() => [...new Set(data?.transactions.flatMap((transaction) => [transaction.from, ...(transaction.to ? [transaction.to] : [])]) ?? [])], [data]);
   const decodedMethodLabelByHash = useMemo(() => {
@@ -578,23 +583,61 @@ function EvmTransactionsPageContent() {
     }
   }
 
+  function handleOpenReloadDialog() {
+    setReloadErrorMessage(null);
+    setReloadDialogOpen(true);
+  }
+
   async function handleReloadCache() {
+    const normalizedStartBlockNumber = reloadStartBlockNumber.trim();
+    const normalizedEndBlockNumber = reloadEndBlockNumber.trim();
+    const hasRangeInput = Boolean(normalizedStartBlockNumber || normalizedEndBlockNumber);
+
+    if (hasRangeInput && (!/^\d+$/.test(normalizedStartBlockNumber) || !/^\d+$/.test(normalizedEndBlockNumber))) {
+      setReloadErrorMessage(txMessages.reloadCacheBlockRangeInvalid);
+      return;
+    }
+
+    if (hasRangeInput && BigInt(normalizedStartBlockNumber) > BigInt(normalizedEndBlockNumber)) {
+      setReloadErrorMessage(txMessages.reloadCacheStartBlockGreaterThanEndBlock);
+      return;
+    }
+
+    setReloadErrorMessage(null);
     setCacheActionLoading('reload');
 
     try {
       await clearEvmTransactionCache();
-      const result = await syncLatestEvmTransactionsDirect({
-        maxBlocks: RELOAD_CACHE_MAX_BLOCKS,
-        maxTransactions: RELOAD_CACHE_MAX_TRANSACTIONS,
-      });
-      setCacheActionState({
-        status: 'valid',
-        label: translateRuntimeText(
-          `Reloaded ${result.syncedTransactions.toLocaleString(locale)} transactions from ${result.scannedBlocks.toLocaleString(locale)} recent blocks.`,
-          locale,
-        ),
-      });
+      if (hasRangeInput) {
+        const result = await syncEvmTransactionsByBlockRangeDirect({
+          startBlockNumber: normalizedStartBlockNumber,
+          endBlockNumber: normalizedEndBlockNumber,
+        });
+
+        setCacheActionState({
+          status: 'valid',
+          label: txMessages.reloadCacheBlockRangeResult
+            .replace('{transactions}', result.syncedTransactions.toLocaleString(locale))
+            .replace('{blocks}', result.scannedBlocks.toLocaleString(locale))
+            .replace('{startBlock}', result.startBlockNumber)
+            .replace('{endBlock}', result.endBlockNumber),
+        });
+      } else {
+        const result = await syncLatestEvmTransactionsDirect({
+          maxBlocks: RELOAD_CACHE_MAX_BLOCKS,
+          maxTransactions: RELOAD_CACHE_MAX_TRANSACTIONS,
+        });
+
+        setCacheActionState({
+          status: 'valid',
+          label: txMessages.reloadCacheLatestResult
+            .replace('{transactions}', result.syncedTransactions.toLocaleString(locale))
+            .replace('{blocks}', result.scannedBlocks.toLocaleString(locale)),
+        });
+      }
+
       setClearDialogOpen(false);
+      setReloadDialogOpen(false);
       setCacheRefreshVersion((current) => current + 1);
     } catch (error) {
       setCacheActionState({
@@ -845,7 +888,7 @@ function EvmTransactionsPageContent() {
                     tooltip={cacheActionLoading === 'reload' ? txMessages.reloadingCache : txMessages.reloadCache}
                     className={cacheActionLoading === 'reload' ? 'cursor-wait text-sky-600' : 'text-slate-400 hover:text-sky-600'}
                     disabled={cacheActionLoading != null}
-                    onClick={() => void handleReloadCache()}
+                    onClick={handleOpenReloadDialog}
                   >
                     <IconRefresh className="size-4" stroke={1.8} />
                   </ActionIconButton>
@@ -1112,6 +1155,68 @@ function EvmTransactionsPageContent() {
           </label>
         </div>
         {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{translateRuntimeText(searchErrorMessage, locale)}</p> : null}
+      </ModalDialog>
+      <ModalDialog
+        open={reloadDialogOpen}
+        onOpenChange={setReloadDialogOpen}
+        title={txMessages.reloadCacheTitle}
+        description={txMessages.reloadCacheDescription}
+        maxWidthClassName="max-w-lg"
+        footer={
+          <>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={cacheActionLoading === 'reload'}
+              onClick={() => setReloadDialogOpen(false)}
+            >
+              {commonMessages.cancel}
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-9 items-center rounded-lg bg-slate-900 px-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-70"
+              disabled={cacheActionLoading === 'reload'}
+              onClick={() => void handleReloadCache()}
+            >
+              {cacheActionLoading === 'reload' ? txMessages.reloadingCache : txMessages.reloadCache}
+            </button>
+          </>
+        }
+      >
+        <div className="grid gap-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="grid gap-1.5" htmlFor="evm-cache-reload-start-block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.reloadCacheStartBlockNumber}</span>
+              <Input
+                id="evm-cache-reload-start-block"
+                inputMode="numeric"
+                value={reloadStartBlockNumber}
+                placeholder={txMessages.reloadCacheBlockNumberPlaceholder}
+                disabled={cacheActionLoading === 'reload'}
+                onChange={(event) => {
+                  setReloadErrorMessage(null);
+                  setReloadStartBlockNumber(event.target.value);
+                }}
+              />
+            </label>
+            <label className="grid gap-1.5" htmlFor="evm-cache-reload-end-block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{txMessages.reloadCacheEndBlockNumber}</span>
+              <Input
+                id="evm-cache-reload-end-block"
+                inputMode="numeric"
+                value={reloadEndBlockNumber}
+                placeholder={txMessages.reloadCacheBlockNumberPlaceholder}
+                disabled={cacheActionLoading === 'reload'}
+                onChange={(event) => {
+                  setReloadErrorMessage(null);
+                  setReloadEndBlockNumber(event.target.value);
+                }}
+              />
+            </label>
+          </div>
+          <p className="text-sm leading-6 text-slate-500">{txMessages.reloadCacheBlockNumberHint}</p>
+          {reloadErrorMessage ? <p className="text-sm text-rose-600">{translateRuntimeText(reloadErrorMessage, locale)}</p> : null}
+        </div>
       </ModalDialog>
     </AppShell>
   );

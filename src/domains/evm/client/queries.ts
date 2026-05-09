@@ -1168,6 +1168,58 @@ export async function syncLatestEvmTransactionsDirect(input?: { latestCachedBloc
   };
 }
 
+export async function syncEvmTransactionsByBlockRangeDirect(input: { startBlockNumber: string; endBlockNumber: string; maxBlocks?: number; maxTransactions?: number }) {
+  const { client, profile } = await getEvmClientWithProfile();
+  const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
+  const startBlockNumber = BigInt(input.startBlockNumber);
+  const endBlockNumber = BigInt(input.endBlockNumber);
+  const maxBlocks = input.maxBlocks ?? Number.POSITIVE_INFINITY;
+  const maxTransactions = input.maxTransactions ?? Number.POSITIVE_INFINITY;
+  const cacheCandidates: EvmCachedTransactionItem[] = [];
+  let cursor = endBlockNumber;
+  let scannedBlocks = 0;
+  let syncedTransactions = 0;
+
+  while (cursor >= startBlockNumber && scannedBlocks < maxBlocks && syncedTransactions < maxTransactions) {
+    const remainingBlocksInRange = Number(cursor - startBlockNumber + 1n);
+    const remainingBlocksByLimit = maxBlocks - scannedBlocks;
+    const nextBlocks = await getRecentBlocksChunk(client, cursor, Math.min(HOME_BLOCK_FETCH_BATCH_SIZE, remainingBlocksInRange, remainingBlocksByLimit), true);
+
+    for (const block of nextBlocks) {
+      scannedBlocks += 1;
+
+      const remainingTransactions = maxTransactions - syncedTransactions;
+      const blockTransactions = formatTransactionsPageItemsForBlock(block, currencyName, remainingTransactions);
+
+      cacheCandidates.push(...blockTransactions);
+      syncedTransactions += blockTransactions.length;
+
+      if (block.number <= startBlockNumber || scannedBlocks >= maxBlocks || syncedTransactions >= maxTransactions) {
+        break;
+      }
+    }
+
+    const lastBlock = nextBlocks[nextBlocks.length - 1];
+
+    if (!nextBlocks.length || lastBlock?.number <= startBlockNumber || scannedBlocks >= maxBlocks || syncedTransactions >= maxTransactions) {
+      break;
+    }
+
+    cursor = lastBlock.number - 1n;
+  }
+
+  await rememberEvmTransactionCacheSafe(cacheCandidates);
+
+  return {
+    startBlockNumber: startBlockNumber.toString(),
+    endBlockNumber: endBlockNumber.toString(),
+    scannedBlocks,
+    syncedTransactions,
+    truncatedByBlockWindow: Number.isFinite(maxBlocks) && endBlockNumber - startBlockNumber + 1n > BigInt(scannedBlocks),
+    truncatedByTransactionLimit: syncedTransactions >= maxTransactions,
+  };
+}
+
 export async function getLatestEvmTransactionsDirect(limit = 20) {
   const { client, profile } = await getEvmClientWithProfile();
   const latestBlock = await client.getBlock({

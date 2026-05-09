@@ -372,7 +372,6 @@ const EXACT_TEXT_TRANSLATIONS: Record<string, string> = {
   'Protocol Pool': '协议池',
   Slashing: '惩罚',
   Staking: '质押',
-  'Quarix Gas Waiver': 'Quarix Gas 豁免',
   'Quarix Veto': 'Quarix 否决',
   'Unknown Provider': '未知节点',
   'Untitled Proposal': '未命名提案',
@@ -690,6 +689,9 @@ const EXACT_TEXT_TRANSLATIONS: Record<string, string> = {
   Unnamed: '未命名',
   Abstain: '弃权',
   Veto: '否决',
+  Vetoed: '已否决',
+  'In veto period': '否决期内',
+  'Veto info available': '有否决信息',
 };
 
 const ATTRIBUTE_TRANSLATIONS: Record<string, string> = {
@@ -811,6 +813,8 @@ function translatePatternText(input: string) {
     [/^No (.+)$/, (value) => `反对 ${value}`],
     [/^Abstain (.+)$/, (value) => `弃权 ${value}`],
     [/^Veto (.+)$/, (value) => `否决 ${value}`],
+    [/^In veto period until (.+)$/, (value) => `否决期至 ${value}`],
+    [/^Veto period (.+) - (.+)$/, (start, end) => `否决期 ${start} - ${end}`],
     [/^ACCESS_TYPE_(.+)$/, (value) => `访问类型 ${value}`],
     [/^Showing cached transactions up to block (.+)$/, (block) => `显示已缓存到区块 ${block} 的交易`],
     [/^#(.+) - #(.+)$/, (top, bottom) => `#${top} - #${bottom}`],
