@@ -49,6 +49,12 @@ let cache: z.infer<typeof registryStoreSchema> = {
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
 const GENERATED_DEFAULT_BINDING_ID_PREFIX = 'generated-default-binding:';
+const ARTIFACT_ABI_CACHE_STORAGE_KEY = 'chaindev:evm-contract-artifact-abis:v1';
+
+const artifactAbiCacheSchema = z.object({
+  version: z.literal(1),
+  artifacts: z.array(artifactSchema.omit({ bytecode: true })),
+});
 
 type BindingScope = {
   chainId: string;
@@ -68,6 +74,46 @@ function createAuthRequiredError() {
 
 function readRegistryStore() {
   return cache;
+}
+
+function readArtifactAbiCache(): EvmContractArtifact[] {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const rawValue = window.localStorage.getItem(ARTIFACT_ABI_CACHE_STORAGE_KEY);
+
+    if (!rawValue) {
+      return [];
+    }
+
+    const snapshot = artifactAbiCacheSchema.parse(JSON.parse(rawValue));
+    return snapshot.artifacts.map((artifact) => ({
+      ...artifact,
+      bytecode: null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function writeArtifactAbiCache(artifacts: EvmContractArtifact[]) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      ARTIFACT_ABI_CACHE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        artifacts: artifacts.map(({ bytecode: _bytecode, ...artifact }) => artifact),
+      }),
+    );
+  } catch {
+    return;
+  }
 }
 
 function countAbiItems(abi: unknown, type: 'function' | 'event') {
@@ -101,6 +147,15 @@ cache = {
   bindings: [],
 };
 
+const cachedArtifacts = mergeArtifactsWithFallbackSystemArtifacts(readArtifactAbiCache());
+
+if (cachedArtifacts.length) {
+  cache = {
+    artifacts: cachedArtifacts,
+    bindings: [],
+  };
+}
+
 function mergeArtifactsWithFallbackSystemArtifacts(artifacts: EvmContractArtifact[]) {
   const systemArtifactsByName = new Map<string, EvmContractArtifact>();
 
@@ -110,7 +165,12 @@ function mergeArtifactsWithFallbackSystemArtifacts(artifacts: EvmContractArtifac
 
   for (const artifact of artifacts) {
     if (artifact.scope === 'system') {
-      systemArtifactsByName.set(artifact.name, artifact);
+      const fallbackArtifact = systemArtifactsByName.get(artifact.name);
+
+      systemArtifactsByName.set(artifact.name, {
+        ...artifact,
+        bytecode: artifact.bytecode ?? fallbackArtifact?.bytecode ?? null,
+      });
     }
   }
 
@@ -123,6 +183,7 @@ function writeRegistryStore(value: z.infer<typeof registryStoreSchema>) {
     artifacts: mergeArtifactsWithFallbackSystemArtifacts(value.artifacts),
   });
   loaded = true;
+  writeArtifactAbiCache(cache.artifacts);
 }
 
 async function parseError(response: Response, fallback: string) {

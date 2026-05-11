@@ -1088,12 +1088,6 @@ function buildSearchCursorRequest(store: IDBObjectStore, filters: Required<EvmCa
     return index.openCursor(IDBKeyRange.bound([normalizedMethod, timestampRange.lower, CURSOR_MIN_STRING], [normalizedMethod, timestampRange.upper, CURSOR_MAX_STRING]), 'prev');
   }
 
-  if (filters.methodQuery && (filters.methodQuery === 'transfer' || filters.methodQuery === 'create')) {
-    const normalizedMethod = normalizeMethodQuery(filters.methodQuery);
-    const index = store.index(TRANSACTIONS_BY_METHOD_TIMESTAMP_INDEX);
-    return index.openCursor(IDBKeyRange.bound([normalizedMethod, timestampRange.lower, CURSOR_MIN_STRING], [normalizedMethod, timestampRange.upper, CURSOR_MAX_STRING]), 'prev');
-  }
-
   if (filters.startBlockNumber != null || filters.endBlockNumber != null) {
     const lower = Math.max(0, filters.startBlockNumber ?? 0);
     const upper = Math.max(lower, filters.endBlockNumber ?? Number.MAX_SAFE_INTEGER);

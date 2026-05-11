@@ -43,6 +43,16 @@ type MatchedReceiptLogEvent = {
   event: AbiEvent;
 };
 
+type MatchedTransactionFunction = {
+  artifactName: string;
+  bindingLabel: string;
+  abiJson: string;
+  functionName: string;
+  functionSignature: string;
+  selector: string;
+  inputs: ReturnType<typeof getContractFunctions>[number]['inputs'];
+};
+
 // TODO: Replace these hard-coded fallback event ABIs with the system artifacts
 // catalog once it is available in the app.
 const COMMON_EVM_EVENT_ARTIFACTS: Array<{
@@ -204,6 +214,66 @@ function findBoundArtifact(address: string | null | undefined) {
   };
 }
 
+function findMatchingTransactionFunctionInArtifact(input: {
+  artifactName: string;
+  bindingLabel: string;
+  abiJson: string;
+  selector: string;
+}): MatchedTransactionFunction | null {
+  try {
+    const functions = getContractFunctions(input.abiJson);
+    const matchedFunction = functions.find((fn) => toFunctionSelector(`function ${fn.signature}`).toLowerCase() === input.selector);
+
+    if (!matchedFunction) {
+      return null;
+    }
+
+    return {
+      artifactName: input.artifactName,
+      bindingLabel: input.bindingLabel,
+      abiJson: input.abiJson,
+      functionName: matchedFunction.name,
+      functionSignature: matchedFunction.signature,
+      selector: input.selector,
+      inputs: matchedFunction.inputs,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function resolveTransactionFunction(input: { to: string | null | undefined; selector: string }): MatchedTransactionFunction | null {
+  const boundArtifact = findBoundArtifact(input.to);
+
+  if (boundArtifact) {
+    const matchedFunction = findMatchingTransactionFunctionInArtifact({
+      artifactName: boundArtifact.artifact.name,
+      bindingLabel: boundArtifact.binding.label,
+      abiJson: boundArtifact.artifact.abiJson,
+      selector: input.selector,
+    });
+
+    if (matchedFunction) {
+      return matchedFunction;
+    }
+  }
+
+  for (const artifact of listEvmContractArtifacts()) {
+    const matchedFunction = findMatchingTransactionFunctionInArtifact({
+      artifactName: artifact.name,
+      bindingLabel: artifact.scope === 'system' ? 'System Artifact Match' : 'Imported Artifact Match',
+      abiJson: artifact.abiJson,
+      selector: input.selector,
+    });
+
+    if (matchedFunction) {
+      return matchedFunction;
+    }
+  }
+
+  return null;
+}
+
 function findMatchingEventInAbi(abiJson: string, topic0: string | null) {
   if (!topic0) {
     return null;
@@ -237,7 +307,7 @@ function resolveReceiptLogEvent(input: { address: string | null | undefined; top
     if (matchedEvent) {
       return {
         artifactName: artifact.name,
-        bindingLabel: 'Imported Artifact Match',
+        bindingLabel: artifact.scope === 'system' ? 'System Artifact Match' : 'Imported Artifact Match',
         abiJson: artifact.abiJson,
         event: matchedEvent,
       };
@@ -314,15 +384,16 @@ export function decodeHexToUtf8(value: string) {
 
 export function decodeBoundEvmTransactionInput(input: { to: string | null | undefined; inputData: string | undefined }): EvmDecodedTransactionInput | null {
   const normalizedInputData = input.inputData ?? '0x';
-  const boundArtifact = findBoundArtifact(input.to);
 
-  if (!boundArtifact || normalizedInputData === '0x') {
+  if (normalizedInputData === '0x') {
     return null;
   }
 
   const selector = normalizedInputData.slice(0, 10).toLowerCase();
-  const functions = getContractFunctions(boundArtifact.artifact.abiJson);
-  const matchedFunction = functions.find((fn) => toFunctionSelector(`function ${fn.signature}`).toLowerCase() === selector);
+  const matchedFunction = resolveTransactionFunction({
+    to: input.to,
+    selector,
+  });
 
   if (!matchedFunction) {
     return null;
@@ -330,19 +401,19 @@ export function decodeBoundEvmTransactionInput(input: { to: string | null | unde
 
   try {
     const decoded = decodeFunctionData({
-      abi: parseContractAbiJson(boundArtifact.artifact.abiJson),
+      abi: parseContractAbiJson(matchedFunction.abiJson),
       data: normalizedInputData as Hex,
     });
     const args = Array.isArray(decoded.args) ? decoded.args : [];
 
     return {
-      methodLabel: matchedFunction.name,
-      functionName: matchedFunction.name,
-      functionSignature: matchedFunction.signature,
+      methodLabel: matchedFunction.functionName,
+      functionName: matchedFunction.functionName,
+      functionSignature: matchedFunction.functionSignature,
       selector,
-      artifactName: boundArtifact.artifact.name,
-      abiJson: boundArtifact.artifact.abiJson,
-      bindingLabel: boundArtifact.binding.label,
+      artifactName: matchedFunction.artifactName,
+      abiJson: matchedFunction.abiJson,
+      bindingLabel: matchedFunction.bindingLabel,
       args: matchedFunction.inputs.map((parameter, index) => ({
         name: parameter.name || `arg${index + 1}`,
         type: parameter.type,
@@ -351,13 +422,13 @@ export function decodeBoundEvmTransactionInput(input: { to: string | null | unde
     };
   } catch {
     return {
-      methodLabel: matchedFunction.name,
-      functionName: matchedFunction.name,
-      functionSignature: matchedFunction.signature,
+      methodLabel: matchedFunction.functionName,
+      functionName: matchedFunction.functionName,
+      functionSignature: matchedFunction.functionSignature,
       selector,
-      artifactName: boundArtifact.artifact.name,
-      abiJson: boundArtifact.artifact.abiJson,
-      bindingLabel: boundArtifact.binding.label,
+      artifactName: matchedFunction.artifactName,
+      abiJson: matchedFunction.abiJson,
+      bindingLabel: matchedFunction.bindingLabel,
       args: [],
     };
   }

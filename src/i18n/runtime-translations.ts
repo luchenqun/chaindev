@@ -375,6 +375,7 @@ const EXACT_TEXT_TRANSLATIONS: Record<string, string> = {
   'Quarix Veto': 'Quarix 否决',
   'Unknown Provider': '未知节点',
   'Untitled Proposal': '未命名提案',
+  'System Artifact Match': '系统构件匹配',
   'Imported Artifact Match': '导入构件匹配',
   'Self Bond': '自质押',
   Success: '成功',
