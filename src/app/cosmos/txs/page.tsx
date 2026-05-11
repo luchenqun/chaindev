@@ -705,7 +705,7 @@ function CosmosTransactionsPageContent() {
             />
           </label>
         </div>
-        {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{translateRuntimeText(searchErrorMessage, locale)}</p> : null}
+        {searchErrorMessage ? <p className="mt-4 overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(searchErrorMessage, locale)}</p> : null}
       </ModalDialog>
     </AppShell>
   );

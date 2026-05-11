@@ -13,7 +13,6 @@ import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
 import { JsonInput } from '@/components/ui/json-input';
 import { ModalDialog } from '@/components/ui/modal-dialog';
-import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { formatLocalizedDateTime } from '@/i18n/format';
@@ -44,6 +43,7 @@ import {
   subscribeEvmKeyring,
   type EvmStoredPrivateKey,
 } from '@/domains/evm/client/keyring';
+import { EvmPrivateKeyUnlockDialog, useEvmPrivateKeyUnlockDialog } from '@/domains/evm/ui/private-key-unlock-dialog';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
@@ -379,10 +379,8 @@ export default function EvmContractsRegistryPage() {
     bindingError: string | null;
   } | null>(null);
   const [deployActionLoading, setDeployActionLoading] = useState<'fill' | 'deploy' | null>(null);
-  const [deployUnlockDialogOpen, setDeployUnlockDialogOpen] = useState(false);
-  const [deployUnlockPassword, setDeployUnlockPassword] = useState('');
-  const [deployUnlockError, setDeployUnlockError] = useState<string | null>(null);
   const [pendingDeployAction, setPendingDeployAction] = useState<'fill' | 'deploy' | null>(null);
+  const deployUnlockDialog = useEvmPrivateKeyUnlockDialog();
 
   function goToLogin() {
     router.push('/login?callbackUrl=%2Fevm%2Fcontracts');
@@ -590,9 +588,7 @@ export default function EvmContractsRegistryPage() {
     setDeployError(null);
     setDeployResult(null);
     setDeployActionLoading(null);
-    setDeployUnlockDialogOpen(false);
-    setDeployUnlockPassword('');
-    setDeployUnlockError(null);
+    deployUnlockDialog.closeDialog();
     setPendingDeployAction(null);
     deploySimulationFailureRef.current = {
       key: '',
@@ -678,9 +674,7 @@ export default function EvmContractsRegistryPage() {
     setDeployError(null);
     setDeployResult(null);
     setDeployActionLoading(null);
-    setDeployUnlockDialogOpen(false);
-    setDeployUnlockPassword('');
-    setDeployUnlockError(null);
+    deployUnlockDialog.closeDialog();
     setPendingDeployAction(null);
     deploySimulationFailureRef.current = {
       key: '',
@@ -956,9 +950,7 @@ export default function EvmContractsRegistryPage() {
 
       if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingDeployAction('fill');
-        setDeployUnlockPassword('');
-        setDeployUnlockError(null);
-        setDeployUnlockDialogOpen(true);
+        deployUnlockDialog.openDialog();
         return;
       }
 
@@ -1078,9 +1070,7 @@ export default function EvmContractsRegistryPage() {
 
       if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingDeployAction('deploy');
-        setDeployUnlockPassword('');
-        setDeployUnlockError(null);
-        setDeployUnlockDialogOpen(true);
+        deployUnlockDialog.openDialog();
         return;
       }
 
@@ -1098,19 +1088,18 @@ export default function EvmContractsRegistryPage() {
     }
 
     try {
-      await resolveEvmStoredPrivateKey(activeKey.id, deployUnlockPassword);
+      await resolveEvmStoredPrivateKey(activeKey.id, deployUnlockDialog.password);
       const nextAction = pendingDeployAction;
       setPendingDeployAction(null);
-      setDeployUnlockDialogOpen(false);
-      setDeployUnlockPassword('');
-      setDeployUnlockError(null);
+      const password = deployUnlockDialog.password;
+      deployUnlockDialog.handleUnlockResolved();
       if (nextAction === 'fill') {
-        await fillDeployDefaults(deployUnlockPassword);
+        await fillDeployDefaults(password);
       } else {
         await executeDeployAction();
       }
     } catch (error) {
-      setDeployUnlockError(
+      deployUnlockDialog.setErrorMessage(
         normalizeWorkbenchErrorMessage(
           error instanceof Error ? error.message : messages.evmTxDetail.failedToUnlockPrivateKey,
           messages.evmTxDetail.failedToUnlockPrivateKey,
@@ -1607,7 +1596,7 @@ export default function EvmContractsRegistryPage() {
                 placeholder={contractRegistryMessages.optionalContractAddressAfterCreate}
               />
             ) : null}
-            {artifactError ? <p className="text-sm text-rose-600">{translateRuntimeText(artifactError, locale)}</p> : null}
+            {artifactError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(artifactError, locale)}</p> : null}
           </div>
         </ModalDialog>
 
@@ -1691,7 +1680,7 @@ export default function EvmContractsRegistryPage() {
               }
               placeholder={contractRegistryMessages.bindingLabel}
             />
-            {bindingError ? <p className="text-sm text-rose-600">{translateRuntimeText(bindingError, locale)}</p> : null}
+            {bindingError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(bindingError, locale)}</p> : null}
           </div>
         </ModalDialog>
 
@@ -1936,24 +1925,25 @@ export default function EvmContractsRegistryPage() {
           </div>
         </ModalDialog>
 
-        <SecretInputDialog
-          open={deployUnlockDialogOpen}
+        <EvmPrivateKeyUnlockDialog
+          open={deployUnlockDialog.open}
           onOpenChange={(open) => {
             if (!open) {
-              setDeployUnlockDialogOpen(false);
-              setDeployUnlockPassword('');
-              setDeployUnlockError(null);
+              deployUnlockDialog.closeDialog();
               setPendingDeployAction(null);
+              return;
             }
+
+            deployUnlockDialog.setOpen(true);
           }}
           title={messages.privateKeys.unlockPrivateKey}
           description={activeKey ? messages.evmTxDetail.unlockDescription.replace('{name}', activeKey.name) : messages.evmTxDetail.unlockFallbackDescription}
-          value={deployUnlockPassword}
-          onValueChange={setDeployUnlockPassword}
+          password={deployUnlockDialog.password}
+          onPasswordChange={deployUnlockDialog.setPassword}
           placeholder={messages.sendTx.password}
           confirmLabel={messages.sendTx.unlock}
-          confirmDisabled={!deployUnlockPassword.trim()}
-          errorMessage={deployUnlockError}
+          errorMessage={deployUnlockDialog.errorMessage}
+          submitting={deployActionLoading !== null}
           onConfirm={() => {
             void handleConfirmDeployUnlock();
           }}

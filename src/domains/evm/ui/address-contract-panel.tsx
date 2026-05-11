@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { JsonInput } from '@/components/ui/json-input';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { ModalDialog } from '@/components/ui/modal-dialog';
-import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { formatLocalizedDateTime } from '@/i18n/format';
@@ -33,6 +32,7 @@ import {
   type EvmStoredPrivateKey,
 } from '@/domains/evm/client/keyring';
 import { type EvmContractArtifact, type EvmContractBinding } from '@/domains/evm/client/contract-registry';
+import { EvmPrivateKeyUnlockDialog, useEvmPrivateKeyUnlockDialog } from '@/domains/evm/ui/private-key-unlock-dialog';
 
 const textareaClassName =
   'min-h-32 w-full resize-none overflow-hidden rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400';
@@ -543,7 +543,7 @@ function WriteExecutionPreview({
       ) : null}
       {error ? (
         <div className="max-h-32 overflow-auto border-t border-slate-200 px-4 py-4">
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="overflow-hidden break-all whitespace-pre-wrap rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
             <p className="break-all whitespace-pre-wrap">{translateRuntimeText(error, locale)}</p>
           </div>
         </div>
@@ -563,7 +563,6 @@ type FunctionListSectionProps = {
   onCopySignature: (fn: EvmContractFunctionDescriptor) => void;
   renderHeaderActions?: (fn: EvmContractFunctionDescriptor) => React.ReactNode;
   headerTrailingContent?: ReactNode;
-  inputBadgeLabel?: string;
   renderExpanded: (fn: EvmContractFunctionDescriptor) => React.ReactNode;
   emptyText: string;
 };
@@ -579,7 +578,6 @@ function FunctionListSection({
   onCopySignature,
   renderHeaderActions,
   headerTrailingContent,
-  inputBadgeLabel,
   renderExpanded,
   emptyText,
 }: FunctionListSectionProps) {
@@ -621,9 +619,6 @@ function FunctionListSection({
                     <p className="text-sm font-semibold text-slate-900">
                       {index + 1}. {fn.name} <span className="font-medium text-slate-400">({selector})</span>
                     </p>
-                    {inputBadgeLabel && fn.inputs.length ? (
-                      <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{inputBadgeLabel}</span>
-                    ) : null}
                   </div>
                 </div>
                 <div
@@ -686,9 +681,6 @@ export function AddressContractPanel({
   const [writeErrors, setWriteErrors] = useState<Record<string, string>>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionLoadingKey, setActionLoadingKey] = useState<string | null>(null);
-  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
-  const [unlockPassword, setUnlockPassword] = useState('');
-  const [unlockError, setUnlockError] = useState<string | null>(null);
   const [pendingWriteAction, setPendingWriteAction] = useState<{
     signature: string;
     type: 'write' | 'manual-open' | 'manual-confirm';
@@ -696,6 +688,7 @@ export function AddressContractPanel({
   const [manualWriteTarget, setManualWriteTarget] = useState<string | null>(null);
   const [manualWriteDialogValues, setManualWriteDialogValues] = useState<ManualWriteDialogState>(createInitialManualWriteDialogState());
   const [manualWriteDialogError, setManualWriteDialogError] = useState<string | null>(null);
+  const unlockDialog = useEvmPrivateKeyUnlockDialog();
 
   const readFunctions = useMemo(() => getReadContractFunctions(artifact.abiJson), [artifact.abiJson]);
   const abiJsonValue = useMemo(() => JSON.parse(artifact.abiJson) as object, [artifact.abiJson]);
@@ -864,6 +857,12 @@ export function AddressContractPanel({
       return;
     }
 
+    if (activeKey.securityMode === 'encrypted' && !isEvmStoredPrivateKeyUnlocked(activeKey.id) && !password) {
+      setPendingWriteAction({ signature, type: 'write' });
+      unlockDialog.openDialog();
+      return;
+    }
+
     setActionLoadingKey(`write:${signature}`);
     setWriteErrors((current) => {
       const next = { ...current };
@@ -930,9 +929,7 @@ export function AddressContractPanel({
 
       if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingWriteAction({ signature, type: 'write' });
-        setUnlockPassword('');
-        setUnlockError(null);
-        setUnlockDialogOpen(true);
+        unlockDialog.openDialog();
         return;
       }
 
@@ -954,6 +951,12 @@ export function AddressContractPanel({
 
     if (!activeKey) {
       setErrorMessage(txMessages.selectGlobalKeyFirst);
+      return;
+    }
+
+    if (activeKey.securityMode === 'encrypted' && !isEvmStoredPrivateKeyUnlocked(activeKey.id) && !password) {
+      setPendingWriteAction({ signature, type: 'manual-open' });
+      unlockDialog.openDialog();
       return;
     }
 
@@ -1004,9 +1007,7 @@ export function AddressContractPanel({
 
       if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingWriteAction({ signature, type: 'manual-open' });
-        setUnlockPassword('');
-        setUnlockError(null);
-        setUnlockDialogOpen(true);
+        unlockDialog.openDialog();
         return;
       }
 
@@ -1028,6 +1029,12 @@ export function AddressContractPanel({
 
     if (!activeKey) {
       setErrorMessage(txMessages.selectGlobalKeyFirst);
+      return;
+    }
+
+    if (activeKey.securityMode === 'encrypted' && !isEvmStoredPrivateKeyUnlocked(activeKey.id) && !password) {
+      setPendingWriteAction({ signature, type: 'manual-confirm' });
+      unlockDialog.openDialog();
       return;
     }
 
@@ -1131,9 +1138,7 @@ export function AddressContractPanel({
 
       if (message === messages.privateKeys.passwordRequiredForEncrypted) {
         setPendingWriteAction({ signature, type: 'manual-confirm' });
-        setUnlockPassword('');
-        setUnlockError(null);
-        setUnlockDialogOpen(true);
+        unlockDialog.openDialog();
         return;
       }
 
@@ -1153,19 +1158,19 @@ export function AddressContractPanel({
     }
 
     try {
-      setUnlockError(null);
+      unlockDialog.setErrorMessage(null);
+      const password = unlockDialog.password;
       if (pendingWriteAction.type === 'manual-open') {
-        await openManualWriteDialog(pendingWriteAction.signature, unlockPassword);
+        await openManualWriteDialog(pendingWriteAction.signature, password);
       } else if (pendingWriteAction.type === 'manual-confirm') {
-        await executeManualWriteAction(pendingWriteAction.signature, unlockPassword);
+        await executeManualWriteAction(pendingWriteAction.signature, password);
       } else {
-        await executeWriteAction(pendingWriteAction.signature, unlockPassword);
+        await executeWriteAction(pendingWriteAction.signature, password);
       }
-      setUnlockDialogOpen(false);
-      setUnlockPassword('');
+      unlockDialog.handleUnlockResolved();
       setPendingWriteAction(null);
     } catch (error) {
-      setUnlockError(
+      unlockDialog.setErrorMessage(
         normalizeContractActionErrorMessage(
           error instanceof Error ? error.message : txMessages.failedToUnlockPrivateKey,
           txMessages.failedToUnlockPrivateKey,
@@ -1373,7 +1378,6 @@ export function AddressContractPanel({
                 );
               })()
             }
-            inputBadgeLabel={messages.common.copyInput}
             emptyText={contractPanelMessages.readMethodsEmpty}
             renderExpanded={(fn) => (
               <div className="grid gap-4">
@@ -1386,7 +1390,7 @@ export function AddressContractPanel({
                 {readResults[fn.signature] ? (
                   <ValuePreview value={readResults[fn.signature]} />
                 ) : readErrors[fn.signature] ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{translateRuntimeText(readErrors[fn.signature], locale)}</div>
+                  <div className="overflow-hidden break-all whitespace-pre-wrap rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">{translateRuntimeText(readErrors[fn.signature], locale)}</div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm text-slate-400">
                     {contractPanelMessages.queryMethodToViewResult}
@@ -1418,7 +1422,7 @@ export function AddressContractPanel({
             {!activeKey ? <p className="mt-4 text-sm text-amber-600">{txMessages.selectGlobalKeyFirst}</p> : null}
           </article>
 
-          {errorMessage ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{translateRuntimeText(errorMessage, locale)}</div> : null}
+          {errorMessage ? <div className="overflow-hidden break-all whitespace-pre-wrap rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{translateRuntimeText(errorMessage, locale)}</div> : null}
 
           <FunctionListSection
             title={contractPanelMessages.writeContract}
@@ -1459,7 +1463,6 @@ export function AddressContractPanel({
                 );
               })()
             }
-            inputBadgeLabel={messages.common.copyInput}
             emptyText={contractPanelMessages.writeMethodsEmpty}
             renderExpanded={(fn) => (
               <div className="grid gap-4">
@@ -1482,25 +1485,25 @@ export function AddressContractPanel({
         </div>
       ) : null}
 
-      <SecretInputDialog
-        open={unlockDialogOpen}
+      <EvmPrivateKeyUnlockDialog
+        open={unlockDialog.open}
         onOpenChange={(open) => {
-          setUnlockDialogOpen(open);
-
           if (!open) {
-            setUnlockPassword('');
-            setUnlockError(null);
+            unlockDialog.closeDialog();
             setPendingWriteAction(null);
+            return;
           }
+
+          unlockDialog.setOpen(true);
         }}
         title={messages.privateKeys.unlockPrivateKey}
         description={activeKey ? messages.sendTx.unlockDescription.replace('{name}', activeKey.name) : messages.sendTx.unlockFallbackDescription}
-        value={unlockPassword}
-        onValueChange={setUnlockPassword}
+        password={unlockDialog.password}
+        onPasswordChange={unlockDialog.setPassword}
         placeholder={messages.sendTx.password}
         confirmLabel={messages.sendTx.unlock}
-        errorMessage={unlockError}
-        confirmDisabled={!unlockPassword.trim()}
+        errorMessage={unlockDialog.errorMessage}
+        submitting={actionLoadingKey !== null}
         onConfirm={() => void handleConfirmUnlock()}
       />
       <ModalDialog

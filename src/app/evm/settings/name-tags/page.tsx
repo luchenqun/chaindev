@@ -224,7 +224,7 @@ export default function EvmNameTagsPage() {
               {status === 'authenticated' ? nameTagMessages.saveTag : nameTagMessages.signInToSave}
             </Button>
           </div>
-          {createError ? <p className="px-5 pb-4 text-sm text-rose-600">{translateRuntimeText(createError, locale)}</p> : null}
+          {createError ? <p className="overflow-hidden break-all whitespace-pre-wrap px-5 pb-4 text-sm text-rose-600">{translateRuntimeText(createError, locale)}</p> : null}
         </section>
 
         <section className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">

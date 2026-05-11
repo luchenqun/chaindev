@@ -914,7 +914,7 @@ export default function EvmAddressPage() {
               <Input value={address} readOnly className="bg-slate-50 text-slate-500" />
             </label>
 
-            {bindingError ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">{translateRuntimeText(bindingError, locale)}</div> : null}
+            {bindingError ? <div className="overflow-hidden break-all whitespace-pre-wrap rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">{translateRuntimeText(bindingError, locale)}</div> : null}
             {!artifacts.length ? (
               <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
                 {contractMessages.noPersonalArtifacts}

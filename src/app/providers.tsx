@@ -4,8 +4,10 @@ import { usePathname } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 import { SessionProvider, useSession } from 'next-auth/react';
 import { ToastProvider } from '@/components/ui/toast';
+import { CosmosChainStateBootstrap } from '@/domains/cosmos/ui/cosmos-chain-state-bootstrap';
 import { CosmosHomeDataProvider } from '@/domains/cosmos/ui/home-data-provider';
 import { syncEvmKeyringFromServer } from '@/domains/evm/client/keyring';
+import { EvmChainStateBootstrap } from '@/domains/evm/ui/evm-chain-state-bootstrap';
 import { EvmHomeDataProvider } from '@/domains/evm/ui/home-data-provider';
 import { LocaleProvider } from '@/i18n/locale-provider';
 import type { Locale } from '@/i18n/config';
@@ -62,6 +64,8 @@ export function AppProviders({ children, initialLocale }: { children: ReactNode;
           <ActivePlatformModeProvider>
             <ActivePlatformModeSync />
             <GuestWorkbenchDefaultsSync />
+            <EvmChainStateBootstrap />
+            <CosmosChainStateBootstrap />
             <EvmHomeDataProvider>
               <CosmosHomeDataProvider>{children}</CosmosHomeDataProvider>
             </EvmHomeDataProvider>

@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconSearch, IconSend, IconShieldOff, IconUserCircle, IconWallet, IconBinaryTree2, IconWaveSine } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconSearch, IconSend, IconShieldOff, IconUserCircle, IconWallet, IconBinaryTree2, IconWaveSine, IconUsers } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { type PlatformMode } from '@/config/chains';
 import { getCosmosChainState, subscribeCosmosChainState } from '@/domains/cosmos/client/chain-state';
+import { getEvmChainState, subscribeEvmChainState } from '@/domains/evm/client/chain-state';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { resolveAbsoluteCallbackUrl, resolveClientRedirectUrl } from '@/platform/auth/callback-url';
 import { getAccountMenuSections } from '@/platform/layout/account-menu-config';
@@ -134,12 +135,21 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   const userMenuSections = getAccountMenuSections(mode, messages);
   const userMenuActive = userMenuSections.some((section) => section.items.some((item) => matchesNavItem(pathname, item.href)));
   const quarixMoreGroup: NavGroup | null =
-    mode === 'cosmos' && isQuarixChain
-      ? {
-          id: 'quarix',
-          label: 'Quarix',
-          items: [{ href: '/cosmos/quarix/blacklists', label: labelMessages.blacklists, icon: IconShieldOff }],
-        }
+    isQuarixChain
+      ? mode === 'cosmos'
+        ? {
+            id: 'quarix',
+            label: 'Quarix',
+            items: [{ href: '/cosmos/quarix/blacklists', label: labelMessages.blacklists, icon: IconShieldOff }],
+          }
+        : {
+            id: 'quarix',
+            label: 'Quarx',
+            items: [
+              { href: '/evm/quarix/accounts', label: labelMessages.accounts, icon: IconUsers },
+              { href: '/evm/quarix/blacklists', label: labelMessages.blacklists, icon: IconShieldOff },
+            ],
+          }
       : null;
 
   const moreGroups: NavGroup[] =
@@ -188,6 +198,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/evm/tools/rpc', label: labelMessages.rpcApi, icon: IconCloudCode },
             ],
           },
+          ...(quarixMoreGroup ? [quarixMoreGroup] : []),
           {
             id: 'tools',
             label: messages.topNav.tools,
@@ -223,13 +234,18 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
   }, []);
 
   useEffect(() => {
-    if (mode !== 'cosmos') {
-      setIsQuarixChain(false);
-      return;
+    if (mode === 'cosmos') {
+      setIsQuarixChain(getCosmosChainState().isQuarix);
+      return subscribeCosmosChainState((state) => setIsQuarixChain(state.isQuarix));
     }
 
-    setIsQuarixChain(getCosmosChainState().isQuarix);
-    return subscribeCosmosChainState((state) => setIsQuarixChain(state.isQuarix));
+    if (mode === 'evm') {
+      setIsQuarixChain(getEvmChainState().isQuarix);
+      return subscribeEvmChainState((state) => setIsQuarixChain(state.isQuarix));
+    }
+
+    setIsQuarixChain(false);
+    return;
   }, [mode]);
 
   function cancelScheduledClose() {

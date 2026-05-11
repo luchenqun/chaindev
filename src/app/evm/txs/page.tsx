@@ -1154,7 +1154,7 @@ function EvmTransactionsPageContent() {
             </Select>
           </label>
         </div>
-        {searchErrorMessage ? <p className="mt-4 text-sm text-rose-600">{translateRuntimeText(searchErrorMessage, locale)}</p> : null}
+        {searchErrorMessage ? <p className="mt-4 overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(searchErrorMessage, locale)}</p> : null}
       </ModalDialog>
       <ModalDialog
         open={reloadDialogOpen}
@@ -1215,7 +1215,7 @@ function EvmTransactionsPageContent() {
             </label>
           </div>
           <p className="text-sm leading-6 text-slate-500">{txMessages.reloadCacheBlockNumberHint}</p>
-          {reloadErrorMessage ? <p className="text-sm text-rose-600">{translateRuntimeText(reloadErrorMessage, locale)}</p> : null}
+          {reloadErrorMessage ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(reloadErrorMessage, locale)}</p> : null}
         </div>
       </ModalDialog>
     </AppShell>

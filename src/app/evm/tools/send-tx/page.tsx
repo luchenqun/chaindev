@@ -9,11 +9,11 @@ import { copyText } from '@/components/ui/copy-text';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
 import { JsonViewPanel } from '@/components/ui/json-view-panel';
-import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
 import { forceSendEvmTransactionDirect } from '@/domains/evm/client/contract-executor';
 import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
+import { EvmPrivateKeyUnlockDialog, useEvmPrivateKeyUnlockDialog } from '@/domains/evm/ui/private-key-unlock-dialog';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
@@ -281,13 +281,11 @@ function EvmSendTxContent() {
   const [submitting, setSubmitting] = useState(false);
   const [broadcastProgress, setBroadcastProgress] = useState<BroadcastProgress | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
-  const [unlockPassword, setUnlockPassword] = useState('');
-  const [unlockError, setUnlockError] = useState<string | null>(null);
   const copyButtonRef = useRef<HTMLButtonElement | null>(null);
   const copyTimeoutRef = useRef<number | null>(null);
   const stopRequestedRef = useRef(false);
   const [formCacheLoaded, setFormCacheLoaded] = useState(false);
+  const unlockDialog = useEvmPrivateKeyUnlockDialog();
 
   const currencyName = getEvmCurrencyName(readActiveRpcProfileCookie('evm')?.nativeCurrencySymbol);
 
@@ -525,9 +523,7 @@ function EvmSendTxContent() {
       const message = error instanceof Error ? translateRuntimeText(error.message, locale) : sendTxMessages.failedToSend;
 
       if (message === sendTxMessages.passwordRequired) {
-        setUnlockPassword('');
-        setUnlockError(null);
-        setUnlockDialogOpen(true);
+        unlockDialog.openDialog();
         return;
       }
 
@@ -554,14 +550,12 @@ function EvmSendTxContent() {
     }
 
     try {
-      await resolveEvmStoredPrivateKey(activeKey.id, unlockPassword);
-      setUnlockDialogOpen(false);
-      const password = unlockPassword;
-      setUnlockPassword('');
-      setUnlockError(null);
+      await resolveEvmStoredPrivateKey(activeKey.id, unlockDialog.password);
+      const password = unlockDialog.password;
+      unlockDialog.handleUnlockResolved();
       await submit(password);
     } catch (error) {
-      setUnlockError(error instanceof Error ? translateRuntimeText(error.message, locale) : sendTxMessages.failedToUnlock);
+      unlockDialog.setErrorMessage(error instanceof Error ? translateRuntimeText(error.message, locale) : sendTxMessages.failedToUnlock);
     }
   }
 
@@ -791,7 +785,11 @@ function EvmSendTxContent() {
                   <Input id="evm-tx-nonce" value={nonce} inputMode="numeric" placeholder={sendTxMessages.autoPlaceholder} disabled={submitting} className="mt-1" onChange={(event) => setNonce(event.target.value)} />
                 </div>
 
-                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{translateRuntimeText(formError, locale)}</p> : null}
+                {formError ? (
+                  <p className="overflow-hidden break-all whitespace-pre-wrap rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">
+                    {translateRuntimeText(formError, locale)}
+                  </p>
+                ) : null}
               </div>
 
               {broadcastProgress ? (
@@ -883,24 +881,24 @@ function EvmSendTxContent() {
         </section>
       </main>
 
-      <SecretInputDialog
-        open={unlockDialogOpen}
+      <EvmPrivateKeyUnlockDialog
+        open={unlockDialog.open}
         onOpenChange={(nextOpen) => {
-          setUnlockDialogOpen(nextOpen);
-
           if (!nextOpen) {
-            setUnlockPassword('');
-            setUnlockError(null);
+            unlockDialog.closeDialog();
+            return;
           }
+
+          unlockDialog.setOpen(true);
         }}
         title={sendTxMessages.unlockPrivateKey}
         description={activeKey ? sendTxMessages.unlockDescription.replace('{name}', activeKey.name) : sendTxMessages.unlockFallbackDescription}
-        value={unlockPassword}
-        onValueChange={setUnlockPassword}
+        password={unlockDialog.password}
+        onPasswordChange={unlockDialog.setPassword}
         placeholder={sendTxMessages.password}
         confirmLabel={sendTxMessages.unlock}
-        confirmDisabled={!unlockPassword.trim()}
-        errorMessage={unlockError}
+        errorMessage={unlockDialog.errorMessage}
+        submitting={submitting}
         onConfirm={() => void handleConfirmUnlock()}
       />
     </>

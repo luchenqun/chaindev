@@ -176,7 +176,7 @@ export function CosmosHomeMetrics() {
           ))}
         </div>
       ) : null}
-      {errorMessage ? <div className="border-t border-slate-200 bg-rose-50 px-5 py-3 text-sm text-rose-600">{translateRuntimeText(errorMessage, locale)}</div> : null}
+      {errorMessage ? <div className="overflow-hidden break-all whitespace-pre-wrap border-t border-slate-200 bg-rose-50 px-5 py-3 text-sm text-rose-600">{translateRuntimeText(errorMessage, locale)}</div> : null}
       {snapshot ? (
         <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-2 text-xs text-slate-500">
           <span>

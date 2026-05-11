@@ -254,7 +254,7 @@ export function QuarixStakingPanels() {
         <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-lg font-semibold text-slate-900">{pageMessages.investmentProgramPools}</p>
-            {investmentProgramPoolsState.error ? <p className="mt-2 text-sm text-rose-600">{translateRuntimeText(investmentProgramPoolsState.error, locale)}</p> : null}
+            {investmentProgramPoolsState.error ? <p className="mt-2 overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(investmentProgramPoolsState.error, locale)}</p> : null}
           </div>
           <div className="flex items-center gap-0 lg:justify-end">
             <ActionIconButton
@@ -333,7 +333,7 @@ export function QuarixStakingPanels() {
         <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="text-lg font-semibold text-slate-900">{pageMessages.allocateInvestmentProgramPools}</p>
-            {allocateInvestmentProgramPoolsState.error ? <p className="mt-2 text-sm text-rose-600">{translateRuntimeText(allocateInvestmentProgramPoolsState.error, locale)}</p> : null}
+            {allocateInvestmentProgramPoolsState.error ? <p className="mt-2 overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(allocateInvestmentProgramPoolsState.error, locale)}</p> : null}
           </div>
           <div className="flex items-center gap-0 lg:justify-end">
             <ActionIconButton

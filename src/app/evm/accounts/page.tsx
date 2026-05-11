@@ -530,7 +530,7 @@ function EvmAccountsPageContent() {
                 autoFocus
               />
             </div>
-            {tagErrorMessage ? <p className="text-sm text-rose-600">{translateRuntimeText(tagErrorMessage, locale)}</p> : null}
+            {tagErrorMessage ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(tagErrorMessage, locale)}</p> : null}
           </div>
         </ModalDialog>
       </main>

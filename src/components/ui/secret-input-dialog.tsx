@@ -78,7 +78,7 @@ export function SecretInputDialog({
         </div>
         <div className="mt-5">
           <Input autoFocus type="password" value={value} onChange={(event) => onValueChange(event.target.value)} placeholder={placeholder} />
-          {errorMessage ? <p className="mt-2 text-sm text-rose-600">{translateRuntimeText(errorMessage, locale)}</p> : null}
+          {errorMessage ? <p className="mt-2 overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(errorMessage, locale)}</p> : null}
         </div>
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

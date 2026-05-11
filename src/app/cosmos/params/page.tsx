@@ -1042,7 +1042,7 @@ export default function CosmosParamsPage() {
         </div>
 
         {errorMessage ? (
-          <section className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
+          <section className="overflow-hidden break-all whitespace-pre-wrap rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-700">
             {translateRuntimeText(errorMessage, locale)}
           </section>
         ) : null}

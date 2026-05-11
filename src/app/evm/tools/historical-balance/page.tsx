@@ -208,7 +208,7 @@ export default function EvmHistoricalBalancePage() {
               </div>
             </div>
 
-            {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{translateRuntimeText(error, locale)}</div> : null}
+            {error ? <div className="overflow-hidden break-all whitespace-pre-wrap rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{translateRuntimeText(error, locale)}</div> : null}
 
             {result ? (
               <section className="space-y-5 border-t border-slate-200 pt-6">

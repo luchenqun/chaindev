@@ -193,7 +193,7 @@ export default function UnitConverterPage() {
                 );
               })}
             </div>
-            {error ? <p className="mt-3 text-sm text-rose-600">{translateRuntimeText(error, locale)}</p> : null}
+            {error ? <p className="mt-3 overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(error, locale)}</p> : null}
           </div>
         </section>
       </main>

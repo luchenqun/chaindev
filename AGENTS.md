@@ -62,6 +62,9 @@
 
 所有 copy / 复制交互默认都要提供即时成功反馈，例如显示短暂的 `Copied` 提示；不要只复制不反馈。
 
+涉及 EVM 私钥解锁的交互时，不要在页面内重复定义 `unlockDialogOpen`、`unlockPassword`、`unlockError` 和单独的 `SecretInputDialog`。
+优先复用 `src/domains/evm/ui/private-key-unlock-dialog.tsx` 提供的 `useEvmPrivateKeyUnlockDialog()` 和 `EvmPrivateKeyUnlockDialog`，把解锁弹窗状态、错误展示和关闭行为统一起来。
+
 ## 测试规范
 
 当前第一版还没有自动化测试套件。在引入测试前，使用以下命令验证：

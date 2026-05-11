@@ -12,31 +12,11 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         inputs: [
           {
             components: [
-              {
-                internalType: 'bytes',
-                name: 'key',
-                type: 'bytes',
-              },
-              {
-                internalType: 'uint64',
-                name: 'offset',
-                type: 'uint64',
-              },
-              {
-                internalType: 'uint64',
-                name: 'limit',
-                type: 'uint64',
-              },
-              {
-                internalType: 'bool',
-                name: 'countTotal',
-                type: 'bool',
-              },
-              {
-                internalType: 'bool',
-                name: 'reverse',
-                type: 'bool',
-              },
+              { internalType: 'bytes', name: 'key', type: 'bytes' },
+              { internalType: 'uint64', name: 'offset', type: 'uint64' },
+              { internalType: 'uint64', name: 'limit', type: 'uint64' },
+              { internalType: 'bool', name: 'countTotal', type: 'bool' },
+              { internalType: 'bool', name: 'reverse', type: 'bool' },
             ],
             internalType: 'struct PageRequest',
             name: 'pageRequest',
@@ -47,16 +27,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         outputs: [
           {
             components: [
-              {
-                internalType: 'string',
-                name: 'typeUrl',
-                type: 'string',
-              },
-              {
-                internalType: 'bytes',
-                name: 'value',
-                type: 'bytes',
-              },
+              { internalType: 'string', name: 'typeUrl', type: 'string' },
+              { internalType: 'bytes', name: 'value', type: 'bytes' },
             ],
             internalType: 'struct ProtoAny[]',
             name: 'accounts_',
@@ -64,16 +36,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           },
           {
             components: [
-              {
-                internalType: 'bytes',
-                name: 'nextKey',
-                type: 'bytes',
-              },
-              {
-                internalType: 'uint64',
-                name: 'total',
-                type: 'uint64',
-              },
+              { internalType: 'bytes', name: 'nextKey', type: 'bytes' },
+              { internalType: 'uint64', name: 'total', type: 'uint64' },
             ],
             internalType: 'struct PageResponse',
             name: 'pageResponse',
@@ -86,25 +50,42 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'address',
-            name: 'account',
-            type: 'address',
+            components: [
+              { internalType: 'bytes', name: 'key', type: 'bytes' },
+              { internalType: 'uint64', name: 'offset', type: 'uint64' },
+              { internalType: 'uint64', name: 'limit', type: 'uint64' },
+              { internalType: 'bool', name: 'countTotal', type: 'bool' },
+              { internalType: 'bool', name: 'reverse', type: 'bool' },
+            ],
+            internalType: 'struct PageRequest',
+            name: 'pageRequest',
+            type: 'tuple',
           },
         ],
+        name: 'accountsAsJSON',
+        outputs: [
+          { internalType: 'string', name: 'accountsJson', type: 'string' },
+          {
+            components: [
+              { internalType: 'bytes', name: 'nextKey', type: 'bytes' },
+              { internalType: 'uint64', name: 'total', type: 'uint64' },
+            ],
+            internalType: 'struct PageResponse',
+            name: 'pageResponse',
+            type: 'tuple',
+          },
+        ],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
         name: 'account',
         outputs: [
           {
             components: [
-              {
-                internalType: 'string',
-                name: 'typeUrl',
-                type: 'string',
-              },
-              {
-                internalType: 'bytes',
-                name: 'value',
-                type: 'bytes',
-              },
+              { internalType: 'string', name: 'typeUrl', type: 'string' },
+              { internalType: 'bytes', name: 'value', type: 'bytes' },
             ],
             internalType: 'struct ProtoAny',
             name: 'account_',
@@ -115,21 +96,16 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
       {
-        inputs: [
-          {
-            internalType: 'uint64',
-            name: 'accountId',
-            type: 'uint64',
-          },
-        ],
+        inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
+        name: 'accountAsJSON',
+        outputs: [{ internalType: 'string', name: 'accountJson', type: 'string' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'uint64', name: 'accountId', type: 'uint64' }],
         name: 'accountAddressByID',
-        outputs: [
-          {
-            internalType: 'string',
-            name: 'accountAddress',
-            type: 'string',
-          },
-        ],
+        outputs: [{ internalType: 'string', name: 'accountAddress', type: 'string' }],
         stateMutability: 'view',
         type: 'function',
       },
@@ -139,31 +115,11 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         outputs: [
           {
             components: [
-              {
-                internalType: 'uint64',
-                name: 'maxMemoCharacters',
-                type: 'uint64',
-              },
-              {
-                internalType: 'uint64',
-                name: 'txSigLimit',
-                type: 'uint64',
-              },
-              {
-                internalType: 'uint64',
-                name: 'txSizeCostPerByte',
-                type: 'uint64',
-              },
-              {
-                internalType: 'uint64',
-                name: 'sigVerifyCostED25519',
-                type: 'uint64',
-              },
-              {
-                internalType: 'uint64',
-                name: 'sigVerifyCostSecp256k1',
-                type: 'uint64',
-              },
+              { internalType: 'uint64', name: 'maxMemoCharacters', type: 'uint64' },
+              { internalType: 'uint64', name: 'txSigLimit', type: 'uint64' },
+              { internalType: 'uint64', name: 'txSizeCostPerByte', type: 'uint64' },
+              { internalType: 'uint64', name: 'sigVerifyCostED25519', type: 'uint64' },
+              { internalType: 'uint64', name: 'sigVerifyCostSecp256k1', type: 'uint64' },
             ],
             internalType: 'struct AuthParams',
             name: 'params_',
@@ -179,16 +135,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         outputs: [
           {
             components: [
-              {
-                internalType: 'string',
-                name: 'typeUrl',
-                type: 'string',
-              },
-              {
-                internalType: 'bytes',
-                name: 'value',
-                type: 'bytes',
-              },
+              { internalType: 'string', name: 'typeUrl', type: 'string' },
+              { internalType: 'bytes', name: 'value', type: 'bytes' },
             ],
             internalType: 'struct ProtoAny[]',
             name: 'accounts_',
@@ -199,27 +147,20 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
       {
-        inputs: [
-          {
-            internalType: 'string',
-            name: 'name',
-            type: 'string',
-          },
-        ],
+        inputs: [],
+        name: 'moduleAccountsAsJSON',
+        outputs: [{ internalType: 'string', name: 'accountsJson', type: 'string' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
+        inputs: [{ internalType: 'string', name: 'name', type: 'string' }],
         name: 'moduleAccountByName',
         outputs: [
           {
             components: [
-              {
-                internalType: 'string',
-                name: 'typeUrl',
-                type: 'string',
-              },
-              {
-                internalType: 'bytes',
-                name: 'value',
-                type: 'bytes',
-              },
+              { internalType: 'string', name: 'typeUrl', type: 'string' },
+              { internalType: 'bytes', name: 'value', type: 'bytes' },
             ],
             internalType: 'struct ProtoAny',
             name: 'account_',
@@ -230,100 +171,51 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         type: 'function',
       },
       {
+        inputs: [{ internalType: 'string', name: 'name', type: 'string' }],
+        name: 'moduleAccountByNameAsJSON',
+        outputs: [{ internalType: 'string', name: 'accountJson', type: 'string' }],
+        stateMutability: 'view',
+        type: 'function',
+      },
+      {
         inputs: [],
         name: 'bech32Prefix',
-        outputs: [
-          {
-            internalType: 'string',
-            name: 'bech32Prefix_',
-            type: 'string',
-          },
-        ],
+        outputs: [{ internalType: 'string', name: 'bech32Prefix_', type: 'string' }],
         stateMutability: 'view',
         type: 'function',
       },
       {
-        inputs: [
-          {
-            internalType: 'bytes',
-            name: 'addressBytes',
-            type: 'bytes',
-          },
-        ],
+        inputs: [{ internalType: 'bytes', name: 'addressBytes', type: 'bytes' }],
         name: 'addressBytesToString',
-        outputs: [
-          {
-            internalType: 'string',
-            name: 'addressString',
-            type: 'string',
-          },
-        ],
+        outputs: [{ internalType: 'string', name: 'addressString', type: 'string' }],
         stateMutability: 'view',
         type: 'function',
       },
       {
-        inputs: [
-          {
-            internalType: 'string',
-            name: 'addressString',
-            type: 'string',
-          },
-        ],
+        inputs: [{ internalType: 'string', name: 'addressString', type: 'string' }],
         name: 'addressStringToBytes',
-        outputs: [
-          {
-            internalType: 'bytes',
-            name: 'addressBytes',
-            type: 'bytes',
-          },
-        ],
+        outputs: [{ internalType: 'bytes', name: 'addressBytes', type: 'bytes' }],
         stateMutability: 'view',
         type: 'function',
       },
       {
-        inputs: [
-          {
-            internalType: 'address',
-            name: 'account',
-            type: 'address',
-          },
-        ],
+        inputs: [{ internalType: 'address', name: 'account', type: 'address' }],
         name: 'accountInfo',
         outputs: [
           {
             components: [
-              {
-                internalType: 'string',
-                name: 'address',
-                type: 'string',
-              },
+              { internalType: 'string', name: 'address', type: 'string' },
               {
                 components: [
-                  {
-                    internalType: 'string',
-                    name: 'typeUrl',
-                    type: 'string',
-                  },
-                  {
-                    internalType: 'bytes',
-                    name: 'value',
-                    type: 'bytes',
-                  },
+                  { internalType: 'string', name: 'typeUrl', type: 'string' },
+                  { internalType: 'bytes', name: 'value', type: 'bytes' },
                 ],
                 internalType: 'struct ProtoAny',
                 name: 'pubKey',
                 type: 'tuple',
               },
-              {
-                internalType: 'uint64',
-                name: 'accountNumber',
-                type: 'uint64',
-              },
-              {
-                internalType: 'uint64',
-                name: 'sequence',
-                type: 'uint64',
-              },
+              { internalType: 'uint64', name: 'accountNumber', type: 'uint64' },
+              { internalType: 'uint64', name: 'sequence', type: 'uint64' },
             ],
             internalType: 'struct AccountInfo',
             name: 'info',

@@ -776,7 +776,7 @@ function CosmosSendTxContent() {
                   />
                 </div>
 
-                {formError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{translateRuntimeText(formError, locale)}</p> : null}
+                {formError ? <p className="overflow-hidden break-all whitespace-pre-wrap rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 sm:col-span-4">{translateRuntimeText(formError, locale)}</p> : null}
               </div>
 
               {broadcastProgress ? (

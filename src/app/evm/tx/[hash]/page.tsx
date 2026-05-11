@@ -13,7 +13,6 @@ import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { RelativeTime } from '@/components/relative-time';
-import { SecretInputDialog } from '@/components/ui/secret-input-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
@@ -35,6 +34,7 @@ import { decodeBoundEvmReceiptLog, decodeBoundEvmTransactionInput, decodeHexToUt
 import { getEvmTransactionByHashDirect, getEvmTransactionDebugTraceDirect } from '@/domains/evm/client/queries';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
+import { EvmPrivateKeyUnlockDialog, useEvmPrivateKeyUnlockDialog } from '@/domains/evm/ui/private-key-unlock-dialog';
 import { formatLocalizedDateTime } from '@/i18n/format';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
@@ -657,12 +657,10 @@ export default function EvmTxPage() {
   const [rewriteDialogValues, setRewriteDialogValues] = useState<RewriteDialogState>(createInitialRewriteDialogState());
   const [rewriteError, setRewriteError] = useState<string | null>(null);
   const [rewriteActionLoading, setRewriteActionLoading] = useState<'rewrite' | null>(null);
-  const [rewriteUnlockDialogOpen, setRewriteUnlockDialogOpen] = useState(false);
-  const [rewriteUnlockPassword, setRewriteUnlockPassword] = useState('');
-  const [rewriteUnlockError, setRewriteUnlockError] = useState<string | null>(null);
   const [copiedInputDataKey, setCopiedInputDataKey] = useState<string | null>(null);
   const copiedInputDataTimeoutRef = useRef<number | null>(null);
   const decodedInputCopyButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const rewriteUnlockDialog = useEvmPrivateKeyUnlockDialog();
   const normalizedReceiptLogs = useMemo(() => normalizeReceiptLogs(transaction?.logs), [transaction]);
   const decodedReceiptLogs = useMemo(() => {
     void decodeVersion;
@@ -885,9 +883,7 @@ export default function EvmTxPage() {
     );
     setRewriteError(null);
     setRewriteActionLoading(null);
-    setRewriteUnlockDialogOpen(false);
-    setRewriteUnlockPassword('');
-    setRewriteUnlockError(null);
+    rewriteUnlockDialog.closeDialog();
     setRewriteDialogOpen(true);
   }
 
@@ -955,9 +951,7 @@ export default function EvmTxPage() {
       const message = error instanceof Error ? error.message : txMessages.failedToRewriteTransaction;
 
       if (message === messages.privateKeys.passwordRequiredForEncrypted) {
-        setRewriteUnlockPassword('');
-        setRewriteUnlockError(null);
-        setRewriteUnlockDialogOpen(true);
+        rewriteUnlockDialog.openDialog();
         return;
       }
 
@@ -980,13 +974,12 @@ export default function EvmTxPage() {
     }
 
     try {
-      await resolveEvmStoredPrivateKey(activeKey.id, rewriteUnlockPassword);
-      setRewriteUnlockDialogOpen(false);
-      setRewriteUnlockPassword('');
-      setRewriteUnlockError(null);
-      await executeRewriteAction(rewriteUnlockPassword);
+      await resolveEvmStoredPrivateKey(activeKey.id, rewriteUnlockDialog.password);
+      const password = rewriteUnlockDialog.password;
+      rewriteUnlockDialog.handleUnlockResolved();
+      await executeRewriteAction(password);
     } catch (error) {
-      setRewriteUnlockError(
+      rewriteUnlockDialog.setErrorMessage(
         normalizeContractActionErrorMessage(error instanceof Error ? error.message : txMessages.failedToUnlockPrivateKey, txMessages.failedToUnlockPrivateKey, {
           transactionRejectedMissingRole: txMessages.transactionRejectedMissingRole,
           transactionRevertedWithReason: txMessages.transactionRevertedWithReason,
@@ -1622,24 +1615,24 @@ export default function EvmTxPage() {
           </div>
         ) : null}
       </ModalDialog>
-      <SecretInputDialog
-        open={rewriteUnlockDialogOpen}
+      <EvmPrivateKeyUnlockDialog
+        open={rewriteUnlockDialog.open}
         onOpenChange={(open) => {
-          setRewriteUnlockDialogOpen(open);
-
           if (!open) {
-            setRewriteUnlockPassword('');
-            setRewriteUnlockError(null);
+            rewriteUnlockDialog.closeDialog();
+            return;
           }
+
+          rewriteUnlockDialog.setOpen(true);
         }}
         title={messages.privateKeys.unlockPrivateKey}
         description={activeKey ? txMessages.unlockDescription.replace('{name}', activeKey.name) : txMessages.unlockFallbackDescription}
-        value={rewriteUnlockPassword}
-        onValueChange={setRewriteUnlockPassword}
+        password={rewriteUnlockDialog.password}
+        onPasswordChange={rewriteUnlockDialog.setPassword}
         placeholder={messages.sendTx.password}
         confirmLabel={messages.sendTx.unlock}
-        errorMessage={rewriteUnlockError}
-        confirmDisabled={!rewriteUnlockPassword.trim()}
+        errorMessage={rewriteUnlockDialog.errorMessage}
+        submitting={rewriteActionLoading === 'rewrite'}
         onConfirm={() => void handleConfirmRewriteUnlock()}
       />
     </AppShell>

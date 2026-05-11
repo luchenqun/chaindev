@@ -546,7 +546,7 @@ export default function PrivateKeysPage() {
               placeholder={keyMessages.optionalPasswordForRemoteEncryption}
             />
             <p className="text-xs text-slate-500">{keyMessages.leavePasswordEmptyForPlain}</p>
-            {createError ? <p className="text-sm text-rose-600">{translateRuntimeText(createError, locale)}</p> : null}
+            {createError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(createError, locale)}</p> : null}
           </div>
         </ModalDialog>
 
@@ -643,7 +643,7 @@ export default function PrivateKeysPage() {
             ) : (
               <p className="text-xs text-slate-500">{keyMessages.plainStorageHint}</p>
             )}
-            {editError ? <p className="text-sm text-rose-600">{translateRuntimeText(editError, locale)}</p> : null}
+            {editError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(editError, locale)}</p> : null}
           </div>
         </ModalDialog>
 
