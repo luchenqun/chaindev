@@ -67,7 +67,7 @@ export function EvmHomeActivity() {
     () => [
       ...new Set([
         ...(activity?.blocks.map((block) => block.miner) ?? []),
-        ...(activity?.transactions.flatMap((transaction) => [transaction.from, ...(transaction.to ? [transaction.to] : [])]) ?? []),
+        ...(activity?.transactions.flatMap((transaction) => [transaction.from, ...(transaction.interactedWith ? [transaction.interactedWith] : transaction.to ? [transaction.to] : [])]) ?? []),
       ]),
     ],
     [activity],
@@ -219,13 +219,13 @@ export function EvmHomeActivity() {
                           </p>
                           <p className="truncate text-sm text-slate-600">
                             {messages.common.to}{' '}
-                            {transaction.to ? (
+                            {transaction.interactedWith ? (
                               <AddressLink
-                                address={transaction.to}
-                                href={`/evm/address/${transaction.to}`}
-                                label={resolvePreferredToAddressLabel(transaction.to, {
+                                address={transaction.interactedWith}
+                                href={`/evm/address/${transaction.interactedWith}`}
+                                label={resolvePreferredToAddressLabel(transaction.interactedWith, {
                                   nameTagsByAddress,
-                                  fallbackLabel: transaction.toLabel,
+                                  fallbackLabel: transaction.interactedWithLabel ?? transaction.toLabel,
                                 })}
                                 className="font-semibold text-sky-600 hover:text-sky-700"
                                 showCopyButton={false}

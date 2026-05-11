@@ -4,7 +4,7 @@ import { IconArrowsExchange, IconCopy } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { type KeyboardEvent, useEffect, useMemo, useState } from 'react';
-import { decodeFunctionData, isAddress, parseAbiItem, toFunctionSelector, type Abi, type AbiFunction, type AbiParameter, type Hex } from 'viem';
+import { isAddress, parseAbiItem, type Abi, type Hex } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { AutoGrowTextarea } from '@/components/ui/auto-grow-textarea';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,15 @@ import { JsonInput } from '@/components/ui/json-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { parseContractAbiJson } from '@/domains/evm/client/abi-utils';
 import { listEvmContractArtifacts, subscribeEvmContractRegistry, type EvmContractArtifact } from '@/domains/evm/client/contract-registry';
+import {
+  buildAllLocalArtifactCandidates,
+  buildDecodedCandidate,
+  dedupeCandidatesBySignature,
+  fetchFourByteFunctionCandidates,
+  getFunctionSignature,
+  normalizeHexData,
+  stringifyDecodedValue,
+} from '@/domains/evm/client/tx-input-decoder';
 import { decodeHexToUtf8 } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
@@ -24,20 +33,6 @@ const TEXTAREA_CLASS_NAME =
 const INPUT_DATA_TEXTAREA_CLASS_NAME =
   'min-h-10 max-h-64 w-full resize-none overflow-y-auto rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-sm leading-6 text-slate-900 outline-none transition focus-visible:ring-2 focus-visible:ring-sky-400';
 const DECODE_EVM_TX_STORAGE_KEY = 'chaindev:decode-evm-tx:input-data';
-
-type FourByteSignatureRecord = {
-  id: number;
-  text_signature: string;
-  hex_signature: string;
-  bytes_signature: string;
-};
-
-type FourByteApiResponse = {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: FourByteSignatureRecord[];
-};
 
 type DecodedArgument = {
   name: string;
@@ -100,69 +95,6 @@ function buildDefaultInputDataView(
   }
 
   return lines.join('\n');
-}
-
-function stringifyValue(value: unknown) {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (typeof value === 'bigint') {
-    return value.toString();
-  }
-
-  if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
-    return String(value);
-  }
-
-  return JSON.stringify(value, (_key, currentValue) => (typeof currentValue === 'bigint' ? currentValue.toString() : currentValue), 2);
-}
-
-function normalizeHexData(value: string, errorMessage: string) {
-  const trimmed = value.trim().toLowerCase();
-
-  if (!trimmed) {
-    throw new Error(errorMessage);
-  }
-
-  const normalized = trimmed.startsWith('0x') ? trimmed : `0x${trimmed}`;
-
-  if (!/^0x[0-9a-f]*$/.test(normalized) || normalized.length < 10 || normalized.length % 2 !== 0) {
-    throw new Error(errorMessage);
-  }
-
-  return normalized as Hex;
-}
-
-function isAbiFunctionItem(item: Abi[number] | unknown): item is AbiFunction {
-  return typeof item === 'object' && item !== null && 'type' in item && item.type === 'function' && 'name' in item;
-}
-
-function hasTupleComponents(parameter: AbiParameter): parameter is AbiParameter & { components: readonly AbiParameter[] } {
-  return 'components' in parameter && Array.isArray(parameter.components);
-}
-
-function getCanonicalAbiParameterType(parameter: AbiParameter): string {
-  if (!parameter.type.endsWith(']')) {
-    if (parameter.type !== 'tuple') {
-      return parameter.type;
-    }
-
-    const components = hasTupleComponents(parameter) ? parameter.components : [];
-    return `(${components.map(getCanonicalAbiParameterType).join(',')})`;
-  }
-
-  const arraySuffix = parameter.type.slice(parameter.type.indexOf('['));
-  const baseParameter = {
-    ...parameter,
-    type: parameter.type.slice(0, parameter.type.indexOf('[')),
-  } satisfies AbiParameter;
-
-  return `${getCanonicalAbiParameterType(baseParameter)}${arraySuffix}`;
-}
-
-function getFunctionSignature(fn: AbiFunction) {
-  return `${fn.name}(${fn.inputs.map(getCanonicalAbiParameterType).join(',')})`;
 }
 
 function isSingleAbiItemLike(value: unknown) {
@@ -262,119 +194,6 @@ function parseManualAbiInput(rawValue: string, messages: ReturnType<typeof useMe
     : messages.manualAbi;
 
   return [{ label, abi, abiJson: JSON.stringify(abi, null, 2) }];
-}
-
-function buildDecodedCandidate(input: {
-  id: string;
-  label: string;
-  sourceLabel: string;
-  abi: Abi;
-  abiJson: string;
-  data: Hex;
-  decodeFailedMessage: string;
-}) {
-  const selector = input.data.slice(0, 10).toLowerCase();
-  const functions = input.abi.filter(isAbiFunctionItem);
-  const matchedFunction = functions.find((fn) => toFunctionSelector(`function ${getFunctionSignature(fn)}`).toLowerCase() === selector);
-
-  if (!matchedFunction) {
-    return null;
-  }
-
-  const functionSignature = getFunctionSignature(matchedFunction);
-  const hasInputs = matchedFunction.inputs.length > 0;
-
-  try {
-    const decoded = decodeFunctionData({
-      abi: input.abi,
-      data: input.data,
-    });
-    const decodedArgs = Array.isArray(decoded.args) ? decoded.args : [];
-
-    return {
-      id: input.id,
-      label: input.label,
-      sourceLabel: input.sourceLabel,
-      functionSignature,
-      selector,
-      methodName: matchedFunction.name,
-      decodeError: null,
-      hasInputs,
-      args: matchedFunction.inputs.map((parameter, index) => ({
-        name: parameter.name || `arg${index + 1}`,
-        type: parameter.type,
-        value: stringifyValue(decodedArgs[index]),
-      })),
-    } satisfies DecodedCandidate;
-  } catch (error) {
-    return {
-      id: input.id,
-      label: input.label,
-      sourceLabel: input.sourceLabel,
-      functionSignature,
-      selector,
-      methodName: matchedFunction.name,
-      decodeError: error instanceof Error ? error.message : input.decodeFailedMessage,
-      hasInputs,
-      args: [],
-    } satisfies DecodedCandidate;
-  }
-}
-
-async function fetchFourByteCandidates(selector: string, messages: ReturnType<typeof useMessages>['decodeEvmTx']) {
-  const response = await fetch(`https://www.4byte.directory/api/v1/signatures/?hex_signature=${encodeURIComponent(selector)}`);
-
-  if (!response.ok) {
-    throw new Error(`${messages.lookupFailed} (${response.status})`);
-  }
-
-  const payload = (await response.json()) as FourByteApiResponse;
-  const uniqueSignatures = Array.from(new Map(payload.results.sort((left, right) => left.id - right.id).map((item) => [item.text_signature, item])).values());
-
-  return uniqueSignatures.flatMap((item, index) => {
-    try {
-      const abiItem = parseAbiItem(`function ${item.text_signature}`);
-      const abi = [abiItem] satisfies Abi;
-
-      return [
-        {
-          id: `4byte:${item.id}:${index}`,
-          label: item.text_signature,
-          sourceLabel: messages.fourByte,
-          abi,
-          abiJson: JSON.stringify(abi, null, 2),
-        } satisfies AbiParseResult & { id: string; sourceLabel: string },
-      ];
-    } catch {
-      return [];
-    }
-  });
-}
-
-function buildLocalArtifactCandidates(artifacts: EvmContractArtifact[]) {
-  return artifacts.map((artifact, index) => ({
-    id: `artifact:${artifact.id}:${index}`,
-    label: artifact.name,
-    sourceLabel: artifact.scope,
-    abi: parseContractAbiJson(artifact.abiJson),
-    abiJson: artifact.abiJson,
-  }));
-}
-
-function dedupeCandidatesBySignature(candidates: DecodedCandidate[]) {
-  const uniqueCandidates: DecodedCandidate[] = [];
-  const seenSignatures = new Set<string>();
-
-  for (const candidate of candidates) {
-    if (seenSignatures.has(candidate.functionSignature)) {
-      continue;
-    }
-
-    seenSignatures.add(candidate.functionSignature);
-    uniqueCandidates.push(candidate);
-  }
-
-  return uniqueCandidates;
 }
 
 function TxAddressLink({ address }: { address: string }) {
@@ -488,17 +307,18 @@ export default function DecodeEvmTxPage() {
               abi: item.abi,
               abiJson: item.abiJson,
             }))
-          : buildLocalArtifactCandidates(artifacts);
+          : buildAllLocalArtifactCandidates({
+              localArtifact: pageMessages.localArtifact,
+              systemArtifact: pageMessages.systemArtifact,
+              importedArtifact: pageMessages.importedArtifact,
+            });
 
       const localDecoded = abiSources.flatMap((source) => {
         try {
           const decoded = buildDecodedCandidate({
             id: source.id,
             label: source.label,
-            sourceLabel:
-              manualAbis.length > 0
-                ? pageMessages.manualAbi
-                : `${pageMessages.localArtifact} · ${source.sourceLabel === 'system' ? pageMessages.systemArtifact : pageMessages.importedArtifact}`,
+            sourceLabel: manualAbis.length > 0 ? pageMessages.manualAbi : source.sourceLabel,
             abi: source.abi,
             abiJson: source.abiJson,
             data: normalizedData,
@@ -514,7 +334,10 @@ export default function DecodeEvmTxPage() {
       let nextCandidates = dedupeCandidatesBySignature(localDecoded);
 
       if (!manualAbis.length) {
-        const fourByteCandidates = await fetchFourByteCandidates(selector, pageMessages);
+        const fourByteCandidates = await fetchFourByteFunctionCandidates(selector, {
+          lookupFailed: pageMessages.lookupFailed,
+          fourByte: pageMessages.fourByte,
+        });
         const fourByteDecoded = fourByteCandidates.flatMap((source) => {
           try {
             const decoded = buildDecodedCandidate({

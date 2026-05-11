@@ -289,6 +289,8 @@ type EvmHomeTransactionItem = {
   fromLabel: string;
   to: string | null;
   toLabel: string;
+  interactedWith: string | null;
+  interactedWithLabel: string;
   value: string;
   timestampMs: number | null;
   receiptStatus: EvmCachedTransactionItem['receiptStatus'] | undefined;
@@ -336,6 +338,8 @@ function formatHomeTransactions(
       fromLabel: shortenAddress(transaction.from),
       to: transaction.to ?? null,
       toLabel: shortenAddress(transaction.to),
+      interactedWith: transaction.to ?? null,
+      interactedWithLabel: shortenAddress(transaction.to),
       value: formatTxValue(transaction.value, currencyName),
       timestampMs: timestamp ? Number(timestamp) * 1000 : null,
       receiptStatus: receiptStatusByHash?.get(transaction.hash),
@@ -354,6 +358,8 @@ function formatCachedHomeTransactions(transactions: EvmCachedTransactionItem[], 
     fromLabel: transaction.fromLabel,
     to: transaction.to,
     toLabel: transaction.toLabel,
+    interactedWith: transaction.interactedWith,
+    interactedWithLabel: transaction.interactedWithLabel,
     value: transaction.amountLabel,
     timestampMs: transaction.timestampMs,
     receiptStatus: transaction.receiptStatus,
@@ -438,6 +444,8 @@ function finalizeTransactionsPageItems(
     fromLabel: string;
     to: string | null;
     toLabel: string;
+    interactedWith: string | null;
+    interactedWithLabel: string;
     methodLabel: string;
     inputData: string;
     value: bigint | null;
@@ -460,6 +468,8 @@ function finalizeTransactionsPageItems(
       to: transaction.to,
       toLabel: transaction.toLabel,
       toLower: transaction.to?.toLowerCase() ?? null,
+      interactedWith: transaction.interactedWith,
+      interactedWithLabel: transaction.interactedWithLabel,
       methodLabel: transaction.methodLabel,
       methodKey: transaction.methodLabel.toLowerCase(),
       methodSelector: transaction.inputData && transaction.inputData !== '0x' && transaction.inputData.length >= 10 ? transaction.inputData.slice(0, 10).toLowerCase() : null,
@@ -496,6 +506,8 @@ function formatTransactionsPageItemsForBlock(
     fromLabel: string;
     to: string | null;
     toLabel: string;
+    interactedWith: string | null;
+    interactedWithLabel: string;
     methodLabel: string;
     inputData: string;
     value: bigint | null;
@@ -522,6 +534,8 @@ function formatTransactionsPageItemsForBlock(
       fromLabel: shortenAddress(transaction.from),
       to: transaction.to ?? null,
       toLabel: shortenAddress(transaction.to),
+      interactedWith: transaction.to ?? null,
+      interactedWithLabel: shortenAddress(transaction.to),
       methodLabel: formatMethodLabel(transaction.input, transaction.to),
       inputData: transaction.input ?? '0x',
       value: transaction.value ?? 0n,
@@ -542,6 +556,8 @@ type FormattedPendingTransactionItem = {
   fromLabel: string;
   to: string | null;
   toLabel: string;
+  interactedWith: string | null;
+  interactedWithLabel: string;
   methodLabel: string;
   inputData: string;
   amountLabel: string;
@@ -581,6 +597,8 @@ function formatPendingTransactions(transactions: readonly unknown[], currencyNam
       fromLabel: shortenAddress(transaction.from),
       to: transaction.to ?? null,
       toLabel: shortenAddress(transaction.to),
+      interactedWith: transaction.to ?? null,
+      interactedWithLabel: shortenAddress(transaction.to),
       methodLabel: formatMethodLabel(transaction.input, transaction.to),
       inputData: transaction.input ?? '0x',
       amountLabel: formatTxValue(transaction.value, currencyName),
@@ -1123,7 +1141,7 @@ export async function syncLatestEvmTransactionsDirect(input?: { latestCachedBloc
     };
   }
 
-  const floorBlockNumberByWindow = latestBlock.number >= BigInt(maxBlocks - 1) ? latestBlock.number - BigInt(maxBlocks - 1) : 0n;
+  const floorBlockNumberByWindow = latestBlock.number >= BigInt(maxBlocks - 1) ? latestBlock.number - BigInt(maxBlocks - 1) : latestBlock.number > 0n ? 1n : 0n;
   const floorBlockNumber = cachedLatestBlockNumber != null && cachedLatestBlockNumber + 1n > floorBlockNumberByWindow ? cachedLatestBlockNumber + 1n : floorBlockNumberByWindow;
   const cacheCandidates: EvmCachedTransactionItem[] = [];
   let cursor = latestBlock.number;
@@ -1171,14 +1189,26 @@ export async function syncLatestEvmTransactionsDirect(input?: { latestCachedBloc
 export async function syncEvmTransactionsByBlockRangeDirect(input: { startBlockNumber: string; endBlockNumber: string; maxBlocks?: number; maxTransactions?: number }) {
   const { client, profile } = await getEvmClientWithProfile();
   const currencyName = getEvmCurrencyName(profile.nativeCurrencySymbol);
-  const startBlockNumber = BigInt(input.startBlockNumber);
+  const requestedStartBlockNumber = BigInt(input.startBlockNumber);
   const endBlockNumber = BigInt(input.endBlockNumber);
+  const startBlockNumber = requestedStartBlockNumber === 0n ? 1n : requestedStartBlockNumber;
   const maxBlocks = input.maxBlocks ?? Number.POSITIVE_INFINITY;
   const maxTransactions = input.maxTransactions ?? Number.POSITIVE_INFINITY;
   const cacheCandidates: EvmCachedTransactionItem[] = [];
   let cursor = endBlockNumber;
   let scannedBlocks = 0;
   let syncedTransactions = 0;
+
+  if (endBlockNumber < startBlockNumber) {
+    return {
+      startBlockNumber: requestedStartBlockNumber.toString(),
+      endBlockNumber: endBlockNumber.toString(),
+      scannedBlocks: 0,
+      syncedTransactions: 0,
+      truncatedByBlockWindow: false,
+      truncatedByTransactionLimit: false,
+    };
+  }
 
   while (cursor >= startBlockNumber && scannedBlocks < maxBlocks && syncedTransactions < maxTransactions) {
     const remainingBlocksInRange = Number(cursor - startBlockNumber + 1n);
@@ -1211,7 +1241,7 @@ export async function syncEvmTransactionsByBlockRangeDirect(input: { startBlockN
   await rememberEvmTransactionCacheSafe(cacheCandidates);
 
   return {
-    startBlockNumber: startBlockNumber.toString(),
+    startBlockNumber: requestedStartBlockNumber.toString(),
     endBlockNumber: endBlockNumber.toString(),
     scannedBlocks,
     syncedTransactions,
@@ -1543,6 +1573,8 @@ export async function getEvmBlockByNumberDirect(number: bigint) {
 
       return {
         ...transaction,
+        interactedWith: cachedTransaction?.interactedWith ?? transaction.to,
+        interactedWithLabel: cachedTransaction?.interactedWithLabel ?? shortenAddress(cachedTransaction?.interactedWith ?? transaction.to),
         receiptStatus: cachedTransaction?.receiptStatus,
         receiptStatusLabel: cachedTransaction?.receiptStatusLabel,
         feeLabel: cachedTransaction?.feeLabel,

@@ -30,6 +30,14 @@ import {
   subscribeEvmKeyring,
   type EvmStoredPrivateKey,
 } from '@/domains/evm/client/keyring';
+import {
+  buildAllLocalArtifactCandidates,
+  buildDecodedCandidate,
+  dedupeCandidatesBySignature,
+  fetchFourByteFunctionCandidates,
+  normalizeHexData,
+  type EvmTxDecodedCandidate,
+} from '@/domains/evm/client/tx-input-decoder';
 import { decodeBoundEvmReceiptLog, decodeBoundEvmTransactionInput, decodeHexToUtf8, resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { getEvmTransactionByHashDirect, getEvmTransactionDebugTraceDirect } from '@/domains/evm/client/queries';
 import { AddressLink } from '@/domains/evm/ui/address-link';
@@ -650,6 +658,10 @@ export default function EvmTxPage() {
   const [inputDataView, setInputDataView] = useState<'default' | 'utf8' | 'original'>('default');
   const [showDecodedInputTable, setShowDecodedInputTable] = useState(false);
   const [decodeVersion, setDecodeVersion] = useState(0);
+  const [fallbackDecodeCandidates, setFallbackDecodeCandidates] = useState<EvmTxDecodedCandidate[]>([]);
+  const [fallbackDecodeLoading, setFallbackDecodeLoading] = useState(false);
+  const [fallbackDecodeError, setFallbackDecodeError] = useState<string | null>(null);
+  const [selectedFallbackCandidateId, setSelectedFallbackCandidateId] = useState('');
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
   const [rewriteEnvironment, setRewriteEnvironment] = useState<RewriteEnvironmentState>(null);
   const [rewriteDialogOpen, setRewriteDialogOpen] = useState(false);
@@ -697,8 +709,36 @@ export default function EvmTxPage() {
         })
       : null;
   }, [transaction, decodeVersion]);
+  const selectedFallbackCandidate = useMemo(
+    () => fallbackDecodeCandidates.find((candidate) => candidate.id === selectedFallbackCandidateId) ?? fallbackDecodeCandidates[0] ?? null,
+    [fallbackDecodeCandidates, selectedFallbackCandidateId],
+  );
+  const effectiveDecodedTransactionInput = useMemo(() => {
+    if (decodedTransactionInput) {
+      return decodedTransactionInput;
+    }
+
+    if (!selectedFallbackCandidate) {
+      return null;
+    }
+
+    return {
+      methodLabel: selectedFallbackCandidate.methodName,
+      functionName: selectedFallbackCandidate.methodName,
+      functionSignature: selectedFallbackCandidate.functionSignature,
+      selector: selectedFallbackCandidate.selector,
+      artifactName: selectedFallbackCandidate.sourceLabel,
+      abiJson: selectedFallbackCandidate.abiJson,
+      bindingLabel: selectedFallbackCandidate.label,
+      args: selectedFallbackCandidate.args,
+    };
+  }, [decodedTransactionInput, selectedFallbackCandidate]);
   const decodedMethodLabel = useMemo(() => {
     void decodeVersion;
+
+    if (effectiveDecodedTransactionInput) {
+      return effectiveDecodedTransactionInput.methodLabel;
+    }
 
     return transaction
       ? resolveEvmTransactionMethodLabel({
@@ -707,7 +747,7 @@ export default function EvmTxPage() {
           fallbackMethodLabel: transaction.methodLabel,
         })
       : '';
-  }, [transaction, decodeVersion]);
+  }, [effectiveDecodedTransactionInput, transaction, decodeVersion]);
   const utf8InputData = useMemo(() => (transaction ? decodeHexToUtf8(transaction.inputData) : null), [transaction]);
   const defaultInputDataView = useMemo(
     () =>
@@ -719,15 +759,15 @@ export default function EvmTxPage() {
               methodId: txMessages.methodId,
             },
             decodedTransactionInput?.functionSignature,
-            decodedTransactionInput?.selector,
+            effectiveDecodedTransactionInput?.selector,
           )
         : '',
-    [transaction, decodedTransactionInput],
+    [transaction, decodedTransactionInput, effectiveDecodedTransactionInput],
   );
   const rewriteTargetAddress = useMemo(() => transaction?.interactedWith ?? transaction?.to ?? null, [transaction]);
   const isContractDeployment = Boolean(transaction && !transaction.to);
   const isRewriteTransfer = Boolean(transaction?.to && transaction.inputData === '0x');
-  const canRewriteTransaction = Boolean(!isContractDeployment && rewriteTargetAddress && (decodedTransactionInput || isRewriteTransfer));
+  const canRewriteTransaction = Boolean(!isContractDeployment && rewriteTargetAddress && (effectiveDecodedTransactionInput || isRewriteTransfer));
 
   useEffect(() => {
     if (!isValid) {
@@ -749,6 +789,10 @@ export default function EvmTxPage() {
           setActiveTab('overview');
           setInputDataView('default');
           setShowDecodedInputTable(false);
+          setFallbackDecodeCandidates([]);
+          setSelectedFallbackCandidateId('');
+          setFallbackDecodeError(null);
+          setFallbackDecodeLoading(false);
         }
       } catch (error) {
         if (!cancelled) {
@@ -824,6 +868,98 @@ export default function EvmTxPage() {
   }, []);
 
   useEffect(() => {
+    if (!transaction || decodedTransactionInput || !transaction.inputData || transaction.inputData === '0x') {
+      setFallbackDecodeCandidates([]);
+      setSelectedFallbackCandidateId('');
+      setFallbackDecodeError(null);
+      setFallbackDecodeLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const currentInputData = transaction.inputData;
+
+    async function loadFallbackCandidates() {
+      setFallbackDecodeLoading(true);
+      setFallbackDecodeError(null);
+
+      try {
+        const normalizedData = normalizeHexData(currentInputData, txMessages.failedToLoadFallback);
+        const selector = normalizedData.slice(0, 10).toLowerCase();
+        const localSources = buildAllLocalArtifactCandidates({
+          localArtifact: messages.decodeEvmTx.localArtifact,
+          systemArtifact: messages.decodeEvmTx.systemArtifact,
+          importedArtifact: messages.decodeEvmTx.importedArtifact,
+        });
+        const localDecoded = localSources.flatMap((source) => {
+          const decoded = buildDecodedCandidate({
+            id: source.id,
+            label: source.label,
+            sourceLabel: source.sourceLabel,
+            abi: source.abi,
+            abiJson: source.abiJson,
+            data: normalizedData,
+            decodeFailedMessage: messages.decodeEvmTx.decodeFailed,
+          });
+
+          return decoded ? [decoded] : [];
+        });
+        const fourByteSources = await fetchFourByteFunctionCandidates(selector, {
+          lookupFailed: messages.decodeEvmTx.lookupFailed,
+          fourByte: messages.decodeEvmTx.fourByte,
+        });
+        const fourByteDecoded = fourByteSources.flatMap((source) => {
+          const decoded = buildDecodedCandidate({
+            id: source.id,
+            label: source.label,
+            sourceLabel: source.sourceLabel,
+            abi: source.abi,
+            abiJson: source.abiJson,
+            data: normalizedData,
+            decodeFailedMessage: messages.decodeEvmTx.decodeFailed,
+          });
+
+          return decoded ? [decoded] : [];
+        });
+        const nextCandidates = dedupeCandidatesBySignature([...localDecoded, ...fourByteDecoded]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setFallbackDecodeCandidates(nextCandidates);
+        setSelectedFallbackCandidateId((current) => {
+          const currentCandidate = nextCandidates.find((candidate) => candidate.id === current);
+
+          if (currentCandidate && !currentCandidate.decodeError) {
+            return current;
+          }
+
+          return (nextCandidates.find((candidate) => !candidate.decodeError) ?? nextCandidates[0])?.id ?? '';
+        });
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setFallbackDecodeCandidates([]);
+        setSelectedFallbackCandidateId('');
+        setFallbackDecodeError(error instanceof Error ? error.message : messages.decodeEvmTx.lookupFailed);
+      } finally {
+        if (!cancelled) {
+          setFallbackDecodeLoading(false);
+        }
+      }
+    }
+
+    void loadFallbackCandidates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [decodedTransactionInput, messages.decodeEvmTx.decodeFailed, messages.decodeEvmTx.fourByte, messages.decodeEvmTx.importedArtifact, messages.decodeEvmTx.localArtifact, messages.decodeEvmTx.lookupFailed, messages.decodeEvmTx.systemArtifact, transaction, txMessages.failedToLoadFallback]);
+
+  useEffect(() => {
     function loadVisibleTags() {
       setNameTagsByAddress(getEvmAddressTags(visibleAddresses));
     }
@@ -873,7 +1009,7 @@ export default function EvmTxPage() {
       return;
     }
 
-    setRewriteArgumentValues(decodedTransactionInput?.args.map((arg) => arg.value) ?? []);
+    setRewriteArgumentValues(effectiveDecodedTransactionInput?.args.map((arg) => arg.value) ?? []);
     setRewriteDialogValues(
       createInitialRewriteDialogState({
         transactionType: resolveRewriteTransactionType(transaction.rawJson),
@@ -898,11 +1034,11 @@ export default function EvmTxPage() {
 
     try {
       const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
-      const result = decodedTransactionInput
+      const result = effectiveDecodedTransactionInput
         ? await forceWriteEvmContractMethodDirect({
             address: rewriteTargetAddress,
-            abiJson: decodedTransactionInput.abiJson,
-            functionSignature: decodedTransactionInput.functionSignature,
+            abiJson: effectiveDecodedTransactionInput.abiJson,
+            functionSignature: effectiveDecodedTransactionInput.functionSignature,
             rawArgs: rewriteArgumentValues,
             privateKey,
             transactionType: rewriteDialogValues.transactionType,
@@ -933,7 +1069,7 @@ export default function EvmTxPage() {
           ? {
               title: txMessages.rewriteSubmitted,
               description: txMessages.rewriteSubmittedDescription
-                .replace('{name}', decodedTransactionInput?.functionName ?? txMessages.transfer)
+                .replace('{name}', effectiveDecodedTransactionInput?.functionName ?? txMessages.transfer)
                 .replace('{time}', formatChainTimestamp(result.receipt.blockTimestamp))
                 .replace('{hash}', formatMiddleEllipsis(result.hash)),
               tone: 'success',
@@ -941,7 +1077,7 @@ export default function EvmTxPage() {
           : {
               title: txMessages.rewriteReverted,
               description: txMessages.rewriteRevertedDescription
-                .replace('{name}', decodedTransactionInput?.functionName ?? txMessages.transfer)
+                .replace('{name}', effectiveDecodedTransactionInput?.functionName ?? txMessages.transfer)
                 .replace('{time}', formatChainTimestamp(result.receipt.blockTimestamp))
                 .replace('{hash}', formatMiddleEllipsis(result.hash)),
               tone: 'info',
@@ -1210,10 +1346,10 @@ export default function EvmTxPage() {
                     <DetailRow
                       label={txMessages.method}
                       value={
-                        decodedTransactionInput ? (
+                        effectiveDecodedTransactionInput ? (
                           <span className="inline-flex flex-wrap items-center gap-2">
                             <span>{decodedMethodLabel}</span>
-                            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500 mono">{decodedTransactionInput.selector}</span>
+                            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500 mono">{effectiveDecodedTransactionInput.selector}</span>
                           </span>
                         ) : (
                           decodedMethodLabel
@@ -1243,8 +1379,35 @@ export default function EvmTxPage() {
                     <DetailRow
                       label={txMessages.inputData}
                       value={
-                        showDecodedInputTable && decodedTransactionInput ? (
+                        showDecodedInputTable && effectiveDecodedTransactionInput ? (
                           <div className="space-y-3">
+                            {!decodedTransactionInput && fallbackDecodeCandidates.length ? (
+                              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                                <div className="space-y-3">
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{txMessages.decodeCandidates}</p>
+                                    <p className="mt-1 text-sm text-slate-600">{txMessages.decodeCandidatesDescription.replace('{count}', String(fallbackDecodeCandidates.length))}</p>
+                                  </div>
+                                  <div className="w-full">
+                                    <Select value={selectedFallbackCandidate?.id ?? ''} onValueChange={setSelectedFallbackCandidateId}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder={txMessages.selectDecodeCandidate} />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {fallbackDecodeCandidates.map((candidate) => (
+                                          <SelectItem key={candidate.id} value={candidate.id} disabled={Boolean(candidate.decodeError)}>
+                                            <span className={candidate.decodeError ? 'text-slate-400' : undefined}>
+                                              {candidate.functionSignature}
+                                              {candidate.decodeError ? ` · ${txMessages.undecodableDecodeCandidate}` : ''}
+                                            </span>
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
                             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
                               <div className="max-h-[360px] overflow-auto">
                                 <table className="data-table">
@@ -1257,7 +1420,7 @@ export default function EvmTxPage() {
                                     </tr>
                                   </thead>
                                   <tbody>
-                                    {decodedTransactionInput.args.map((arg, index) => (
+                                    {effectiveDecodedTransactionInput.args.map((arg, index) => (
                                       <tr key={`${arg.name}-${index}`} className="border-t border-slate-200">
                                         <td className="px-4 py-3 align-top text-sm text-slate-900 mono">{index}</td>
                                         <td className="px-4 py-3 align-top text-sm text-slate-900 mono">{arg.name}</td>
@@ -1332,9 +1495,15 @@ export default function EvmTxPage() {
                                   </SelectContent>
                                 </Select>
                               </div>
-                              <Button type="button" variant="secondary" size="sm" disabled={!decodedTransactionInput} onClick={() => setShowDecodedInputTable(true)}>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                disabled={!effectiveDecodedTransactionInput && !fallbackDecodeLoading}
+                                onClick={() => setShowDecodedInputTable(true)}
+                              >
                                 <IconCode className="mr-1.5 size-3.5" stroke={1.8} />
-                                {txMessages.decodeInputData}
+                                {fallbackDecodeLoading ? txMessages.decodingCandidates : txMessages.decodeInputData}
                               </Button>
                               <button
                                 type="button"
@@ -1349,6 +1518,11 @@ export default function EvmTxPage() {
                                 {txMessages.rewrite}
                               </Button>
                             </div>
+                            {!decodedTransactionInput && fallbackDecodeError ? (
+                              <div className="overflow-hidden break-all whitespace-pre-wrap rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                                {translateRuntimeText(fallbackDecodeError, locale)}
+                              </div>
+                            ) : null}
                           </div>
                         )
                       }
@@ -1416,7 +1590,7 @@ export default function EvmTxPage() {
         }}
         title={txMessages.rewriteTransaction}
         description={
-          decodedTransactionInput
+          effectiveDecodedTransactionInput
             ? txMessages.rewriteDecodedDescription
             : txMessages.rewriteTransferDescription
         }
@@ -1460,28 +1634,28 @@ export default function EvmTxPage() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.method}</p>
-                <p className="mt-1 text-sm text-slate-900">{decodedTransactionInput ? decodedTransactionInput.functionSignature : messages.labels.sendTransaction}</p>
+                <p className="mt-1 text-sm text-slate-900">{effectiveDecodedTransactionInput ? effectiveDecodedTransactionInput.functionSignature : messages.labels.sendTransaction}</p>
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.selectedKey}</p>
                 <p className="mt-1 text-sm text-slate-900">{activeKey?.name ?? txMessages.noKeySelected}</p>
               </div>
-              {decodedTransactionInput ? (
+              {effectiveDecodedTransactionInput ? (
                 <div className="min-w-0 sm:col-span-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{txMessages.artifact}</p>
-                  <p className="mt-1 text-sm text-slate-900">{decodedTransactionInput.artifactName}</p>
+                  <p className="mt-1 text-sm text-slate-900">{effectiveDecodedTransactionInput.artifactName}</p>
                 </div>
               ) : null}
             </div>
 
             {!activeKey ? <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{txMessages.selectGlobalKeyFirst}</div> : null}
 
-            {decodedTransactionInput ? (
+            {effectiveDecodedTransactionInput ? (
               <div className="grid gap-3">
                 <p className="text-sm font-medium text-slate-700">{txMessages.functionArguments}</p>
                 <div className="max-h-64 overflow-y-auto pr-1">
                   <RewriteArgumentsForm
-                    args={decodedTransactionInput.args.map((arg) => ({
+                    args={effectiveDecodedTransactionInput.args.map((arg) => ({
                       name: arg.name,
                       type: arg.type,
                     }))}

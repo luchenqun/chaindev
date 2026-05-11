@@ -21,6 +21,8 @@ export type EvmCachedTransactionItem = {
   to: string | null;
   toLabel: string;
   toLower: string | null;
+  interactedWith: string | null;
+  interactedWithLabel: string;
   methodLabel: string;
   methodKey: string;
   methodSelector: string | null;
@@ -131,7 +133,7 @@ export const MAX_CACHED_EVM_TRANSACTIONS = 200_000;
 export const EVM_VALUE_WEI_SORT_KEY_WIDTH = 80;
 
 const DB_NAME = 'chaindev-evm-transaction-cache';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const TRANSACTIONS_STORE = 'transactions';
 const ADDRESS_TRANSACTIONS_STORE = 'addressTransactions';
 const ADDRESS_SUMMARIES_STORE = 'addressSummaries';
@@ -242,6 +244,8 @@ async function enrichTransactionsWithReceipts(items: EvmCachedTransactionItem[])
       return [
         item.hash,
         {
+          interactedWith: item.to ?? receipt.contractAddress ?? null,
+          interactedWithLabel: formatAddressLabel(item.to ?? receipt.contractAddress ?? ''),
           receiptStatus: receipt.status ?? 'unavailable',
           receiptStatusLabel: receipt.status === 'success' ? 'Success' : receipt.status === 'reverted' ? 'Failed' : 'Unavailable',
           feeLabel: formatTransactionFee(feeValue, currencyName),
@@ -276,6 +280,8 @@ async function enrichTransactionsWithReceipts(items: EvmCachedTransactionItem[])
 
   return items.map((item) => ({
     ...item,
+    interactedWith: item.interactedWith ?? item.to,
+    interactedWithLabel: item.interactedWithLabel || formatAddressLabel(item.interactedWith ?? item.to ?? ''),
     gasLimitLabel: item.gasLimitLabel ?? 'Unavailable',
     nonceLabel: item.nonceLabel ?? 'Unavailable',
     ...receiptDetailsByHash.get(item.hash),
@@ -286,6 +292,8 @@ function mergeTransactionRecord(existingRecord: EvmCachedTransactionRecord, item
   const nextRecord: EvmCachedTransactionRecord = {
     ...existingRecord,
     inputData: existingRecord.inputData || item.inputData,
+    interactedWith: item.interactedWith ?? existingRecord.interactedWith,
+    interactedWithLabel: item.interactedWithLabel || existingRecord.interactedWithLabel,
     receiptStatus: item.receiptStatus ?? existingRecord.receiptStatus,
     receiptStatusLabel: item.receiptStatusLabel ?? existingRecord.receiptStatusLabel,
     feeLabel: item.feeLabel ?? existingRecord.feeLabel,
@@ -297,6 +305,8 @@ function mergeTransactionRecord(existingRecord: EvmCachedTransactionRecord, item
 
   const changed =
     nextRecord.inputData !== existingRecord.inputData ||
+    nextRecord.interactedWith !== existingRecord.interactedWith ||
+    nextRecord.interactedWithLabel !== existingRecord.interactedWithLabel ||
     nextRecord.receiptStatus !== existingRecord.receiptStatus ||
     nextRecord.receiptStatusLabel !== existingRecord.receiptStatusLabel ||
     nextRecord.feeLabel !== existingRecord.feeLabel ||
@@ -321,6 +331,8 @@ function toPublicTransaction(record: EvmCachedTransactionRecord): EvmCachedTrans
     to: record.to,
     toLabel: record.toLabel,
     toLower: record.toLower,
+    interactedWith: record.interactedWith,
+    interactedWithLabel: record.interactedWithLabel,
     methodLabel: record.methodLabel,
     methodKey: record.methodKey,
     methodSelector: record.methodSelector,
@@ -381,7 +393,23 @@ function isCurrentTransactionCacheRecord(value: unknown) {
     return false;
   }
 
+  if (!hasObjectKey(value, 'interactedWith')) {
+    return false;
+  }
+
+  if (!hasObjectKey(value, 'interactedWithLabel')) {
+    return false;
+  }
+
   if (record.toLower != null && typeof record.toLower !== 'string') {
+    return false;
+  }
+
+  if (record.interactedWith != null && typeof record.interactedWith !== 'string') {
+    return false;
+  }
+
+  if (typeof record.interactedWithLabel !== 'string') {
     return false;
   }
 

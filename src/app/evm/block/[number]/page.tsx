@@ -140,7 +140,7 @@ export default function EvmBlockDetailPage() {
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
   const [decodeVersion, setDecodeVersion] = useState(0);
   const visibleAddresses = useMemo(
-    () => [...new Set(block?.transactions.flatMap((transaction) => [transaction.from, ...(transaction.to ? [transaction.to] : [])]) ?? [])],
+    () => [...new Set(block?.transactions.flatMap((transaction) => [transaction.from, ...(transaction.interactedWith ? [transaction.interactedWith] : transaction.to ? [transaction.to] : [])]) ?? [])],
     [block],
   );
   const decodedMethodLabelByHash = useMemo(() => {
@@ -533,13 +533,13 @@ export default function EvmBlockDetailPage() {
                             />
                           </td>
                           <td className="px-5 py-3 text-sm">
-                            {transaction.to ? (
+                            {transaction.interactedWith ? (
                               <AddressLink
-                                address={transaction.to}
-                                href={`/evm/address/${transaction.to}`}
-                                label={resolvePreferredToAddressLabel(transaction.to, {
+                                address={transaction.interactedWith}
+                                href={`/evm/address/${transaction.interactedWith}`}
+                                label={resolvePreferredToAddressLabel(transaction.interactedWith, {
                                   nameTagsByAddress,
-                                  fallbackLabel: transaction.toLabel,
+                                  fallbackLabel: transaction.interactedWithLabel ?? transaction.toLabel,
                                 })}
                                 className="font-medium text-sky-600 hover:text-sky-700"
                               />
