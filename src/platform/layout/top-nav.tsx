@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconSearch, IconSend, IconShieldOff, IconUserCircle, IconWallet, IconBinaryTree2, IconWaveSine, IconUsers } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconPointerBolt, IconSearch, IconSend, IconUserCircle, IconWallet, IconBinaryTree2, IconWaveSine, IconUsers } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -140,14 +140,14 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
         ? {
             id: 'quarix',
             label: 'Quarix',
-            items: [{ href: '/cosmos/quarix/blacklists', label: labelMessages.blacklists, icon: IconShieldOff }],
+            items: [{ href: '/cosmos/quarix/blacklists', label: labelMessages.blacklists, icon: IconPointerBolt }],
           }
         : {
             id: 'quarix',
             label: 'Quarx',
             items: [
               { href: '/evm/quarix/accounts', label: labelMessages.accounts, icon: IconUsers },
-              { href: '/evm/quarix/blacklists', label: labelMessages.blacklists, icon: IconShieldOff },
+              { href: '/evm/quarix/blacklists', label: labelMessages.blacklists, icon: IconPointerBolt },
             ],
           }
       : null;

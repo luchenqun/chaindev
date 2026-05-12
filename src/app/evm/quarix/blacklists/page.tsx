@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCode, IconPlus, IconRefresh, IconShieldOff } from '@tabler/icons-react';
+import { IconCode, IconPointerBolt, IconPointerOff, IconRefresh } from '@tabler/icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { isAddress } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
@@ -386,7 +386,7 @@ export default function EvmQuarixBlacklistsPage() {
                   setCreateError(null);
                 }}
               >
-                <IconPlus className="size-4" stroke={1.8} />
+                <IconPointerOff className="size-4" stroke={1.8} />
               </ActionIconButton>
               <ActionIconButton
                 tooltip={pageMessages.removeBlacklist}
@@ -397,7 +397,7 @@ export default function EvmQuarixBlacklistsPage() {
                   setRemoveDialogOpen(true);
                 }}
               >
-                <IconShieldOff className="size-4" stroke={1.8} />
+                <IconPointerBolt className="size-4" stroke={1.8} />
               </ActionIconButton>
               <ActionIconButton
                 tooltip={showRawJson ? messages.common.hideRawJson : messages.common.showRawJson}
@@ -450,7 +450,7 @@ export default function EvmQuarixBlacklistsPage() {
                             aria-label={pageMessages.removeBlacklist}
                             onClick={() => void handleRemove(address)}
                           >
-                            <IconShieldOff className="size-4" stroke={1.8} />
+                            <IconPointerBolt className="size-4" stroke={1.8} />
                           </ActionIconButton>
                         </div>
                       </td>

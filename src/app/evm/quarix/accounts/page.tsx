@@ -1,7 +1,7 @@
 'use client';
 
 import { fromBech32 } from '@cosmjs/encoding';
-import { IconArrowsExchange, IconCircleMinus, IconCirclePlus, IconCode, IconRefresh, IconShieldOff, IconShieldX, IconUserCheck, IconUserX } from '@tabler/icons-react';
+import { IconArrowsExchange, IconCode, IconLicense, IconLicenseOff, IconPointerBolt, IconPointerOff, IconRefresh, IconUserBitcoin, IconUserX } from '@tabler/icons-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { bytesToHex, formatEther, isAddress, type Abi } from 'viem';
@@ -426,7 +426,7 @@ function QuarixAccountActionsCell({
         disabled={disabled || !address}
         onClick={() => onAction(hasKyc ? 'revokeKyc' : 'grantKyc', address)}
       >
-        {hasKyc ? <IconUserX className="size-4" stroke={1.8} /> : <IconUserCheck className="size-4" stroke={1.8} />}
+        {hasKyc ? <IconUserX className="size-4" stroke={1.8} /> : <IconUserBitcoin className="size-4" stroke={1.8} />}
       </ActionIconButton>
       <ActionIconButton
         tooltip={isBlacklisted ? pageMessages.removeBlacklist : pageMessages.addBlacklist}
@@ -435,7 +435,7 @@ function QuarixAccountActionsCell({
         disabled={disabled || !address}
         onClick={() => onAction(isBlacklisted ? 'removeBlacklist' : 'addBlacklist', address)}
       >
-        {isBlacklisted ? <IconShieldOff className="size-4" stroke={1.8} /> : <IconShieldX className="size-4" stroke={1.8} />}
+        {isBlacklisted ? <IconPointerBolt className="size-4" stroke={1.8} /> : <IconPointerOff className="size-4" stroke={1.8} />}
       </ActionIconButton>
       <ActionIconButton
         tooltip={existingRoleName ? pageMessages.removeRole : pageMessages.addRole}
@@ -444,7 +444,7 @@ function QuarixAccountActionsCell({
         disabled={disabled || !address}
         onClick={() => onAction(existingRoleName ? 'removeRole' : 'addRole', address, roleName)}
       >
-        {existingRoleName ? <IconCircleMinus className="size-4" stroke={1.8} /> : <IconCirclePlus className="size-4" stroke={1.8} />}
+        {existingRoleName ? <IconLicenseOff className="size-4" stroke={1.8} /> : <IconLicense className="size-4" stroke={1.8} />}
       </ActionIconButton>
     </div>
   );
@@ -1113,7 +1113,7 @@ export default function EvmQuarixAccountsPage() {
                   className="h-8 w-8 rounded-md text-slate-400 hover:text-emerald-600"
                   onClick={() => openActionDialog('grantKyc')}
                 >
-                  <IconUserCheck className="size-4" stroke={1.8} />
+                  <IconUserBitcoin className="size-4" stroke={1.8} />
                 </ActionIconButton>
               ) : null}
               {showQuarixAccountFlags ? (
@@ -1131,7 +1131,7 @@ export default function EvmQuarixAccountsPage() {
                   className="h-8 w-8 rounded-md text-slate-400 hover:text-rose-600"
                   onClick={() => openActionDialog('addBlacklist')}
                 >
-                  <IconShieldX className="size-4" stroke={1.8} />
+                  <IconPointerOff className="size-4" stroke={1.8} />
                 </ActionIconButton>
               ) : null}
               {showQuarixAccountFlags ? (
@@ -1140,7 +1140,7 @@ export default function EvmQuarixAccountsPage() {
                   className="h-8 w-8 rounded-md text-slate-400 hover:text-emerald-600"
                   onClick={() => openActionDialog('removeBlacklist')}
                 >
-                  <IconShieldOff className="size-4" stroke={1.8} />
+                  <IconPointerBolt className="size-4" stroke={1.8} />
                 </ActionIconButton>
               ) : null}
               {showQuarixAccountFlags ? (
@@ -1149,7 +1149,7 @@ export default function EvmQuarixAccountsPage() {
                   className="h-8 w-8 rounded-md text-slate-400 hover:text-emerald-600"
                   onClick={() => openActionDialog('addRole')}
                 >
-                  <IconCirclePlus className="size-4" stroke={1.8} />
+                  <IconLicense className="size-4" stroke={1.8} />
                 </ActionIconButton>
               ) : null}
               {showQuarixAccountFlags ? (
@@ -1158,7 +1158,7 @@ export default function EvmQuarixAccountsPage() {
                   className="h-8 w-8 rounded-md text-slate-400 hover:text-rose-600"
                   onClick={() => openActionDialog('removeRole')}
                 >
-                  <IconCircleMinus className="size-4" stroke={1.8} />
+                  <IconLicenseOff className="size-4" stroke={1.8} />
                 </ActionIconButton>
               ) : null}
             </div>
