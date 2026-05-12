@@ -291,6 +291,8 @@ type EvmHomeTransactionItem = {
   toLabel: string;
   interactedWith: string | null;
   interactedWithLabel: string;
+  methodLabel: string;
+  inputData?: string;
   value: string;
   timestampMs: number | null;
   receiptStatus: EvmCachedTransactionItem['receiptStatus'] | undefined;
@@ -315,6 +317,7 @@ function formatHomeTransactions(
     from: string;
     to?: string | null;
     value?: bigint;
+    input?: string;
   };
 
   function isHomeTransactionLike(transaction: unknown): transaction is HomeTransactionLike {
@@ -340,6 +343,8 @@ function formatHomeTransactions(
       toLabel: shortenAddress(transaction.to),
       interactedWith: transaction.to ?? null,
       interactedWithLabel: shortenAddress(transaction.to),
+      methodLabel: formatMethodLabel(transaction.input, transaction.to),
+      inputData: transaction.input ?? '0x',
       value: formatTxValue(transaction.value, currencyName),
       timestampMs: timestamp ? Number(timestamp) * 1000 : null,
       receiptStatus: receiptStatusByHash?.get(transaction.hash),
@@ -360,6 +365,8 @@ function formatCachedHomeTransactions(transactions: EvmCachedTransactionItem[], 
     toLabel: transaction.toLabel,
     interactedWith: transaction.interactedWith,
     interactedWithLabel: transaction.interactedWithLabel,
+    methodLabel: transaction.methodLabel,
+    inputData: transaction.inputData,
     value: transaction.amountLabel,
     timestampMs: transaction.timestampMs,
     receiptStatus: transaction.receiptStatus,

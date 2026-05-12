@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { HomeActivitySkeleton } from '@/components/ui/loading-placeholders';
 import { getEvmAddressTags, subscribeEvmAddressTags } from '@/domains/evm/client/address-tags';
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
+import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { useEvmHomeData } from '@/domains/evm/ui/home-data-provider';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
@@ -23,6 +24,10 @@ type HomeActivityViewportStyle = React.CSSProperties & {
 const HOME_ACTIVITY_VISIBLE_ITEMS = 6;
 const LATEST_BLOCKS_TITLE = 'Latest Blocks';
 const LATEST_TRANSACTIONS_TITLE = 'Latest Transactions';
+
+function isDecodedMethodLabel(methodLabel: string) {
+  return methodLabel !== 'Create' && methodLabel !== 'Transfer' && !/^0x[0-9a-f]{8}$/i.test(methodLabel);
+}
 
 function EmptyState({ title, message }: { title: string; message: string }) {
   const { locale } = useLocale();
@@ -63,6 +68,20 @@ export function EvmHomeActivity() {
   const hasTransactions = pushedTransactionItems.length > 0;
   const pushedTransactionEnteringRows = pushedTransactionItems.filter((item) => item.phase === 'entering').length || 1;
   const [nameTagsByAddress, setNameTagsByAddress] = useState<Record<string, string | null>>({});
+  const decodedMethodLabelByHash = useMemo(
+    () =>
+      Object.fromEntries(
+        transactionItems.map((transaction) => [
+          transaction.hash,
+          resolveEvmTransactionMethodLabel({
+            to: transaction.to,
+            inputData: transaction.inputData,
+            fallbackMethodLabel: transaction.methodLabel,
+          }),
+        ]),
+      ),
+    [transactionItems],
+  );
   const visibleAddresses = useMemo(
     () => [
       ...new Set([
@@ -185,61 +204,66 @@ export function EvmHomeActivity() {
           >
             {hasTransactions ? (
               <div className={cn('grid', pushedTransactionItems.some((item) => item.phase !== 'stable') && 'home-activity-push-list-moving')}>
-                {pushedTransactionItems.map(({ item: transaction, key, phase }, index) => (
-                  <div key={key} className={cn('home-activity-push-row', index ? 'border-t border-slate-200' : '', `home-activity-push-row-${phase}`)}>
-                    <div className="home-activity-push-row-content">
-                      <div className="grid grid-cols-[40px_minmax(170px,1fr)_minmax(0,1fr)_120px] items-center gap-3 py-4">
-                        <div className="flex size-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                          <IconFileText className="size-5" stroke={1.8} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex min-w-0 items-center gap-0.5">
-                            {transaction.receiptStatus === 'reverted' ? <IconAlertCircle className="size-4 shrink-0 text-rose-500" stroke={2} /> : null}
-                            <Link prefetch={false} className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
-                              {transaction.hashLabel}
-                            </Link>
+                {pushedTransactionItems.map(({ item: transaction, key, phase }, index) => {
+                  const decodedMethodLabel = decodedMethodLabelByHash[transaction.hash] ?? transaction.methodLabel;
+                  const primaryLabel = isDecodedMethodLabel(decodedMethodLabel) ? decodedMethodLabel : transaction.hashLabel;
+
+                  return (
+                    <div key={key} className={cn('home-activity-push-row', index ? 'border-t border-slate-200' : '', `home-activity-push-row-${phase}`)}>
+                      <div className="home-activity-push-row-content">
+                        <div className="grid grid-cols-[40px_minmax(170px,1fr)_minmax(0,1fr)_120px] items-center gap-3 py-4">
+                          <div className="flex size-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+                            <IconFileText className="size-5" stroke={1.8} />
                           </div>
-                          <p className="mt-1 truncate text-sm text-slate-500">
-                            {messages.common.block} {transaction.blockNumber} · {formatRelativeAge(transaction.timestampMs, nowMs, locale)}
-                          </p>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm text-slate-600">
-                            {messages.common.from}{' '}
-                            <AddressLink
-                              address={transaction.from}
-                              href={`/evm/address/${transaction.from}`}
-                              label={resolvePreferredAddressLabel(transaction.from, {
-                                nameTagsByAddress,
-                                fallbackLabel: transaction.fromLabel,
-                              })}
-                              className="font-semibold text-sky-600 hover:text-sky-700"
-                              showCopyButton={false}
-                            />
-                          </p>
-                          <p className="truncate text-sm text-slate-600">
-                            {messages.common.to}{' '}
-                            {transaction.interactedWith ? (
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-0.5">
+                              {transaction.receiptStatus === 'reverted' ? <IconAlertCircle className="size-4 shrink-0 text-rose-500" stroke={2} /> : null}
+                              <Link prefetch={false} className="block truncate text-sm font-semibold text-sky-600 hover:text-sky-700" href={`/evm/tx/${transaction.hash}`}>
+                                {primaryLabel}
+                              </Link>
+                            </div>
+                            <p className="mt-1 truncate text-sm text-slate-500">
+                              {messages.common.block} {transaction.blockNumber} · {formatRelativeAge(transaction.timestampMs, nowMs, locale)}
+                            </p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm text-slate-600">
+                              {messages.common.from}{' '}
                               <AddressLink
-                                address={transaction.interactedWith}
-                                href={`/evm/address/${transaction.interactedWith}`}
-                                label={resolvePreferredToAddressLabel(transaction.interactedWith, {
+                                address={transaction.from}
+                                href={`/evm/address/${transaction.from}`}
+                                label={resolvePreferredAddressLabel(transaction.from, {
                                   nameTagsByAddress,
-                                  fallbackLabel: transaction.interactedWithLabel ?? transaction.toLabel,
+                                  fallbackLabel: transaction.fromLabel,
                                 })}
                                 className="font-semibold text-sky-600 hover:text-sky-700"
                                 showCopyButton={false}
                               />
-                            ) : (
-                              <span className="text-slate-500">{translateRuntimeText(transaction.toLabel, locale)}</span>
-                            )}
-                          </p>
+                            </p>
+                            <p className="truncate text-sm text-slate-600">
+                              {messages.common.to}{' '}
+                              {transaction.interactedWith ? (
+                                <AddressLink
+                                  address={transaction.interactedWith}
+                                  href={`/evm/address/${transaction.interactedWith}`}
+                                  label={resolvePreferredToAddressLabel(transaction.interactedWith, {
+                                    nameTagsByAddress,
+                                    fallbackLabel: transaction.interactedWithLabel ?? transaction.toLabel,
+                                  })}
+                                  className="font-semibold text-sky-600 hover:text-sky-700"
+                                  showCopyButton={false}
+                                />
+                              ) : (
+                                <span className="text-slate-500">{translateRuntimeText(transaction.toLabel, locale)}</span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{transaction.value}</div>
                         </div>
-                        <div className="truncate rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-right text-xs text-slate-600">{transaction.value}</div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               errorMessage ? (

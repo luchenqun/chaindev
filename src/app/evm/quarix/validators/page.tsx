@@ -2,6 +2,7 @@
 
 import { fromBech32, toBech32, toHex } from '@cosmjs/encoding';
 import { IconCode, IconCoins, IconPencil, IconPlus, IconRefresh, IconX } from '@tabler/icons-react';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { hexToBytes, type Abi, isAddress } from 'viem';
@@ -1918,17 +1919,7 @@ function EvmQuarixValidatorsPageContent() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="data-table min-w-[1260px] table-fixed">
-              <colgroup>
-                <col className="w-[260px]" />
-                <col className="w-[260px]" />
-                <col className="w-[160px]" />
-                <col className="w-[160px]" />
-                <col className="w-[160px]" />
-                <col className="w-[120px]" />
-                <col className="w-[120px]" />
-                <col className="w-[96px]" />
-              </colgroup>
+            <table className="data-table w-full">
               <thead>
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.validator}</th>
@@ -1946,10 +1937,18 @@ function EvmQuarixValidatorsPageContent() {
                   validators.map((validator) => (
                     <tr key={validator.operatorAddress} className="border-t border-slate-200">
                       <td className="px-5 py-3 text-sm text-slate-900">
-                        <p className="truncate font-medium text-slate-900">{validator.moniker}</p>
+                        <Link className="block truncate font-medium text-sky-600 hover:text-sky-700" href={`/evm/quarix/validator/${encodeURIComponent(validator.operatorAddress)}`}>
+                          {validator.moniker}
+                        </Link>
                       </td>
                       <td className="px-5 py-3 text-sm">
-                        <CosmosAddressLink href={`/cosmos/validator/${encodeURIComponent(validator.operatorAddress)}`} label={validator.operatorAddress} copyValue={validator.operatorAddress} />
+                        <CosmosAddressLink
+                          href={`/evm/quarix/validator/${encodeURIComponent(validator.operatorAddress)}`}
+                          label={validator.operatorAddress}
+                          copyValue={validator.operatorAddress}
+                          truncate={false}
+                          multiline
+                        />
                       </td>
                       <td className="px-5 py-3 text-right text-sm tabular-nums text-slate-700">{validator.totalStakingLabel}</td>
                       <td className="px-5 py-3 text-right text-sm tabular-nums text-slate-700">{validator.weightLabel}</td>

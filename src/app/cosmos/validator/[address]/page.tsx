@@ -1,6 +1,6 @@
 'use client';
 
-import { IconLogout, IconX } from '@tabler/icons-react';
+import { IconFileDollar, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
@@ -131,7 +131,7 @@ function RewardSummaryRow({ label, value, actionLabel, onAction }: { label: stri
       {actionLabel && onAction ? (
         <span className="justify-self-start sm:justify-self-end">
           <ActionIconButton tooltip={translateRuntimeText(actionLabel, locale)} className="text-slate-400 hover:text-sky-600" onClick={onAction}>
-            <IconLogout className="size-4" stroke={1.8} />
+            <IconFileDollar className="size-4" stroke={1.8} />
           </ActionIconButton>
         </span>
       ) : (

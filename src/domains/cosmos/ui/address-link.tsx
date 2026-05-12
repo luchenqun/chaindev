@@ -14,9 +14,11 @@ type CosmosAddressLinkProps = {
   copyValue: string;
   className?: string;
   prefetch?: boolean;
+  truncate?: boolean;
+  multiline?: boolean;
 };
 
-export function CosmosAddressLink({ href, label, copyValue, className, prefetch }: CosmosAddressLinkProps) {
+export function CosmosAddressLink({ href, label, copyValue, className, prefetch, truncate = true, multiline = false }: CosmosAddressLinkProps) {
   const messages = useMessages();
   const [copied, setCopied] = useState(false);
   const [tooltipOpen, setTooltipOpen] = useState(false);
@@ -80,7 +82,14 @@ export function CosmosAddressLink({ href, label, copyValue, className, prefetch 
         <Link
           ref={linkRef}
           prefetch={prefetch}
-          className={cn('block min-w-0 max-w-full truncate font-medium text-sky-600 hover:text-sky-700', className)}
+          className={cn(
+            truncate
+              ? 'block min-w-0 max-w-full truncate font-medium text-sky-600 hover:text-sky-700'
+              : multiline
+                ? 'block break-all font-medium text-sky-600 hover:text-sky-700'
+                : 'block whitespace-nowrap font-medium text-sky-600 hover:text-sky-700',
+            className,
+          )}
           href={href}
           onMouseEnter={openTooltip}
           onMouseLeave={closeTooltipSoon}
