@@ -1,11 +1,12 @@
 'use client';
 
+import { toBech32 } from '@cosmjs/encoding';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type Abi } from 'viem';
-import { IconBinaryTree2, IconCode, IconInfoCircle, IconRefresh, IconTag } from '@tabler/icons-react';
+import { hexToBytes, isAddress, type Abi } from 'viem';
+import { IconArrowBackUp, IconArrowsExchange, IconBinaryTree2, IconCode, IconCoins, IconInfoCircle, IconRefresh, IconTag } from '@tabler/icons-react';
 import { RelativeTime } from '@/components/relative-time';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/components/ui/toast';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
 import { formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
 import { deleteEvmAddressTag, getEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsertEvmAddressTag } from '@/domains/evm/client/address-tags';
@@ -32,12 +34,14 @@ import {
   type EvmContractBinding,
 } from '@/domains/evm/client/contract-registry';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
-import { getActiveEvmContractEnvironmentDirect } from '@/domains/evm/client/contract-executor';
+import { getActiveEvmContractEnvironmentDirect, writeEvmContractMethodDirect } from '@/domains/evm/client/contract-executor';
+import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmKeyring, type EvmStoredPrivateKey } from '@/domains/evm/client/keyring';
 import { createEvmClient } from '@/domains/evm/client/rpc-client';
 import { isQuarixEvmChainId } from '@/domains/evm/chain-features';
 import { EVM_BANK_MODULE_ADDRESS, EVM_DISTRIBUTION_ADDRESS, EVM_STAKING_ADDRESS } from '@/domains/evm/lib/precompile-artifact-default-addresses';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { AddressContractPanel } from '@/domains/evm/ui/address-contract-panel';
+import { EvmPrivateKeyUnlockDialog, useEvmPrivateKeyUnlockDialog } from '@/domains/evm/ui/private-key-unlock-dialog';
 import { getActiveEvmCurrencyNameClient, getEvmAddressSummaryDirect, hydrateEvmCachedTransactionInputsByHashDirect } from '@/domains/evm/client/queries';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
@@ -53,7 +57,10 @@ const EVM_DISTRIBUTION_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.c
 const EVM_BANK_ALL_BALANCES_ABI = EVM_BANK_ABI.filter((item) => item.type === 'function' && item.name === 'allBalances') as Abi;
 const EVM_STAKING_DELEGATOR_VALIDATORS_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'delegatorValidators') as Abi;
 const EVM_STAKING_DELEGATION_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'delegation') as Abi;
+const EVM_STAKING_UNDELEGATE_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'undelegate') as Abi;
+const EVM_STAKING_REDELEGATE_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'redelegate') as Abi;
 const EVM_STAKING_VALIDATORS_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'validators') as Abi;
+const EVM_DISTRIBUTION_WITHDRAW_DELEGATOR_REWARDS_ABI = EVM_DISTRIBUTION_ABI.filter((item) => item.type === 'function' && item.name === 'withdrawDelegatorRewards') as Abi;
 const EVM_DISTRIBUTION_DELEGATION_REWARDS_ABI = EVM_DISTRIBUTION_ABI.filter((item) => item.type === 'function' && item.name === 'delegationRewards') as Abi;
 const EVM_BANK_PRECOMPILE_ADDRESS = EVM_BANK_MODULE_ADDRESS as `0x${string}`;
 const EVM_STAKING_PRECOMPILE_ADDRESS = EVM_STAKING_ADDRESS as `0x${string}`;
@@ -125,6 +132,11 @@ type EvmDelegationsSnapshot = {
 type EvmBankBalanceItem = {
   denom: string;
   amount: bigint | number | string;
+};
+type QuarixDelegationActionKind = 'withdrawRewards' | 'undelegate' | 'redelegate';
+type QuarixDelegationActionTarget = {
+  validatorAddress: string;
+  validatorMoniker: string | null;
 };
 const EMPTY_DELEGATIONS_SNAPSHOT: EvmDelegationsSnapshot = {
   totalDelegations: 0,
@@ -228,6 +240,40 @@ function formatBankBalanceItem(balance: EvmBankBalanceItem) {
 
 function formatBankBalanceRawAmount(balance: EvmBankBalanceItem) {
   return normalizeBigintLike(balance.amount).toString();
+}
+
+function scaleToIntegerByPowerOfTen(rawValue: string, exponent: number) {
+  const value = rawValue.trim();
+
+  if (!/^\d+(?:\.\d+)?$/.test(value)) {
+    return null;
+  }
+
+  const [wholePart, fractionPart = ''] = value.split('.');
+  const digits = `${wholePart}${fractionPart}`.replace(/^0+(?=\d)/, '') || '0';
+  const decimalShift = exponent - fractionPart.length;
+
+  if (decimalShift < 0) {
+    return null;
+  }
+
+  return `${digits}${'0'.repeat(decimalShift)}`;
+}
+
+function toQuarixValidatorAddress(input: string) {
+  if (input.startsWith('quarix')) {
+    return input;
+  }
+
+  if (!isAddress(input)) {
+    return null;
+  }
+
+  try {
+    return toBech32('quarixvaloper', hexToBytes(input));
+  } catch {
+    return null;
+  }
 }
 
 async function getQuarixDelegationsSnapshot(address: string, locale: string): Promise<EvmDelegationsSnapshot> {
@@ -501,6 +547,7 @@ function AddressMetric({ label, value, subtext, tooltip }: { label: string; valu
 export default function EvmAddressPage() {
   const messages = useMessages();
   const { locale } = useLocale();
+  const { showToast } = useToast();
   const accountMessages = messages.cosmosAccountDetail;
   const nameTagMessages = messages.nameTags;
   const txMessages = messages.evmTxDetail;
@@ -508,6 +555,7 @@ export default function EvmAddressPage() {
   const params = useParams<{ address: string }>();
   const router = useRouter();
   const { status } = useSession();
+  const unlockDialog = useEvmPrivateKeyUnlockDialog();
   const searchParams = useSearchParams();
   const address = params.address;
   const isValid = useMemo(() => /^0x[a-fA-F0-9]{40}$/.test(address), [address]);
@@ -548,6 +596,14 @@ export default function EvmAddressPage() {
   const [quarixBalances, setQuarixBalances] = useState<EvmBankBalanceItem[]>([]);
   const [showDelegationsRawJson, setShowDelegationsRawJson] = useState(false);
   const [delegationsRefreshVersion, setDelegationsRefreshVersion] = useState(0);
+  const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
+  const [delegationActionSubmitting, setDelegationActionSubmitting] = useState(false);
+  const [delegationActionError, setDelegationActionError] = useState<string | null>(null);
+  const [delegationActionKind, setDelegationActionKind] = useState<QuarixDelegationActionKind | null>(null);
+  const [delegationActionTarget, setDelegationActionTarget] = useState<QuarixDelegationActionTarget | null>(null);
+  const [undelegateAmountInput, setUndelegateAmountInput] = useState('');
+  const [redelegateTargetValidatorInput, setRedelegateTargetValidatorInput] = useState('');
+  const [redelegateAmountInput, setRedelegateAmountInput] = useState('');
   const currencyName = getActiveEvmCurrencyNameClient();
 
   function goToLogin() {
@@ -670,6 +726,22 @@ export default function EvmAddressPage() {
   }, [address, isValid]);
 
   useEffect(() => {
+    function loadActiveKey() {
+      setActiveKey(getActiveEvmStoredPrivateKey());
+    }
+
+    loadActiveKey();
+
+    const unsubscribe = subscribeEvmKeyring(() => {
+      loadActiveKey();
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!isValid) {
       return;
     }
@@ -753,6 +825,25 @@ export default function EvmAddressPage() {
   const outboundCount = addressCacheSnapshot.outboundCount;
   const selfCount = addressCacheSnapshot.selfCount;
   const isQuarixChain = isQuarixEvmChainId(contractEnvironment?.chainId);
+  const redelegateValidatorOptions = useMemo(() => {
+    const currentValidator = delegationActionTarget?.validatorAddress?.toLowerCase() ?? null;
+
+    return delegationsSnapshot.response.validators
+      .map((validator) => {
+        const value = normalizeStringValue(validator.operatorAddress);
+
+        if (!value || value.toLowerCase() === currentValidator) {
+          return null;
+        }
+
+        return {
+          value,
+          label: normalizeStringValue(validator.description?.moniker) ?? value,
+        };
+      })
+      .filter((item): item is { value: string; label: string } => Boolean(item))
+      .filter((item, index, array) => array.findIndex((entry) => entry.value.toLowerCase() === item.value.toLowerCase()) === index);
+  }, [delegationActionTarget?.validatorAddress, delegationsSnapshot.response.validators]);
   const resolvedActiveTab =
     requestedTab === 'contract' && contractBinding && contractArtifact && contractEnvironment
       ? 'contract'
@@ -936,6 +1027,155 @@ export default function EvmAddressPage() {
     });
   }
 
+  function openDelegationAction(kind: QuarixDelegationActionKind, item: EvmDelegationItem) {
+    if (!item.validatorAddress) {
+      return;
+    }
+
+    setDelegationActionKind(kind);
+    setDelegationActionTarget({
+      validatorAddress: item.validatorAddress,
+      validatorMoniker: item.validatorMoniker,
+    });
+    setDelegationActionError(null);
+    setUndelegateAmountInput('');
+    setRedelegateTargetValidatorInput('');
+    setRedelegateAmountInput('');
+    unlockDialog.setErrorMessage(null);
+  }
+
+  function closeDelegationAction() {
+    setDelegationActionKind(null);
+    setDelegationActionTarget(null);
+    setDelegationActionError(null);
+    setUndelegateAmountInput('');
+    setRedelegateTargetValidatorInput('');
+    setRedelegateAmountInput('');
+  }
+
+  async function submitDelegationAction(password?: string) {
+    if (!activeKey) {
+      setDelegationActionError(messages.quarixEvmValidators.noActiveKey);
+      return;
+    }
+
+    if (!delegationActionKind || !delegationActionTarget) {
+      return;
+    }
+
+    setDelegationActionSubmitting(true);
+    setDelegationActionError(null);
+    unlockDialog.setErrorMessage(null);
+
+    try {
+      const privateKey = await resolveEvmStoredPrivateKey(activeKey.id, password);
+
+      unlockDialog.handleUnlockResolved();
+
+      if (delegationActionKind === 'withdrawRewards') {
+        const validatorAddress = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
+
+        if (!validatorAddress) {
+          throw new Error(messages.quarixEvmValidators.invalidValidatorAddress);
+        }
+
+        await writeEvmContractMethodDirect({
+          address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
+          abiJson: JSON.stringify(EVM_DISTRIBUTION_WITHDRAW_DELEGATOR_REWARDS_ABI),
+          functionSignature: 'withdrawDelegatorRewards(address,string)',
+          rawArgs: [activeKey.address, validatorAddress],
+          privateKey,
+          value: '0',
+        });
+
+        showToast({
+          title: messages.quarixEvmValidators.withdrawBroadcasted,
+          description: delegationActionTarget.validatorAddress,
+        });
+      } else if (delegationActionKind === 'undelegate') {
+        const scaledAmount = scaleToIntegerByPowerOfTen(undelegateAmountInput, 18);
+        const validatorAddress = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
+
+        if (!scaledAmount || !/^\d+$/.test(scaledAmount)) {
+          throw new Error(messages.quarixEvmValidators.invalidAmount);
+        }
+
+        if (!validatorAddress) {
+          throw new Error(messages.quarixEvmValidators.invalidValidatorAddress);
+        }
+
+        await writeEvmContractMethodDirect({
+          address: EVM_STAKING_PRECOMPILE_ADDRESS,
+          abiJson: JSON.stringify(EVM_STAKING_UNDELEGATE_ABI),
+          functionSignature: 'undelegate(address,string,uint256)',
+          rawArgs: [activeKey.address, validatorAddress, scaledAmount],
+          privateKey,
+          value: '0',
+        });
+
+        showToast({
+          title: accountMessages.undelegateBroadcasted,
+          description: delegationActionTarget.validatorAddress,
+        });
+      } else {
+        const scaledAmount = scaleToIntegerByPowerOfTen(redelegateAmountInput, 18);
+        const sourceValidator = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
+        const destinationValidator = toQuarixValidatorAddress(redelegateTargetValidatorInput.trim());
+
+        if (!destinationValidator) {
+          throw new Error(messages.quarixEvmValidators.invalidValidatorAddress);
+        }
+
+        if (!sourceValidator) {
+          throw new Error(messages.quarixEvmValidators.invalidValidatorAddress);
+        }
+
+        if (!scaledAmount || !/^\d+$/.test(scaledAmount)) {
+          throw new Error(messages.quarixEvmValidators.invalidAmount);
+        }
+
+        await writeEvmContractMethodDirect({
+          address: EVM_STAKING_PRECOMPILE_ADDRESS,
+          abiJson: JSON.stringify(EVM_STAKING_REDELEGATE_ABI),
+          functionSignature: 'redelegate(address,string,string,uint256)',
+          rawArgs: [activeKey.address, sourceValidator, destinationValidator, scaledAmount],
+          privateKey,
+          value: '0',
+        });
+
+        showToast({
+          title: accountMessages.redelegateBroadcasted,
+          description: `${delegationActionTarget.validatorAddress} -> ${destinationValidator}`,
+        });
+      }
+
+      closeDelegationAction();
+      setDelegationsRefreshVersion((current) => current + 1);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : delegationActionKind === 'withdrawRewards'
+            ? messages.quarixEvmValidators.failedToBroadcastWithdrawal
+            : delegationActionKind === 'redelegate'
+              ? accountMessages.failedToBroadcastRedelegate
+              : accountMessages.failedToBroadcastUndelegate;
+
+      if (message === messages.privateKeys.passwordRequiredForEncrypted) {
+        unlockDialog.openDialog();
+      } else if (unlockDialog.open) {
+        unlockDialog.setErrorMessage(message);
+      } else {
+        setDelegationActionError(message);
+      }
+    } finally {
+      if (password) {
+        closeDelegationAction();
+      }
+      setDelegationActionSubmitting(false);
+    }
+  }
+
   function handleTransactionPageChange(nextPage: number) {
     const nextParams = new URLSearchParams(searchParams.toString());
 
@@ -1086,7 +1326,7 @@ export default function EvmAddressPage() {
               className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'quarix' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
               onClick={() => navigateToTab('quarix')}
             >
-              Quarix
+              {accountMessages.quarix}
             </button>
           ) : null}
           {contractBinding && contractArtifact && contractEnvironment ? (
@@ -1221,7 +1461,7 @@ export default function EvmAddressPage() {
                   <thead>
                     <tr>
                       <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.denom}</th>
-                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Raw Amount</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{accountMessages.rawAmount}</th>
                       <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{accountMessages.amount}</th>
                     </tr>
                   </thead>
@@ -1289,6 +1529,7 @@ export default function EvmAddressPage() {
                       <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.operatorAddress}</th>
                       <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.amount}</th>
                       <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.outstandingRewards}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.labels.actions}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1299,11 +1540,12 @@ export default function EvmAddressPage() {
                           <td className="px-1 py-3"><Skeleton className="h-4 w-72" /></td>
                           <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-32" /></td>
                           <td className="px-5 py-3"><Skeleton className="ml-auto h-4 w-32" /></td>
+                          <td className="px-5 py-3"><Skeleton className="ml-auto h-4 w-44" /></td>
                         </tr>
                       ))
                     ) : delegationsError ? (
                       <tr>
-                        <td colSpan={4} className="px-5 py-10 text-center text-sm text-rose-600">
+                        <td colSpan={5} className="px-5 py-10 text-center text-sm text-rose-600">
                           {translateRuntimeText(delegationsError, locale)}
                         </td>
                       </tr>
@@ -1332,11 +1574,24 @@ export default function EvmAddressPage() {
                             {formatDelegationAmountLabel(item.balance, locale)}
                           </td>
                           <td className="px-5 py-3 text-right text-sm tabular-nums text-slate-500">{item.rewardLabel}</td>
+                          <td className="px-5 py-3 text-right text-sm">
+                            <div className="flex justify-end gap-0">
+                              <ActionIconButton tooltip={accountMessages.claimRewards} className="text-slate-400 hover:text-sky-600" onClick={() => openDelegationAction('withdrawRewards', item)}>
+                                <IconCoins className="size-4" stroke={1.8} />
+                              </ActionIconButton>
+                              <ActionIconButton tooltip={accountMessages.undelegate} className="text-slate-400 hover:text-sky-600" onClick={() => openDelegationAction('undelegate', item)}>
+                                <IconArrowBackUp className="size-4" stroke={1.8} />
+                              </ActionIconButton>
+                              <ActionIconButton tooltip={accountMessages.redelegate} className="text-slate-400 hover:text-sky-600" onClick={() => openDelegationAction('redelegate', item)}>
+                                <IconArrowsExchange className="size-4" stroke={1.8} />
+                              </ActionIconButton>
+                            </div>
+                          </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={4} className="px-5 py-10 text-center text-sm text-slate-500">
+                        <td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">
                           {messages.quarixEvmValidators.emptyValidatorsLabel}
                         </td>
                       </tr>
@@ -1386,6 +1641,125 @@ export default function EvmAddressPage() {
             <span className="text-sm font-medium text-slate-700">{messages.labels.tag}</span>
             <Input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder={nameTagMessages.nameTagPlaceholder} />
           </label>
+        </ModalDialog>
+
+        <ModalDialog
+          open={delegationActionKind === 'withdrawRewards'}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeDelegationAction();
+            }
+          }}
+          title={accountMessages.claimRewards}
+          description={
+            delegationActionTarget
+              ? accountMessages.confirmClaimRewardsDescription.replace('{validator}', delegationActionTarget.validatorAddress)
+              : accountMessages.claimRewards
+          }
+          footer={
+            <>
+              <Button type="button" variant="outline" onClick={closeDelegationAction}>
+                {messages.common.cancel}
+              </Button>
+              <Button type="button" onClick={() => void submitDelegationAction()} disabled={delegationActionSubmitting}>
+                {accountMessages.confirm}
+              </Button>
+            </>
+          }
+          maxWidthClassName="max-w-lg"
+        >
+          {delegationActionError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(delegationActionError, locale)}</p> : null}
+        </ModalDialog>
+
+        <ModalDialog
+          open={delegationActionKind === 'undelegate'}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeDelegationAction();
+            }
+          }}
+          title={accountMessages.undelegate}
+          description={
+            delegationActionTarget
+              ? accountMessages.confirmUndelegateDescription.replace('{validator}', delegationActionTarget.validatorAddress)
+              : accountMessages.undelegateDescription
+          }
+          footer={
+            <>
+              <Button type="button" variant="outline" onClick={closeDelegationAction}>
+                {messages.common.cancel}
+              </Button>
+              <Button type="button" onClick={() => void submitDelegationAction()} disabled={!undelegateAmountInput.trim() || delegationActionSubmitting}>
+                {accountMessages.confirm}
+              </Button>
+            </>
+          }
+          maxWidthClassName="max-w-lg"
+        >
+          <div className="space-y-3">
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">{messages.quarixEvmValidators.amount}</span>
+              <Input value={undelegateAmountInput} onChange={(event) => setUndelegateAmountInput(event.target.value)} placeholder="1" />
+            </label>
+            {delegationActionError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(delegationActionError, locale)}</p> : null}
+          </div>
+        </ModalDialog>
+
+        <ModalDialog
+          open={delegationActionKind === 'redelegate'}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeDelegationAction();
+            }
+          }}
+          title={accountMessages.redelegate}
+          description={
+            delegationActionTarget
+              ? accountMessages.confirmRedelegateDescription.replace('{validator}', delegationActionTarget.validatorAddress)
+              : accountMessages.redelegate
+          }
+          footer={
+            <>
+              <Button type="button" variant="outline" onClick={closeDelegationAction}>
+                {messages.common.cancel}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void submitDelegationAction()}
+                disabled={!redelegateTargetValidatorInput.trim() || !redelegateAmountInput.trim() || delegationActionSubmitting}
+              >
+                {accountMessages.confirm}
+              </Button>
+            </>
+          }
+          maxWidthClassName="max-w-lg"
+        >
+          <div className="space-y-3">
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">{accountMessages.targetValidatorAddress}</span>
+              <Select value={redelegateTargetValidatorInput} onValueChange={setRedelegateTargetValidatorInput}>
+                <SelectTrigger>
+                  <SelectValue placeholder={accountMessages.selectValidator} />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {redelegateValidatorOptions.length ? (
+                    redelegateValidatorOptions.map((validator) => (
+                      <SelectItem key={validator.value} value={validator.value}>
+                        {validator.label}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-sm text-slate-500">{accountMessages.noRedelegateValidators}</div>
+                  )}
+                </SelectContent>
+              </Select>
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">{messages.quarixEvmValidators.amount}</span>
+              <Input value={redelegateAmountInput} onChange={(event) => setRedelegateAmountInput(event.target.value)} placeholder="1" />
+            </label>
+            {delegationActionError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(delegationActionError, locale)}</p> : null}
+          </div>
         </ModalDialog>
 
         <ModalDialog
@@ -1445,6 +1819,24 @@ export default function EvmAddressPage() {
             ) : null}
           </div>
         </ModalDialog>
+
+        <EvmPrivateKeyUnlockDialog
+          open={unlockDialog.open}
+          password={unlockDialog.password}
+          errorMessage={unlockDialog.errorMessage}
+          submitting={delegationActionSubmitting}
+          title={messages.quarixEvmValidators.unlockPrivateKey}
+          description={activeKey ? messages.quarixEvmValidators.unlockWithdrawalDescription.replace('{name}', activeKey.name) : messages.quarixEvmValidators.unlockFallbackDescription}
+          placeholder={messages.quarixEvmValidators.password}
+          confirmLabel={messages.quarixEvmValidators.unlock}
+          onOpenChange={(open) => {
+            if (!open) {
+              unlockDialog.closeDialog();
+            }
+          }}
+          onPasswordChange={unlockDialog.setPassword}
+          onConfirm={() => void submitDelegationAction(unlockDialog.password)}
+        />
       </main>
     </AppShell>
   );
