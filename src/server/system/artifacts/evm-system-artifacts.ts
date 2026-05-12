@@ -8430,9 +8430,9 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
+            internalType: 'address',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             internalType: 'uint64',
@@ -8688,9 +8688,9 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
+                internalType: 'address',
                 name: 'validatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 internalType: 'uint64',
