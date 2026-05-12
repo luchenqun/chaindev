@@ -148,6 +148,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             items: [
               { href: '/evm/quarix/accounts', label: labelMessages.accounts, icon: IconUsers },
               { href: '/evm/quarix/validators', label: labelMessages.validators, icon: IconRosetteDiscountCheck },
+              { href: '/evm/quarix/bank-supply', label: labelMessages.bankSupply, icon: IconChartHistogram },
               { href: '/evm/quarix/blacklists', label: labelMessages.blacklists, icon: IconPointerBolt },
             ],
           }

@@ -174,6 +174,7 @@ type QuarixEvmAllocatedInvestmentProgramPoolsState = {
 const PAGE_SIZE = 15;
 const EVM_STAKING_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmStaking')?.abi ?? []) as Abi;
 const EVM_STAKING_PRECOMPILE_ADDRESS = EVM_STAKING_ADDRESS as `0x${string}`;
+const DO_NOT_MODIFY_VALIDATOR_FIELD = '-1';
 
 function getActiveEvmProfile() {
   const profile = readActiveRpcProfileCookie('evm');
@@ -187,6 +188,32 @@ function getActiveEvmProfile() {
 
 function normalizeStringValue(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeInputString(value: unknown) {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'bigint') {
+    return String(value);
+  }
+
+  return '';
+}
+
+function readTupleField(value: unknown, key: string, index: number) {
+  const record = value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+
+  if (record && key in record) {
+    return record[key];
+  }
+
+  if (Array.isArray(value)) {
+    return value[index];
+  }
+
+  return undefined;
 }
 
 function scaleToIntegerByPowerOfTen(rawValue: string, exponent: number) {
@@ -225,6 +252,31 @@ function normalizeBigintLike(value: unknown) {
   }
 
   return 0n;
+}
+
+function hasBigintLikeValue(value: unknown) {
+  return (
+    typeof value === 'bigint' ||
+    (typeof value === 'number' && Number.isFinite(value)) ||
+    (typeof value === 'string' && /^\d+$/.test(value))
+  );
+}
+
+function normalizeBigintInputString(value: unknown) {
+  return hasBigintLikeValue(value) ? normalizeBigintLike(value).toString() : null;
+}
+
+function getEditValidatorNumericArg(inputValue: string, currentValue: unknown) {
+  return inputValue === normalizeBigintInputString(currentValue) ? DO_NOT_MODIFY_VALIDATOR_FIELD : inputValue;
+}
+
+function trimDecimalInputValue(value: string) {
+  if (!value.includes('.')) {
+    return value;
+  }
+
+  const trimmed = value.replace(/0+$/, '').replace(/\.$/, '');
+  return trimmed || '0';
 }
 
 function formatValidatorStatus(value: unknown) {
@@ -367,8 +419,52 @@ function normalizeValidatorEvmAddress(input: string) {
   }
 }
 
-function formatScaled18InputValue(value: unknown, locale: string) {
-  return formatDecimalByPrecision(value, 18, locale, 18).replace(/\.?0+$/, '');
+function formatScaled18InputValue(value: unknown) {
+  if (!hasBigintLikeValue(value)) {
+    return '';
+  }
+
+  return trimDecimalInputValue(formatPlainDecimalByPrecision(value, 18, 18));
+}
+
+function getValidatorDescription(item: EvmStakingValidator): EvmStakingValidatorDescription {
+  const rawDescription = readTupleField(item, 'description', 6);
+
+  return {
+    moniker: normalizeInputString(readTupleField(rawDescription, 'moniker', 0)),
+    identity: normalizeInputString(readTupleField(rawDescription, 'identity', 1)),
+    website: normalizeInputString(readTupleField(rawDescription, 'website', 2)),
+    securityContact: normalizeInputString(readTupleField(rawDescription, 'securityContact', 3) ?? readTupleField(rawDescription, 'security_contact', 3)),
+    details: normalizeInputString(readTupleField(rawDescription, 'details', 4)),
+  };
+}
+
+function getValidatorOperatorAddress(item: EvmStakingValidator) {
+  return normalizeStringValue(readTupleField(item, 'operatorAddress', 0));
+}
+
+function getValidatorConsensusPubkey(item: EvmStakingValidator) {
+  return normalizeInputString(readTupleField(item, 'consensusPubkey', 1));
+}
+
+function getValidatorJailed(item: EvmStakingValidator) {
+  return Boolean(readTupleField(item, 'jailed', 2));
+}
+
+function getValidatorStatus(item: EvmStakingValidator) {
+  return readTupleField(item, 'status', 3);
+}
+
+function getValidatorTokens(item: EvmStakingValidator) {
+  return readTupleField(item, 'tokens', 4);
+}
+
+function getValidatorCommission(item: EvmStakingValidator) {
+  return readTupleField(item, 'commission', 9);
+}
+
+function getValidatorMinSelfDelegation(item: EvmStakingValidator) {
+  return readTupleField(item, 'minSelfDelegation', 10);
 }
 
 function parsePageTotal(value: unknown, fallback: number) {
@@ -387,31 +483,33 @@ function mapValidatorItem(
     unknown: string;
   },
 ): QuarixEvmValidatorItem | null {
-  const operatorAddress = normalizeStringValue(item.operatorAddress);
+  const operatorAddress = getValidatorOperatorAddress(item);
 
   if (!operatorAddress) {
     return null;
   }
 
-  const description = item.description ?? {};
+  const description = getValidatorDescription(item);
   const moniker = normalizeStringValue(description.moniker) ?? operatorAddress;
-  const statusKey = formatValidatorStatus(item.status);
+  const statusKey = formatValidatorStatus(getValidatorStatus(item));
+  const tokens = getValidatorTokens(item);
+  const commission = getValidatorCommission(item);
 
   return {
     operatorAddress,
     moniker,
-    jailed: Boolean(item.jailed),
+    jailed: getValidatorJailed(item),
     statusLabel:
       statusKey === 'bonded'
         ? statusLabels.bonded
         : statusKey === 'unbonding'
           ? statusLabels.unbonding
           : statusKey === 'unbonded'
-            ? statusLabels.unbonded
+          ? statusLabels.unbonded
             : statusLabels.unknown,
-    totalStakingLabel: formatScaled18Label(item.tokens, locale),
-    weightLabel: formatValidatorWeightLabel(item.tokens, bondedTokenTotal, locale),
-    commissionLabel: formatScaled18PercentLabel(item.commission, locale),
+    totalStakingLabel: formatScaled18Label(tokens, locale),
+    weightLabel: formatValidatorWeightLabel(tokens, bondedTokenTotal, locale),
+    commissionLabel: formatScaled18PercentLabel(commission, locale),
     raw: item,
   };
 }
@@ -473,11 +571,11 @@ async function requestQuarixEvmValidators(page: number, pageSize: number, locale
     args: ['', pageRequest],
   })) as readonly [EvmStakingValidator[], EvmStakingPageResponse];
   const bondedTokenTotal = validators.reduce((total, validator) => {
-    if (formatValidatorStatus(validator.status) !== 'bonded' || validator.jailed) {
+    if (formatValidatorStatus(getValidatorStatus(validator)) !== 'bonded' || getValidatorJailed(validator)) {
       return total;
     }
 
-    return total + normalizeBigintLike(validator.tokens);
+    return total + normalizeBigintLike(getValidatorTokens(validator));
   }, 0n);
   const mappedValidators = validators
     .map((item) =>
@@ -507,6 +605,31 @@ async function requestQuarixEvmValidators(page: number, pageSize: number, locale
     hasNextPage: safePage < totalPages,
     bondedTokenTotal,
   };
+}
+
+async function requestQuarixEvmValidator(address: string, locale: string, fallback: QuarixEvmValidatorItem): Promise<QuarixEvmValidatorItem> {
+  const validatorAddress = normalizeValidatorEvmAddress(address);
+
+  if (!validatorAddress) {
+    throw new Error('The validator address is invalid.');
+  }
+
+  const profile = getActiveEvmProfile();
+  const client = createEvmClient(profile.rpcUrl);
+  const validator = (await client.readContract({
+    address: EVM_STAKING_PRECOMPILE_ADDRESS,
+    abi: EVM_STAKING_ABI,
+    functionName: 'validator',
+    args: [validatorAddress],
+  })) as EvmStakingValidator;
+  const mapped = mapValidatorItem(validator, locale, normalizeBigintLike(getValidatorTokens(validator)), {
+    bonded: locale.startsWith('zh') ? '已绑定' : 'Bonded',
+    unbonding: locale.startsWith('zh') ? '解绑中' : 'Unbonding',
+    unbonded: locale.startsWith('zh') ? '未绑定' : 'Unbonded',
+    unknown: locale.startsWith('zh') ? '未知' : 'Unknown',
+  });
+
+  return mapped ?? { ...fallback, raw: validator };
 }
 
 async function requestQuarixEvmInvestmentProgramPools(locale: string): Promise<QuarixEvmInvestmentProgramPoolsState> {
@@ -1049,17 +1172,19 @@ function ValidatorDialog({
     }
 
     if (mode === 'edit' && initialValue) {
-      setMoniker(initialValue.raw.description?.moniker ?? '');
-      setIdentity(initialValue.raw.description?.identity ?? '');
-      setWebsite(initialValue.raw.description?.website ?? '');
-      setSecurityContact(initialValue.raw.description?.securityContact ?? '');
-      setDetails(initialValue.raw.description?.details ?? '');
+      const description = getValidatorDescription(initialValue.raw);
+
+      setMoniker(description.moniker ?? '');
+      setIdentity(description.identity ?? '');
+      setWebsite(description.website ?? '');
+      setSecurityContact(description.securityContact ?? '');
+      setDetails(description.details ?? '');
       setValidatorAddress(initialValue.operatorAddress);
-      setCommissionRate(formatScaled18InputValue(initialValue.raw.commission, 'en-US'));
+      setCommissionRate(formatScaled18InputValue(getValidatorCommission(initialValue.raw)));
       setMaxCommissionRate('');
       setMaxCommissionChangeRate('');
-      setMinSelfDelegation(formatScaled18InputValue(initialValue.raw.minSelfDelegation, 'en-US'));
-      setPubkey(initialValue.raw.consensusPubkey ?? '');
+      setMinSelfDelegation(formatScaled18InputValue(getValidatorMinSelfDelegation(initialValue.raw)));
+      setPubkey(getValidatorConsensusPubkey(initialValue.raw));
       setAmount('');
       return;
     }
@@ -1240,6 +1365,7 @@ function EvmQuarixValidatorsPageContent() {
   const [delegateError, setDelegateError] = useState<string | null>(null);
   const [validatorDialogOpen, setValidatorDialogOpen] = useState(false);
   const [validatorDialogSubmitting, setValidatorDialogSubmitting] = useState(false);
+  const [validatorDetailLoading, setValidatorDetailLoading] = useState(false);
   const [validatorDialogError, setValidatorDialogError] = useState<string | null>(null);
   const [editingValidator, setEditingValidator] = useState<QuarixEvmValidatorItem | null>(null);
   const [createInvestmentProgramPoolOpen, setCreateInvestmentProgramPoolOpen] = useState(false);
@@ -1267,6 +1393,7 @@ function EvmQuarixValidatorsPageContent() {
   const validatorsLoadedRef = useRef(false);
   const investmentProgramPoolsLoadedRef = useRef(false);
   const allocatedInvestmentProgramPoolsLoadedRef = useRef(false);
+  const validatorDetailRequestIdRef = useRef(0);
   const unlockDialog = useEvmPrivateKeyUnlockDialog();
   const validators = useMemo(() => data?.validators ?? [], [data]);
   const validatorMonikerByAddress = useMemo(
@@ -1461,6 +1588,31 @@ function EvmQuarixValidatorsPageContent() {
     setRefreshVersion((current) => current + 1);
   }
 
+  async function openEditValidatorDialog(validator: QuarixEvmValidatorItem) {
+    const requestId = validatorDetailRequestIdRef.current + 1;
+    validatorDetailRequestIdRef.current = requestId;
+    setEditingValidator(validator);
+    setValidatorDialogError(null);
+    setValidatorDialogOpen(true);
+    setValidatorDetailLoading(true);
+
+    try {
+      const next = await requestQuarixEvmValidator(validator.operatorAddress, locale, validator);
+
+      if (validatorDetailRequestIdRef.current === requestId) {
+        setEditingValidator((current) => (current?.operatorAddress === validator.operatorAddress ? next : current));
+      }
+    } catch (error) {
+      if (validatorDetailRequestIdRef.current === requestId) {
+        setValidatorDialogError(error instanceof Error ? error.message : pageMessages.failedToLoadFallback);
+      }
+    } finally {
+      if (validatorDetailRequestIdRef.current === requestId) {
+        setValidatorDetailLoading(false);
+      }
+    }
+  }
+
   async function submitDelegate(input: { amount: string; password?: string }) {
     if (!selectedValidator) {
       return;
@@ -1596,6 +1748,9 @@ function EvmQuarixValidatorsPageContent() {
       unlockDialog.handleUnlockResolved();
 
       if (editingValidator) {
+        const editCommissionRate = getEditValidatorNumericArg(commissionRate, getValidatorCommission(editingValidator.raw));
+        const editMinSelfDelegation = getEditValidatorNumericArg(minSelfDelegation, getValidatorMinSelfDelegation(editingValidator.raw));
+
         await writeEvmContractMethodDirect({
           address: EVM_STAKING_PRECOMPILE_ADDRESS,
           abiJson: JSON.stringify(EVM_STAKING_ABI),
@@ -1609,8 +1764,8 @@ function EvmQuarixValidatorsPageContent() {
               details: validatorPayload.details,
             }),
             validatorAddress,
-            commissionRate,
-            minSelfDelegation,
+            editCommissionRate,
+            editMinSelfDelegation,
           ],
           privateKey,
           value: '0',
@@ -1943,7 +2098,7 @@ function EvmQuarixValidatorsPageContent() {
                       </td>
                       <td className="px-5 py-3 text-sm">
                         <CosmosAddressLink
-                          href={`/evm/quarix/validator/${encodeURIComponent(validator.operatorAddress)}`}
+                          href={`/evm/address/${validator.operatorAddress}`}
                           label={validator.operatorAddress}
                           copyValue={validator.operatorAddress}
                           truncate={false}
@@ -1963,11 +2118,7 @@ function EvmQuarixValidatorsPageContent() {
                         <ActionIconButton
                           tooltip={pageMessages.editValidator}
                           className="text-slate-400 hover:text-sky-600"
-                          onClick={() => {
-                            setEditingValidator(validator);
-                            setValidatorDialogError(null);
-                            setValidatorDialogOpen(true);
-                          }}
+                          onClick={() => void openEditValidatorDialog(validator)}
                         >
                           <IconPencil className="size-4" stroke={1.8} />
                         </ActionIconButton>
@@ -2211,7 +2362,7 @@ function EvmQuarixValidatorsPageContent() {
         />
         <ValidatorDialog
           open={validatorDialogOpen}
-          submitting={validatorDialogSubmitting}
+          submitting={validatorDialogSubmitting || validatorDetailLoading}
           errorMessage={validatorDialogError}
           cancelLabel={messages.common.cancel}
           mode={editingValidator ? 'edit' : 'create'}
@@ -2220,6 +2371,8 @@ function EvmQuarixValidatorsPageContent() {
           onOpenChange={(open) => {
             setValidatorDialogOpen(open);
             if (!open) {
+              validatorDetailRequestIdRef.current += 1;
+              setValidatorDetailLoading(false);
               setEditingValidator(null);
               setValidatorDialogError(null);
             }

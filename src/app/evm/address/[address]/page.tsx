@@ -4,17 +4,20 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { IconBinaryTree2, IconInfoCircle, IconTag } from '@tabler/icons-react';
+import { type Abi } from 'viem';
+import { IconBinaryTree2, IconCode, IconInfoCircle, IconRefresh, IconTag } from '@tabler/icons-react';
 import { RelativeTime } from '@/components/relative-time';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { Button } from '@/components/ui/button';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
+import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DEFAULT_TABLE_PAGE_SIZE } from '@/config/pagination';
+import { formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
 import { deleteEvmAddressTag, getEvmAddressTag, getEvmAddressTags, subscribeEvmAddressTags, upsertEvmAddressTag } from '@/domains/evm/client/address-tags';
 import { resolvePreferredAddressLabel, resolvePreferredToAddressLabel } from '@/domains/evm/client/address-display';
 import { getEvmAddressCacheSnapshot, MAX_CACHED_EVM_TRANSACTIONS, subscribeEvmTransactionCache } from '@/domains/evm/client/transaction-cache';
@@ -30,16 +33,33 @@ import {
 } from '@/domains/evm/client/contract-registry';
 import { resolveEvmTransactionMethodLabel } from '@/domains/evm/client/transaction-decoder';
 import { getActiveEvmContractEnvironmentDirect } from '@/domains/evm/client/contract-executor';
+import { createEvmClient } from '@/domains/evm/client/rpc-client';
+import { isQuarixEvmChainId } from '@/domains/evm/chain-features';
+import { EVM_BANK_MODULE_ADDRESS, EVM_DISTRIBUTION_ADDRESS, EVM_STAKING_ADDRESS } from '@/domains/evm/lib/precompile-artifact-default-addresses';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { AddressContractPanel } from '@/domains/evm/ui/address-contract-panel';
 import { getActiveEvmCurrencyNameClient, getEvmAddressSummaryDirect, hydrateEvmCachedTransactionInputsByHashDirect } from '@/domains/evm/client/queries';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
+import { readActiveRpcProfileCookie } from '@/platform/workbench/rpc-profile-client';
+import { EVM_SYSTEM_ARTIFACTS } from '@/server/system/artifacts/evm-system-artifacts';
 import { TransactionHashCell, TransactionMethodBadge, TransactionPreviewButton } from '@/domains/evm/ui/transaction-list-cells';
 
 const VISIBLE_TRANSACTIONS = DEFAULT_TABLE_PAGE_SIZE;
-type AddressPageTab = 'transactions' | 'contract';
+const EVM_STAKING_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmStaking')?.abi ?? []) as Abi;
+const EVM_BANK_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmBank')?.abi ?? []) as Abi;
+const EVM_DISTRIBUTION_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmDistribution')?.abi ?? []) as Abi;
+const EVM_BANK_ALL_BALANCES_ABI = EVM_BANK_ABI.filter((item) => item.type === 'function' && item.name === 'allBalances') as Abi;
+const EVM_STAKING_DELEGATOR_VALIDATORS_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'delegatorValidators') as Abi;
+const EVM_STAKING_DELEGATION_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'delegation') as Abi;
+const EVM_STAKING_VALIDATORS_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'validators') as Abi;
+const EVM_DISTRIBUTION_DELEGATION_REWARDS_ABI = EVM_DISTRIBUTION_ABI.filter((item) => item.type === 'function' && item.name === 'delegationRewards') as Abi;
+const EVM_BANK_PRECOMPILE_ADDRESS = EVM_BANK_MODULE_ADDRESS as `0x${string}`;
+const EVM_STAKING_PRECOMPILE_ADDRESS = EVM_STAKING_ADDRESS as `0x${string}`;
+const EVM_DISTRIBUTION_PRECOMPILE_ADDRESS = EVM_DISTRIBUTION_ADDRESS as `0x${string}`;
+
+type AddressPageTab = 'transactions' | 'quarix' | 'contract';
 type ContractSubview = 'code' | 'read' | 'write';
 type ContractEnvironmentState = {
   providerProfileId: string;
@@ -47,6 +67,74 @@ type ContractEnvironmentState = {
   chainId: string;
   nativeCurrency: string;
 } | null;
+type EvmStakingPageRequest = {
+  key: `0x${string}`;
+  offset: bigint;
+  limit: bigint;
+  countTotal: boolean;
+  reverse: boolean;
+};
+type EvmDelegationBalance = {
+  denom?: string;
+  amount?: bigint | number | string;
+};
+type EvmStakingValidatorDescription = {
+  moniker?: string;
+};
+type EvmStakingValidator = {
+  operatorAddress?: string;
+  description?: EvmStakingValidatorDescription;
+};
+type EvmDistributionDecCoin = {
+  denom?: string;
+  amount?: bigint | number | string;
+  precision?: bigint | number | string;
+};
+type EvmSingleDelegationResponse = {
+  shares?: bigint | number | string;
+  balance?: EvmDelegationBalance;
+};
+type EvmDelegationsPageResponse = {
+  total?: bigint | number | string;
+};
+type EvmDelegationItem = {
+  delegatorAddress?: string;
+  validatorAddress?: string;
+  shares?: bigint | number | string;
+  balance?: EvmDelegationBalance;
+  validatorMoniker: string | null;
+  rewardLabel: string;
+};
+type EvmDelegationLoadItem = EvmDelegationItem & {
+  rawRewards: EvmDistributionDecCoin[];
+  sortIndex: number;
+};
+type EvmDelegationsSnapshot = {
+  totalDelegations: number;
+  items: EvmDelegationItem[];
+  response: {
+    delegatorValidators: EvmStakingValidator[];
+    validators: EvmStakingValidator[];
+    delegations: Array<{
+      validatorAddress: string | undefined;
+      delegation: EvmSingleDelegationResponse;
+      rewards: EvmDistributionDecCoin[];
+    }>;
+  };
+};
+type EvmBankBalanceItem = {
+  denom: string;
+  amount: bigint | number | string;
+};
+const EMPTY_DELEGATIONS_SNAPSHOT: EvmDelegationsSnapshot = {
+  totalDelegations: 0,
+  items: [],
+  response: {
+    delegatorValidators: [],
+    validators: [],
+    delegations: [],
+  },
+};
 
 function parsePageParam(rawPage: string | null) {
   const parsed = Number.parseInt(rawPage ?? '1', 10);
@@ -57,6 +145,215 @@ function parsePageParam(rawPage: string | null) {
 
   return parsed;
 }
+
+function normalizeBigintLike(value: unknown) {
+  if (typeof value === 'bigint') {
+    return value;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return BigInt(Math.trunc(value));
+  }
+
+  if (typeof value === 'string' && /^-?\d+$/.test(value)) {
+    try {
+      return BigInt(value);
+    } catch {
+      return 0n;
+    }
+  }
+
+  return 0n;
+}
+
+function normalizeStringValue(value: unknown) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function formatDecCoinAmount(item: EvmDistributionDecCoin) {
+  const amount = normalizeBigintLike(item.amount);
+  const precision = Number(normalizeBigintLike(item.precision));
+
+  if (!Number.isFinite(precision) || precision <= 0) {
+    return amount.toString();
+  }
+
+  const divisor = 10n ** BigInt(precision);
+  const whole = amount / divisor;
+  const fraction = amount % divisor;
+  const fractionLabel = fraction.toString().padStart(precision, '0').replace(/0+$/, '');
+
+  return fractionLabel ? `${whole.toString()}.${fractionLabel}` : whole.toString();
+}
+
+function formatDelegationRewardLabel(rewards: EvmDistributionDecCoin[], locale: string) {
+  if (!rewards.length) {
+    return '0';
+  }
+
+  return rewards
+    .map((item) => {
+      const amountLabel = formatDecCoinAmount(item);
+      const [wholePart, fractionPart = ''] = amountLabel.split('.');
+      const wholeNumber = Number.parseInt(wholePart || '0', 10);
+      const normalizedWhole = Number.isFinite(wholeNumber) ? wholeNumber.toLocaleString(locale) : wholePart;
+      const normalizedAmount = fractionPart ? `${normalizedWhole}.${fractionPart}` : normalizedWhole;
+      const denom = normalizeStringValue(item.denom);
+      const readableDenom = denom ? formatReadableDenom(denom) : null;
+
+      return readableDenom ? `${normalizedAmount} ${readableDenom}` : normalizedAmount;
+    })
+    .join(', ');
+}
+
+function formatScaled18AmountLabel(value: unknown, locale: string) {
+  const normalized = normalizeBigintLike(value);
+  const divisor = 10n ** 18n;
+  const whole = normalized / divisor;
+  const fraction = normalized % divisor;
+  const fractionLabel = fraction.toString().padStart(18, '0').replace(/0+$/, '');
+  const wholeLabel = whole.toLocaleString(locale);
+
+  return fractionLabel ? `${wholeLabel}.${fractionLabel}` : wholeLabel;
+}
+
+function formatDelegationAmountLabel(balance: EvmDelegationBalance | undefined, locale: string) {
+  const denom = typeof balance?.denom === 'string' && balance.denom.trim() ? balance.denom.trim() : '--';
+  return `${formatScaled18AmountLabel(balance?.amount, locale)} ${denom}`;
+}
+
+function formatBankBalanceItem(balance: EvmBankBalanceItem) {
+  return `${formatReadableTokenAmount(normalizeBigintLike(balance.amount).toString())} ${formatReadableDenom(balance.denom)}`;
+}
+
+function formatBankBalanceRawAmount(balance: EvmBankBalanceItem) {
+  return normalizeBigintLike(balance.amount).toString();
+}
+
+async function getQuarixDelegationsSnapshot(address: string, locale: string): Promise<EvmDelegationsSnapshot> {
+  const profile = readActiveRpcProfileCookie('evm');
+
+  if (!profile) {
+    throw new Error('No active EVM provider selected.');
+  }
+
+  const client = createEvmClient(profile.rpcUrl);
+  const pageRequest: EvmStakingPageRequest = {
+    key: '0x',
+    offset: 0n,
+    limit: 500n,
+    countTotal: true,
+    reverse: false,
+  };
+  const validatorsPageRequest: EvmStakingPageRequest = {
+    key: '0x',
+    offset: 0n,
+    limit: 500n,
+    countTotal: false,
+    reverse: false,
+  };
+
+  const [[delegatorValidators, delegatorValidatorsPageResponse], [validators]] = (await Promise.all([
+    client.readContract({
+      address: EVM_STAKING_PRECOMPILE_ADDRESS,
+      abi: EVM_STAKING_DELEGATOR_VALIDATORS_ABI,
+      functionName: 'delegatorValidators',
+      args: [address as `0x${string}`, pageRequest],
+    }) as Promise<readonly [EvmStakingValidator[], EvmDelegationsPageResponse]>,
+    client.readContract({
+      address: EVM_STAKING_PRECOMPILE_ADDRESS,
+      abi: EVM_STAKING_VALIDATORS_ABI,
+      functionName: 'validators',
+      args: ['', validatorsPageRequest],
+    }) as Promise<readonly [EvmStakingValidator[], EvmDelegationsPageResponse]>,
+  ])) as [readonly [EvmStakingValidator[], EvmDelegationsPageResponse], readonly [EvmStakingValidator[], EvmDelegationsPageResponse]];
+
+  const validatorMonikerByAddress = new Map(
+    [...validators, ...delegatorValidators]
+      .map((validator) => {
+        const operatorAddress = normalizeStringValue(validator.operatorAddress);
+
+        if (!operatorAddress) {
+          return null;
+        }
+
+        return [operatorAddress.toLowerCase(), normalizeStringValue(validator.description?.moniker)] as const;
+      })
+      .filter((entry): entry is readonly [string, string | null] => Boolean(entry)),
+  );
+
+  const items = (await Promise.all(
+    delegatorValidators.map(async (validator, index) => {
+      const validatorAddress = normalizeStringValue(validator.operatorAddress);
+
+      if (!validatorAddress) {
+        return {
+          delegatorAddress: address,
+          validatorAddress: undefined,
+          shares: 0n,
+          balance: {
+            denom: '',
+            amount: 0n,
+          },
+          validatorMoniker: null,
+          rewardLabel: '0',
+          rawRewards: [],
+          sortIndex: index,
+        } satisfies EvmDelegationLoadItem;
+      }
+
+      const [delegation, rewards] = await Promise.all([
+        client.readContract({
+          address: EVM_STAKING_PRECOMPILE_ADDRESS,
+          abi: EVM_STAKING_DELEGATION_ABI,
+          functionName: 'delegation',
+          args: [address as `0x${string}`, validatorAddress],
+        }) as Promise<readonly [bigint, EvmDelegationBalance]>,
+        client.readContract({
+          address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
+          abi: EVM_DISTRIBUTION_DELEGATION_REWARDS_ABI,
+          functionName: 'delegationRewards',
+          args: [address as `0x${string}`, validatorAddress],
+        }) as Promise<EvmDistributionDecCoin[]>,
+      ]);
+
+      return {
+        delegatorAddress: address,
+        validatorAddress,
+        shares: delegation[0],
+        balance: delegation[1],
+        validatorMoniker: validatorMonikerByAddress.get(validatorAddress.toLowerCase()) ?? null,
+        rewardLabel: formatDelegationRewardLabel(rewards, locale),
+        rawRewards: rewards,
+        sortIndex: index,
+      } satisfies EvmDelegationLoadItem;
+    }),
+  )) as EvmDelegationLoadItem[];
+
+  const totalDelegations = Number(normalizeBigintLike(delegatorValidatorsPageResponse?.total ?? items.length));
+  const sortedItems = items
+    .slice()
+    .sort((left, right) => left.sortIndex - right.sortIndex)
+    .map(({ sortIndex, ...item }) => item);
+
+  return {
+    totalDelegations,
+    items: sortedItems,
+    response: {
+      delegatorValidators,
+      validators,
+      delegations: items.map((item) => ({
+        validatorAddress: item.validatorAddress,
+        delegation: {
+          shares: item.shares,
+          balance: item.balance,
+        },
+        rewards: item.rawRewards,
+      })),
+    },
+  };
+}
+
 
 function AddressPageSkeleton() {
   return (
@@ -245,11 +542,76 @@ export default function EvmAddressPage() {
   const [bindingArtifactId, setBindingArtifactId] = useState('');
   const [bindingLabelInput, setBindingLabelInput] = useState('');
   const [bindingError, setBindingError] = useState<string | null>(null);
+  const [delegationsSnapshot, setDelegationsSnapshot] = useState<EvmDelegationsSnapshot>(EMPTY_DELEGATIONS_SNAPSHOT);
+  const [delegationsLoading, setDelegationsLoading] = useState(false);
+  const [delegationsError, setDelegationsError] = useState<string | null>(null);
+  const [quarixBalances, setQuarixBalances] = useState<EvmBankBalanceItem[]>([]);
+  const [showDelegationsRawJson, setShowDelegationsRawJson] = useState(false);
+  const [delegationsRefreshVersion, setDelegationsRefreshVersion] = useState(0);
   const currencyName = getActiveEvmCurrencyNameClient();
 
   function goToLogin() {
     router.push(`/login?callbackUrl=${encodeURIComponent(`/evm/address/${address}`)}`);
   }
+
+  useEffect(() => {
+    if (!isValid || !isQuarixEvmChainId(contractEnvironment?.chainId)) {
+      setDelegationsSnapshot(EMPTY_DELEGATIONS_SNAPSHOT);
+      setQuarixBalances([]);
+      setDelegationsLoading(false);
+      setDelegationsError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadDelegations() {
+      setDelegationsLoading(true);
+
+      try {
+        const profile = readActiveRpcProfileCookie('evm');
+
+        if (!profile) {
+          throw new Error('No active EVM provider selected.');
+        }
+
+        const client = createEvmClient(profile.rpcUrl);
+        const [nextSnapshot, nextBalances] = await Promise.all([
+          getQuarixDelegationsSnapshot(address, locale),
+          client.readContract({
+            address: EVM_BANK_PRECOMPILE_ADDRESS,
+            abi: EVM_BANK_ALL_BALANCES_ABI,
+            functionName: 'allBalances',
+            args: [address as `0x${string}`],
+          }) as Promise<EvmBankBalanceItem[]>,
+        ]);
+
+        if (!cancelled) {
+          setDelegationsSnapshot(nextSnapshot);
+          setQuarixBalances(nextBalances);
+          setDelegationsError(null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setDelegationsSnapshot(EMPTY_DELEGATIONS_SNAPSHOT);
+          setQuarixBalances([]);
+          setDelegationsError(error instanceof Error ? error.message : accountMessages.failedToLoadFallback);
+        }
+      } finally {
+        if (!cancelled) {
+          setDelegationsLoading(false);
+        }
+      }
+    }
+
+    void loadDelegations();
+    window.addEventListener('chaindev:active-rpc-profile-changed', loadDelegations);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('chaindev:active-rpc-profile-changed', loadDelegations);
+    };
+  }, [address, isValid, contractEnvironment?.chainId, accountMessages.failedToLoadFallback, locale, delegationsRefreshVersion]);
 
   useEffect(() => {
     if (!isValid) {
@@ -390,7 +752,13 @@ export default function EvmAddressPage() {
   const inboundCount = addressCacheSnapshot.inboundCount;
   const outboundCount = addressCacheSnapshot.outboundCount;
   const selfCount = addressCacheSnapshot.selfCount;
-  const resolvedActiveTab = requestedTab === 'contract' && contractBinding && contractArtifact && contractEnvironment ? 'contract' : 'transactions';
+  const isQuarixChain = isQuarixEvmChainId(contractEnvironment?.chainId);
+  const resolvedActiveTab =
+    requestedTab === 'contract' && contractBinding && contractArtifact && contractEnvironment
+      ? 'contract'
+      : requestedTab === 'quarix' && isQuarixChain
+        ? 'quarix'
+      : 'transactions';
   const initialContractTab: ContractSubview = requestedContractTab === 'code' || requestedContractTab === 'write' ? requestedContractTab : 'read';
   const visibleAddresses = useMemo(
     () => [...new Set(visibleTransactions.flatMap((transaction) => [transaction.from, ...(transaction.interactedWith ? [transaction.interactedWith] : transaction.to ? [transaction.to] : [])]))],
@@ -550,6 +918,10 @@ export default function EvmAddressPage() {
     if (nextTab === 'transactions') {
       nextParams.delete('tab');
       nextParams.delete('contractTab');
+    } else if (nextTab === 'quarix') {
+      nextParams.set('tab', nextTab);
+      nextParams.delete('contractTab');
+      nextParams.delete('page');
     } else {
       nextParams.set('tab', nextTab);
 
@@ -708,6 +1080,15 @@ export default function EvmAddressPage() {
           >
             {messages.labels.transactions}
           </button>
+          {isQuarixChain ? (
+            <button
+              type="button"
+              className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${resolvedActiveTab === 'quarix' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
+              onClick={() => navigateToTab('quarix')}
+            >
+              Quarix
+            </button>
+          ) : null}
           {contractBinding && contractArtifact && contractEnvironment ? (
             <button
               type="button"
@@ -829,6 +1210,148 @@ export default function EvmAddressPage() {
               </table>
             </div>
           </section>
+        ) : resolvedActiveTab === 'quarix' ? (
+          <div className="mt-4 space-y-4">
+            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <p className="text-sm text-slate-500">{accountMessages.balancesDescription}</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="data-table w-full">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">{accountMessages.denom}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">Raw Amount</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{accountMessages.amount}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {delegationsLoading ? (
+                      Array.from({ length: 3 }).map((_, index) => (
+                        <tr key={`balance-skeleton-${index}`} className="border-t border-slate-200">
+                          <td className="pl-5 pr-1 py-3"><Skeleton className="h-4 w-32" /></td>
+                          <td className="px-5 py-3"><Skeleton className="ml-auto h-4 w-40" /></td>
+                          <td className="px-5 py-3"><Skeleton className="ml-auto h-4 w-40" /></td>
+                        </tr>
+                      ))
+                    ) : quarixBalances.length ? (
+                      quarixBalances.map((item, index) => (
+                        <tr key={`${item.denom}-${index}`} className="border-t border-slate-200">
+                          <td className="pl-5 pr-1 py-3 text-sm text-slate-700">{formatReadableDenom(item.denom)}</td>
+                          <td className="px-5 py-3 text-right text-sm tabular-nums text-slate-500">{formatBankBalanceRawAmount(item)}</td>
+                          <td className="px-5 py-3 text-right text-sm font-medium tabular-nums text-slate-900">{formatBankBalanceItem(item)}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="px-5 py-10 text-center text-sm text-slate-500">
+                          {accountMessages.noBalancesReturned}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-500">{messages.quarixEvmValidators.delegationsDescription}</p>
+                </div>
+                <div className="flex items-center gap-0 lg:justify-end">
+                  <ActionIconButton
+                    tooltip={showDelegationsRawJson ? messages.common.hideRawJson : messages.common.showRawJson}
+                    className={
+                      showDelegationsRawJson
+                        ? 'h-8 w-8 rounded-md bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700'
+                        : 'h-8 w-8 rounded-md text-slate-400 hover:text-slate-700'
+                    }
+                    onClick={() => setShowDelegationsRawJson((current) => !current)}
+                  >
+                    <IconCode className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                  <ActionIconButton
+                    tooltip={messages.common.refresh}
+                    className={delegationsLoading ? 'h-8 w-8 text-sky-600' : 'h-8 w-8 text-slate-400 hover:text-slate-600'}
+                    onClick={() => setDelegationsRefreshVersion((current) => current + 1)}
+                  >
+                    <IconRefresh className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="data-table w-full">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.validator}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.operatorAddress}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.amount}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.outstandingRewards}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {delegationsLoading ? (
+                      Array.from({ length: 6 }).map((_, index) => (
+                        <tr key={`delegation-skeleton-${index}`} className="border-t border-slate-200">
+                          <td className="pl-5 pr-1 py-3"><Skeleton className="h-4 w-40" /></td>
+                          <td className="px-1 py-3"><Skeleton className="h-4 w-72" /></td>
+                          <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-32" /></td>
+                          <td className="px-5 py-3"><Skeleton className="ml-auto h-4 w-32" /></td>
+                        </tr>
+                      ))
+                    ) : delegationsError ? (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-10 text-center text-sm text-rose-600">
+                          {translateRuntimeText(delegationsError, locale)}
+                        </td>
+                      </tr>
+                    ) : delegationsSnapshot.items.length ? (
+                      delegationsSnapshot.items.map((item, index) => (
+                        <tr key={`${item.delegatorAddress ?? 'delegator'}-${item.validatorAddress ?? 'validator'}-${index}`} className="border-t border-slate-200">
+                          <td className="pl-5 pr-1 py-3 text-sm">
+                            {item.validatorAddress ? (
+                              <Link className="block truncate font-medium text-sky-600 hover:text-sky-700" href={`/evm/quarix/validator/${encodeURIComponent(item.validatorAddress)}`}>
+                                {item.validatorMoniker ?? item.validatorAddress}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">--</span>
+                            )}
+                          </td>
+                          <td className="px-1 py-3 text-sm mono">
+                            {item.validatorAddress ? (
+                              <Link className="font-medium text-sky-600 hover:text-sky-700" href={`/evm/quarix/validator/${encodeURIComponent(item.validatorAddress)}`}>
+                                {item.validatorAddress}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">--</span>
+                            )}
+                          </td>
+                          <td className="px-1 py-3 text-right text-sm font-medium tabular-nums text-slate-900">
+                            {formatDelegationAmountLabel(item.balance, locale)}
+                          </td>
+                          <td className="px-5 py-3 text-right text-sm tabular-nums text-slate-500">{item.rewardLabel}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-10 text-center text-sm text-slate-500">
+                          {messages.quarixEvmValidators.emptyValidatorsLabel}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {showDelegationsRawJson ? (
+                <div className="border-t border-slate-200 px-5 py-4">
+                  <JsonViewPanel value={{ balances: quarixBalances, ...delegationsSnapshot.response } as object} className="border-0 p-0 shadow-none" controlsClassName="right-0 top-0" />
+                </div>
+              ) : null}
+            </section>
+          </div>
         ) : (
           <section className="mt-4">
             {contractBinding && contractArtifact && contractEnvironment ? (

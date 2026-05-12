@@ -14,6 +14,7 @@ import { ModalDialog } from '@/components/ui/modal-dialog';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/toast';
+import { formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
 import { getEvmChainState, subscribeEvmChainState } from '@/domains/evm/client/chain-state';
 import { writeEvmContractMethodDirect } from '@/domains/evm/client/contract-executor';
@@ -22,7 +23,7 @@ import { createEvmClient } from '@/domains/evm/client/rpc-client';
 import { getActiveEvmCurrencyNameClient } from '@/domains/evm/client/queries';
 import { AddressLink } from '@/domains/evm/ui/address-link';
 import { EvmPrivateKeyUnlockDialog, useEvmPrivateKeyUnlockDialog } from '@/domains/evm/ui/private-key-unlock-dialog';
-import { EVM_AUTH_ADDRESS, EVM_BLACKLIST_ADDRESS, EVM_SERVICE_PROVIDER_ADDRESS, EVM_SERVICE_ROLE_ADDRESS, EVM_SERVICE_WRAPPER_ADDRESS } from '@/domains/evm/lib/precompile-artifact-default-addresses';
+import { EVM_AUTH_ADDRESS, EVM_BANK_MODULE_ADDRESS, EVM_BLACKLIST_ADDRESS, EVM_SERVICE_PROVIDER_ADDRESS, EVM_SERVICE_ROLE_ADDRESS, EVM_SERVICE_WRAPPER_ADDRESS } from '@/domains/evm/lib/precompile-artifact-default-addresses';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
@@ -61,10 +62,16 @@ type QuarixEvmAccountItem = {
   sequence: string | null;
   balanceLabel: string;
   balanceExactLabel: string;
+  balanceTooltipLines: string[];
   kycStatus: QuarixAccountFlagStatus;
   blacklistStatus: QuarixAccountFlagStatus;
   roles: string[];
   rolesLabel: string;
+};
+
+type EvmBankBalanceItem = {
+  denom: string;
+  amount: bigint | number | string;
 };
 
 type QuarixEvmAccountsState = {
@@ -85,11 +92,14 @@ const QUARIX_ACCOUNT_ROLE_OPTIONS = ['QOE', 'Validator', 'Developer'] as const;
 type QuarixAccountRoleName = (typeof QUARIX_ACCOUNT_ROLE_OPTIONS)[number];
 
 const EVM_AUTH_PRECOMPILE_ADDRESS = EVM_AUTH_ADDRESS as `0x${string}`;
+const EVM_BANK_PRECOMPILE_ADDRESS = EVM_BANK_MODULE_ADDRESS as `0x${string}`;
 const EVM_BLACKLIST_PRECOMPILE_ADDRESS = EVM_BLACKLIST_ADDRESS as `0x${string}`;
 const EVM_SERVICE_PROVIDER_PRECOMPILE_ADDRESS = EVM_SERVICE_PROVIDER_ADDRESS as `0x${string}`;
 const EVM_SERVICE_ROLE_PRECOMPILE_ADDRESS = EVM_SERVICE_ROLE_ADDRESS as `0x${string}`;
 const EVM_SERVICE_WRAPPER_PRECOMPILE_ADDRESS = EVM_SERVICE_WRAPPER_ADDRESS as `0x${string}`;
 const EVM_AUTH_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmAuth')?.abi ?? []) as Abi;
+const EVM_BANK_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmBank')?.abi ?? []) as Abi;
+const EVM_BANK_ALL_BALANCES_ABI = EVM_BANK_ABI.filter((item) => item.type === 'function' && item.name === 'allBalances') as Abi;
 const EVM_BLACKLIST_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmBlacklist')?.abi ?? []) as Abi;
 const EVM_SERVICE_PROVIDER_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmServiceProvider')?.abi ?? []) as Abi;
 const EVM_SERVICE_ROLE_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmServiceRole')?.abi ?? []) as Abi;
@@ -157,22 +167,58 @@ function formatEvmAddressForDisplay(input: { evmAddress: string | null; cosmosAd
   return input.evmAddress ?? input.cosmosAddress ?? null;
 }
 
-function formatBalanceLabel(value: bigint) {
-  const amount = Number(formatEther(value));
+function normalizeBigintLike(value: unknown) {
+  if (typeof value === 'bigint') {
+    return value;
+  }
 
-  if (!Number.isFinite(amount) || amount === 0) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return BigInt(Math.trunc(value));
+  }
+
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    try {
+      return BigInt(value);
+    } catch {
+      return 0n;
+    }
+  }
+
+  return 0n;
+}
+
+function formatBankBalanceItem(balance: EvmBankBalanceItem) {
+  return `${formatReadableTokenAmount(normalizeBigintLike(balance.amount).toString())} ${formatReadableDenom(balance.denom)}`;
+}
+
+function formatBankBalanceRawItem(balance: EvmBankBalanceItem) {
+  return `${normalizeBigintLike(balance.amount).toString()} ${balance.denom}`;
+}
+
+function formatBankBalanceSummary(balances: EvmBankBalanceItem[]) {
+  if (!balances.length) {
     return '0';
   }
 
-  if (amount < 0.000001) {
-    return '<0.000001';
+  const visible = balances.slice(0, 2).map(formatBankBalanceItem);
+
+  if (balances.length > 2) {
+    visible.push(`+${balances.length - 2} more`);
   }
 
-  return amount.toFixed(amount < 1 ? 6 : 4).replace(/\.?0+$/, '');
+  return visible.join(', ');
 }
 
-function formatExactBalanceLabel(value: bigint, currencyName: string) {
-  return `${formatEther(value)} ${currencyName}`;
+function formatBankBalanceTooltip(balances: EvmBankBalanceItem[]) {
+  if (!balances.length) {
+    return '0';
+  }
+
+  return balances.map(formatBankBalanceRawItem).join(', ');
+}
+
+function formatBankBalanceTooltipLines(balances: EvmBankBalanceItem[]) {
+  return balances.length ? balances.map(formatBankBalanceRawItem) : ['0'];
 }
 
 function normalizeStringArray(value: unknown) {
@@ -272,6 +318,7 @@ function mapAccountItem(item: unknown, index: number): QuarixEvmAccountItem | nu
     sequence: normalizeNumberLikeValue(source.sequence),
     balanceLabel: '0',
     balanceExactLabel: '0',
+    balanceTooltipLines: ['0'],
     kycStatus: 'unknown',
     blacklistStatus: 'unknown',
     roles: [],
@@ -530,9 +577,11 @@ function ModuleAccountTypeBadge({
 function EvmAccountBalanceTooltip({
   label,
   exactLabel,
+  lines,
 }: {
   label: string;
   exactLabel: string;
+  lines: string[];
 }) {
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
@@ -587,7 +636,13 @@ function EvmAccountBalanceTooltip({
         onMouseLeave={closeTooltipSoon}
         className="max-w-[520px] whitespace-normal border border-slate-200 bg-white text-slate-700"
       >
-        <span className="block select-text break-all">{exactLabel}</span>
+        <div className="space-y-1">
+          {(lines.length ? lines : [exactLabel]).map((line) => (
+            <p key={line} className="select-text break-all text-sm">
+              {line}
+            </p>
+          ))}
+        </div>
       </FloatingTooltip>
     </>
   );
@@ -647,7 +702,6 @@ async function requestQuarixEvmAccountFlags(client: ReturnType<typeof createEvmC
 async function requestQuarixEvmAccounts(requestedPage: number, options?: { includeQuarixFlags?: boolean }): Promise<QuarixEvmAccountsState> {
   const profile = getActiveEvmProfile();
   const client = createEvmClient(profile.rpcUrl);
-  const currencyName = getActiveEvmCurrencyNameClient();
   const page = Math.max(1, Math.trunc(requestedPage));
   const pageRequest: PageRequest = {
     key: '0x',
@@ -675,33 +729,40 @@ async function requestQuarixEvmAccounts(requestedPage: number, options?: { inclu
         return [account.evmAddress, null] as const;
       }
 
-      const balance = await client.getBalance({ address: account.evmAddress as `0x${string}` });
-      return [account.evmAddress, balance] as const;
+      const balances = (await client.readContract({
+        address: EVM_BANK_PRECOMPILE_ADDRESS,
+        abi: EVM_BANK_ALL_BALANCES_ABI,
+        functionName: 'allBalances',
+        args: [account.evmAddress as `0x${string}`],
+      })) as EvmBankBalanceItem[];
+
+      return [account.evmAddress, balances] as const;
     }),
   );
-  const balancesByAddress = new Map<string, bigint>();
+  const balancesByAddress = new Map<string, EvmBankBalanceItem[]>();
 
   for (const entry of balanceEntries) {
     if (entry.status !== 'fulfilled') {
       continue;
     }
 
-    const [address, balance] = entry.value;
+    const [address, balances] = entry.value;
 
-    if (address && balance != null) {
-      balancesByAddress.set(address.toLowerCase(), balance);
+    if (address && balances != null) {
+      balancesByAddress.set(address.toLowerCase(), balances);
     }
   }
 
   const accountFlagsByAddress = options?.includeQuarixFlags ? await requestQuarixEvmAccountFlags(client, mappedAccounts) : new Map<string, { kycStatus: QuarixAccountFlagStatus; blacklistStatus: QuarixAccountFlagStatus; roles: string[]; rolesLabel: string }>();
   const accounts = mappedAccounts.map((account) => {
     const accountFlags = account.evmAddress ? accountFlagsByAddress.get(account.evmAddress.toLowerCase()) : null;
-    const balance = account.evmAddress ? (balancesByAddress.get(account.evmAddress.toLowerCase()) ?? 0n) : 0n;
+    const balances = account.evmAddress ? (balancesByAddress.get(account.evmAddress.toLowerCase()) ?? []) : [];
 
     return {
       ...account,
-      balanceLabel: formatBalanceLabel(balance),
-      balanceExactLabel: formatExactBalanceLabel(balance, currencyName),
+      balanceLabel: formatBankBalanceSummary(balances),
+      balanceExactLabel: formatBankBalanceTooltip(balances),
+      balanceTooltipLines: formatBankBalanceTooltipLines(balances),
       kycStatus: accountFlags?.kycStatus ?? 'unknown',
       blacklistStatus: accountFlags?.blacklistStatus ?? 'unknown',
       roles: accountFlags?.roles ?? [],
@@ -1168,7 +1229,7 @@ export default function EvmQuarixAccountsPage() {
             <table className={`data-table table-fixed ${showQuarixAccountFlags ? 'min-w-[1280px]' : 'min-w-[900px]'}`}>
               <colgroup>
                 <col className={showQuarixAccountFlags ? 'w-[430px]' : 'w-[360px]'} />
-                <col className="w-[180px]" />
+                <col className="w-[240px]" />
                 <col className="w-[64px]" />
                 {showQuarixAccountFlags ? <col className="w-[82px]" /> : null}
                 {showQuarixAccountFlags ? <col className="w-[130px]" /> : null}
@@ -1205,7 +1266,7 @@ export default function EvmQuarixAccountsPage() {
                           )}
                         </td>
                         <td className="px-5 py-3 text-sm tabular-nums text-slate-700">
-                          <EvmAccountBalanceTooltip label={account.balanceLabel} exactLabel={account.balanceExactLabel} />
+                          <EvmAccountBalanceTooltip label={account.balanceLabel} exactLabel={account.balanceExactLabel} lines={account.balanceTooltipLines} />
                         </td>
                         <td className="px-3 py-3 text-sm tabular-nums text-slate-700">{account.sequence ?? pageMessages.unavailableValue}</td>
                         {showQuarixAccountFlags ? (
