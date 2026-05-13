@@ -1,11 +1,11 @@
 'use client';
 
-import { fromBech32, toBech32, toHex } from '@cosmjs/encoding';
+import { fromBech32, toHex } from '@cosmjs/encoding';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { hexToBytes, isAddress, type Abi } from 'viem';
+import { isAddress, type Abi } from 'viem';
 import { IconArrowBackUp, IconArrowsExchange, IconBinaryTree2, IconCode, IconCoins, IconInfoCircle, IconRefresh, IconTag } from '@tabler/icons-react';
 import { RelativeTime } from '@/components/relative-time';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
@@ -77,6 +77,7 @@ const EVM_DISTRIBUTION_DELEGATION_REWARDS_ABI = EVM_DISTRIBUTION_ABI.filter((ite
 const EVM_BANK_PRECOMPILE_ADDRESS = EVM_BANK_MODULE_ADDRESS as `0x${string}`;
 const EVM_STAKING_PRECOMPILE_ADDRESS = EVM_STAKING_ADDRESS as `0x${string}`;
 const EVM_DISTRIBUTION_PRECOMPILE_ADDRESS = EVM_DISTRIBUTION_ADDRESS as `0x${string}`;
+const ZERO_EVM_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 
 type AddressPageTab = 'transactions' | 'quarix' | 'contract';
 type ContractSubview = 'code' | 'read' | 'write';
@@ -389,22 +390,6 @@ function scaleToIntegerByPowerOfTen(rawValue: string, exponent: number) {
   return `${digits}${'0'.repeat(decimalShift)}`;
 }
 
-function toQuarixValidatorAddress(input: string) {
-  if (input.startsWith('quarix')) {
-    return input;
-  }
-
-  if (!isAddress(input)) {
-    return null;
-  }
-
-  try {
-    return toBech32('quarixvaloper', hexToBytes(input));
-  } catch {
-    return null;
-  }
-}
-
 function normalizeValidatorEvmAddress(input: string | null) {
   if (!input) {
     return null;
@@ -477,7 +462,7 @@ async function getQuarixDelegationsSnapshot(address: string, locale: string): Pr
       address: EVM_STAKING_PRECOMPILE_ADDRESS,
       abi: EVM_STAKING_REDELEGATIONS_ABI,
       functionName: 'redelegations',
-      args: [address as `0x${string}`, '', '', redelegationsPageRequest],
+      args: [address as `0x${string}`, ZERO_EVM_ADDRESS, ZERO_EVM_ADDRESS, redelegationsPageRequest],
     }) as Promise<readonly [EvmRedelegationResponse[], EvmDelegationsPageResponse]>,
     client.readContract({
       address: EVM_STAKING_PRECOMPILE_ADDRESS,
@@ -1331,7 +1316,7 @@ export default function EvmAddressPage() {
       unlockDialog.handleUnlockResolved();
 
       if (delegationActionKind === 'withdrawRewards') {
-        const validatorAddress = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
+        const validatorAddress = normalizeValidatorEvmAddress(delegationActionTarget.validatorAddress);
 
         if (!validatorAddress) {
           throw new Error(messages.quarixEvmValidators.invalidValidatorAddress);
@@ -1340,7 +1325,7 @@ export default function EvmAddressPage() {
         await writeEvmContractMethodDirect({
           address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
           abiJson: JSON.stringify(EVM_DISTRIBUTION_WITHDRAW_DELEGATOR_REWARDS_ABI),
-          functionSignature: 'withdrawDelegatorRewards(address,string)',
+          functionSignature: 'withdrawDelegatorRewards(address,address)',
           rawArgs: [activeKey.address, validatorAddress],
           privateKey,
           value: '0',
@@ -1352,7 +1337,7 @@ export default function EvmAddressPage() {
         });
       } else if (delegationActionKind === 'undelegate') {
         const scaledAmount = scaleToIntegerByPowerOfTen(undelegateAmountInput, 18);
-        const validatorAddress = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
+        const validatorAddress = normalizeValidatorEvmAddress(delegationActionTarget.validatorAddress);
 
         if (!scaledAmount || !/^\d+$/.test(scaledAmount)) {
           throw new Error(messages.quarixEvmValidators.invalidAmount);
@@ -1365,7 +1350,7 @@ export default function EvmAddressPage() {
         await writeEvmContractMethodDirect({
           address: EVM_STAKING_PRECOMPILE_ADDRESS,
           abiJson: JSON.stringify(EVM_STAKING_UNDELEGATE_ABI),
-          functionSignature: 'undelegate(address,string,uint256)',
+          functionSignature: 'undelegate(address,address,uint256)',
           rawArgs: [activeKey.address, validatorAddress, scaledAmount],
           privateKey,
           value: '0',
@@ -1376,7 +1361,7 @@ export default function EvmAddressPage() {
           description: delegationActionTarget.validatorAddress,
         });
       } else if (delegationActionKind === 'cancelUnbondingDelegation') {
-        const validatorAddress = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
+        const validatorAddress = normalizeValidatorEvmAddress(delegationActionTarget.validatorAddress);
         const amount = scaleToIntegerByPowerOfTen(cancelUnbondingAmountInput, 18);
         const creationHeight = delegationActionTarget.creationHeight?.trim() ?? '';
 
@@ -1391,7 +1376,7 @@ export default function EvmAddressPage() {
         await writeEvmContractMethodDirect({
           address: EVM_STAKING_PRECOMPILE_ADDRESS,
           abiJson: JSON.stringify(EVM_STAKING_CANCEL_UNBONDING_DELEGATION_ABI),
-          functionSignature: 'cancelUnbondingDelegation(address,string,uint256,uint256)',
+          functionSignature: 'cancelUnbondingDelegation(address,address,uint256,uint256)',
           rawArgs: [activeKey.address, validatorAddress, amount, creationHeight],
           privateKey,
           value: '0',
@@ -1403,8 +1388,8 @@ export default function EvmAddressPage() {
         });
       } else {
         const scaledAmount = scaleToIntegerByPowerOfTen(redelegateAmountInput, 18);
-        const sourceValidator = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
-        const destinationValidator = toQuarixValidatorAddress(redelegateTargetValidatorInput.trim());
+        const sourceValidator = normalizeValidatorEvmAddress(delegationActionTarget.validatorAddress);
+        const destinationValidator = normalizeValidatorEvmAddress(redelegateTargetValidatorInput.trim());
 
         if (!destinationValidator) {
           throw new Error(messages.quarixEvmValidators.invalidValidatorAddress);
@@ -1421,7 +1406,7 @@ export default function EvmAddressPage() {
         await writeEvmContractMethodDirect({
           address: EVM_STAKING_PRECOMPILE_ADDRESS,
           abiJson: JSON.stringify(EVM_STAKING_REDELEGATE_ABI),
-          functionSignature: 'redelegate(address,string,string,uint256)',
+          functionSignature: 'redelegate(address,address,address,uint256)',
           rawArgs: [activeKey.address, sourceValidator, destinationValidator, scaledAmount],
           privateKey,
           value: '0',

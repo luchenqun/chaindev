@@ -20,7 +20,7 @@ import { getActiveEvmStoredPrivateKey, resolveEvmStoredPrivateKey, subscribeEvmK
 import { createEvmClient } from '@/domains/evm/client/rpc-client';
 import { EVM_DISTRIBUTION_ADDRESS, EVM_STAKING_ADDRESS } from '@/domains/evm/lib/precompile-artifact-default-addresses';
 import { EvmPrivateKeyUnlockDialog, useEvmPrivateKeyUnlockDialog } from '@/domains/evm/ui/private-key-unlock-dialog';
-import { formatLocalizedNumber } from '@/i18n/format';
+import { formatLocalizedDateTime, formatLocalizedNumber } from '@/i18n/format';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
@@ -66,6 +66,19 @@ type EvmStakingDelegationResponse = {
     amount?: bigint | number | string;
   };
 };
+type EvmUnbondingDelegationEntry = {
+  creationHeight?: bigint | number | string;
+  completionTime?: bigint | number | string;
+  initialBalance?: bigint | number | string;
+  balance?: bigint | number | string;
+  unbondingId?: bigint | number | string;
+  unbondingOnHoldRefCount?: bigint | number | string;
+};
+type EvmUnbondingDelegationResponse = {
+  delegatorAddress?: string;
+  validatorAddress?: string;
+  entries?: EvmUnbondingDelegationEntry[];
+};
 
 type EvmDistributionDecCoin = {
   denom?: string;
@@ -86,11 +99,13 @@ type EvmStakingPageResponse = {
 type ValidatorOverviewData = {
   validator: EvmStakingValidator;
   delegations: EvmStakingDelegationResponse[];
+  unbondingDelegations: EvmUnbondingDelegationResponse[];
   currentRewards: EvmDistributionDecCoin[];
   outstandingRewards: EvmDistributionDecCoin[];
   commissionRewards: EvmDistributionDecCoin[];
   distributionInfo: EvmDistributionInfo | null;
   totalDelegations: number;
+  totalUnbondingDelegations: number;
 };
 
 const PAGE_SIZE = 15;
@@ -183,6 +198,19 @@ function formatDelegationSharesLabel(value: unknown) {
   const fractionLabel = fraction.toString().padStart(36, '0').replace(/0+$/, '');
 
   return trimDecimalLabel(fractionLabel ? `${whole.toString()}.${fractionLabel}` : whole.toString());
+}
+
+function formatUnixSecondsTimestamp(value: unknown, locale: string, fallback = '--') {
+  const normalized = normalizeBigintLike(value);
+
+  if (normalized <= 0n) {
+    return fallback;
+  }
+
+  return formatLocalizedDateTime(Number(normalized * 1_000n), {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  }, locale);
 }
 
 function normalizeStringValue(value: unknown) {
@@ -313,7 +341,6 @@ async function requestValidatorDetail(address: string, page: number): Promise<Va
   const profile = getActiveEvmProfile();
   const client = createEvmClient(profile.rpcUrl);
   const validatorAddress = address as `0x${string}`;
-  const operatorAddressString = address;
   const pageRequest: PageRequest = {
     key: '0x',
     offset: BigInt((page - 1) * PAGE_SIZE),
@@ -322,7 +349,7 @@ async function requestValidatorDetail(address: string, page: number): Promise<Va
     reverse: false,
   };
 
-  const [validator, [delegations, pageResponse], currentRewards, outstandingRewards, commissionRewards, distributionInfo] = await Promise.all([
+  const [validator, [delegations, pageResponse], [unbondingDelegations, unbondingPageResponse], currentRewards, outstandingRewards, commissionRewards, distributionInfo] = await Promise.all([
     client.readContract({
       address: EVM_STAKING_PRECOMPILE_ADDRESS,
       abi: EVM_STAKING_ABI,
@@ -333,42 +360,50 @@ async function requestValidatorDetail(address: string, page: number): Promise<Va
       address: EVM_STAKING_PRECOMPILE_ADDRESS,
       abi: EVM_STAKING_ABI,
       functionName: 'validatorDelegations',
-      args: [operatorAddressString, pageRequest],
+      args: [validatorAddress, pageRequest],
     }) as Promise<readonly [EvmStakingDelegationResponse[], EvmStakingPageResponse]>,
+    client.readContract({
+      address: EVM_STAKING_PRECOMPILE_ADDRESS,
+      abi: EVM_STAKING_ABI,
+      functionName: 'validatorUnbondingDelegations',
+      args: [validatorAddress, pageRequest],
+    }) as Promise<readonly [EvmUnbondingDelegationResponse[], EvmStakingPageResponse]>,
     client.readContract({
       address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
       abi: EVM_DISTRIBUTION_ABI,
       functionName: 'validatorCurrentRewards',
-      args: [operatorAddressString],
+      args: [validatorAddress],
     }) as Promise<{ rewards?: EvmDistributionDecCoin[]; period?: bigint | number | string }>,
     client.readContract({
       address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
       abi: EVM_DISTRIBUTION_ABI,
       functionName: 'validatorOutstandingRewards',
-      args: [operatorAddressString],
+      args: [validatorAddress],
     }) as Promise<EvmDistributionDecCoin[]>,
     client.readContract({
       address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
       abi: EVM_DISTRIBUTION_ABI,
       functionName: 'validatorCommission',
-      args: [operatorAddressString],
+      args: [validatorAddress],
     }) as Promise<EvmDistributionDecCoin[]>,
     client.readContract({
       address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
       abi: EVM_DISTRIBUTION_ABI,
       functionName: 'validatorDistributionInfo',
-      args: [operatorAddressString],
+      args: [validatorAddress],
     }) as Promise<EvmDistributionInfo>,
   ]);
 
   return {
     validator,
     delegations,
+    unbondingDelegations,
     currentRewards: currentRewards.rewards ?? [],
     outstandingRewards,
     commissionRewards,
     distributionInfo,
     totalDelegations: Number(normalizeBigintLike(pageResponse.total)),
+    totalUnbondingDelegations: Number(normalizeBigintLike(unbondingPageResponse.total)),
   };
 }
 
@@ -379,7 +414,7 @@ export default function EvmQuarixValidatorPage() {
   const params = useParams<{ address: string }>();
   const address = typeof params.address === 'string' ? params.address : '';
   const [page, setPage] = useState(1);
-  const [activeTab, setActiveTab] = useState<'overview' | 'delegations' | 'json'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'json'>('overview');
   const [data, setData] = useState<ValidatorOverviewData | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -457,8 +492,8 @@ export default function EvmQuarixValidatorPage() {
       await writeEvmContractMethodDirect({
         address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
         abiJson: JSON.stringify(EVM_DISTRIBUTION_ABI),
-        functionSignature: kind === 'commission' ? 'withdrawValidatorCommission(string)' : 'withdrawDelegatorRewards(address,string)',
-        rawArgs: kind === 'commission' ? [data.validator.operatorAddress] : [activeKey.address, data.validator.operatorAddress],
+        functionSignature: kind === 'commission' ? 'withdrawValidatorCommission(address)' : 'withdrawDelegatorRewards(address,address)',
+        rawArgs: kind === 'commission' ? [address] : [activeKey.address, address],
         privateKey,
         value: '0',
       });
@@ -543,13 +578,6 @@ export default function EvmQuarixValidatorPage() {
           </button>
           <button
             type="button"
-            className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${activeTab === 'delegations' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
-            onClick={() => setActiveTab('delegations')}
-          >
-            {pageMessages.validatorDelegations}
-          </button>
-          <button
-            type="button"
             className={`inline-flex rounded-md px-3 py-1.5 text-xs font-semibold ${activeTab === 'json' ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-500'}`}
             onClick={() => setActiveTab('json')}
           >
@@ -610,6 +638,127 @@ export default function EvmQuarixValidatorPage() {
               </dl>
             </div>
 
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-base font-semibold text-slate-900">{pageMessages.validatorDelegations}</p>
+                  <p className="mt-1 text-sm text-slate-500">{pageMessages.delegationsDescription}</p>
+                </div>
+                <PaginationControls
+                  page={page}
+                  totalPages={Math.max(1, Math.ceil(data.totalDelegations / PAGE_SIZE))}
+                  hasPreviousPage={page > 1}
+                  hasNextPage={page * PAGE_SIZE < data.totalDelegations}
+                  plain
+                  onPageChange={setPage}
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.delegator ?? 'Delegator'}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.amount}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.delegatorShares}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.delegations.length ? (
+                      data.delegations.map((delegation, index) => {
+                        const delegatorAddress = normalizeStringValue(delegation.delegatorAddress) ?? '--';
+                        const delegatorHexAddress = decodeCosmosAddressToEvmHexAddress(delegatorAddress) ?? delegatorAddress;
+                        const balanceAmount = delegation.balance?.amount != null ? String(delegation.balance.amount) : '0';
+                        const balanceDenom = delegation.balance?.denom ?? '';
+                        return (
+                          <tr key={`${delegatorHexAddress}-${index}`} className="border-t border-slate-200">
+                            <td className="px-5 py-3 text-sm">
+                              <CosmosAddressLink
+                                href={`/evm/address/${delegatorHexAddress}`}
+                                label={delegatorHexAddress}
+                                copyValue={delegatorHexAddress}
+                              />
+                            </td>
+                            <td className="px-5 py-3 text-sm text-slate-700">
+                              {balanceDenom ? `${formatReadableTokenAmount(balanceAmount)} ${formatReadableDenom(balanceDenom)}` : formatReadableTokenAmount(balanceAmount)}
+                            </td>
+                            <td className="px-5 py-3 text-sm text-slate-900 mono">{formatDelegationSharesLabel(delegation.shares)}</td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="px-5 py-10 text-center text-sm text-slate-500">
+                          {pageMessages.emptyValidatorsLabel}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-base font-semibold text-slate-900">{pageMessages.unbondingDelegationsDescription}</p>
+                </div>
+                <PaginationControls
+                  page={page}
+                  totalPages={Math.max(1, Math.ceil(data.totalUnbondingDelegations / PAGE_SIZE))}
+                  hasPreviousPage={page > 1}
+                  hasNextPage={page * PAGE_SIZE < data.totalUnbondingDelegations}
+                  plain
+                  onPageChange={setPage}
+                />
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.delegator ?? 'Delegator'}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.amount}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.creationHeight}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.unbondingId}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.completionTime}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.unbondingDelegations.length ? (
+                      data.unbondingDelegations.flatMap((unbonding) =>
+                        (unbonding.entries ?? []).map((entry, index) => {
+                          const delegatorAddress = normalizeStringValue(unbonding.delegatorAddress) ?? '--';
+                          const delegatorHexAddress = decodeCosmosAddressToEvmHexAddress(delegatorAddress) ?? delegatorAddress;
+                          return (
+                            <tr key={`${delegatorHexAddress}-${String(entry.unbondingId ?? index)}-${index}`} className="border-t border-slate-200">
+                              <td className="px-5 py-3 text-sm">
+                                <CosmosAddressLink
+                                  href={`/evm/address/${delegatorHexAddress}`}
+                                  label={delegatorHexAddress}
+                                  copyValue={delegatorHexAddress}
+                                />
+                              </td>
+                              <td className="px-5 py-3 text-sm text-slate-700">{formatReadableTokenAmount(String(entry.balance ?? '0'))}</td>
+                              <td className="px-5 py-3 text-sm text-slate-900 mono">{String(entry.creationHeight ?? '0')}</td>
+                              <td className="px-5 py-3 text-sm text-slate-900 mono">{String(entry.unbondingId ?? '0')}</td>
+                              <td className="px-5 py-3 text-sm text-slate-700">{formatUnixSecondsTimestamp(entry.completionTime, locale)}</td>
+                            </tr>
+                          );
+                        }),
+                      )
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">
+                          {pageMessages.noUnbondingDelegationsReturned}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
               <div className="border-b border-slate-200 px-5 py-4">
                 <p className="text-base font-semibold text-slate-900">{pageMessages.rewards}</p>
@@ -654,74 +803,13 @@ export default function EvmQuarixValidatorPage() {
           </section>
         ) : null}
 
-        {activeTab === 'delegations' ? (
-          <section className="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
-            <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <p className="text-base font-semibold text-slate-900">{pageMessages.validatorDelegations}</p>
-                <p className="mt-1 text-sm text-slate-500">{pageMessages.delegationsDescription}</p>
-              </div>
-              <PaginationControls
-                page={page}
-                totalPages={Math.max(1, Math.ceil(data.totalDelegations / PAGE_SIZE))}
-                hasPreviousPage={page > 1}
-                hasNextPage={page * PAGE_SIZE < data.totalDelegations}
-                plain
-                onPageChange={setPage}
-              />
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.labels.delegator ?? 'Delegator'}</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.amount}</th>
-                    <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{pageMessages.delegatorShares}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.delegations.length ? (
-                    data.delegations.map((delegation, index) => {
-                      const delegatorAddress = normalizeStringValue(delegation.delegatorAddress) ?? '--';
-                      const delegatorHexAddress = decodeCosmosAddressToEvmHexAddress(delegatorAddress) ?? delegatorAddress;
-                      const balanceAmount = delegation.balance?.amount != null ? String(delegation.balance.amount) : '0';
-                      const balanceDenom = delegation.balance?.denom ?? '';
-                      return (
-                        <tr key={`${delegatorHexAddress}-${index}`} className="border-t border-slate-200">
-                          <td className="px-5 py-3 text-sm">
-                            <CosmosAddressLink
-                              href={`/evm/address/${delegatorHexAddress}`}
-                              label={delegatorHexAddress}
-                              copyValue={delegatorHexAddress}
-                            />
-                          </td>
-                          <td className="px-5 py-3 text-sm text-slate-700">
-                            {balanceDenom ? `${formatReadableTokenAmount(balanceAmount)} ${formatReadableDenom(balanceDenom)}` : formatReadableTokenAmount(balanceAmount)}
-                          </td>
-                          <td className="px-5 py-3 text-sm text-slate-900 mono">{formatDelegationSharesLabel(delegation.shares)}</td>
-                        </tr>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="px-5 py-10 text-center text-sm text-slate-500">
-                        {pageMessages.emptyValidatorsLabel}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        ) : null}
-
         {activeTab === 'json' ? (
           <JsonViewPanel
             value={
               {
                 validator: data.validator,
                 delegations: data.delegations,
+                unbondingDelegations: data.unbondingDelegations,
                 currentRewards: data.currentRewards,
                 outstandingRewards: data.outstandingRewards,
                 commissionRewards: data.commissionRewards,

@@ -1,11 +1,11 @@
 'use client';
 
-import { fromBech32, toBech32, toHex } from '@cosmjs/encoding';
+import { fromBech32, toHex } from '@cosmjs/encoding';
 import { IconCode, IconCoins, IconPencil, IconPlus, IconRefresh, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { hexToBytes, type Abi, isAddress } from 'viem';
+import { type Abi, isAddress } from 'viem';
 import { ActionIconButton } from '@/components/ui/action-icon-button';
 import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { Input } from '@/components/ui/input';
@@ -382,22 +382,6 @@ function stringifyCellValue(value: unknown) {
   }
 
   return JSON.stringify(value);
-}
-
-function toQuarixValidatorAddress(input: string) {
-  if (input.startsWith('quarix')) {
-    return input;
-  }
-
-  if (!isAddress(input)) {
-    return null;
-  }
-
-  try {
-    return toBech32('quarixvaloper', hexToBytes(input));
-  } catch {
-    return null;
-  }
 }
 
 function normalizeEvmAddress(input: string) {
@@ -1636,7 +1620,7 @@ function EvmQuarixValidatorsPageContent() {
     }
 
     const scaledAmount = scaleToIntegerByPowerOfTen(trimmedAmount, 18);
-    const validatorAddress = toQuarixValidatorAddress(selectedValidator.operatorAddress);
+    const validatorAddress = normalizeEvmAddress(selectedValidator.operatorAddress);
 
     if (!scaledAmount || !/^\d+$/.test(scaledAmount)) {
       setDelegateError(pageMessages.invalidAmount);
@@ -1667,7 +1651,7 @@ function EvmQuarixValidatorsPageContent() {
       await writeEvmContractMethodDirect({
         address: EVM_STAKING_PRECOMPILE_ADDRESS,
         abiJson: JSON.stringify(EVM_STAKING_ABI),
-        functionSignature: 'delegate(address,string,uint256)',
+        functionSignature: 'delegate(address,address,uint256)',
         rawArgs: [activeKey.address, validatorAddress, scaledAmount],
         privateKey,
         value: '0',

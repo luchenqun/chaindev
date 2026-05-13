@@ -1794,9 +1794,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           },
           {
             indexed: false,
-            internalType: 'string',
             name: 'withdrawerAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'SetWithdrawerAddress',
@@ -1832,9 +1831,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         inputs: [
           {
             indexed: true,
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             indexed: false,
@@ -1979,9 +1977,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'delegatorStartingInfo',
@@ -2032,9 +2029,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'delegationRewards',
@@ -2078,9 +2074,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'validatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 components: [
@@ -2146,9 +2141,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         name: 'delegatorValidators',
         outputs: [
           {
-            internalType: 'string[]',
             name: 'validators',
-            type: 'string[]',
+            type: 'address[]',
           },
         ],
         stateMutability: 'view',
@@ -2165,9 +2159,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
         name: 'delegatorWithdrawAddress',
         outputs: [
           {
-            internalType: 'string',
             name: 'withdrawAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         stateMutability: 'view',
@@ -2181,9 +2174,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             components: [
@@ -2258,9 +2250,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'withdrawerAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'setWithdrawAddress',
@@ -2277,9 +2268,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'validatorCommission',
@@ -2313,9 +2303,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'validatorCurrentRewards',
@@ -2361,9 +2350,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'validatorDistributionInfo',
@@ -2371,9 +2359,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'operatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 components: [
@@ -2431,9 +2418,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             internalType: 'uint64',
@@ -2484,9 +2470,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'validatorOutstandingRewards',
@@ -2520,9 +2505,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             internalType: 'uint64',
@@ -2627,9 +2611,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'withdrawDelegatorRewards',
@@ -2658,9 +2641,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'withdrawValidatorCommission',
@@ -7501,9 +7483,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             internalType: 'uint256',
@@ -7623,9 +7604,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             internalType: 'uint256',
@@ -7652,9 +7632,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'delegation',
@@ -7754,14 +7733,12 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorSrcAddress',
-            type: 'string',
+            type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorDstAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             internalType: 'uint256',
@@ -7788,14 +7765,12 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'srcValidatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
-            internalType: 'string',
             name: 'dstValidatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'redelegation',
@@ -7803,19 +7778,16 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'delegatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
-                internalType: 'string',
                 name: 'validatorSrcAddress',
-                type: 'string',
+                type: 'address',
               },
               {
-                internalType: 'string',
                 name: 'validatorDstAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 components: [
@@ -7861,14 +7833,12 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'srcValidatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
-            internalType: 'string',
             name: 'dstValidatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             components: [
@@ -7910,19 +7880,16 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
               {
                 components: [
                   {
-                    internalType: 'string',
                     name: 'delegatorAddress',
-                    type: 'string',
+                    type: 'address',
                   },
                   {
-                    internalType: 'string',
                     name: 'validatorSrcAddress',
-                    type: 'string',
+                    type: 'address',
                   },
                   {
-                    internalType: 'string',
                     name: 'validatorDstAddress',
-                    type: 'string',
+                    type: 'address',
                   },
                   {
                     components: [
@@ -8029,9 +7996,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'unbondingDelegation',
@@ -8039,14 +8005,12 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'delegatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
-                internalType: 'string',
                 name: 'validatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 components: [
@@ -8102,9 +8066,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             internalType: 'uint256',
@@ -8136,9 +8099,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'operatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 internalType: 'string',
@@ -8271,9 +8233,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'operatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 internalType: 'string',
@@ -8726,9 +8687,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             components: [
@@ -8768,14 +8728,12 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'delegatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
-                internalType: 'string',
                 name: 'validatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 internalType: 'uint256',
@@ -8828,9 +8786,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
       {
         inputs: [
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
           {
             components: [
@@ -8870,14 +8827,12 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'delegatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
-                internalType: 'string',
                 name: 'validatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 components: [
@@ -8987,14 +8942,12 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'delegatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
-                internalType: 'string',
                 name: 'validatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 internalType: 'uint256',
@@ -9089,14 +9042,12 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'delegatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
-                internalType: 'string',
                 name: 'validatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 components: [
@@ -9206,9 +9157,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'operatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 internalType: 'string',
@@ -9321,9 +9271,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
             type: 'address',
           },
           {
-            internalType: 'string',
             name: 'validatorAddress',
-            type: 'string',
+            type: 'address',
           },
         ],
         name: 'delegatorValidator',
@@ -9331,9 +9280,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
           {
             components: [
               {
-                internalType: 'string',
                 name: 'operatorAddress',
-                type: 'string',
+                type: 'address',
               },
               {
                 internalType: 'string',
@@ -9458,9 +9406,8 @@ export const EVM_SYSTEM_ARTIFACTS: SystemContractArtifact[] = [
               {
                 components: [
                   {
-                    internalType: 'string',
                     name: 'operatorAddress',
-                    type: 'string',
+                    type: 'address',
                   },
                   {
                     internalType: 'string',
