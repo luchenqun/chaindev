@@ -33,7 +33,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const initialLocale: Locale = locales.includes(localeCookie as Locale) ? (localeCookie as Locale) : defaultLocale;
 
   return (
-    <html lang={initialLocale}>
+    <html lang={initialLocale} suppressHydrationWarning>
       <body>
         <AppProviders initialLocale={initialLocale}>{children}</AppProviders>
       </body>

@@ -12,6 +12,7 @@ import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useToast } from '@/components/ui/toast';
 import { formatReadableDecCoinCollection, formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
+import { decodeCosmosAddressToEvmHexAddress } from '@/domains/cosmos/ui/address-display';
 import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { CosmosDetailGroup as DetailGroup, CosmosDetailRow as DetailRow, CosmosDetailTag as DetailTag } from '@/domains/cosmos/ui/detail-primitives';
 import { writeEvmContractMethodDirect } from '@/domains/evm/client/contract-executor';
@@ -163,6 +164,25 @@ function formatScaled18PercentLabel(value: unknown, locale: string) {
   const fraction = scaledPercent % divisor;
   const fractionTwoDigits = Number((fraction * 100n) / divisor);
   return `${formatLocalizedNumber(whole, locale)}.${String(fractionTwoDigits).padStart(2, '0')}%`;
+}
+
+function trimDecimalLabel(value: string) {
+  if (!value.includes('.')) {
+    return value;
+  }
+
+  const trimmed = value.replace(/0+$/, '').replace(/\.$/, '');
+  return trimmed || '0';
+}
+
+function formatDelegationSharesLabel(value: unknown) {
+  const normalized = normalizeBigintLike(value);
+  const divisor = 10n ** 36n;
+  const whole = normalized / divisor;
+  const fraction = normalized % divisor;
+  const fractionLabel = fraction.toString().padStart(36, '0').replace(/0+$/, '');
+
+  return trimDecimalLabel(fractionLabel ? `${whole.toString()}.${fractionLabel}` : whole.toString());
 }
 
 function normalizeStringValue(value: unknown) {
@@ -664,17 +684,22 @@ export default function EvmQuarixValidatorPage() {
                   {data.delegations.length ? (
                     data.delegations.map((delegation, index) => {
                       const delegatorAddress = normalizeStringValue(delegation.delegatorAddress) ?? '--';
+                      const delegatorHexAddress = decodeCosmosAddressToEvmHexAddress(delegatorAddress) ?? delegatorAddress;
                       const balanceAmount = delegation.balance?.amount != null ? String(delegation.balance.amount) : '0';
                       const balanceDenom = delegation.balance?.denom ?? '';
                       return (
-                        <tr key={`${delegatorAddress}-${index}`} className="border-t border-slate-200">
+                        <tr key={`${delegatorHexAddress}-${index}`} className="border-t border-slate-200">
                           <td className="px-5 py-3 text-sm">
-                            <CosmosAddressLink href={`/evm/address/${delegatorAddress}`} label={delegatorAddress} copyValue={delegatorAddress} />
+                            <CosmosAddressLink
+                              href={`/evm/address/${delegatorHexAddress}`}
+                              label={delegatorHexAddress}
+                              copyValue={delegatorHexAddress}
+                            />
                           </td>
                           <td className="px-5 py-3 text-sm text-slate-700">
                             {balanceDenom ? `${formatReadableTokenAmount(balanceAmount)} ${formatReadableDenom(balanceDenom)}` : formatReadableTokenAmount(balanceAmount)}
                           </td>
-                          <td className="px-5 py-3 text-sm text-slate-900 mono">{String(delegation.shares ?? '0')}</td>
+                          <td className="px-5 py-3 text-sm text-slate-900 mono">{formatDelegationSharesLabel(delegation.shares)}</td>
                         </tr>
                       );
                     })

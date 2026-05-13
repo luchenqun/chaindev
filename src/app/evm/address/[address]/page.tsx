@@ -1,6 +1,6 @@
 'use client';
 
-import { toBech32 } from '@cosmjs/encoding';
+import { fromBech32, toBech32, toHex } from '@cosmjs/encoding';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -43,6 +43,7 @@ import { AddressLink } from '@/domains/evm/ui/address-link';
 import { AddressContractPanel } from '@/domains/evm/ui/address-contract-panel';
 import { EvmPrivateKeyUnlockDialog, useEvmPrivateKeyUnlockDialog } from '@/domains/evm/ui/private-key-unlock-dialog';
 import { getActiveEvmCurrencyNameClient, getEvmAddressSummaryDirect, hydrateEvmCachedTransactionInputsByHashDirect } from '@/domains/evm/client/queries';
+import { formatLocalizedDateTime } from '@/i18n/format';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { AppShell } from '@/platform/layout/app-shell';
@@ -55,11 +56,22 @@ const EVM_STAKING_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contra
 const EVM_BANK_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmBank')?.abi ?? []) as Abi;
 const EVM_DISTRIBUTION_ABI = (EVM_SYSTEM_ARTIFACTS.find((artifact) => artifact.contractName === 'EvmDistribution')?.abi ?? []) as Abi;
 const EVM_BANK_ALL_BALANCES_ABI = EVM_BANK_ABI.filter((item) => item.type === 'function' && item.name === 'allBalances') as Abi;
-const EVM_STAKING_DELEGATOR_VALIDATORS_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'delegatorValidators') as Abi;
-const EVM_STAKING_DELEGATION_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'delegation') as Abi;
-const EVM_STAKING_UNDELEGATE_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'undelegate') as Abi;
-const EVM_STAKING_REDELEGATE_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'redelegate') as Abi;
-const EVM_STAKING_VALIDATORS_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'validators') as Abi;
+const EVM_STAKING_DELEGATOR_VALIDATORS_ABI = EVM_STAKING_ABI.filter(
+  (item) => item.type === 'function' && item.name === 'delegatorValidators' && item.inputs?.length === 2,
+) as Abi;
+const EVM_STAKING_DELEGATION_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'delegation' && item.inputs?.length === 2) as Abi;
+const EVM_STAKING_UNDELEGATE_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'undelegate' && item.inputs?.length === 3) as Abi;
+const EVM_STAKING_REDELEGATE_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'redelegate' && item.inputs?.length === 4) as Abi;
+const EVM_STAKING_CANCEL_UNBONDING_DELEGATION_ABI = EVM_STAKING_ABI.filter(
+  (item) => item.type === 'function' && item.name === 'cancelUnbondingDelegation' && item.inputs?.length === 4,
+) as Abi;
+const EVM_STAKING_REDELEGATIONS_ABI = EVM_STAKING_ABI.filter(
+  (item) => item.type === 'function' && item.name === 'redelegations' && item.inputs?.length === 4,
+) as Abi;
+const EVM_STAKING_DELEGATOR_UNBONDING_DELEGATIONS_ABI = EVM_STAKING_ABI.filter(
+  (item) => item.type === 'function' && item.name === 'delegatorUnbondingDelegations' && item.inputs?.length === 2,
+) as Abi;
+const EVM_STAKING_VALIDATORS_ABI = EVM_STAKING_ABI.filter((item) => item.type === 'function' && item.name === 'validators' && item.inputs?.length === 2) as Abi;
 const EVM_DISTRIBUTION_WITHDRAW_DELEGATOR_REWARDS_ABI = EVM_DISTRIBUTION_ABI.filter((item) => item.type === 'function' && item.name === 'withdrawDelegatorRewards') as Abi;
 const EVM_DISTRIBUTION_DELEGATION_REWARDS_ABI = EVM_DISTRIBUTION_ABI.filter((item) => item.type === 'function' && item.name === 'delegationRewards') as Abi;
 const EVM_BANK_PRECOMPILE_ADDRESS = EVM_BANK_MODULE_ADDRESS as `0x${string}`;
@@ -104,6 +116,39 @@ type EvmSingleDelegationResponse = {
 type EvmDelegationsPageResponse = {
   total?: bigint | number | string;
 };
+type EvmRedelegationEntry = {
+  creationHeight?: bigint | number | string;
+  completionTime?: bigint | number | string;
+  initialBalance?: bigint | number | string;
+  sharesDst?: bigint | number | string;
+};
+type EvmRedelegation = {
+  delegatorAddress?: string;
+  validatorSrcAddress?: string;
+  validatorDstAddress?: string;
+  entries?: EvmRedelegationEntry[];
+};
+type EvmRedelegationEntryResponse = {
+  redelegationEntry?: EvmRedelegationEntry;
+  balance?: bigint | number | string;
+};
+type EvmRedelegationResponse = {
+  redelegation?: EvmRedelegation;
+  entries?: EvmRedelegationEntryResponse[];
+};
+type EvmUnbondingDelegationEntry = {
+  creationHeight?: bigint | number | string;
+  completionTime?: bigint | number | string;
+  initialBalance?: bigint | number | string;
+  balance?: bigint | number | string;
+  unbondingId?: bigint | number | string;
+  unbondingOnHoldRefCount?: bigint | number | string;
+};
+type EvmUnbondingDelegationResponse = {
+  delegatorAddress?: string;
+  validatorAddress?: string;
+  entries?: EvmUnbondingDelegationEntry[];
+};
 type EvmDelegationItem = {
   delegatorAddress?: string;
   validatorAddress?: string;
@@ -116,9 +161,34 @@ type EvmDelegationLoadItem = EvmDelegationItem & {
   rawRewards: EvmDistributionDecCoin[];
   sortIndex: number;
 };
+type EvmRedelegationItem = {
+  delegatorAddress?: string;
+  validatorSrcAddress?: string;
+  validatorDstAddress?: string;
+  validatorSrcMoniker: string | null;
+  validatorDstMoniker: string | null;
+  creationHeight?: bigint | number | string;
+  completionTime?: bigint | number | string;
+  initialBalance?: bigint | number | string;
+  balance?: bigint | number | string;
+  sharesDst?: bigint | number | string;
+};
+type EvmUnbondingDelegationItem = {
+  delegatorAddress?: string;
+  validatorAddress?: string;
+  validatorMoniker: string | null;
+  creationHeight?: bigint | number | string;
+  completionTime?: bigint | number | string;
+  initialBalance?: bigint | number | string;
+  balance?: bigint | number | string;
+  unbondingId?: bigint | number | string;
+  unbondingOnHoldRefCount?: bigint | number | string;
+};
 type EvmDelegationsSnapshot = {
   totalDelegations: number;
   items: EvmDelegationItem[];
+  redelegations: EvmRedelegationItem[];
+  unbondingDelegations: EvmUnbondingDelegationItem[];
   response: {
     delegatorValidators: EvmStakingValidator[];
     validators: EvmStakingValidator[];
@@ -127,24 +197,32 @@ type EvmDelegationsSnapshot = {
       delegation: EvmSingleDelegationResponse;
       rewards: EvmDistributionDecCoin[];
     }>;
+    redelegations: EvmRedelegationResponse[];
+    unbondingDelegations: EvmUnbondingDelegationResponse[];
   };
 };
 type EvmBankBalanceItem = {
   denom: string;
   amount: bigint | number | string;
 };
-type QuarixDelegationActionKind = 'withdrawRewards' | 'undelegate' | 'redelegate';
+type QuarixDelegationActionKind = 'withdrawRewards' | 'undelegate' | 'redelegate' | 'cancelUnbondingDelegation';
 type QuarixDelegationActionTarget = {
   validatorAddress: string;
   validatorMoniker: string | null;
+  amount?: string;
+  creationHeight?: string;
 };
 const EMPTY_DELEGATIONS_SNAPSHOT: EvmDelegationsSnapshot = {
   totalDelegations: 0,
   items: [],
+  redelegations: [],
+  unbondingDelegations: [],
   response: {
     delegatorValidators: [],
     validators: [],
     delegations: [],
+    redelegations: [],
+    unbondingDelegations: [],
   },
 };
 
@@ -229,6 +307,16 @@ function formatScaled18AmountLabel(value: unknown, locale: string) {
   return fractionLabel ? `${wholeLabel}.${fractionLabel}` : wholeLabel;
 }
 
+function formatScaled18InputValue(value: unknown) {
+  const normalized = normalizeBigintLike(value);
+  const divisor = 10n ** 18n;
+  const whole = normalized / divisor;
+  const fraction = normalized % divisor;
+  const fractionLabel = fraction.toString().padStart(18, '0').replace(/0+$/, '');
+
+  return fractionLabel ? `${whole.toString()}.${fractionLabel}` : whole.toString();
+}
+
 function formatDelegationAmountLabel(balance: EvmDelegationBalance | undefined, locale: string) {
   const denom = typeof balance?.denom === 'string' && balance.denom.trim() ? balance.denom.trim() : '--';
   return `${formatScaled18AmountLabel(balance?.amount, locale)} ${denom}`;
@@ -240,6 +328,47 @@ function formatBankBalanceItem(balance: EvmBankBalanceItem) {
 
 function formatBankBalanceRawAmount(balance: EvmBankBalanceItem) {
   return normalizeBigintLike(balance.amount).toString();
+}
+
+function normalizeTimestampMs(value: unknown) {
+  if (typeof value === 'string' && value.trim() && /[a-zA-Z:-]/.test(value)) {
+    const parsed = new Date(value).getTime();
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  const normalized = normalizeBigintLike(value);
+
+  if (normalized <= 0n) {
+    return null;
+  }
+
+  if (normalized >= 1_000_000_000_000_000n) {
+    return Number(normalized / 1_000_000n);
+  }
+
+  if (normalized >= 1_000_000_000_000n) {
+    return Number(normalized);
+  }
+
+  return Number(normalized * 1_000n);
+}
+
+function normalizeUnixSecondsTimestampMs(value: unknown) {
+  const normalized = normalizeBigintLike(value);
+  return normalized > 0n ? Number(normalized * 1_000n) : null;
+}
+
+function formatUnixSecondsTimestamp(value: unknown, locale: string, fallback = '--') {
+  const timestampMs = normalizeUnixSecondsTimestampMs(value);
+
+  if (!timestampMs) {
+    return fallback;
+  }
+
+  return formatLocalizedDateTime(timestampMs, {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  }, locale);
 }
 
 function scaleToIntegerByPowerOfTen(rawValue: string, exponent: number) {
@@ -276,6 +405,24 @@ function toQuarixValidatorAddress(input: string) {
   }
 }
 
+function normalizeValidatorEvmAddress(input: string | null) {
+  if (!input) {
+    return null;
+  }
+
+  const value = input.trim();
+
+  if (isAddress(value)) {
+    return value.toLowerCase();
+  }
+
+  try {
+    return `0x${toHex(fromBech32(value).data)}`.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 async function getQuarixDelegationsSnapshot(address: string, locale: string): Promise<EvmDelegationsSnapshot> {
   const profile = readActiveRpcProfileCookie('evm');
 
@@ -298,8 +445,22 @@ async function getQuarixDelegationsSnapshot(address: string, locale: string): Pr
     countTotal: false,
     reverse: false,
   };
+  const redelegationsPageRequest: EvmStakingPageRequest = {
+    key: '0x',
+    offset: 0n,
+    limit: 500n,
+    countTotal: false,
+    reverse: false,
+  };
+  const unbondingDelegationsPageRequest: EvmStakingPageRequest = {
+    key: '0x',
+    offset: 0n,
+    limit: 500n,
+    countTotal: false,
+    reverse: false,
+  };
 
-  const [[delegatorValidators, delegatorValidatorsPageResponse], [validators]] = (await Promise.all([
+  const [[delegatorValidators, delegatorValidatorsPageResponse], [validators], [redelegations], [unbondingDelegations]] = (await Promise.all([
     client.readContract({
       address: EVM_STAKING_PRECOMPILE_ADDRESS,
       abi: EVM_STAKING_DELEGATOR_VALIDATORS_ABI,
@@ -312,7 +473,24 @@ async function getQuarixDelegationsSnapshot(address: string, locale: string): Pr
       functionName: 'validators',
       args: ['', validatorsPageRequest],
     }) as Promise<readonly [EvmStakingValidator[], EvmDelegationsPageResponse]>,
-  ])) as [readonly [EvmStakingValidator[], EvmDelegationsPageResponse], readonly [EvmStakingValidator[], EvmDelegationsPageResponse]];
+    client.readContract({
+      address: EVM_STAKING_PRECOMPILE_ADDRESS,
+      abi: EVM_STAKING_REDELEGATIONS_ABI,
+      functionName: 'redelegations',
+      args: [address as `0x${string}`, '', '', redelegationsPageRequest],
+    }) as Promise<readonly [EvmRedelegationResponse[], EvmDelegationsPageResponse]>,
+    client.readContract({
+      address: EVM_STAKING_PRECOMPILE_ADDRESS,
+      abi: EVM_STAKING_DELEGATOR_UNBONDING_DELEGATIONS_ABI,
+      functionName: 'delegatorUnbondingDelegations',
+      args: [address as `0x${string}`, unbondingDelegationsPageRequest],
+    }) as Promise<readonly [EvmUnbondingDelegationResponse[], EvmDelegationsPageResponse]>,
+  ])) as [
+    readonly [EvmStakingValidator[], EvmDelegationsPageResponse],
+    readonly [EvmStakingValidator[], EvmDelegationsPageResponse],
+    readonly [EvmRedelegationResponse[], EvmDelegationsPageResponse],
+    readonly [EvmUnbondingDelegationResponse[], EvmDelegationsPageResponse],
+  ];
 
   const validatorMonikerByAddress = new Map(
     [...validators, ...delegatorValidators]
@@ -381,10 +559,56 @@ async function getQuarixDelegationsSnapshot(address: string, locale: string): Pr
     .slice()
     .sort((left, right) => left.sortIndex - right.sortIndex)
     .map(({ sortIndex, ...item }) => item);
+  const redelegationItems = redelegations.flatMap((item) => {
+    const redelegation = item.redelegation;
+    const sourceAddress = normalizeStringValue(redelegation?.validatorSrcAddress);
+    const destinationAddress = normalizeStringValue(redelegation?.validatorDstAddress);
+    const sourceEvmAddress = normalizeValidatorEvmAddress(sourceAddress);
+    const destinationEvmAddress = normalizeValidatorEvmAddress(destinationAddress);
+    const sourceMoniker = sourceEvmAddress ? (validatorMonikerByAddress.get(sourceEvmAddress) ?? null) : null;
+    const destinationMoniker = destinationEvmAddress ? (validatorMonikerByAddress.get(destinationEvmAddress) ?? null) : null;
+
+    return (item.entries ?? []).map((entry, index) => {
+      const fallbackEntry = redelegation?.entries?.[index];
+      const redelegationEntry = entry.redelegationEntry;
+
+      return {
+        delegatorAddress: normalizeStringValue(redelegation?.delegatorAddress) ?? address,
+        validatorSrcAddress: sourceAddress ?? undefined,
+        validatorDstAddress: destinationAddress ?? undefined,
+        validatorSrcMoniker: sourceMoniker,
+        validatorDstMoniker: destinationMoniker,
+        creationHeight: redelegationEntry?.creationHeight ?? fallbackEntry?.creationHeight,
+        completionTime: redelegationEntry?.completionTime ?? fallbackEntry?.completionTime,
+        initialBalance: redelegationEntry?.initialBalance ?? fallbackEntry?.initialBalance,
+        balance: entry.balance,
+        sharesDst: redelegationEntry?.sharesDst ?? fallbackEntry?.sharesDst,
+      } satisfies EvmRedelegationItem;
+    });
+  });
+  const unbondingDelegationItems = unbondingDelegations.flatMap((item) => {
+    const validatorAddress = normalizeStringValue(item.validatorAddress);
+    const validatorEvmAddress = normalizeValidatorEvmAddress(validatorAddress);
+    const validatorMoniker = validatorEvmAddress ? (validatorMonikerByAddress.get(validatorEvmAddress) ?? null) : null;
+
+    return (item.entries ?? []).map((entry) => ({
+      delegatorAddress: normalizeStringValue(item.delegatorAddress) ?? address,
+      validatorAddress: validatorAddress ?? undefined,
+      validatorMoniker,
+      creationHeight: entry.creationHeight,
+      completionTime: entry.completionTime,
+      initialBalance: entry.initialBalance,
+      balance: entry.balance,
+      unbondingId: entry.unbondingId,
+      unbondingOnHoldRefCount: entry.unbondingOnHoldRefCount,
+    }));
+  });
 
   return {
     totalDelegations,
     items: sortedItems,
+    redelegations: redelegationItems,
+    unbondingDelegations: unbondingDelegationItems,
     response: {
       delegatorValidators,
       validators,
@@ -396,6 +620,8 @@ async function getQuarixDelegationsSnapshot(address: string, locale: string): Pr
         },
         rewards: item.rawRewards,
       })),
+      redelegations,
+      unbondingDelegations,
     },
   };
 }
@@ -595,6 +821,8 @@ export default function EvmAddressPage() {
   const [delegationsError, setDelegationsError] = useState<string | null>(null);
   const [quarixBalances, setQuarixBalances] = useState<EvmBankBalanceItem[]>([]);
   const [showDelegationsRawJson, setShowDelegationsRawJson] = useState(false);
+  const [showRedelegationsRawJson, setShowRedelegationsRawJson] = useState(false);
+  const [showUnbondingDelegationsRawJson, setShowUnbondingDelegationsRawJson] = useState(false);
   const [delegationsRefreshVersion, setDelegationsRefreshVersion] = useState(0);
   const [activeKey, setActiveKey] = useState<EvmStoredPrivateKey | null>(null);
   const [delegationActionSubmitting, setDelegationActionSubmitting] = useState(false);
@@ -602,6 +830,7 @@ export default function EvmAddressPage() {
   const [delegationActionKind, setDelegationActionKind] = useState<QuarixDelegationActionKind | null>(null);
   const [delegationActionTarget, setDelegationActionTarget] = useState<QuarixDelegationActionTarget | null>(null);
   const [undelegateAmountInput, setUndelegateAmountInput] = useState('');
+  const [cancelUnbondingAmountInput, setCancelUnbondingAmountInput] = useState('');
   const [redelegateTargetValidatorInput, setRedelegateTargetValidatorInput] = useState('');
   const [redelegateAmountInput, setRedelegateAmountInput] = useState('');
   const currencyName = getActiveEvmCurrencyNameClient();
@@ -632,7 +861,7 @@ export default function EvmAddressPage() {
         }
 
         const client = createEvmClient(profile.rpcUrl);
-        const [nextSnapshot, nextBalances] = await Promise.all([
+        const [snapshotResult, balancesResult] = await Promise.allSettled([
           getQuarixDelegationsSnapshot(address, locale),
           client.readContract({
             address: EVM_BANK_PRECOMPILE_ADDRESS,
@@ -641,6 +870,13 @@ export default function EvmAddressPage() {
             args: [address as `0x${string}`],
           }) as Promise<EvmBankBalanceItem[]>,
         ]);
+
+        if (snapshotResult.status === 'rejected') {
+          throw snapshotResult.reason;
+        }
+
+        const nextSnapshot = snapshotResult.value;
+        const nextBalances = balancesResult.status === 'fulfilled' ? balancesResult.value : [];
 
         if (!cancelled) {
           setDelegationsSnapshot(nextSnapshot);
@@ -1039,6 +1275,27 @@ export default function EvmAddressPage() {
     });
     setDelegationActionError(null);
     setUndelegateAmountInput('');
+    setCancelUnbondingAmountInput('');
+    setRedelegateTargetValidatorInput('');
+    setRedelegateAmountInput('');
+    unlockDialog.setErrorMessage(null);
+  }
+
+  function openUnbondingDelegationAction(item: EvmUnbondingDelegationItem) {
+    if (!item.validatorAddress) {
+      return;
+    }
+
+    setDelegationActionKind('cancelUnbondingDelegation');
+    setDelegationActionTarget({
+      validatorAddress: item.validatorAddress,
+      validatorMoniker: item.validatorMoniker,
+      amount: normalizeBigintLike(item.balance).toString(),
+      creationHeight: normalizeBigintLike(item.creationHeight).toString(),
+    });
+    setDelegationActionError(null);
+    setUndelegateAmountInput('');
+    setCancelUnbondingAmountInput(formatScaled18InputValue(item.balance));
     setRedelegateTargetValidatorInput('');
     setRedelegateAmountInput('');
     unlockDialog.setErrorMessage(null);
@@ -1049,6 +1306,7 @@ export default function EvmAddressPage() {
     setDelegationActionTarget(null);
     setDelegationActionError(null);
     setUndelegateAmountInput('');
+    setCancelUnbondingAmountInput('');
     setRedelegateTargetValidatorInput('');
     setRedelegateAmountInput('');
   }
@@ -1117,6 +1375,32 @@ export default function EvmAddressPage() {
           title: accountMessages.undelegateBroadcasted,
           description: delegationActionTarget.validatorAddress,
         });
+      } else if (delegationActionKind === 'cancelUnbondingDelegation') {
+        const validatorAddress = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
+        const amount = scaleToIntegerByPowerOfTen(cancelUnbondingAmountInput, 18);
+        const creationHeight = delegationActionTarget.creationHeight?.trim() ?? '';
+
+        if (!validatorAddress) {
+          throw new Error(messages.quarixEvmValidators.invalidValidatorAddress);
+        }
+
+        if (!amount || !/^\d+$/.test(amount) || !/^\d+$/.test(creationHeight)) {
+          throw new Error(messages.quarixEvmValidators.invalidAmount);
+        }
+
+        await writeEvmContractMethodDirect({
+          address: EVM_STAKING_PRECOMPILE_ADDRESS,
+          abiJson: JSON.stringify(EVM_STAKING_CANCEL_UNBONDING_DELEGATION_ABI),
+          functionSignature: 'cancelUnbondingDelegation(address,string,uint256,uint256)',
+          rawArgs: [activeKey.address, validatorAddress, amount, creationHeight],
+          privateKey,
+          value: '0',
+        });
+
+        showToast({
+          title: accountMessages.cancelUnbondingDelegationBroadcasted,
+          description: delegationActionTarget.validatorAddress,
+        });
       } else {
         const scaledAmount = scaleToIntegerByPowerOfTen(redelegateAmountInput, 18);
         const sourceValidator = toQuarixValidatorAddress(delegationActionTarget.validatorAddress);
@@ -1157,6 +1441,8 @@ export default function EvmAddressPage() {
           ? error.message
           : delegationActionKind === 'withdrawRewards'
             ? messages.quarixEvmValidators.failedToBroadcastWithdrawal
+            : delegationActionKind === 'cancelUnbondingDelegation'
+              ? accountMessages.failedToBroadcastCancelUnbondingDelegation
             : delegationActionKind === 'redelegate'
               ? accountMessages.failedToBroadcastRedelegate
               : accountMessages.failedToBroadcastUndelegate;
@@ -1606,6 +1892,227 @@ export default function EvmAddressPage() {
                 </div>
               ) : null}
             </section>
+
+            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-500">{messages.quarixEvmValidators.redelegationsDescription}</p>
+                </div>
+                <div className="flex items-center gap-0 lg:justify-end">
+                  <ActionIconButton
+                    tooltip={showRedelegationsRawJson ? messages.common.hideRawJson : messages.common.showRawJson}
+                    className={
+                      showRedelegationsRawJson
+                        ? 'h-8 w-8 rounded-md bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700'
+                        : 'h-8 w-8 rounded-md text-slate-400 hover:text-slate-700'
+                    }
+                    onClick={() => setShowRedelegationsRawJson((current) => !current)}
+                  >
+                    <IconCode className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                  <ActionIconButton
+                    tooltip={messages.common.refresh}
+                    className={delegationsLoading ? 'h-8 w-8 text-sky-600' : 'h-8 w-8 text-slate-400 hover:text-slate-600'}
+                    onClick={() => setDelegationsRefreshVersion((current) => current + 1)}
+                  >
+                    <IconRefresh className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="data-table w-full">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.sourceValidator}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.destinationValidator}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{accountMessages.rawAmount}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.amount}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.creationHeight}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.completionTime}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {delegationsLoading ? (
+                      Array.from({ length: 4 }).map((_, index) => (
+                        <tr key={`redelegation-skeleton-${index}`} className="border-t border-slate-200">
+                          <td className="pl-5 pr-1 py-3"><Skeleton className="h-4 w-40" /></td>
+                          <td className="px-1 py-3"><Skeleton className="h-4 w-40" /></td>
+                          <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-28" /></td>
+                          <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-28" /></td>
+                          <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-20" /></td>
+                          <td className="px-5 py-3"><Skeleton className="ml-auto h-4 w-24" /></td>
+                        </tr>
+                      ))
+                    ) : delegationsError ? (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-10 text-center text-sm text-rose-600">
+                          {translateRuntimeText(delegationsError, locale)}
+                        </td>
+                      </tr>
+                    ) : delegationsSnapshot.redelegations.length ? (
+                      delegationsSnapshot.redelegations.map((item, index) => (
+                        <tr
+                          key={`${item.validatorSrcAddress ?? 'src'}-${item.validatorDstAddress ?? 'dst'}-${String(item.creationHeight ?? index)}-${index}`}
+                          className="border-t border-slate-200"
+                        >
+                          <td className="pl-5 pr-1 py-3 text-sm">
+                            {item.validatorSrcAddress ? (
+                              <Link className="block truncate font-medium text-sky-600 hover:text-sky-700" href={`/evm/quarix/validator/${encodeURIComponent(item.validatorSrcAddress)}`}>
+                                {item.validatorSrcMoniker ?? item.validatorSrcAddress}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">--</span>
+                            )}
+                          </td>
+                          <td className="px-1 py-3 text-sm">
+                            {item.validatorDstAddress ? (
+                              <Link className="block truncate font-medium text-sky-600 hover:text-sky-700" href={`/evm/quarix/validator/${encodeURIComponent(item.validatorDstAddress)}`}>
+                                {item.validatorDstMoniker ?? item.validatorDstAddress}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">--</span>
+                            )}
+                          </td>
+                          <td className="px-1 py-3 text-right text-sm tabular-nums text-slate-500">{normalizeBigintLike(item.balance).toString()}</td>
+                          <td className="px-1 py-3 text-right text-sm font-medium tabular-nums text-slate-900">{formatScaled18AmountLabel(item.balance, locale)}</td>
+                          <td className="px-1 py-3 text-right text-sm tabular-nums text-slate-500">{normalizeBigintLike(item.creationHeight).toString()}</td>
+                          <td className="px-5 py-3 text-right text-sm tabular-nums text-slate-500">
+                            {formatUnixSecondsTimestamp(item.completionTime, locale)}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={6} className="px-5 py-10 text-center text-sm text-slate-500">
+                          {messages.quarixEvmValidators.noRedelegationsReturned}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {showRedelegationsRawJson ? (
+                <div className="border-t border-slate-200 px-5 py-4">
+                  <JsonViewPanel value={{ redelegations: delegationsSnapshot.response.redelegations } as object} className="border-0 p-0 shadow-none" controlsClassName="right-0 top-0" />
+                </div>
+              ) : null}
+            </section>
+
+            <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-500">{messages.quarixEvmValidators.unbondingDelegationsDescription}</p>
+                </div>
+                <div className="flex items-center gap-0 lg:justify-end">
+                  <ActionIconButton
+                    tooltip={showUnbondingDelegationsRawJson ? messages.common.hideRawJson : messages.common.showRawJson}
+                    className={
+                      showUnbondingDelegationsRawJson
+                        ? 'h-8 w-8 rounded-md bg-sky-50 text-sky-600 hover:bg-sky-100 hover:text-sky-700'
+                        : 'h-8 w-8 rounded-md text-slate-400 hover:text-slate-700'
+                    }
+                    onClick={() => setShowUnbondingDelegationsRawJson((current) => !current)}
+                  >
+                    <IconCode className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                  <ActionIconButton
+                    tooltip={messages.common.refresh}
+                    className={delegationsLoading ? 'h-8 w-8 text-sky-600' : 'h-8 w-8 text-slate-400 hover:text-slate-600'}
+                    onClick={() => setDelegationsRefreshVersion((current) => current + 1)}
+                  >
+                    <IconRefresh className="size-4" stroke={1.8} />
+                  </ActionIconButton>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="data-table w-full">
+                  <thead>
+                    <tr>
+                      <th className="border-b border-slate-200 pl-5 pr-1 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.validator}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{accountMessages.rawAmount}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.amount}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.creationHeight}</th>
+                      <th className="border-b border-slate-200 px-1 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.unbondingId}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.quarixEvmValidators.completionTime}</th>
+                      <th className="border-b border-slate-200 px-5 py-3 text-right text-[13px] font-semibold text-slate-800">{messages.labels.actions}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {delegationsLoading ? (
+                      Array.from({ length: 4 }).map((_, index) => (
+                        <tr key={`unbonding-skeleton-${index}`} className="border-t border-slate-200">
+                          <td className="pl-5 pr-1 py-3"><Skeleton className="h-4 w-40" /></td>
+                          <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-28" /></td>
+                          <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-28" /></td>
+                          <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-20" /></td>
+                          <td className="px-1 py-3"><Skeleton className="ml-auto h-4 w-20" /></td>
+                          <td className="px-5 py-3"><Skeleton className="ml-auto h-4 w-24" /></td>
+                          <td className="px-5 py-3"><Skeleton className="ml-auto h-4 w-16" /></td>
+                        </tr>
+                      ))
+                    ) : delegationsError ? (
+                      <tr>
+                        <td colSpan={7} className="px-5 py-10 text-center text-sm text-rose-600">
+                          {translateRuntimeText(delegationsError, locale)}
+                        </td>
+                      </tr>
+                    ) : delegationsSnapshot.unbondingDelegations.length ? (
+                      delegationsSnapshot.unbondingDelegations.map((item, index) => (
+                        <tr
+                          key={`${item.validatorAddress ?? 'validator'}-${String(item.unbondingId ?? index)}-${index}`}
+                          className="border-t border-slate-200"
+                        >
+                          <td className="pl-5 pr-1 py-3 text-sm">
+                            {item.validatorAddress ? (
+                              <Link className="block truncate font-medium text-sky-600 hover:text-sky-700" href={`/evm/quarix/validator/${encodeURIComponent(item.validatorAddress)}`}>
+                                {item.validatorMoniker ?? item.validatorAddress}
+                              </Link>
+                            ) : (
+                              <span className="text-slate-400">--</span>
+                            )}
+                          </td>
+                          <td className="px-1 py-3 text-right text-sm tabular-nums text-slate-500">{normalizeBigintLike(item.balance).toString()}</td>
+                          <td className="px-1 py-3 text-right text-sm font-medium tabular-nums text-slate-900">{formatScaled18AmountLabel(item.balance, locale)}</td>
+                          <td className="px-1 py-3 text-right text-sm tabular-nums text-slate-500">{normalizeBigintLike(item.creationHeight).toString()}</td>
+                          <td className="px-1 py-3 text-right text-sm tabular-nums text-slate-500">{normalizeBigintLike(item.unbondingId).toString()}</td>
+                          <td className="px-5 py-3 text-right text-sm tabular-nums text-slate-500">{formatUnixSecondsTimestamp(item.completionTime, locale)}</td>
+                          <td className="px-5 py-3 text-right text-sm">
+                            <div className="flex justify-end gap-0">
+                              <ActionIconButton
+                                tooltip={accountMessages.cancelUnbondingDelegation}
+                                className="text-slate-400 hover:text-sky-600"
+                                onClick={() => openUnbondingDelegationAction(item)}
+                              >
+                                <IconArrowBackUp className="size-4" stroke={1.8} />
+                              </ActionIconButton>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="px-5 py-10 text-center text-sm text-slate-500">
+                          {messages.quarixEvmValidators.noUnbondingDelegationsReturned}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {showUnbondingDelegationsRawJson ? (
+                <div className="border-t border-slate-200 px-5 py-4">
+                  <JsonViewPanel
+                    value={{ unbondingDelegations: delegationsSnapshot.response.unbondingDelegations } as object}
+                    className="border-0 p-0 shadow-none"
+                    controlsClassName="right-0 top-0"
+                  />
+                </div>
+              ) : null}
+            </section>
           </div>
         ) : (
           <section className="mt-4">
@@ -1661,7 +2168,7 @@ export default function EvmAddressPage() {
               <Button type="button" variant="outline" onClick={closeDelegationAction}>
                 {messages.common.cancel}
               </Button>
-              <Button type="button" onClick={() => void submitDelegationAction()} disabled={delegationActionSubmitting}>
+              <Button type="button" onClick={() => void submitDelegationAction()} disabled={!cancelUnbondingAmountInput.trim() || delegationActionSubmitting}>
                 {accountMessages.confirm}
               </Button>
             </>
@@ -1758,6 +2265,44 @@ export default function EvmAddressPage() {
               <span className="text-sm font-medium text-slate-700">{messages.quarixEvmValidators.amount}</span>
               <Input value={redelegateAmountInput} onChange={(event) => setRedelegateAmountInput(event.target.value)} placeholder="1" />
             </label>
+            {delegationActionError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(delegationActionError, locale)}</p> : null}
+          </div>
+        </ModalDialog>
+
+        <ModalDialog
+          open={delegationActionKind === 'cancelUnbondingDelegation'}
+          onOpenChange={(open) => {
+            if (!open) {
+              closeDelegationAction();
+            }
+          }}
+          title={accountMessages.cancelUnbondingDelegation}
+          description={
+            delegationActionTarget
+              ? accountMessages.confirmCancelUnbondingDelegationDescription.replace('{validator}', delegationActionTarget.validatorAddress)
+              : accountMessages.cancelUnbondingDelegation
+          }
+          footer={
+            <>
+              <Button type="button" variant="outline" onClick={closeDelegationAction}>
+                {messages.common.cancel}
+              </Button>
+              <Button type="button" onClick={() => void submitDelegationAction()} disabled={!cancelUnbondingAmountInput.trim() || delegationActionSubmitting}>
+                {accountMessages.confirm}
+              </Button>
+            </>
+          }
+          maxWidthClassName="max-w-lg"
+        >
+          <div className="space-y-3">
+            {delegationActionTarget?.amount ? <p className="text-sm text-slate-600">{`${accountMessages.rawAmount}: ${delegationActionTarget.amount}`}</p> : null}
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-slate-700">{messages.quarixEvmValidators.amount}</span>
+              <Input value={cancelUnbondingAmountInput} onChange={(event) => setCancelUnbondingAmountInput(event.target.value)} placeholder="1" />
+            </label>
+            {delegationActionTarget?.creationHeight ? (
+              <p className="text-sm text-slate-600">{`${messages.quarixEvmValidators.creationHeight}: ${delegationActionTarget.creationHeight}`}</p>
+            ) : null}
             {delegationActionError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(delegationActionError, locale)}</p> : null}
           </div>
         </ModalDialog>
