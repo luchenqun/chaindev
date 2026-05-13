@@ -11,7 +11,7 @@ import { JsonViewPanel } from '@/components/ui/json-view-panel';
 import { DetailPageSkeleton } from '@/components/ui/loading-placeholders';
 import { PaginationControls } from '@/components/ui/pagination-controls';
 import { useToast } from '@/components/ui/toast';
-import { formatReadableDecCoinCollection, formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
+import { formatReadableDenom, formatReadableTokenAmount } from '@/domains/cosmos/client/tx-helpers';
 import { decodeCosmosAddressToEvmHexAddress } from '@/domains/cosmos/ui/address-display';
 import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { CosmosDetailGroup as DetailGroup, CosmosDetailRow as DetailRow, CosmosDetailTag as DetailTag } from '@/domains/cosmos/ui/detail-primitives';
@@ -236,13 +236,9 @@ function formatDecCoinAmount(item: EvmDistributionDecCoin) {
   return fractionLabel ? `${whole.toString()}.${fractionLabel}` : whole.toString();
 }
 
-function toReadableDecCoinCollection(items: EvmDistributionDecCoin[] | undefined) {
-  return formatReadableDecCoinCollection(
-    (items ?? []).map((item) => ({
-      denom: item.denom ?? '',
-      amount: formatDecCoinAmount(item),
-    })),
-  );
+function formatPreciseDecCoinCollection(items: EvmDistributionDecCoin[] | undefined) {
+  const entries = (items ?? []).map((item) => `${formatDecCoinAmount(item)} ${item.denom ?? ''}`.trim()).filter(Boolean);
+  return entries.length ? entries.join(', ') : '0';
 }
 
 function RewardTooltipValue({
@@ -349,7 +345,7 @@ async function requestValidatorDetail(address: string, page: number): Promise<Va
     reverse: false,
   };
 
-  const [validator, [delegations, pageResponse], [unbondingDelegations, unbondingPageResponse], currentRewards, outstandingRewards, commissionRewards, distributionInfo] = await Promise.all([
+  const [validator, [delegations, pageResponse], [unbondingDelegations, unbondingPageResponse], outstandingRewards, distributionInfo] = await Promise.all([
     client.readContract({
       address: EVM_STAKING_PRECOMPILE_ADDRESS,
       abi: EVM_STAKING_ABI,
@@ -371,19 +367,7 @@ async function requestValidatorDetail(address: string, page: number): Promise<Va
     client.readContract({
       address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
       abi: EVM_DISTRIBUTION_ABI,
-      functionName: 'validatorCurrentRewards',
-      args: [validatorAddress],
-    }) as Promise<{ rewards?: EvmDistributionDecCoin[]; period?: bigint | number | string }>,
-    client.readContract({
-      address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
-      abi: EVM_DISTRIBUTION_ABI,
       functionName: 'validatorOutstandingRewards',
-      args: [validatorAddress],
-    }) as Promise<EvmDistributionDecCoin[]>,
-    client.readContract({
-      address: EVM_DISTRIBUTION_PRECOMPILE_ADDRESS,
-      abi: EVM_DISTRIBUTION_ABI,
-      functionName: 'validatorCommission',
       args: [validatorAddress],
     }) as Promise<EvmDistributionDecCoin[]>,
     client.readContract({
@@ -398,9 +382,9 @@ async function requestValidatorDetail(address: string, page: number): Promise<Va
     validator,
     delegations,
     unbondingDelegations,
-    currentRewards: currentRewards.rewards ?? [],
+    currentRewards: distributionInfo?.selfBondRewards ?? [],
     outstandingRewards,
-    commissionRewards,
+    commissionRewards: distributionInfo?.commission ?? [],
     distributionInfo,
     totalDelegations: Number(normalizeBigintLike(pageResponse.total)),
     totalUnbondingDelegations: Number(normalizeBigintLike(unbondingPageResponse.total)),
@@ -768,7 +752,7 @@ export default function EvmQuarixValidatorPage() {
                   label={pageMessages.stakeRewards}
                   value={
                     <RewardTooltipValue
-                      label={translateRuntimeText(toReadableDecCoinCollection(data.currentRewards), locale)}
+                      label={formatPreciseDecCoinCollection(data.currentRewards)}
                       rawValues={data.currentRewards.map((item) => `${formatDecCoinAmount(item)} ${item.denom ?? ''}`)}
                     />
                   }
@@ -779,7 +763,7 @@ export default function EvmQuarixValidatorPage() {
                   label={pageMessages.commissionRewards}
                   value={
                     <RewardTooltipValue
-                      label={translateRuntimeText(toReadableDecCoinCollection(data.commissionRewards), locale)}
+                      label={formatPreciseDecCoinCollection(data.commissionRewards)}
                       rawValues={data.commissionRewards.map((item) => `${formatDecCoinAmount(item)} ${item.denom ?? ''}`)}
                     />
                   }
@@ -790,7 +774,7 @@ export default function EvmQuarixValidatorPage() {
                   label={pageMessages.outstandingRewards}
                   value={
                     <RewardTooltipValue
-                      label={translateRuntimeText(toReadableDecCoinCollection(data.outstandingRewards), locale)}
+                      label={formatPreciseDecCoinCollection(data.outstandingRewards)}
                       rawValues={data.outstandingRewards.map((item) => `${formatDecCoinAmount(item)} ${item.denom ?? ''}`)}
                     />
                   }
