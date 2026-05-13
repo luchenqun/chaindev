@@ -721,7 +721,11 @@ function translateExactEnglishText(input: string) {
   return EXACT_TEXT_TRANSLATIONS[input] ?? null;
 }
 
-function translatePatternText(input: string) {
+function translatePatternText(input: string | null | undefined) {
+  if (typeof input !== 'string') {
+    return null;
+  }
+
   const patterns: Array<[RegExp, (...matches: string[]) => string]> = [
     [/^Block (\d+)$/, (value) => `区块 ${value}`],
     [/^(.+) Balance$/, (value) => `${value} 余额`],
@@ -960,6 +964,10 @@ function translatePatternText(input: string) {
 }
 
 export function translateRuntimeText(input: string, locale: Locale) {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
   if (locale === 'en') {
     return input;
   }
@@ -968,6 +976,10 @@ export function translateRuntimeText(input: string, locale: Locale) {
 }
 
 export function translateRuntimeAttribute(input: string, locale: Locale) {
+  if (typeof input !== 'string') {
+    return '';
+  }
+
   if (locale === 'en') {
     return input;
   }

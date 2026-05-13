@@ -1246,6 +1246,7 @@ export const zh = {
     totalValidatorsLabel: '{count} 个验证人',
     emptyValidatorsLabel: '0 个验证人',
     validator: '验证人',
+    address: '地址',
     operatorAddress: '操作员地址',
     status: '状态',
     jailed: '监禁',

@@ -2143,23 +2143,26 @@ export default function EvmAddressPage() {
             }
           }}
           title={accountMessages.claimRewards}
-          description={
-            delegationActionTarget
-              ? accountMessages.confirmClaimRewardsDescription.replace('{validator}', delegationActionTarget.validatorAddress)
-              : accountMessages.claimRewards
-          }
           footer={
             <>
               <Button type="button" variant="outline" onClick={closeDelegationAction}>
                 {messages.common.cancel}
               </Button>
-              <Button type="button" onClick={() => void submitDelegationAction()} disabled={!cancelUnbondingAmountInput.trim() || delegationActionSubmitting}>
+              <Button type="button" onClick={() => void submitDelegationAction()} disabled={delegationActionSubmitting}>
                 {accountMessages.confirm}
               </Button>
             </>
           }
           maxWidthClassName="max-w-lg"
         >
+          <p className="text-sm leading-6 text-slate-900">
+            {translateRuntimeText(
+              delegationActionTarget
+                ? accountMessages.confirmClaimRewardsDescription.replace('{validator}', delegationActionTarget.validatorAddress)
+                : accountMessages.claimRewards,
+              locale,
+            )}
+          </p>
           {delegationActionError ? <p className="overflow-hidden break-all whitespace-pre-wrap text-sm text-rose-600">{translateRuntimeText(delegationActionError, locale)}</p> : null}
         </ModalDialog>
 

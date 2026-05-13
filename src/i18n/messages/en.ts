@@ -1247,6 +1247,7 @@ export const en = {
     totalValidatorsLabel: '{count} validators',
     emptyValidatorsLabel: '0 validators',
     validator: 'Validator',
+    address: 'Address',
     operatorAddress: 'Operator Address',
     status: 'Status',
     jailed: 'Jailed',

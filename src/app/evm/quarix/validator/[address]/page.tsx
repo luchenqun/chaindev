@@ -600,9 +600,8 @@ export default function EvmQuarixValidatorPage() {
                   <DetailRow label={pageMessages.jailed} value={<DetailTag tone={validator?.jailed ? 'danger' : 'neutral'}>{validator?.jailed ? pageMessages.jailedYes : pageMessages.jailedNo}</DetailTag>} />
                 </DetailGroup>
                 <DetailGroup>
-                  <DetailRow label={pageMessages.operatorAddress} value={validator?.operatorAddress ?? '-'} mono />
                   <DetailRow
-                    label={pageMessages.hexAddress}
+                    label={pageMessages.address}
                     value={
                       <Link className="text-sky-600 hover:text-sky-700" href={`/evm/address/${address}`}>
                         {address}
