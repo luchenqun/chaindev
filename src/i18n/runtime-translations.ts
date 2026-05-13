@@ -803,6 +803,7 @@ function translatePatternText(input: string | null | undefined) {
     [/^Derived from cached transactions$/, () => '基于缓存交易推导'],
     [/^Unknown Token$/, () => '未知代币'],
     [/^Current provider environment is unavailable\.$/, () => '当前节点环境不可用。'],
+    [/^Showing the total supply list and write actions returned by the active Quarix EVM bank precompile\.$/, () => '显示当前 Quarix EVM Bank 预编译合约返回的总供应量列表和写入操作。'],
     [/^([\d,]+) bytes$/, (value) => `${value} 字节`],
     [/^([\d,]+(?:\.\d+)?) B$/, (value) => `${value} B`],
     [/^([\d,]+(?:\.\d+)?) KB$/, (value) => `${value} KB`],

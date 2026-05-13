@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconCalculator, IconChevronDown, IconChartHistogram, IconClockSearch, IconCloudCode, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconPointerBolt, IconSearch, IconSend, IconUserCircle, IconWallet, IconBinaryTree2, IconWaveSine, IconUsers, IconRosetteDiscountCheck } from '@tabler/icons-react';
+import { IconArrowsExchange, IconBinaryTree2, IconCalculator, IconChartHistogram, IconChevronDown, IconClockSearch, IconCloudCode, IconCoins, IconFlame, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconPointerBolt, IconRosetteDiscountCheck, IconSearch, IconSend, IconTransferOut, IconUserCircle, IconUsers, IconWallet, IconWaveSine } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -148,7 +148,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             items: [
               { href: '/evm/quarix/accounts', label: labelMessages.accounts, icon: IconUsers },
               { href: '/evm/quarix/validators', label: labelMessages.validators, icon: IconRosetteDiscountCheck },
-              { href: '/evm/quarix/bank-supply', label: labelMessages.bankSupply, icon: IconChartHistogram },
+              { href: '/evm/quarix/bank', label: labelMessages.bank, icon: IconCoins },
               { href: '/evm/quarix/blacklists', label: labelMessages.blacklists, icon: IconPointerBolt },
             ],
           }
