@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconBinaryTree2, IconCalculator, IconChartHistogram, IconChevronDown, IconClockSearch, IconCloudCode, IconCoins, IconFlame, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconPointerBolt, IconRosetteDiscountCheck, IconSearch, IconSend, IconTransferOut, IconUserCircle, IconUsers, IconWallet, IconWaveSine } from '@tabler/icons-react';
+import { IconArrowsExchange, IconBinaryTree2, IconCalculator, IconChartHistogram, IconChevronDown, IconClockSearch, IconCloudCode, IconCoins, IconFileText, IconFlame, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconPointerBolt, IconRosetteDiscountCheck, IconSearch, IconSend, IconTransferOut, IconUserCircle, IconUsers, IconWallet, IconWaveSine } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -185,6 +185,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             label: messages.topNav.security,
             items: [
               { href: '/tools/keystore', label: labelMessages.keystore, icon: IconKey },
+              { href: '/tools/text-crypto', label: labelMessages.textCrypto, icon: IconFileText },
               { href: '/tools/wallet-generator', label: labelMessages.walletGenerator, icon: IconWallet },
             ],
           },
@@ -219,6 +220,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
             label: messages.topNav.security,
             items: [
               { href: '/tools/keystore', label: labelMessages.keystore, icon: IconKey },
+              { href: '/tools/text-crypto', label: labelMessages.textCrypto, icon: IconFileText },
               { href: '/tools/wallet-generator', label: labelMessages.walletGenerator, icon: IconWallet },
             ],
           },
