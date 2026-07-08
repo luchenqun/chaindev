@@ -203,7 +203,7 @@ export function extractSender(payload: CosmosRestTxResponse) {
     return 'Unknown';
   }
 
-  const candidateKeys = ['sender', 'from_address', 'delegator_address', 'voter', 'proposer', 'granter', 'grantee', 'validator_address'] as const;
+  const candidateKeys = ['sender', 'from_address', 'delegator_address', 'voter', 'proposer', 'granter', 'grantee', 'validator_address', 'qoe_address'] as const;
 
   for (const key of candidateKeys) {
     const value = message[key];

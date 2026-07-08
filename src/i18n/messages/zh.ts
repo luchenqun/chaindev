@@ -1076,6 +1076,7 @@ export const zh = {
     status: '状态',
     block: '区块',
     timestamp: '时间戳',
+    method: '方法',
     type: '类型',
     sender: '发送方',
     switchToHex: '切换为十六进制地址',
