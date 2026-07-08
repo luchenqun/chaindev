@@ -4,6 +4,7 @@ import { IconAlertCircle, IconEye } from '@tabler/icons-react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
+import { FloatingTooltip } from '@/components/ui/floating-tooltip';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 
@@ -30,6 +31,37 @@ export function CosmosTransactionHashCell({ hash, hashLabel, status }: Pick<Cosm
         {hashLabel}
       </Link>
     </div>
+  );
+}
+
+function formatCosmosTransactionMethodLabel(methodLabel: string) {
+  const normalizedLabel = methodLabel.trim().replace(/\s+/g, '');
+  return normalizedLabel || methodLabel;
+}
+
+export function CosmosTransactionMethodBadge({ methodLabel }: { methodLabel: string }) {
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  const triggerRef = useRef<HTMLSpanElement | null>(null);
+  const normalizedMethodLabel = formatCosmosTransactionMethodLabel(methodLabel);
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        className="inline-flex w-full max-w-[150px] min-w-0 items-center justify-start rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-left text-xs font-medium text-slate-700"
+        aria-label={normalizedMethodLabel}
+        tabIndex={0}
+        onBlur={() => setTooltipOpen(false)}
+        onFocus={() => setTooltipOpen(true)}
+        onMouseEnter={() => setTooltipOpen(true)}
+        onMouseLeave={() => setTooltipOpen(false)}
+      >
+        <span className="block min-w-0 truncate">{normalizedMethodLabel}</span>
+      </span>
+      <FloatingTooltip open={tooltipOpen} anchorRef={triggerRef} className="max-w-[420px] break-words border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium leading-4 text-slate-700">
+        {normalizedMethodLabel}
+      </FloatingTooltip>
+    </>
   );
 }
 

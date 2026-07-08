@@ -1077,6 +1077,7 @@ export const en = {
     status: 'Status',
     block: 'Block',
     timestamp: 'Timestamp',
+    method: 'Method',
     type: 'Type',
     sender: 'Sender',
     switchToHex: 'Switch to hex address',

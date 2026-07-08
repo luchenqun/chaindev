@@ -15,7 +15,7 @@ import { formatCosmosAddressForDisplay, type CosmosAddressDisplayMode } from '@/
 import { CosmosAddressLink } from '@/domains/cosmos/ui/address-link';
 import { COSMOS_TRANSACTIONS_AVAILABLE_EVENT, type CosmosTransactionsAvailableEventDetail } from '@/domains/cosmos/ui/live-events';
 import { buildPageHref, parsePageParam } from '@/domains/cosmos/ui/page-query';
-import { CosmosTransactionHashCell, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
+import { CosmosTransactionHashCell, CosmosTransactionMethodBadge, CosmosTransactionPreviewButton } from '@/domains/cosmos/ui/transaction-list-cells';
 import { useLocale, useMessages } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { cn } from '@/lib/utils';
@@ -538,7 +538,7 @@ function CosmosTransactionsPageContent() {
               <thead className="relative z-10 bg-white">
                 <tr>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.transactionHash}</th>
-                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.type}</th>
+                  <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.method}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{txMessages.block}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.age}</th>
                   <th className="border-b border-slate-200 px-5 py-3 text-left text-[13px] font-semibold text-slate-800">{messages.cosmosAccountDetail.from}</th>
@@ -567,9 +567,7 @@ function CosmosTransactionsPageContent() {
                           </div>
                         </td>
                         <td className="px-5 py-2.5 text-sm leading-6">
-                          <span className="inline-flex h-7 w-full min-w-0 items-center justify-center truncate rounded-md border border-slate-200 bg-slate-50 px-2.5 text-xs font-medium text-slate-700">
-                            {transaction.type}
-                          </span>
+                          <CosmosTransactionMethodBadge methodLabel={transaction.type} />
                         </td>
                         <td className="px-5 py-2.5 text-sm leading-6 tabular-nums">
                           <Link prefetch={false} className="font-medium text-sky-600 hover:text-sky-700" href={`/cosmos/block/${transaction.height}`}>
