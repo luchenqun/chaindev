@@ -100,9 +100,9 @@ export default function CosmosProposalPage() {
   const statusTone =
     proposal.status === 'PROPOSAL_STATUS_PASSED'
       ? 'success'
-      : proposal.status === 'PROPOSAL_STATUS_REJECTED' || proposal.status === 'PROPOSAL_STATUS_FAILED'
+      : proposal.status === 'PROPOSAL_STATUS_REJECTED' || proposal.status === 'PROPOSAL_STATUS_FAILED' || proposal.status === 'PROPOSAL_STATUS_VETOED'
         ? 'danger'
-        : proposal.status === 'PROPOSAL_STATUS_VOTING_PERIOD'
+        : proposal.status === 'PROPOSAL_STATUS_VOTING_PERIOD' || proposal.status === 'PROPOSAL_STATUS_VETO_PERIOD'
           ? 'warning'
           : 'neutral';
 

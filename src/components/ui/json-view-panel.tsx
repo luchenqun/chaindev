@@ -28,7 +28,7 @@ export const JSON_VIEW_PANEL_STYLE = {
   '--w-rjv-type-undefined-color': '#b91c1c',
 } as CSSProperties;
 
-function stringifyJson(value: object) {
+function stringifyJson(value: unknown) {
   return JSON.stringify(
     value,
     (_key, entry) => {
@@ -43,7 +43,7 @@ function stringifyJson(value: object) {
 }
 
 type JsonViewPanelProps = {
-  value: object;
+  value: unknown;
   className?: string;
   jsonClassName?: string;
   controlsClassName?: string;
@@ -121,7 +121,7 @@ export function JsonViewPanel({
       <JsonView
         key={fullyExpanded ? 'expanded-json' : 'first-level-json'}
         className={cn('json-view-wrap', jsonClassName)}
-        value={value}
+        value={value as object}
         collapsed={fullyExpanded ? false : 1}
         shortenTextAfterLength={0}
         enableClipboard={false}
@@ -147,6 +147,21 @@ export function JsonViewPanel({
             }
 
             return <span {...spanProps} />;
+          }}
+        />
+        <JsonView.Null
+          render={(props, context) => {
+            if (context.type !== 'value') {
+              return null;
+            }
+
+            const { as: _as, render: _render, children: _children, ...spanProps } = props;
+
+            return (
+              <span {...spanProps} className={cn('w-rjv-value', spanProps.className)}>
+                null
+              </span>
+            );
           }}
         />
       </JsonView>

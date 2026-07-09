@@ -133,9 +133,9 @@ function StatusBadge({ status, label }: { status: string; label: string }) {
   const className =
     status === 'PROPOSAL_STATUS_PASSED'
       ? 'inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700'
-      : status === 'PROPOSAL_STATUS_REJECTED' || status === 'PROPOSAL_STATUS_FAILED'
+      : status === 'PROPOSAL_STATUS_REJECTED' || status === 'PROPOSAL_STATUS_FAILED' || status === 'PROPOSAL_STATUS_VETOED'
         ? 'inline-flex rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700'
-        : status === 'PROPOSAL_STATUS_VOTING_PERIOD'
+        : status === 'PROPOSAL_STATUS_VOTING_PERIOD' || status === 'PROPOSAL_STATUS_VETO_PERIOD'
           ? 'inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700'
           : 'inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600';
 

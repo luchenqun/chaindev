@@ -320,6 +320,17 @@ type CosmosGovProposalTallyResponse = {
   tally?: CosmosGovTallyResult;
 };
 
+const COSMOS_PROPOSAL_STATUS_BY_NUMERIC_VALUE: Record<number, string> = {
+  0: 'PROPOSAL_STATUS_UNSPECIFIED',
+  1: 'PROPOSAL_STATUS_DEPOSIT_PERIOD',
+  2: 'PROPOSAL_STATUS_VOTING_PERIOD',
+  3: 'PROPOSAL_STATUS_PASSED',
+  4: 'PROPOSAL_STATUS_REJECTED',
+  5: 'PROPOSAL_STATUS_FAILED',
+  20: 'PROPOSAL_STATUS_VETO_PERIOD',
+  21: 'PROPOSAL_STATUS_VETOED',
+};
+
 export type QuarixProposalVeto = {
   proposal_id?: string;
   proposalId?: string;
@@ -1345,6 +1356,30 @@ function extractCosmosProposalType(proposal: NonNullable<CosmosGovProposalsRespo
   return 'Unknown';
 }
 
+function normalizeProposalRuntimeLabel(value: unknown, fallback = 'Unknown') {
+  return typeof value === 'string' && value.trim() ? value : fallback;
+}
+
+function normalizeCosmosProposalStatus(status: unknown) {
+  if (typeof status === 'string' && status.trim()) {
+    return status.trim();
+  }
+
+  if (typeof status === 'number' && Number.isInteger(status)) {
+    return COSMOS_PROPOSAL_STATUS_BY_NUMERIC_VALUE[status] ?? 'Unknown';
+  }
+
+  if (typeof status === 'bigint') {
+    const numericStatus = Number(status);
+
+    if (Number.isSafeInteger(numericStatus)) {
+      return COSMOS_PROPOSAL_STATUS_BY_NUMERIC_VALUE[numericStatus] ?? 'Unknown';
+    }
+  }
+
+  return 'Unknown';
+}
+
 function formatCosmosProposalTallyLabel(tally: CosmosGovTallyResult | undefined | null) {
   if (!tally) {
     return '-';
@@ -1428,11 +1463,13 @@ export function formatQuarixProposalVetoLabel(value: QuarixProposalVetoResponse 
 }
 
 function formatCosmosProposalStatusLabel(status: string | undefined) {
-  if (!status) {
+  const normalizedStatus = normalizeCosmosProposalStatus(status);
+
+  if (normalizedStatus === 'Unknown') {
     return 'Unknown';
   }
 
-  return status
+  return normalizedStatus
     .replace(/^PROPOSAL_STATUS_/, '')
     .toLowerCase()
     .replace(/(^\w)|_(\w)/g, (_, first, next) => String(first ?? next).toUpperCase())
@@ -1440,11 +1477,13 @@ function formatCosmosProposalStatusLabel(status: string | undefined) {
 }
 
 function formatCosmosProposalVoteOptionLabel(option: string | undefined) {
-  if (!option) {
+  const normalizedOption = normalizeProposalRuntimeLabel(option);
+
+  if (normalizedOption === 'Unknown') {
     return 'Unknown';
   }
 
-  return option
+  return normalizedOption
     .replace(/^VOTE_OPTION_/, '')
     .toLowerCase()
     .replace(/(^\w)|_(\w)/g, (_, first, next) => String(first ?? next).toUpperCase())
@@ -3129,6 +3168,7 @@ export async function getCosmosProposalsDirect(requestedPage = 1, pageSize = 15)
         const tallyResponse = tallyResponses[index]?.status === 'fulfilled' ? tallyResponses[index].value : null;
         const vetoResponse = vetoResponses[index]?.status === 'fulfilled' ? vetoResponses[index].value : null;
         const tally = tallyResponse?.tally ?? proposal.final_tally_result;
+        const normalizedStatus = normalizeCosmosProposalStatus(proposal.status);
 
         return {
           id,
@@ -3144,8 +3184,8 @@ export async function getCosmosProposalsDirect(requestedPage = 1, pageSize = 15)
           votingEndTimeLabel: formatLocalTimestamp(proposal.voting_end_time),
           totalDepositLabel: formatReadableDenomCollection(proposal.total_deposit),
           tallyLabel: formatCosmosProposalTallyLabel(tally),
-          status: proposal.status ?? 'Unknown',
-          statusLabel: formatCosmosProposalStatusLabel(proposal.status),
+          status: normalizedStatus,
+          statusLabel: formatCosmosProposalStatusLabel(normalizedStatus),
           rawJson: {
             proposal,
             tally: tallyResponse,
@@ -3240,14 +3280,16 @@ export async function getCosmosProposalByIdDirect(id: string, requestedVotePage 
           pagination: { total: '0' },
         }));
 
+  const normalizedStatus = normalizeCosmosProposalStatus(proposal?.status);
+
   return {
     id: proposal.id ?? proposal.proposal_id ?? proposalId,
     title: extractCosmosProposalTitle(proposal),
     summary: proposal.summary?.trim() || 'None',
     metadataLabel: proposal.metadata?.trim() || '-',
     typeLabel: extractCosmosProposalType(proposal),
-    status: proposal.status ?? 'Unknown',
-    statusLabel: formatCosmosProposalStatusLabel(proposal.status),
+    status: normalizedStatus,
+    statusLabel: formatCosmosProposalStatusLabel(normalizedStatus),
     submitTime: proposal.submit_time ?? null,
     submitTimeLabel: formatLocalTimestamp(proposal.submit_time),
     depositEndTime: proposal.deposit_end_time ?? null,
