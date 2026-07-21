@@ -43,6 +43,25 @@ paths:
           description: A successful response.
           schema:
             type: object
+  /cosmos/evm/vm/v1/owner/{address}:
+    get:
+      tags:
+        - cosmos.evm.vm.v1
+      operationId: Owner
+      summary: Owner queries the owner of an EVM contract.
+      parameters:
+        - name: address
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            type: object
+            properties:
+              owner:
+                type: string
   /cosmos/evm/vm/v1/validator_account/{cons_address}:
     get:
       tags:
