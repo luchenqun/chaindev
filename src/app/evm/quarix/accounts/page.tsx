@@ -703,25 +703,55 @@ async function requestQuarixEvmAccounts(requestedPage: number, options?: { inclu
   const profile = getActiveEvmProfile();
   const client = createEvmClient(profile.rpcUrl);
   const page = Math.max(1, Math.trunc(requestedPage));
-  const pageRequest: PageRequest = {
-    key: '0x',
-    offset: BigInt((page - 1) * PAGE_SIZE),
-    limit: BigInt(PAGE_SIZE),
-    countTotal: true,
-    reverse: false,
-  };
+  const pages: Array<{
+    response: EvmAuthAccountsResponse;
+    pageResponse: EvmAuthPageResponse;
+    sourceAccounts: unknown[];
+  }> = [];
+  const seenCursors = new Set<string>();
+  let cursor: `0x${string}` = '0x';
+  let totalAccounts = 0;
 
-  const result = (await client.readContract({
-    address: EVM_AUTH_PRECOMPILE_ADDRESS,
-    abi: EVM_AUTH_ABI,
-    functionName: 'accountsAsJSON',
-    args: [pageRequest],
-  })) as readonly [string, EvmAuthPageResponse];
-  const [accountsJson, pageResponse] = result;
+  while (true) {
+    if (seenCursors.has(cursor)) {
+      throw new Error('Accounts pagination returned a repeated cursor.');
+    }
 
-  const parsed = JSON.parse(accountsJson) as EvmAuthAccountsJsonPayload;
-  const response = Array.isArray(parsed) ? ({ accounts: parsed } satisfies EvmAuthAccountsResponse) : parsed;
-  const sourceAccounts = Array.isArray(parsed) ? parsed : Array.isArray(response.accounts) ? response.accounts : [];
+    seenCursors.add(cursor);
+
+    const pageRequest: PageRequest = {
+      key: cursor,
+      offset: 0n,
+      limit: BigInt(PAGE_SIZE),
+      countTotal: false,
+      reverse: false,
+    };
+    const [accountsJson, pageResponse] = (await client.readContract({
+      address: EVM_AUTH_PRECOMPILE_ADDRESS,
+      abi: EVM_AUTH_ABI,
+      functionName: 'accountsAsJSON',
+      args: [pageRequest],
+    })) as readonly [string, EvmAuthPageResponse];
+    const parsed = JSON.parse(accountsJson) as EvmAuthAccountsJsonPayload;
+    const response = Array.isArray(parsed) ? ({ accounts: parsed } satisfies EvmAuthAccountsResponse) : parsed;
+    const sourceAccounts = Array.isArray(parsed) ? parsed : Array.isArray(response.accounts) ? response.accounts : [];
+
+    pages.push({ response, pageResponse, sourceAccounts });
+    totalAccounts += sourceAccounts.length;
+
+    const nextKey = typeof pageResponse?.nextKey === 'string' ? pageResponse.nextKey : '0x';
+
+    if (nextKey === '0x') {
+      break;
+    }
+
+    cursor = nextKey as `0x${string}`;
+  }
+
+  const totalPages = Math.max(1, pages.length);
+  const normalizedPage = Math.min(page, totalPages);
+  const selectedPage = pages[normalizedPage - 1] ?? { response: {}, pageResponse: {}, sourceAccounts: [] };
+  const { response, sourceAccounts } = selectedPage;
   const mappedAccounts = sourceAccounts.map(mapAccountItem).filter((item): item is QuarixEvmAccountItem => item != null);
   const balanceEntries = await Promise.allSettled(
     mappedAccounts.map(async (account) => {
@@ -769,12 +799,6 @@ async function requestQuarixEvmAccounts(requestedPage: number, options?: { inclu
       rolesLabel: accountFlags?.rolesLabel ?? '-',
     };
   });
-  const pageResponseTotal = Number.parseInt(String(pageResponse?.total ?? ''), 10);
-  const jsonPaginationTotal = Number.parseInt(String(response.pagination?.total ?? ''), 10);
-  const totalAccounts = Math.max(accounts.length, Number.isFinite(pageResponseTotal) ? pageResponseTotal : 0, Number.isFinite(jsonPaginationTotal) ? jsonPaginationTotal : 0);
-  const totalPages = Math.max(1, Math.ceil(totalAccounts / PAGE_SIZE));
-  const normalizedPage = Math.min(page, totalPages);
-  const hasNextPage = Boolean(pageResponse?.nextKey && pageResponse.nextKey !== '0x') || normalizedPage < totalPages;
 
   return {
     accounts,
@@ -784,7 +808,7 @@ async function requestQuarixEvmAccounts(requestedPage: number, options?: { inclu
     totalAccounts,
     totalPages,
     hasPreviousPage: normalizedPage > 1,
-    hasNextPage,
+    hasNextPage: normalizedPage < totalPages,
   };
 }
 
