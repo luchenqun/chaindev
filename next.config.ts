@@ -2,6 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  allowedDevOrigins: ['192.168.*.*'],
   env: {
     BOOTSTRAP_EVM_PROVIDER: process.env.BOOTSTRAP_EVM_PROVIDER,
     BOOTSTRAP_COSMOS_PROVIDER: process.env.BOOTSTRAP_COSMOS_PROVIDER,

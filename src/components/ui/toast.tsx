@@ -5,6 +5,7 @@ import { createContext, type ReactNode, useContext, useMemo, useRef, useState } 
 import { useLocale } from '@/i18n/locale-provider';
 import { translateRuntimeText } from '@/i18n/runtime-translations';
 import { cn } from '@/lib/utils';
+import { createUuid } from '@/lib/uuid';
 
 type ToastTone = 'success' | 'info' | 'error';
 
@@ -62,7 +63,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ToastContextValue>(
     () => ({
       showToast(input) {
-        const id = crypto.randomUUID();
+        const id = createUuid();
         const durationMs = input.durationMs ?? 3000;
 
         setToasts((current) => [

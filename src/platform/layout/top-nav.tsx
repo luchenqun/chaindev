@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowsExchange, IconBinaryTree2, IconCalculator, IconChartHistogram, IconChevronDown, IconClockSearch, IconCloudCode, IconCoins, IconFileText, IconFlame, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconPointerBolt, IconRosetteDiscountCheck, IconSearch, IconSend, IconTransferOut, IconUserCircle, IconUsers, IconWallet, IconWaveSine } from '@tabler/icons-react';
+import { IconArrowsExchange, IconBinaryTree2, IconCalculator, IconChartHistogram, IconChevronDown, IconClockSearch, IconCloudCode, IconCoins, IconFileText, IconFlame, IconFunction, IconHash, IconKey, IconLanguage, IconLogout, IconPointerBolt, IconQrcode, IconRosetteDiscountCheck, IconSearch, IconSend, IconTransferOut, IconUserCircle, IconUsers, IconWallet, IconWaveSine } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -175,6 +175,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/tools/big-number', label: labelMessages.bigNumber, icon: IconFunction },
               { href: '/tools/unit-converter', label: labelMessages.unitConverter, icon: IconCalculator },
               { href: '/tools/bech32', label: labelMessages.bech32, icon: IconArrowsExchange },
+              { href: '/tools/qr-code', label: labelMessages.qrCode, icon: IconQrcode },
               { href: '/tools/decode-evm-tx', label: labelMessages.decodeEvmTx, icon: IconBinaryTree2 },
               { href: '/tools/decode-evm-event', label: labelMessages.decodeEvmEvent, icon: IconWaveSine },
               { href: '/tools/4byte', label: labelMessages.signatureLookup, icon: IconSearch },
@@ -210,6 +211,7 @@ export function TopNav({ mode: modeOverride }: { mode?: PlatformMode }) {
               { href: '/tools/big-number', label: labelMessages.bigNumber, icon: IconFunction },
               { href: '/tools/unit-converter', label: labelMessages.unitConverter, icon: IconCalculator },
               { href: '/tools/bech32', label: labelMessages.bech32, icon: IconArrowsExchange },
+              { href: '/tools/qr-code', label: labelMessages.qrCode, icon: IconQrcode },
               { href: '/tools/decode-evm-tx', label: labelMessages.decodeEvmTx, icon: IconBinaryTree2 },
               { href: '/tools/decode-evm-event', label: labelMessages.decodeEvmEvent, icon: IconWaveSine },
               { href: '/tools/4byte', label: labelMessages.signatureLookup, icon: IconSearch },

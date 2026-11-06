@@ -573,8 +573,8 @@ export function RpcProviderManager({ mode, variant = 'compact', onReadyChange }:
                   <SelectValue placeholder={providerMessages.selectChainType} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="evm">{messages.navigation.blockchain}</SelectItem>
-                  <SelectItem value="cosmos">{messages.labels.chain}</SelectItem>
+                  <SelectItem value="evm">EVM</SelectItem>
+                  <SelectItem value="cosmos">Cosmos</SelectItem>
                 </SelectContent>
               </Select>
             </label>

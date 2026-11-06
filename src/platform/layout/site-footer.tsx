@@ -80,6 +80,7 @@ export function SiteFooter() {
         { href: '/tools/bech32', label: labelMessages.bech32 },
         { href: '/tools/keystore', label: labelMessages.keystore },
         { href: '/tools/text-crypto', label: labelMessages.textCrypto },
+        { href: '/tools/qr-code', label: labelMessages.qrCode },
         { href: '/settings/providers', label: messages.navigation.providers },
         { href: 'https://github.com/luchenqun/chaindev', label: footerMessages.github, external: true },
       ],

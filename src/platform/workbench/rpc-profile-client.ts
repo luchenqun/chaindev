@@ -1,6 +1,7 @@
 'use client';
 
 import type { PlatformMode } from '@/config/chains';
+import { createUuid } from '@/lib/uuid';
 import {
   ACTIVE_PLATFORM_MODE_COOKIE_NAME,
   getDefaultActivePlatformMode,
@@ -177,7 +178,7 @@ export function setLocalSelectedRpcProfile(mode: PlatformMode, profileId: string
 export function saveLocalRpcProfile(input: RpcProfileDraft) {
   const now = Date.now();
   const profile: RpcProfile = {
-    id: crypto.randomUUID(),
+    id: createUuid(),
     mode: input.mode,
     name: input.name,
     nativeCurrencySymbol: input.mode === 'evm' ? input.nativeCurrencySymbol : null,
